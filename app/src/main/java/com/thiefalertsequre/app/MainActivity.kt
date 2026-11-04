@@ -239,6 +239,9 @@ class MainActivity : FragmentActivity() {
                 else -> old
             }
         }
+        if (next.mode != ProtectionMode.ALARM_TRIGGERED) {
+            runCatching { AlarmVolumeController.restore(this, getSystemService(android.media.AudioManager::class.java)) }
+        }
         when (next.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(this, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
             ProtectionMode.ALARM_TRIGGERED -> runCatching {
