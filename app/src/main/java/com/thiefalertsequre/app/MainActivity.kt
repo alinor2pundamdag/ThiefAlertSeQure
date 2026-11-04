@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -68,10 +69,23 @@ class MainActivity : FragmentActivity() {
         }
         scroll.addView(root)
 
+        val brandRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val brandIcon = ImageView(this).apply {
+            setImageResource(R.mipmap.thiefalertsequreicon)
+            contentDescription = "ThiefAlertSeQure shield and alarm icon"
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }
+        brandRow.addView(brandIcon, LinearLayout.LayoutParams(dp(52), dp(52)))
         val brand = label("THIEF ALERT  /  SEQURE", 12f, getColor(R.color.tas_primary), true).apply {
             letterSpacing = 0.18f
         }
-        root.addView(brand, matchWrap())
+        val brandTextParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        brandTextParams.marginStart = dp(12)
+        brandRow.addView(brand, brandTextParams)
+        root.addView(brandRow, matchWrap())
         root.addView(space(8))
 
         root.addView(label("Protection that stays\non this device.", 30f, getColor(R.color.tas_text), true), matchWrap())
