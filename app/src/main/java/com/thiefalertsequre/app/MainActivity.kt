@@ -243,6 +243,8 @@ class MainActivity : FragmentActivity() {
         setContentView(scroll)
         reconcileCharging()
         render()
+        status.removeCallbacks(ticker)
+        status.post(ticker)
 
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
