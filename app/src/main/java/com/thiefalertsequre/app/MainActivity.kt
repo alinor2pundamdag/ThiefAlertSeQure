@@ -270,8 +270,11 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun openDndSettings() {
-        runCatching { startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) }
-            .onFailure { showError("Open Settings > Sound & vibration > Do Not Disturb, then allow alarms for ThiefAlertSeQure where your device provides that control.") }
+        runCatching { startActivity(Intent(Settings.ACTION_ZEN_MODE_PRIORITY_SETTINGS)) }
+            .onFailure {
+                runCatching { startActivity(Intent(Settings.ACTION_SOUND_SETTINGS)) }
+                    .onFailure { showError("Open Settings > Sound & vibration > Do Not Disturb, then allow alarms for ThiefAlertSeQure where your device provides that control.") }
+            }
     }
 
     private fun openAppSettings() {
@@ -315,6 +318,20 @@ class MainActivity : FragmentActivity() {
             state.mode == ProtectionMode.ALARM_TRIGGERED ->
                 "Biometric failures: ${throttle.failedAttempts}/${AuthenticationThrottle.MAX_FAILURES}. Five consecutive failures start a 30-second cooldown."
             else -> ""
+        }
+        val exactAlarmMessage = if (Build.VERSION.SDK_INT >= 31 &&
+            !getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
+        ) {
+            "Precise alarm access is off. Android may delay the 10-second deadline; enable Alarms & reminders below."
+        } else {
+            "Precise alarm scheduling is available on this device."
+        }
+        val notificationMessage = if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            "Notifications are disabled; the ongoing alarm notification may not be visible."
+        } else {
+            "Alarm notification access is available."
         }
         val ownerMessage = if (ManagedProtectionController.isDeviceOwner(this)) {
             if (ManagedProtectionController.isPolicyConfigured(this)) "Managed Device Owner lockdown is configured." else "Device Owner is enrolled; managed lockdown is not enabled."
