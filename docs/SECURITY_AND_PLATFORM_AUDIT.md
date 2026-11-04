@@ -14,7 +14,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 - State transitions are serialized through ProtectionStore.
 - Triggered state is monotonic against charger events; only successful Keyguard or BiometricPrompt authentication clears it.
 - State and throttle are synchronously persisted.
-- Countdown uses elapsedRealtime and boot count during the same boot; wall-clock fallback is used after reboot.
+- Countdown uses elapsedRealtime and boot count during the same boot; if a countdown was pending at reboot and the charger remains absent, the alarm is triggered immediately; if charging, protection returns to ARMED.
 - AlarmDeadlineReceiver rechecks the deadline and reschedules early delivery.
 - Exact alarm scheduling handles permission revocation races and falls back to inexact delivery when exact access is unavailable.
 
