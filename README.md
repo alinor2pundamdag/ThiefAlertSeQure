@@ -1,28 +1,53 @@
 # ThiefAlertSeQure
 
-ThiefAlertSeQure is a local-only Android charging anti-theft alarm. The installed application name is **ThiefAlertSeQure**.
+A local-only Android charging anti-theft alarm. Installed application name: **ThiefAlertSeQure**.
 
-## Local protection behavior
-- Automatically arms when charging is connected.
-- Charger removal starts a 10-second countdown.
-- Reconnecting before the deadline cancels only that countdown.
-- Once triggered, the alarm remains latched until Android confirms owner authentication.
-- State transitions are serialized and persisted locally.
-- A monotonic elapsed-realtime deadline protects the countdown against wall-clock changes during the same boot; reboot recovery uses the persisted wall-clock deadline and boot count.
+## Core protection rules
 
-## Authentication
-- Device PIN, pattern, and password are verified by Android Keyguard.
-- Fingerprint and face are offered only when Android reports an enrolled BIOMETRIC_STRONG modality.
-- Five consecutive biometric failures start a persisted 30-second cooldown. After cooldown, the count resets and another group of five failures can trigger another cooldown.
-- Cancelled authentication and failed authentication never clear the alarm.
-- Android does not disclose failed PIN/pattern/password attempts to ordinary apps. Keyguard applies its own credential lockout; the app never reads or stores the device credential.
+- Launch the app once after installation and complete the system-access checklist.
+- Connecting a charger automatically changes protection to ARMED.
+- Disconnecting while ARMED starts a 10-second countdown.
+- Reconnecting before the deadline returns the state to ARMED.
+- At the deadline, ALARM_TRIGGERED is latched. Reconnecting the charger cannot clear it.
+- Only successful Android Keyguard device-credential verification or AndroidX BIOMETRIC_STRONG authentication clears the triggered state.
+- Cancelled and failed authentication never clear the alarm.
+- Five consecutive biometric failures start a 30-second cooldown. After the cooldown, a new group of five failures can start another cooldown.
+- Android controls incorrect PIN, pattern and password lockout. The app never reads or stores device credentials.
 
-## Exact user assets
-- Launcher icon: original ThiefAlertSeQureIcon.jpg, copied without image edits to app/src/main/res/mipmap-nodpi/thiefalertsequreicon.jpg.
-- Alarm: original Soundfizz .opus recording, copied to app/src/main/res/raw/thiefalertsequre_alarm.opus.
-- App label: ThiefAlertSeQure.
+## Premium UI and device compatibility
+
+- Material 3 dark interface with a responsive scroll layout, high-contrast protection states and large touch targets.
+- Minimum supported Android: API 26 / Android 8.0.
+- Target Android API: 35.
+- Fingerprint and face are available only when Android reports an enrolled BIOMETRIC_STRONG authenticator. Hardware, OEM and Android-version differences are expected.
+- Exact alarm access is user-controlled on Android 12+. Without it, the fallback alarm can be delayed.
+- Android 15+ boot recovery uses an immediate exact alarm when the user has granted exact-alarm access. Without that access, immediate background audio after reboot is not guaranteed.
+- Open the app after installation; grant notifications and Alarms & reminders access where requested/needed. Review app battery/background settings and OEM auto-start settings if available.
+
+## Optional Android Enterprise mode
+
+A fully managed Device Owner enrollment can enable Lock Task Mode. While kiosk mode is active on supported Android builds, the app omits the global-actions power dialog and applies selected Device Owner restrictions.
+
+This requires intentional Android Enterprise provisioning, usually on a new or factory-reset test device. The app cannot self-grant Device Owner status. Read [docs/DEVICE_OWNER_MODE.md](docs/DEVICE_OWNER_MODE.md) before enrollment.
+
+Managed mode does not block hardware forced shutdown, battery removal, bootloader/recovery reset, or OEM firmware controls. The in-app exit control removes the managed policies.
+
+## Privacy
+
+- No INTERNET permission.
+- No backend, account, analytics, advertising SDK or cloud storage.
+- Device credentials are verified by Android Keyguard and are never collected, stored, logged or transmitted.
+- The original icon and alarm audio are stored locally in the APK.
 
 ## Build and test
-gradle :app:testDebugUnitTest :app:assembleDebug
 
-CI must pass and physical-device verification is still required before release. Android does not allow an ordinary app to block the power menu, guarantee unkillable background operation, globally disable volume keys, force 105% volume, or guarantee immediate alarm playback from a BOOT_COMPLETED receiver on Android 15+.
+    gradle :app:testDebugUnitTest :app:assembleDebug
+
+CI uploads a debug APK only after unit tests and assembly pass. A passing CI build is not a substitute for physical-device tests.
+
+## Documentation
+
+- [Feature completion matrix](docs/FEATURE_COMPLETION_MATRIX.md)
+- [Protection rules and state machine](docs/PROTECTION_RULES.md)
+- [Security and Android platform audit](docs/SECURITY_AND_PLATFORM_AUDIT.md)
+- [Device Owner mode and rollback](docs/DEVICE_OWNER_MODE.md)
