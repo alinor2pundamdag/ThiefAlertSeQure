@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.AudioFocusRequest
 import android.media.MediaPlayer
 import android.media.ToneGenerator
 import android.os.Build
@@ -19,6 +20,9 @@ import androidx.core.app.NotificationCompat
 class AlarmService : Service() {
     private var player: MediaPlayer? = null
     private var fallbackTone: ToneGenerator? = null
+    private var audioManager: AudioManager? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
+    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { /* Keep alarm state active on focus changes. */ }
     private val handler = Handler(Looper.getMainLooper())
     private val repeatFallback = object : Runnable {
         override fun run() {
@@ -72,6 +76,19 @@ class AlarmService : Service() {
             .setUsage(AudioAttributes.USAGE_ALARM)
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
             .build()
+        audioManager = audio
+        if (Build.VERSION.SDK_INT >= 26) {
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                .setAudioAttributes(attributes)
+                .setOnAudioFocusChangeListener(audioFocusListener)
+                .setWillPauseWhenDucked(false)
+                .build()
+            audioFocusRequest = request
+            runCatching { audio.requestAudioFocus(request) }
+        } else {
+            @Suppress("DEPRECATION")
+            runCatching { audio.requestAudioFocus(audioFocusListener, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT) }
+        }
         val media = runCatching {
             MediaPlayer.create(this, R.raw.thiefalertsequre_alarm, attributes)
         }.getOrNull()
@@ -132,6 +149,16 @@ class AlarmService : Service() {
         runCatching { fallbackTone?.stopTone() }
         runCatching { fallbackTone?.release() }
         fallbackTone = null
+        audioManager?.let { manager ->
+            if (Build.VERSION.SDK_INT >= 26) {
+                audioFocusRequest?.let { request -> runCatching { manager.abandonAudioFocusRequest(request) } }
+            } else {
+                @Suppress("DEPRECATION")
+                runCatching { manager.abandonAudioFocus(audioFocusListener) }
+            }
+        }
+        audioFocusRequest = null
+        audioManager = null
     }
 
     override fun onDestroy() {
