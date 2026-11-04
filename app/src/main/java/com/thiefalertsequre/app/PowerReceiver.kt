@@ -3,7 +3,6 @@ package com.thiefalertsequre.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import androidx.core.content.ContextCompat
 
 class PowerReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -23,11 +22,7 @@ class PowerReceiver : BroadcastReceiver() {
                 context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount
             )
             ProtectionMode.ARMED, ProtectionMode.DISARMED -> AlarmScheduler.cancel(context)
-            ProtectionMode.ALARM_TRIGGERED -> runCatching {
-                ContextCompat.startForegroundService(
-                    context, Intent(context, AlarmService::class.java).setAction(AlarmService.ACTION_START)
-                )
-            }
+            ProtectionMode.ALARM_TRIGGERED -> AlarmScheduler.scheduleImmediateRecovery(context)
         }
     }
 }
