@@ -437,7 +437,7 @@ class MainActivity : FragmentActivity() {
             .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
         val credentialAvailable = getSystemService(KeyguardManager::class.java).isDeviceSecure
         biometricButton.isEnabled = alarmActive && biometricAvailable && !coolingDown
-        credentialButton.isEnabled = alarmActive && credentialAvailable && !coolingDown
+        credentialButton.isEnabled = alarmActive && credentialAvailable
         cancelButton.isEnabled = biometricPrompt != null
         managedButton.text = when {
             !ManagedProtectionController.isDeviceOwner(this) -> "Device Owner setup guide"
@@ -520,11 +520,8 @@ class MainActivity : FragmentActivity() {
         val boot = ProtectionClock.bootCount(this)
         val store = ProtectionStore(this)
         if (store.read().mode != ProtectionMode.ALARM_TRIGGERED) return
-        val throttle = store.readAuthenticationThrottle(now, elapsed, boot)
-        if (AuthenticationThrottle.remainingMs(throttle, now, elapsed, boot) > 0L) {
-            render()
-            return
-        }
+        // The app cooldown applies to biometric callbacks only. Android Keyguard owns
+        // PIN/pattern/password retry throttling and remains the independent recovery path.
         val keyguard = getSystemService(KeyguardManager::class.java)
         if (!keyguard.isDeviceSecure) {
             details.text = "Set a secure device PIN, pattern or password in Android settings first."
