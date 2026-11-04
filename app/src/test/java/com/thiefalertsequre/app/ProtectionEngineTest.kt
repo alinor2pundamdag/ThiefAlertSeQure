@@ -28,9 +28,13 @@ class ProtectionEngineTest {
         assertEquals(ProtectionMode.COUNTDOWN, early.mode)
         assertEquals(1L, ProtectionEngine.remainingMs(early, 99_000_000L, 14_999L, 7))
     }
-    @Test fun rebootUsesPersistedWallClockFallback() {
+    @Test fun rebootDuringCountdownTriggersImmediatelyWhenChargerIsAbsent() {
         val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
-        assertEquals(ProtectionMode.ALARM_TRIGGERED, ProtectionEngine.evaluateDeadline(s, 11_000L, 1_000L, 8).mode)
+        assertEquals(ProtectionMode.ALARM_TRIGGERED, ProtectionEngine.restoreAfterBoot(s, false, 2_000L, 500L, 8).mode)
+    }
+    @Test fun rebootDuringCountdownRearmsIfChargerIsConnected() {
+        val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
+        assertEquals(ProtectionMode.ARMED, ProtectionEngine.restoreAfterBoot(s, true, 2_000L, 500L, 8).mode)
     }
     @Test fun reconnectCannotCancelTriggeredAlarm() {
         val s = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
