@@ -446,6 +446,7 @@ class MainActivity : FragmentActivity() {
             store.resetAuthenticationFailures()
             AlarmScheduler.cancel(this)
             stopService(Intent(this, AlarmService::class.java))
+            runCatching { AlarmVolumeController.restore(this, getSystemService(android.media.AudioManager::class.java)) }
             details.text = "Owner authenticated. Alarm stopped."
         }
         render()
