@@ -20,7 +20,7 @@ Local-first Android charging anti-theft alarm prototype. No backend, analytics, 
 - Android/OEM battery management can terminate background work. No third-party app can guarantee process immortality.
 
 ## Asset status
-The exact user-provided alarm recording and circular icon were not included in the files available to this coding session. This branch uses an Android system tone fallback and a platform default launcher icon. Replace with the exact supplied assets when they are uploaded; no claim is made that these are the requested originals.
+The exact user-provided alarm recording and circular icon were not included in the files available to this coding session. This branch uses an Android system-tone fallback and a provisional vector shield icon. Replace both with the exact supplied assets when they are uploaded; no claim is made that these are the requested originals.
 
 ## Build
 Requires JDK 17 and Android Gradle Plugin-compatible SDK 35:
