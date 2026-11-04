@@ -13,6 +13,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.FragmentActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
@@ -86,7 +87,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(10))
         root.addView(action("Review privacy notice / change choice") {
             getSharedPreferences("privacy_notice_v1", MODE_PRIVATE).edit().clear().apply()
-            startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK))
+            startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK))
             finish()
         })
         root.addView(space(22))
@@ -105,9 +106,13 @@ class SettingsActivity : FragmentActivity() {
         val alarm = if (Build.VERSION.SDK_INT < 31 ||
             getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
         ) "Exact alarm scheduling: available" else "Exact alarm scheduling: NOT granted — timing may be delayed"
-        val notifications = if (Build.VERSION.SDK_INT < 33 ||
+        val runtimeAllowed = Build.VERSION.SDK_INT < 33 ||
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        ) "Notifications: allowed" else "Notifications: not allowed"
+        val notifications = if (runtimeAllowed && NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+            "Notifications: allowed"
+        } else {
+            "Notifications: disabled in Android settings or permission not granted"
+        }
         return "$alarm\n$notifications\nMinimum supported Android: 8.0 (API 26)"
     }
 
