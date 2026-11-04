@@ -33,6 +33,17 @@ class AuthenticationThrottleTest {
         assertTrue(AuthenticationThrottle.remainingMs(state, 32_004L) > 0L)
     }
 
+    @Test fun cooldownUsesMonotonicClockAgainstWallClockManipulation() {
+        val cooling = AuthThrottleState(0, 31_000L, 50_000L, 9)
+        assertEquals(10_000L, AuthenticationThrottle.remainingMs(cooling, 99_000_000L, 40_000L, 9))
+        assertEquals(30_000L, AuthenticationThrottle.remainingMs(cooling, 1L, 20_000L, 9))
+    }
+
+    @Test fun rebootFallsBackToPersistedWallClockDeadline() {
+        val cooling = AuthThrottleState(0, 31_000L, 50_000L, 9)
+        assertEquals(10_000L, AuthenticationThrottle.remainingMs(cooling, 21_000L, 1_000L, 10))
+    }
+
     @Test fun cooldownCanBeStartedByAndroidBiometricLockout() {
         val state = AuthenticationThrottle.startCooldown(AuthThrottleState(2, 0L), 5_000L)
         assertEquals(35_000L, state.cooldownUntilEpochMs)
