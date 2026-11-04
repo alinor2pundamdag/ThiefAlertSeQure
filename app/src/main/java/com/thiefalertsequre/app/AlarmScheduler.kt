@@ -21,7 +21,8 @@ object AlarmScheduler {
         val clockType = if (sameBoot) AlarmManager.ELAPSED_REALTIME_WAKEUP else AlarmManager.RTC_WAKEUP
         val triggerAt = if (sameBoot) deadlineElapsedRealtimeMs else deadlineEpochMs
 
-        if (Build.VERSION.SDK_INT >= 31 && alarmManager.canScheduleExactAlarms()) {
+        val exactAllowed = Build.VERSION.SDK_INT < 31 || alarmManager.canScheduleExactAlarms()
+        if (exactAllowed) {
             try {
                 alarmManager.setExactAndAllowWhileIdle(clockType, triggerAt, operation)
                 return
