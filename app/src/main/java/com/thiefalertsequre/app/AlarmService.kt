@@ -90,25 +90,39 @@ class AlarmService : Service() {
             runCatching { audio.requestAudioFocus(audioFocusListener, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT) }
         }
         val media = runCatching {
-            MediaPlayer.create(this, R.raw.thiefalertsequre_alarm, attributes)
+            val descriptor = resources.openRawResourceFd(R.raw.thiefalertsequre_alarm)
+            val prepared = MediaPlayer()
+            try {
+                prepared.setAudioAttributes(attributes)
+                prepared.setDataSource(
+                    descriptor.fileDescriptor,
+                    descriptor.startOffset,
+                    descriptor.length
+                )
+            } finally {
+                descriptor.close()
+            }
+            prepared.setWakeMode(this, android.os.PowerManager.PARTIAL_WAKE_LOCK)
+            prepared.isLooping = true
+            prepared.setOnErrorListener { failedPlayer, _, _ ->
+                runCatching { failedPlayer.release() }
+                if (player === failedPlayer) player = null
+                startFallbackTone()
+                true
+            }
+            prepared.prepare()
+            prepared
         }.getOrNull()
         if (media == null) {
             startFallbackTone()
             return
         }
         try {
-            media.setWakeMode(this, android.os.PowerManager.PARTIAL_WAKE_LOCK)
-            media.isLooping = true
-            media.setOnErrorListener { failedPlayer, _, _ ->
-                runCatching { failedPlayer.release() }
-                if (player === failedPlayer) player = null
-                startFallbackTone()
-                true
-            }
-            media.start()
             player = media
+            media.start()
         } catch (_: Exception) {
             runCatching { media.release() }
+            player = null
             startFallbackTone()
         }
     }
