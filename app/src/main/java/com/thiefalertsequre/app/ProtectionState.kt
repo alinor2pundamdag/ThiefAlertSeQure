@@ -1,5 +1,5 @@
-packagecom.thiefalertsequre.app
- 
+package com.thiefalertsequre.app
+
 enum class ProtectionMode { DISARMED, ARMED, COUNTDOWN, ALARM_TRIGGERED }
 
 data class ProtectionState(
