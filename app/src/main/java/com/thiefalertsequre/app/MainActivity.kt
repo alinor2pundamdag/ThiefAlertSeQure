@@ -351,7 +351,7 @@ class MainActivity : FragmentActivity() {
         } else {
             "Standard Android mode. Device Owner kiosk controls are unavailable until the device is enrolled."
         }
-        details.text = listOf(stateMessage, attemptMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
+        details.text = listOf(stateMessage, attemptMessage, exactAlarmMessage, notificationMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
 
         val alarmActive = state.mode == ProtectionMode.ALARM_TRIGGERED
         val biometricAvailable = BiometricManager.from(this)
