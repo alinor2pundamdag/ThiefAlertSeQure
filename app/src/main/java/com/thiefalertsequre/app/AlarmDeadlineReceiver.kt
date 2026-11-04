@@ -7,13 +7,16 @@ import androidx.core.content.ContextCompat
 
 class AlarmDeadlineReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
+        val now = System.currentTimeMillis()
         val store = ProtectionStore(context)
-        val updated = ProtectionEngine.evaluateDeadline(store.read(), System.currentTimeMillis())
-        if (updated != store.read()) store.write(updated)
+        val updated = store.update { ProtectionEngine.evaluateDeadline(it, now) }
         when (updated.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, updated.deadlineEpochMs)
             ProtectionMode.ALARM_TRIGGERED -> runCatching {
-                ContextCompat.startForegroundService(context, Intent(context, AlarmService::class.java).setAction(AlarmService.ACTION_START))
+                ContextCompat.startForegroundService(
+                    context,
+                    Intent(context, AlarmService::class.java).setAction(AlarmService.ACTION_START)
+                )
             }
             else -> Unit
         }
