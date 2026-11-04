@@ -18,6 +18,8 @@
 | Android 15 boot recovery | Schedules exact alarm when user granted exact-alarm access; exact-alarm delivery is an allowed FGS-start path |
 | Local-only operation | No INTERNET permission, backend, analytics or advertising SDK |
 | Alarm foreground notification | Ongoing notification opens lockscreen-capable authentication Activity |
+| First-launch privacy notice | Accept / decline choices are recorded distinctly; both continue to the same essential local protection functions |
+| Dedicated Settings screen | Android alarm, notification, battery/background, DND, app-info and privacy-notice controls |
 | Premium adaptive UI | Material 3 dark theme, responsive scroll layout, high-contrast status states, large touch targets and explicit setup controls |
 | Device PIN / pattern / password | Android Keyguard credential confirmation; credentials are never read or stored |
 | Fingerprint / face | BIOMETRIC_STRONG only, if enrolled and supported |
@@ -32,7 +34,7 @@
 | Unit tests | Protection state machine and authentication throttle |
 
 ## Authentication boundary
-The five-failure / 30-second app cooldown applies to biometric failures reported through AndroidX BiometricPrompt. Android does not disclose incorrect device PIN/pattern/password attempts to ordinary apps. Android Keyguard enforces its own credential lockout. The app never collects, stores, logs or transmits device credentials.
+The five-failure / 30-second app cooldown applies to biometric failures reported through AndroidX BiometricPrompt. Device PIN/pattern/password remains available during that app cooldown; Android Keyguard independently enforces credential lockout. Android does not disclose incorrect device PIN/pattern/password attempts to ordinary apps. Android Keyguard enforces its own credential lockout. The app never collects, stores, logs or transmits device credentials.
 
 Strong face authentication is available only if Android reports the enrolled face modality as BIOMETRIC_STRONG. Weak face unlock is intentionally not accepted.
 
