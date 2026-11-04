@@ -33,6 +33,11 @@ This requires intentional Android Enterprise provisioning, usually on a new or f
 
 Managed mode does not block hardware forced shutdown, battery removal, bootloader/recovery reset, or OEM firmware controls. The in-app exit control removes the managed policies.
 
+## First launch and Settings
+
+- First launch presents an in-app privacy notice with separate Accept & continue and Decline & continue choices. Both continue to the same essential local protection dashboard; the recorded choice is not represented as consent when declined.
+- A dedicated Settings screen exposes Android exact-alarm, notification, battery/background, DND and app-information settings, plus a way to review the privacy notice again.
+
 ## Privacy
 
 - No INTERNET permission.
