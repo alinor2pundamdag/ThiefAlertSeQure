@@ -58,8 +58,86 @@ class MainActivity : FragmentActivity() {
             setTurnScreenOn(true)
         }
 
+        if (!getSharedPreferences("privacy_notice_v1", MODE_PRIVATE).contains("decision")) {
+            showPrivacyScreen()
+            return
+        }
+        buildDashboard()
+    }
+
+    private fun showPrivacyScreen() {
         val scroll = ScrollView(this).apply {
-            fillViewport = true
+            isFillViewport = true
+            setBackgroundColor(getColor(R.color.tas_background))
+        }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(26), dp(36), dp(26), dp(36))
+        }
+        scroll.addView(root)
+        val icon = ImageView(this).apply {
+            setImageResource(R.mipmap.thiefalertsequreicon)
+            contentDescription = "ThiefAlertSeQure app icon"
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }
+        root.addView(icon, LinearLayout.LayoutParams(dp(84), dp(84)))
+        root.addView(space(22))
+        root.addView(label("YOUR DEVICE.\nYOUR CONTROL.", 30f, getColor(R.color.tas_text), true), matchWrap())
+        root.addView(space(10))
+        root.addView(label("PRIVACY NOTICE & LOCAL PROTECTION", 11f, getColor(R.color.tas_primary), true), matchWrap())
+        root.addView(space(18))
+        val notice = card()
+        val body = column()
+        body.setPadding(dp(18), dp(18), dp(18), dp(18))
+        body.addView(label("What this app does", 18f, getColor(R.color.tas_text), true), matchWrap())
+        body.addView(space(8))
+        body.addView(label(
+            "ThiefAlertSeQure monitors charger connection locally, starts a 10-second countdown when unplugged, and plays an alarm if the countdown expires. You can stop a latched alarm only after Android verifies your existing device credential or an enrolled supported strong biometric.",
+            14f, getColor(R.color.tas_muted), false
+        ), matchWrap())
+        body.addView(space(16))
+        body.addView(label("Data and privacy", 18f, getColor(R.color.tas_text), true), matchWrap())
+        body.addView(space(8))
+        body.addView(label(
+            "The app is designed to work without an account, backend, analytics, advertising, or internet access. Protection state and biometric-failure cooldown counters are stored locally on this device. Your PIN, pattern, password, and biometric templates are never collected or stored by this app; Android performs verification.",
+            14f, getColor(R.color.tas_muted), false
+        ), matchWrap())
+        body.addView(space(16))
+        body.addView(label("System access and limitations", 18f, getColor(R.color.tas_text), true), matchWrap())
+        body.addView(space(8))
+        body.addView(label(
+            "The app may use boot and charger broadcasts, alarm scheduling, notifications, alarm audio, and a foreground service. Exact alarm access and notification permission are controlled by Android. Optional Device Owner mode requires separate device enrollment and can restrict device settings. No ordinary app can guarantee protection against force-stop, uninstall, physical shutdown, recovery controls, battery removal, or every manufacturer-specific power policy. Alarm delivery may be delayed when Android restricts background execution or exact alarms.",
+            14f, getColor(R.color.tas_muted), false
+        ), matchWrap())
+        body.addView(space(16))
+        body.addView(label("Your choice", 18f, getColor(R.color.tas_text), true), matchWrap())
+        body.addView(space(6))
+        body.addView(label(
+            "Accept records that you acknowledge this notice. Decline records that you do not accept it. Both choices open the dashboard and retain the same essential local protection functions; declining does not disable core protection or falsely represent consent. You can review this notice later in Settings.",
+            13f, getColor(R.color.tas_muted), false
+        ), matchWrap())
+        notice.addView(body)
+        root.addView(notice, matchWrap())
+        root.addView(space(22))
+        root.addView(button("Accept & continue") {
+            getSharedPreferences("privacy_notice_v1", MODE_PRIVATE).edit()
+                .putString("decision", "accepted").putLong("decision_at", System.currentTimeMillis()).apply()
+            buildDashboard()
+        }, matchWrap())
+        root.addView(space(10))
+        root.addView(outlinedButton("Decline & continue") {
+            getSharedPreferences("privacy_notice_v1", MODE_PRIVATE).edit()
+                .putString("decision", "declined").putLong("decision_at", System.currentTimeMillis()).apply()
+            buildDashboard()
+        }, matchWrap())
+        root.addView(space(16))
+        root.addView(label("LOCAL-FIRST • NO ACCOUNT • NO CLOUD SYNC", 10f, getColor(R.color.tas_muted), true), matchWrap())
+        setContentView(scroll)
+    }
+
+    private fun buildDashboard() {
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
             setBackgroundColor(getColor(R.color.tas_background))
         }
         val root = LinearLayout(this).apply {
