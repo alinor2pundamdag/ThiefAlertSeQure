@@ -15,18 +15,18 @@ class BootReceiver : BroadcastReceiver() {
         val elapsed = ProtectionClock.elapsedRealtime()
         val boot = ProtectionClock.bootCount(context)
         val store = ProtectionStore(context)
-        val next = store.update {
-            ProtectionEngine.restoreAfterBoot(it, charging, now, elapsed, boot)
-        }
+        val next = store.update { ProtectionEngine.restoreAfterBoot(it, charging, now, elapsed, boot) }
+
         when (next.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(
                 context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount
             )
             ProtectionMode.ALARM_TRIGGERED -> {
-                // Android 15+ restricts mediaPlayback foreground-service starts from BOOT_COMPLETED.
-                // On earlier releases, attempt recovery; on Android 15+, keep the alarm latched
-                // and resume playback when the owner opens the app.
-                if (Build.VERSION.SDK_INT < 35) {
+                if (Build.VERSION.SDK_INT >= 35) {
+                    // Exact alarms are exempt from the Android 15 BOOT_COMPLETED mediaPlayback-FGS restriction.
+                    // If the user has not granted exact-alarm access, a best-effort inexact recovery is scheduled.
+                    AlarmScheduler.scheduleImmediateRecovery(context)
+                } else {
                     runCatching {
                         ContextCompat.startForegroundService(
                             context,
