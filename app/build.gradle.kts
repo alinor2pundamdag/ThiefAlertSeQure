@@ -26,5 +26,6 @@ dependencies {
     implementation("androidx.fragment:fragment-ktx:1.8.5")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+    implementation("com.google.android.material:material:1.12.0")
     testImplementation("junit:junit:4.13.2")
 }
