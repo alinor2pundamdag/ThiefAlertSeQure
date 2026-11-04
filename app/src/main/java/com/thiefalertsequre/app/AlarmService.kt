@@ -65,13 +65,7 @@ class AlarmService : Service() {
 
     private fun startAlarmAudio() {
         val audio = getSystemService(AudioManager::class.java)
-        runCatching {
-            audio.setStreamVolume(
-                AudioManager.STREAM_ALARM,
-                audio.getStreamMaxVolume(AudioManager.STREAM_ALARM),
-                0
-            )
-        }
+        AlarmVolumeController.raiseToMaximum(this, audio)
         val attributes = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_ALARM)
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
@@ -173,6 +167,7 @@ class AlarmService : Service() {
         }
         audioFocusRequest = null
         audioManager = null
+        runCatching { AlarmVolumeController.restore(this, getSystemService(AudioManager::class.java)) }
     }
 
     override fun onDestroy() {
