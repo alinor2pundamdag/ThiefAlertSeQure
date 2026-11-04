@@ -1,54 +1,55 @@
-# Feature Completion Matrix
+# ThiefAlertSeQure — Feature Completion Matrix
 
-Status meanings:
-- IMPLEMENTED — source code exists in this branch.
-- TESTS-WRITTEN — automated test exists but has not yet been confirmed passing.
-- PLATFORM-LIMITED — Android does not expose the requested global capability to ordinary apps.
-- BLOCKED-ASSET — exact user-supplied media was not available in this coding session.
-- DEVICE-VERIFY — must be exercised on physical hardware and OEM builds.
+## Implemented in this branch
 
-| Requirement | Status | Evidence / limitation |
-|---|---|---|
-| Automatic arm on plug-in | IMPLEMENTED | PowerReceiver and MainActivity reconciliation |
-| 10-second grace period | IMPLEMENTED | ProtectionEngine and AlarmScheduler |
-| Replug cancels pre-trigger countdown | IMPLEMENTED | chargerConnected transition |
-| Replug cannot clear triggered alarm | IMPLEMENTED + TESTS-WRITTEN | triggered state is immutable to charger events |
-| Persist state across process death | IMPLEMENTED | private SharedPreferences |
-| Countdown recovery after reboot | IMPLEMENTED, DEVICE-VERIFY | BootReceiver reconciles wall-clock deadline |
-| Start alarm after deadline | IMPLEMENTED, PLATFORM-LIMITED | receiver attempts mediaPlayback foreground service; Android may reject background starts |
-| Continue alarm after swipe from Recents | IMPLEMENTED, DEVICE-VERIFY | foreground service is ongoing; OS/user can still stop it |
-| Exact original alarm audio | BLOCKED-ASSET | original file not supplied to this session; system tone fallback is used |
-| Loop fallback alarm | IMPLEMENTED | ToneGenerator is restarted by Handler |
-| Max available alarm stream | IMPLEMENTED, DEVICE-VERIFY | requests stream maximum; OEM/user policy can limit it |
-| 105% volume | PLATFORM-LIMITED | not exposed by standard Android volume API |
-| Block physical volume keys globally | PLATFORM-LIMITED | requires privileged/system or device-owner control |
-| Bypass DND/silent on every device | PLATFORM-LIMITED | no universal bypass; notification policy access and OEM behavior vary |
-| Block power menu / prevent shutdown | PLATFORM-LIMITED | ordinary third-party apps cannot intercept global power menu |
-| Lock-screen information | PARTIAL | activity is configured showWhenLocked; app cannot create an un-dismissible system overlay |
-| Device PIN/pattern/password | IMPLEMENTED | DEVICE_CREDENTIAL via BiometricPrompt |
-| Fingerprint / face | IMPLEMENTED, DEVICE-VERIFY | BIOMETRIC_STRONG only; supported modalities vary by device |
-| Never collect device password | IMPLEMENTED | OS owns credential UI; app receives success callback only |
-| No backend / no network permission | IMPLEMENTED | manifest has no INTERNET permission |
-| Keystore encryption | NOT-REQUIRED-CURRENTLY | no secrets or credentials are stored; preferences contain only state/deadlines |
-| Exact-alarm permission onboarding | IMPLEMENTED | button opens Android special-access screen on Android 12+ |
-| Notification permission onboarding | IMPLEMENTED | runtime request on Android 13+ |
-| Original circular app icon | BLOCKED-ASSET | temporary vector icon used; exact user asset not supplied |
-| Unit tests | TESTS-WRITTEN | state transition tests; CI execution still pending |
-| Physical-device test matrix | DEVICE-VERIFY | not possible from GitHub connector environment |
+| Feature | Implementation |
+|---|---|
+| Installed app name | ThiefAlertSeQure in AndroidManifest |
+| Exact launcher icon | Original ThiefAlertSeQureIcon.jpg copied byte-for-byte to mipmap-nodpi |
+| Exact alarm sound | Original uploaded Soundfizz .opus copied to res/raw and looped by MediaPlayer |
+| Unsupported Opus fallback | ToneGenerator fallback if platform decoder cannot load the supplied file |
+| Charger auto-arm | PowerReceiver |
+| 10-second unplug countdown | ProtectionEngine + AlarmScheduler |
+| Reconnect before deadline | Returns to ARMED |
+| Reconnect after trigger | Cannot clear ALARM_TRIGGERED |
+| Wall-clock manipulation resistance | elapsedRealtime deadline + boot count while same boot |
+| Reboot recovery | Persisted state + wall-clock fallback |
+| Local-only operation | No INTERNET permission or backend |
+| Alarm foreground notification | Ongoing, lockscreen-visible notification opens authentication Activity |
+| Device PIN / pattern / password | Android Keyguard credential confirmation |
+| Fingerprint / face | BIOMETRIC_STRONG only, when enrolled and supported by device |
+| Five failed biometric attempts | Persisted attempt counter; fifth failure starts 30-second cooldown |
+| Repeated cooldown | Counter resets after cooldown; another five failures start another 30-second cooldown |
+| Cancel authentication | Does not count as failure and never clears alarm |
+| Failed authentication | Never clears alarm |
+| Successful authentication | Clears triggered state and stops alarm |
+| State transition serialization | Shared process lock + synchronous preference commits |
+| Unit tests | State machine, monotonic clock, authentication throttle |
+| App icon and sound asset integration | Source assets preserved without editing |
+
+## Important authentication boundary
+
+The five-failure / 30-second app cooldown applies to biometric failures reported through AndroidX BiometricPrompt. Android does not disclose incorrect device PIN, pattern, or password attempts to ordinary apps. Device credentials are verified by Android Keyguard, which applies its own lockout policy. The app never reads, stores, logs, or transmits device credentials. Cancellation never clears the alarm and is not counted as a biometric failure.
+
+Strong face authentication is available only if Android reports the enrolled face modality as BIOMETRIC_STRONG. Weak face unlock is intentionally not accepted.
+
+## Android platform limitations
+
+- An ordinary app cannot block the global power menu, guarantee survival against force-stop/uninstall, globally disable hardware volume keys, or force 105% volume.
+- Android 15+ restricts starting a mediaPlayback foreground service from BOOT_COMPLETED. The triggered state remains latched, but immediate background audio after reboot cannot be guaranteed by an ordinary app.
+- Exact alarm delivery depends on special access. Without it, Android may delay the inexact fallback.
+- DND behavior depends on Android alarm exceptions and device settings.
+- The app uses a show-when-locked Activity and a public ongoing notification, not an un-dismissible system-owned overlay.
 
 ## Release gates
-1. Supply the original icon and alarm audio, then replace provisional assets.
-2. Obtain a passing GitHub Actions result for unit tests and debug APK assembly.
-3. Install and test on the target HONOR device and at least one other Android OEM.
-4. Verify exact-alarm special access and notification permission behavior.
-5. Verify unplug/replug at 0–10 seconds, alarm trigger, app swipe-away, process kill, reboot, DND, silent mode, and audio route changes.
-6. Validate authentication for device credential and each enrolled biometric modality.
-7. Verify Android 15+ boot restrictions and document the exact behavior observed.
-8. Do not merge or publish until all applicable gates are passed.
 
-## Security invariants
-- Charger reconnection never transitions ALARM_TRIGGERED to ARMED or DISARMED.
-- Only the successful Android device-authentication callback clears ALARM_TRIGGERED.
-- App code never reads, stores, logs, or transmits the device credential.
-- The app contains no network permission and no backend integration.
-- No claim of unstoppable operation, physical shutdown prevention, or absolute privacy is made beyond the code and platform evidence.
+1. Latest GitHub Actions run must pass unit tests and debug APK assembly.
+2. Install and test on the target HONOR device.
+3. Verify the supplied Opus file decodes and loops on the target Android version.
+4. Verify the original icon and exact app label before and after installation.
+5. Verify charger events, deadline, reconnect, process death and reboot.
+6. Verify PIN, pattern, password, fingerprint and supported strong face authentication.
+7. Verify five biometric failures, 30-second cooldown, reset, and second cooldown cycle.
+8. Verify cancellation and unsuccessful authentication never stop the alarm.
+9. Verify lockscreen, notification, DND, volume and OEM battery behavior.
+10. Keep the PR unmerged until all gates are passed.
