@@ -2,32 +2,85 @@ package com.thiefalertsequre.app
 
 data class AuthThrottleState(
     val failedAttempts: Int = 0,
-    val cooldownUntilEpochMs: Long = 0L
+    val cooldownUntilEpochMs: Long = 0L,
+    val cooldownUntilElapsedRealtimeMs: Long = 0L,
+    val bootCount: Int = -1
 )
 
 object AuthenticationThrottle {
     const val MAX_FAILURES = 5
     const val COOLDOWN_MS = 30_000L
 
-    fun normalize(state: AuthThrottleState, now: Long): AuthThrottleState =
-        if (state.cooldownUntilEpochMs > 0L && now >= state.cooldownUntilEpochMs) {
-            AuthThrottleState()
-        } else state.copy(failedAttempts = state.failedAttempts.coerceIn(0, MAX_FAILURES))
-
-    fun onFailure(state: AuthThrottleState, now: Long): AuthThrottleState {
-        val current = normalize(state, now)
-        if (current.cooldownUntilEpochMs > now) return current
-        val failures = current.failedAttempts + 1
-        return if (failures >= MAX_FAILURES) {
-            AuthThrottleState(0, now + COOLDOWN_MS)
+    fun normalize(
+        state: AuthThrottleState,
+        nowEpochMs: Long,
+        nowElapsedRealtimeMs: Long = 0L,
+        currentBootCount: Int = -1
+    ): AuthThrottleState {
+        val sameBoot = state.bootCount >= 0 && currentBootCount == state.bootCount &&
+            state.cooldownUntilElapsedRealtimeMs > 0L && nowElapsedRealtimeMs > 0L
+        val remaining = if (sameBoot) {
+            state.cooldownUntilElapsedRealtimeMs - nowElapsedRealtimeMs
         } else {
-            AuthThrottleState(failures, 0L)
+            state.cooldownUntilEpochMs - nowEpochMs
+        }
+        return if ((state.cooldownUntilEpochMs > 0L || state.cooldownUntilElapsedRealtimeMs > 0L) && remaining <= 0L) {
+            AuthThrottleState()
+        } else {
+            state.copy(failedAttempts = state.failedAttempts.coerceIn(0, MAX_FAILURES))
         }
     }
 
-    fun startCooldown(state: AuthThrottleState, now: Long): AuthThrottleState =
-        AuthThrottleState(0, maxOf(state.cooldownUntilEpochMs, now + COOLDOWN_MS))
+    fun onFailure(
+        state: AuthThrottleState,
+        nowEpochMs: Long,
+        nowElapsedRealtimeMs: Long = 0L,
+        currentBootCount: Int = -1
+    ): AuthThrottleState {
+        val current = normalize(state, nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
+        val remaining = if (current.bootCount >= 0 && current.bootCount == currentBootCount &&
+            current.cooldownUntilElapsedRealtimeMs > 0L && nowElapsedRealtimeMs > 0L
+        ) current.cooldownUntilElapsedRealtimeMs - nowElapsedRealtimeMs
+        else current.cooldownUntilEpochMs - nowEpochMs
+        if (remaining > 0L) return current
+        val failures = current.failedAttempts + 1
+        return if (failures >= MAX_FAILURES) {
+            AuthThrottleState(
+                failedAttempts = 0,
+                cooldownUntilEpochMs = nowEpochMs + COOLDOWN_MS,
+                cooldownUntilElapsedRealtimeMs = if (nowElapsedRealtimeMs > 0L) nowElapsedRealtimeMs + COOLDOWN_MS else 0L,
+                bootCount = currentBootCount
+            )
+        } else {
+            AuthThrottleState(failedAttempts = failures)
+        }
+    }
 
-    fun remainingMs(state: AuthThrottleState, now: Long): Long =
-        (normalize(state, now).cooldownUntilEpochMs - now).coerceAtLeast(0L)
+    fun startCooldown(
+        state: AuthThrottleState,
+        nowEpochMs: Long,
+        nowElapsedRealtimeMs: Long = 0L,
+        currentBootCount: Int = -1
+    ): AuthThrottleState = AuthThrottleState(
+        failedAttempts = 0,
+        cooldownUntilEpochMs = maxOf(state.cooldownUntilEpochMs, nowEpochMs + COOLDOWN_MS),
+        cooldownUntilElapsedRealtimeMs = if (nowElapsedRealtimeMs > 0L) nowElapsedRealtimeMs + COOLDOWN_MS else 0L,
+        bootCount = currentBootCount
+    )
+
+    fun remainingMs(
+        state: AuthThrottleState,
+        nowEpochMs: Long,
+        nowElapsedRealtimeMs: Long = 0L,
+        currentBootCount: Int = -1
+    ): Long {
+        val normalized = normalize(state, nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
+        val sameBoot = normalized.bootCount >= 0 && normalized.bootCount == currentBootCount &&
+            normalized.cooldownUntilElapsedRealtimeMs > 0L && nowElapsedRealtimeMs > 0L
+        return if (sameBoot) {
+            (normalized.cooldownUntilElapsedRealtimeMs - nowElapsedRealtimeMs).coerceAtLeast(0L)
+        } else {
+            (normalized.cooldownUntilEpochMs - nowEpochMs).coerceAtLeast(0L)
+        }
+    }
 }
