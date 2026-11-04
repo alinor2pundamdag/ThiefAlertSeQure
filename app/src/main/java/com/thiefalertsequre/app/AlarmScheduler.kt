@@ -14,16 +14,52 @@ object AlarmScheduler {
         deadlineBootCount: Int = -1
     ) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
-        val pendingIntent = pendingIntent(context)
+        val operation = pendingIntent(context)
         val sameBoot = deadlineBootCount >= 0 &&
             ProtectionClock.bootCount(context) == deadlineBootCount &&
             deadlineElapsedRealtimeMs > 0L
         val clockType = if (sameBoot) AlarmManager.ELAPSED_REALTIME_WAKEUP else AlarmManager.RTC_WAKEUP
         val triggerAt = if (sameBoot) deadlineElapsedRealtimeMs else deadlineEpochMs
+
         if (Build.VERSION.SDK_INT >= 31 && alarmManager.canScheduleExactAlarms()) {
-            alarmManager.setExactAndAllowWhileIdle(clockType, triggerAt, pendingIntent)
-        } else {
-            alarmManager.setAndAllowWhileIdle(clockType, triggerAt, pendingIntent)
+            try {
+                alarmManager.setExactAndAllowWhileIdle(clockType, triggerAt, operation)
+                return
+            } catch (_: SecurityException) {
+                // Permission can be revoked between the capability check and scheduling.
+            }
+        }
+        alarmManager.setAndAllowWhileIdle(clockType, triggerAt, operation)
+    }
+
+    /**
+     * Android 15+ blocks BOOT_COMPLETED receivers from directly launching a mediaPlayback
+     * foreground service. A user-authorized exact alarm is an allowed background-start path.
+     */
+    fun scheduleImmediateRecovery(context: Context): Boolean {
+        val alarmManager = context.getSystemService(AlarmManager::class.java)
+        if (Build.VERSION.SDK_INT >= 31 && !alarmManager.canScheduleExactAlarms()) {
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                System.currentTimeMillis() + 1_000L,
+                pendingIntent(context)
+            )
+            return false
+        }
+        return try {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                System.currentTimeMillis() + 250L,
+                pendingIntent(context)
+            )
+            true
+        } catch (_: SecurityException) {
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                System.currentTimeMillis() + 1_000L,
+                pendingIntent(context)
+            )
+            false
         }
     }
 
