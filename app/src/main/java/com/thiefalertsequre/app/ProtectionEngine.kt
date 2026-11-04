@@ -20,7 +20,7 @@ object ProtectionEngine {
 
     fun restoreAfterBoot(s: ProtectionState, isCharging: Boolean, now: Long): ProtectionState = when (s.mode) {
         ProtectionMode.ALARM_TRIGGERED -> s
-        ProtectionMode.COUNTDOWN -> evaluateDeadline(s, now)
+        ProtectionMode.COUNTDOWN -> if (isCharging) chargerConnected(s, now) else evaluateDeadline(s, now)
         ProtectionMode.ARMED -> if (isCharging) s else chargerDisconnected(s, now)
         ProtectionMode.DISARMED -> if (isCharging) chargerConnected(s, now) else s
     }
