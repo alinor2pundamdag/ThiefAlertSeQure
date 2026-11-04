@@ -4,23 +4,21 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.BatteryManager
-import androidx.core.content.ContextCompat
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-        val battery = context.getSystemService(BatteryManager::class.java)
-        val charging = battery.isCharging
+        val charging = context.getSystemService(BatteryManager::class.java).isCharging
+        val now = System.currentTimeMillis()
         val store = ProtectionStore(context)
-        val next = ProtectionEngine.restoreAfterBoot(store.read(), charging, System.currentTimeMillis())
-        store.write(next)
+        val next = store.update { ProtectionEngine.restoreAfterBoot(it, charging, now) }
         when (next.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, next.deadlineEpochMs)
             ProtectionMode.ALARM_TRIGGERED -> {
-                // Android 15+ prohibits starting a mediaPlayback FGS from BOOT_COMPLETED.
-                // The alarm state is retained; the user-visible app/notification entry can resume playback.
+                // Android 15+ restricts mediaPlayback foreground-service starts from BOOT_COMPLETED.
+                // Keep the alarm latched; the owner can resume playback through the app notification/activity.
             }
-            else -> Unit
+            else -> AlarmScheduler.cancel(context)
         }
     }
 }
