@@ -255,6 +255,7 @@ class MainActivity : FragmentActivity() {
         super.onResume()
         reconcileCharging()
         ManagedProtectionController.startIfConfigured(this)
+        if (!::status.isInitialized) return
         render()
         status.removeCallbacks(ticker)
         status.post(ticker)
