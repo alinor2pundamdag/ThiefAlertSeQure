@@ -3,10 +3,10 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 android {
-    namespace = "com.thiefalertseq ure.app".replace(" ", "")
+    namespace = "com.thiefalertsequre.app"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.thiefalertseq ure.app".replace(" ", "")
+        applicationId = "com.thiefalertsequre.app"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
