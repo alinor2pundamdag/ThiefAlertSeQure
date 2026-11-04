@@ -1,4 +1,4 @@
-package com.thiefalertseq ure.app
+package com.thiefalertsequre.app
 
 const val COUNTDOWN_MS = 10_000L
 
