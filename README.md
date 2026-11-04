@@ -57,3 +57,4 @@ CI uploads a debug APK only after unit tests and assembly pass. A passing CI bui
 - [Protection rules and state machine](docs/PROTECTION_RULES.md)
 - [Security and Android platform audit](docs/SECURITY_AND_PLATFORM_AUDIT.md)
 - [Device Owner mode and rollback](docs/DEVICE_OWNER_MODE.md)
+- [Privacy policy](docs/PRIVACY_POLICY.md)
