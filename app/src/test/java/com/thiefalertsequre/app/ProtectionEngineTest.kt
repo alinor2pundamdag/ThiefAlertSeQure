@@ -1,48 +1,51 @@
 package com.thiefalertsequre.app
 
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class ProtectionEngineTest {
     @Test fun plugInArms() {
-        val s = ProtectionEngine.chargerConnected(ProtectionState(), 100L)
-        assertEquals(ProtectionMode.ARMED, s.mode)
+        assertEquals(ProtectionMode.ARMED, ProtectionEngine.chargerConnected(ProtectionState(), 100L).mode)
     }
-
     @Test fun unplugStartsTenSecondCountdown() {
-        val armed = ProtectionState(ProtectionMode.ARMED, 0, 100)
-        val s = ProtectionEngine.chargerDisconnected(armed, 1_000L)
+        val s = ProtectionEngine.chargerDisconnected(ProtectionState(ProtectionMode.ARMED, 0, 100), 1_000L, 5_000L, 7)
         assertEquals(ProtectionMode.COUNTDOWN, s.mode)
         assertEquals(11_000L, s.deadlineEpochMs)
+        assertEquals(15_000L, s.deadlineElapsedRealtimeMs)
+        assertEquals(7, s.bootCount)
     }
-
     @Test fun reconnectBeforeDeadlineRearms() {
-        val countdown = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000)
-        assertEquals(ProtectionMode.ARMED, ProtectionEngine.chargerConnected(countdown, 5_000).mode)
+        val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
+        assertEquals(ProtectionMode.ARMED, ProtectionEngine.chargerConnected(s, 5_000).mode)
     }
-
-    @Test fun deadlineTriggers() {
-        val countdown = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000)
-        assertEquals(ProtectionMode.ALARM_TRIGGERED, ProtectionEngine.evaluateDeadline(countdown, 11_000).mode)
+    @Test fun deadlineTriggersAtMonotonicDeadline() {
+        val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
+        assertEquals(ProtectionMode.ALARM_TRIGGERED, ProtectionEngine.evaluateDeadline(s, 1_010L, 15_000L, 7).mode)
     }
-
+    @Test fun wallClockChangeCannotPrematurelyTriggerDuringSameBoot() {
+        val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
+        val early = ProtectionEngine.evaluateDeadline(s, 99_000_000L, 14_999L, 7)
+        assertEquals(ProtectionMode.COUNTDOWN, early.mode)
+        assertEquals(1L, ProtectionEngine.remainingMs(early, 99_000_000L, 14_999L, 7))
+    }
+    @Test fun rebootUsesPersistedWallClockFallback() {
+        val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
+        assertEquals(ProtectionMode.ALARM_TRIGGERED, ProtectionEngine.evaluateDeadline(s, 11_000L, 1_000L, 8).mode)
+    }
     @Test fun reconnectCannotCancelTriggeredAlarm() {
-        val alarm = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
-        assertEquals(alarm, ProtectionEngine.chargerConnected(alarm, 12_000))
+        val s = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
+        assertEquals(s, ProtectionEngine.chargerConnected(s, 12_000))
     }
-
-    @Test fun rebootWhileStillChargingCancelsOnlyPreTriggerCountdown() {
-        val countdown = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000)
-        assertEquals(ProtectionMode.ARMED, ProtectionEngine.restoreAfterBoot(countdown, true, 5_000).mode)
-    }
-
     @Test fun rebootPreservesTriggeredAlarm() {
-        val alarm = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
-        assertEquals(alarm, ProtectionEngine.restoreAfterBoot(alarm, true, 20_000))
+        val s = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
+        assertEquals(s, ProtectionEngine.restoreAfterBoot(s, true, 20_000))
     }
-
-    @Test fun validAuthenticationClearsAlarm() {
+    @Test fun onlyTriggeredStateCanBeClearedByAuthentication() {
         val alarm = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
+        val armed = ProtectionState(ProtectionMode.ARMED, 0, 1_000)
         assertEquals(ProtectionMode.DISARMED, ProtectionEngine.authenticated(alarm, 12_000).mode)
+        assertEquals(armed, ProtectionEngine.authenticated(armed, 12_000))
+        assertNotEquals(ProtectionMode.DISARMED, ProtectionEngine.authenticated(alarm, 12_000).mode)
     }
 }
