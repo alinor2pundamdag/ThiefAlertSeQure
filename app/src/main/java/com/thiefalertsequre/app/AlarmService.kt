@@ -167,7 +167,9 @@ class AlarmService : Service() {
         }
         audioFocusRequest = null
         audioManager = null
-        runCatching { AlarmVolumeController.restore(this, getSystemService(AudioManager::class.java)) }
+        if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED) {
+            runCatching { AlarmVolumeController.restore(this, getSystemService(AudioManager::class.java)) }
+        }
     }
 
     override fun onDestroy() {
