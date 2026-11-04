@@ -1,40 +1,45 @@
 # Security and Android Platform Audit
 
 ## Threat model
-Protect against casual charger removal and ordinary user-level interference. This app is not a device-owner, kiosk, system, or privileged application. It cannot defend against a person who can force shutdown, uninstall/disable the app, revoke permissions, boot recovery, remove the battery, or use privileged tools.
+Protect against casual charger removal and ordinary user-level interference. This app is not a device-owner, kiosk, system, or privileged application. It cannot defend against force shutdown, uninstall/disable, permission revocation, recovery boot, battery removal, or privileged tools.
 
 ## State integrity
-- All transitions are centralized in ProtectionEngine.
-- Triggered state is monotonic against charger events: only successful OS device authentication clears it.
-- The state is persisted synchronously to private app preferences.
-- Countdown uses an epoch deadline to permit reboot recovery. Wall-clock changes can affect remaining time; a future hardening pass should combine elapsedRealtime while booted with a persisted boot identifier and wall-clock fallback.
-- AlarmDeadlineReceiver rechecks the deadline before triggering; early delivery reschedules.
+- State transitions are serialized through a process-wide lock in ProtectionStore.
+- Triggered state is monotonic against charger events; only successful Android owner authentication clears it.
+- State and authentication cooldown are synchronously persisted in private app preferences.
+- Countdown uses elapsedRealtime and Android boot count while the device remains in the same boot, so wall-clock changes cannot accelerate or extend the active countdown.
+- After reboot, the persisted wall-clock deadline is used because elapsedRealtime resets at boot.
+- AlarmDeadlineReceiver rechecks the deadline before triggering and reschedules early deliveries.
 
 ## Authentication
-- No PIN/password is read or stored by this app.
-- BiometricPrompt delegates verification to Android.
-- Allowed authenticators are BIOMETRIC_STRONG and DEVICE_CREDENTIAL. Weak face unlock may not qualify; availability is device-dependent.
-- A successful prompt is the only app-level transition that clears an active alarm.
+- Device PIN, pattern, and password are verified only by Android Keyguard.
+- Fingerprint and face are accepted only through BIOMETRIC_STRONG.
+- Five consecutive biometric failure callbacks start a persisted 30-second cooldown. After it expires, the next five failures can start another cooldown.
+- Authentication cancellation is not counted as a biometric failure.
+- Android does not disclose incorrect device-credential attempts to third-party apps. Keyguard's own anti-brute-force lockout applies to PIN/pattern/password. The app does not collect credentials.
+- Only a successful Keyguard or BiometricPrompt result can clear ALARM_TRIGGERED.
 
-## Audio and system controls
-- Requests maximum STREAM_ALARM volume, but user/OEM policies may prevent changes.
-- Uses a ToneGenerator fallback because the supplied custom audio asset is absent.
-- Does not claim volume-key interception, power-menu blocking, universal DND bypass, or 105% volume.
-- The notification is ongoing but users/system can still stop or restrict the app.
+## Audio and lockscreen
+- Uses the exact user-uploaded Ogg Opus audio asset in res/raw and loops it with MediaPlayer.
+- Uses ToneGenerator only if the platform decoder cannot load the supplied Opus file.
+- Requests the maximum available alarm stream volume; Android/OEM policy can still constrain output.
+- Alarm notification is ongoing and its content action opens the lockscreen-capable authentication Activity.
+- The Activity is configured to show when locked and turn the screen on.
+- Audio playback uses USAGE_ALARM; DND alarm exceptions remain controlled by Android settings.
+- No claim is made for 105% volume, global volume-key interception, or global power-menu blocking.
 
 ## Permissions and privacy
-- No INTERNET permission; no backend or network SDK.
+- No INTERNET permission, backend, analytics or advertising SDK.
 - Notifications are requested at runtime on Android 13+.
-- Exact-alarm special access is not automatically granted. Inexact fallback can delay alarm deadline delivery.
-- WAKE_LOCK is declared but a permanent wake lock is intentionally not held because it drains battery and does not guarantee process survival.
+- Exact-alarm special access is user-controlled on Android 12+; inexact fallback may delay the nominal deadline.
+- A permanent wake lock is not held while merely armed. MediaPlayer uses a playback wake mode while the alarm is playing.
 
-## Release blockers
-1. Upload exact icon and alarm recording, then add them under mipmap/drawable and res/raw.
-2. Implement explicit in-app exact-alarm and notification permission onboarding.
-3. Add a proper Android 12+ exact-alarm access flow and reschedule on permission grant.
-4. Test power broadcasts and FGS launch policy on Android 14–16 and OEM devices.
-5. Verify behavior under DND and audio routing on physical devices.
-6. Add instrumentation tests and CI execution evidence.
-7. Replace epoch-only countdown with boot-aware monotonic deadline persistence.
-8. Review notification interaction and owner authentication while device is locked.
-9. Verify package ID and branding with owner before publishing.
+## Remaining verification
+1. Confirm GitHub Actions passes on the latest branch head.
+2. Install and exercise on physical Android 14/15/16 devices.
+3. Verify exact Opus decode, loop and fallback behavior.
+4. Test all device credential and strong biometric paths.
+5. Test the five-failure cooldown repeatedly and cancellation semantics.
+6. Test alarm behavior with screen locked, DND, silent mode, Bluetooth and headphones.
+7. Test app process death, force-stop limitations, reboot, exact-alarm access revocation and OEM battery management.
+8. Do not describe the application as unstoppable or production-certified until device tests pass.
