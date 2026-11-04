@@ -31,7 +31,7 @@ class ProtectionEngineTest {
         assertEquals(alarm, ProtectionEngine.chargerConnected(alarm, 12_000))
     }
 
-    @Test fun rebootPreservesTriggeredAlarm() {
+    @Test fun rebootWhileStillChargingCancelsOnlyPreTriggerCountdown() {\n        val countdown = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000)\n        assertEquals(ProtectionMode.ARMED, ProtectionEngine.restoreAfterBoot(countdown, true, 5_000).mode)\n    }\n\n    @Test fun rebootPreservesTriggeredAlarm() {
         val alarm = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
         assertEquals(alarm, ProtectionEngine.restoreAfterBoot(alarm, true, 20_000))
     }
