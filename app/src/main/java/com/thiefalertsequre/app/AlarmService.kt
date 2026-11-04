@@ -1,4 +1,4 @@
-package com.thiefalertseq ure.app
+package com.thiefalertsequre.app
 
 import android.app.Notification
 import android.app.NotificationChannel
