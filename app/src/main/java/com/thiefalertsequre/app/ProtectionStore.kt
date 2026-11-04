@@ -15,21 +15,37 @@ class ProtectionStore(context: Context) {
         next
     }
 
-    fun readAuthenticationThrottle(now: Long): AuthThrottleState = synchronized(LOCK) {
+    fun readAuthenticationThrottle(
+        nowEpochMs: Long,
+        nowElapsedRealtimeMs: Long = 0L,
+        currentBootCount: Int = -1
+    ): AuthThrottleState = synchronized(LOCK) {
         val current = readThrottleUnlocked()
-        val normalized = AuthenticationThrottle.normalize(current, now)
+        val normalized = AuthenticationThrottle.normalize(current, nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
         if (normalized != current) writeThrottleUnlocked(normalized)
         normalized
     }
 
-    fun recordAuthenticationFailure(now: Long): AuthThrottleState = synchronized(LOCK) {
-        val next = AuthenticationThrottle.onFailure(readThrottleUnlocked(), now)
+    fun recordAuthenticationFailure(
+        nowEpochMs: Long,
+        nowElapsedRealtimeMs: Long = 0L,
+        currentBootCount: Int = -1
+    ): AuthThrottleState = synchronized(LOCK) {
+        val next = AuthenticationThrottle.onFailure(
+            readThrottleUnlocked(), nowEpochMs, nowElapsedRealtimeMs, currentBootCount
+        )
         writeThrottleUnlocked(next)
         next
     }
 
-    fun startAuthenticationCooldown(now: Long): AuthThrottleState = synchronized(LOCK) {
-        val next = AuthenticationThrottle.startCooldown(readThrottleUnlocked(), now)
+    fun startAuthenticationCooldown(
+        nowEpochMs: Long,
+        nowElapsedRealtimeMs: Long = 0L,
+        currentBootCount: Int = -1
+    ): AuthThrottleState = synchronized(LOCK) {
+        val next = AuthenticationThrottle.startCooldown(
+            readThrottleUnlocked(), nowEpochMs, nowElapsedRealtimeMs, currentBootCount
+        )
         writeThrottleUnlocked(next)
         next
     }
@@ -57,13 +73,17 @@ class ProtectionStore(context: Context) {
 
     private fun readThrottleUnlocked() = AuthThrottleState(
         prefs.getInt(KEY_AUTH_FAILURES, 0).coerceIn(0, AuthenticationThrottle.MAX_FAILURES),
-        prefs.getLong(KEY_AUTH_COOLDOWN, 0L)
+        prefs.getLong(KEY_AUTH_COOLDOWN, 0L),
+        prefs.getLong(KEY_AUTH_COOLDOWN_ELAPSED, 0L),
+        prefs.getInt(KEY_AUTH_BOOT_COUNT, -1)
     )
 
     private fun writeThrottleUnlocked(state: AuthThrottleState) {
         prefs.edit()
             .putInt(KEY_AUTH_FAILURES, state.failedAttempts)
             .putLong(KEY_AUTH_COOLDOWN, state.cooldownUntilEpochMs)
+            .putLong(KEY_AUTH_COOLDOWN_ELAPSED, state.cooldownUntilElapsedRealtimeMs)
+            .putInt(KEY_AUTH_BOOT_COUNT, state.bootCount)
             .commit()
     }
 
@@ -71,5 +91,7 @@ class ProtectionStore(context: Context) {
         private val LOCK = Any()
         private const val KEY_AUTH_FAILURES = "auth_failed_attempts"
         private const val KEY_AUTH_COOLDOWN = "auth_cooldown_until"
+        private const val KEY_AUTH_COOLDOWN_ELAPSED = "auth_cooldown_until_elapsed"
+        private const val KEY_AUTH_BOOT_COUNT = "auth_cooldown_boot_count"
     }
 }
