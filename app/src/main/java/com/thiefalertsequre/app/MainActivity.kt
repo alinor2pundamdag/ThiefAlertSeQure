@@ -164,8 +164,10 @@ class MainActivity : FragmentActivity() {
         val store = ProtectionStore(this)
         val state = store.read()
         val now = System.currentTimeMillis()
-        val throttle = store.readAuthenticationThrottle(now)
-        val cooldownMs = AuthenticationThrottle.remainingMs(throttle, now)
+        val elapsed = ProtectionClock.elapsedRealtime()
+        val boot = ProtectionClock.bootCount(this)
+        val throttle = store.readAuthenticationThrottle(now, elapsed, boot)
+        val cooldownMs = AuthenticationThrottle.remainingMs(throttle, now, elapsed, boot)
         val coolingDown = cooldownMs > 0L
         status.text = when (state.mode) {
             ProtectionMode.DISARMED -> "Protection disarmed"
@@ -204,8 +206,11 @@ class MainActivity : FragmentActivity() {
         val store = ProtectionStore(this)
         val state = store.read()
         if (state.mode != ProtectionMode.ALARM_TRIGGERED) return
-        val throttle = store.readAuthenticationThrottle(System.currentTimeMillis())
-        if (AuthenticationThrottle.remainingMs(throttle, System.currentTimeMillis()) > 0L) {
+        val authNow = System.currentTimeMillis()
+        val authElapsed = ProtectionClock.elapsedRealtime()
+        val authBoot = ProtectionClock.bootCount(this)
+        val throttle = store.readAuthenticationThrottle(authNow, authElapsed, authBoot)
+        if (AuthenticationThrottle.remainingMs(throttle, authNow, authElapsed, authBoot) > 0L) {
             render()
             return
         }
@@ -227,7 +232,9 @@ class MainActivity : FragmentActivity() {
                 }
 
                 override fun onAuthenticationFailed() {
-                    val next = store.recordAuthenticationFailure(System.currentTimeMillis())
+                    val next = store.recordAuthenticationFailure(
+                        System.currentTimeMillis(), ProtectionClock.elapsedRealtime(), ProtectionClock.bootCount(this@MainActivity)
+                    )
                     if (next.cooldownUntilEpochMs > System.currentTimeMillis()) {
                         biometricPrompt?.cancelAuthentication()
                         biometricPrompt = null
@@ -243,7 +250,9 @@ class MainActivity : FragmentActivity() {
                     when (errorCode) {
                         BiometricPrompt.ERROR_LOCKOUT,
                         BiometricPrompt.ERROR_LOCKOUT_PERMANENT -> {
-                            store.startAuthenticationCooldown(System.currentTimeMillis())
+                            store.startAuthenticationCooldown(
+                                System.currentTimeMillis(), ProtectionClock.elapsedRealtime(), ProtectionClock.bootCount(this@MainActivity)
+                            )
                             details.text = "Android biometric lockout. Wait 30 seconds or use device credentials if Android permits."
                         }
                         BiometricPrompt.ERROR_USER_CANCELED,
@@ -273,8 +282,10 @@ class MainActivity : FragmentActivity() {
         val state = ProtectionStore(this).read()
         if (state.mode != ProtectionMode.ALARM_TRIGGERED) return
         val now = System.currentTimeMillis()
-        val throttle = ProtectionStore(this).readAuthenticationThrottle(now)
-        if (AuthenticationThrottle.remainingMs(throttle, now) > 0L) {
+        val elapsed = ProtectionClock.elapsedRealtime()
+        val boot = ProtectionClock.bootCount(this)
+        val throttle = ProtectionStore(this).readAuthenticationThrottle(now, elapsed, boot)
+        if (AuthenticationThrottle.remainingMs(throttle, now, elapsed, boot) > 0L) {
             render()
             return
         }
