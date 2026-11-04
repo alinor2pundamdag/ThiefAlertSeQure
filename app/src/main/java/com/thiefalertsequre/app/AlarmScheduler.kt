@@ -1,4 +1,4 @@
-package com.thiefalertseq ure.app
+package com.thiefalertsequre.app
 
 import android.app.AlarmManager
 import android.app.PendingIntent
