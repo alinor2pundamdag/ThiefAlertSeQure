@@ -14,7 +14,7 @@
 | Reconnect before deadline | Returns to ARMED |
 | Reconnect after trigger | Cannot clear ALARM_TRIGGERED |
 | Same-boot clock integrity | elapsedRealtime + boot count |
-| Reboot recovery | Persisted state + wall-clock fallback |
+| Reboot recovery | If countdown is pending and charger remains absent, trigger immediately; if charging, return to ARMED |
 | Android 15 boot recovery | Schedules exact alarm when user granted exact-alarm access; exact-alarm delivery is an allowed FGS-start path |
 | Local-only operation | No INTERNET permission, backend, analytics or advertising SDK |
 | Alarm foreground notification | Ongoing notification opens lockscreen-capable authentication Activity |
