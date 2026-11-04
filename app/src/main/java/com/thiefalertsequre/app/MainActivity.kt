@@ -3,7 +3,6 @@ package com.thiefalertsequre.app
 import android.Manifest
 import android.app.AlarmManager
 import android.app.KeyguardManager
-import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
