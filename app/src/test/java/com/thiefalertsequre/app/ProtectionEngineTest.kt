@@ -1,4 +1,4 @@
-package com.thiefalertseq ure.app
+package com.thiefalertsequre.app
 
 import org.junit.Assert.*
 import org.junit.Test
