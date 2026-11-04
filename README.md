@@ -1,29 +1,28 @@
 # ThiefAlertSeQure
 
-Local-first Android charging anti-theft alarm prototype. No backend, analytics, advertising, or network permission is declared.
+ThiefAlertSeQure is a local-only Android charging anti-theft alarm. The installed application name is **ThiefAlertSeQure**.
 
-## Implemented in this branch
-- Persisted protection state machine: DISARMED → ARMED → COUNTDOWN (10 seconds) → ALARM_TRIGGERED.
-- Reconnection cancels only a pre-trigger countdown. Reconnection cannot clear ALARM_TRIGGERED.
-- Countdown deadline and state survive process recreation; boot receiver reconciles state against charging status.
-- Device-owner verification uses AndroidX BiometricPrompt with BIOMETRIC_STRONG or DEVICE_CREDENTIAL.
-- Alarm foreground service, ongoing notification, and maximum available alarm-stream volume request.
-- Unit tests cover core transitions and reboot persistence semantics.
-- GitHub Actions builds the APK and runs unit tests.
+## Local protection behavior
+- Automatically arms when charging is connected.
+- Charger removal starts a 10-second countdown.
+- Reconnecting before the deadline cancels only that countdown.
+- Once triggered, the alarm remains latched until Android confirms owner authentication.
+- State transitions are serialized and persisted locally.
+- A monotonic elapsed-realtime deadline protects the countdown against wall-clock changes during the same boot; reboot recovery uses the persisted wall-clock deadline and boot count.
 
-## Android platform limits (not bypassable by a normal app)
-- Android 15+ blocks a BOOT_COMPLETED receiver from launching a mediaPlayback foreground service. Boot recovery therefore persists the alarm and countdown state but cannot promise immediate background audio playback after reboot. The user must reopen the app or interact with its notification to resume playback.
-- A normal app cannot intercept the global power menu, prevent hardware power-off, globally disable volume keys, or force 105% hardware volume.
-- DND/silent bypass requires user-granted notification policy access and still cannot guarantee audio on every OEM/device configuration.
-- A normal app cannot place an un-dismissible system-owned overlay over every lockscreen state. The app uses a visible activity and notification entry instead.
-- Exact alarm scheduling depends on the user's special access on Android 12+; when unavailable, an inexact fallback is used and the ten-second trigger may be delayed.
-- Android/OEM battery management can terminate background work. No third-party app can guarantee process immortality.
+## Authentication
+- Device PIN, pattern, and password are verified by Android Keyguard.
+- Fingerprint and face are offered only when Android reports an enrolled BIOMETRIC_STRONG modality.
+- Five consecutive biometric failures start a persisted 30-second cooldown. After cooldown, the count resets and another group of five failures can trigger another cooldown.
+- Cancelled authentication and failed authentication never clear the alarm.
+- Android does not disclose failed PIN/pattern/password attempts to ordinary apps. Keyguard applies its own credential lockout; the app never reads or stores the device credential.
 
-## Asset status
-The exact user-provided alarm recording and circular icon were not included in the files available to this coding session. This branch uses an Android system-tone fallback and a provisional vector shield icon. Replace both with the exact supplied assets when they are uploaded; no claim is made that these are the requested originals.
+## Exact user assets
+- Launcher icon: original ThiefAlertSeQureIcon.jpg, copied without image edits to app/src/main/res/mipmap-nodpi/thiefalertsequreicon.jpg.
+- Alarm: original Soundfizz .opus recording, copied to app/src/main/res/raw/thiefalertsequre_alarm.opus.
+- App label: ThiefAlertSeQure.
 
-## Build
-Requires JDK 17 and Android Gradle Plugin-compatible SDK 35:
-`gradle :app:testDebugUnitTest :app:assembleDebug`
+## Build and test
+gradle :app:testDebugUnitTest :app:assembleDebug
 
-This is an initial implementation branch, not a claim of device-verified production readiness. Test on physical devices across Android 8–16 and OEM power-management variants before release.
+CI must pass and physical-device verification is still required before release. Android does not allow an ordinary app to block the power menu, guarantee unkillable background operation, globally disable volume keys, force 105% volume, or guarantee immediate alarm playback from a BOOT_COMPLETED receiver on Android 15+.
