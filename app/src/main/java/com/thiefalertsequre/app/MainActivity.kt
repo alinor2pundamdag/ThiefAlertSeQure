@@ -232,10 +232,11 @@ class MainActivity : FragmentActivity() {
                 }
 
                 override fun onAuthenticationFailed() {
-                    val next = store.recordAuthenticationFailure(
-                        System.currentTimeMillis(), ProtectionClock.elapsedRealtime(), ProtectionClock.bootCount(this@MainActivity)
-                    )
-                    if (next.cooldownUntilEpochMs > System.currentTimeMillis()) {
+                    val failedAt = System.currentTimeMillis()
+                    val failedElapsed = ProtectionClock.elapsedRealtime()
+                    val failedBoot = ProtectionClock.bootCount(this@MainActivity)
+                    val next = store.recordAuthenticationFailure(failedAt, failedElapsed, failedBoot)
+                    if (AuthenticationThrottle.remainingMs(next, failedAt, failedElapsed, failedBoot) > 0L) {
                         biometricPrompt?.cancelAuthentication()
                         biometricPrompt = null
                         details.text = "Five consecutive biometric failures. Wait 30 seconds before trying again."
