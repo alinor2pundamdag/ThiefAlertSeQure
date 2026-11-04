@@ -1,45 +1,67 @@
 # Security and Android Platform Audit
 
 ## Threat model
-Protect against casual charger removal and ordinary user-level interference. This app is not a device-owner, kiosk, system, or privileged application. It cannot defend against force shutdown, uninstall/disable, permission revocation, recovery boot, battery removal, or privileged tools.
+Protect against casual charger removal and ordinary user-level interference. Standard mode is a normal Android app, not a system, privileged or device-owner app. Optional managed mode uses legitimate Android Enterprise Device Owner provisioning and Lock Task APIs. Neither mode can promise resistance to hardware forced shutdown, battery removal, bootloader/recovery, firmware changes or physical tampering.
+
+## Local privacy and data
+- No INTERNET permission, backend, analytics, ad SDK or account.
+- App state and biometric cooldown counters remain in private app storage.
+- Device PIN, pattern and password are verified only by Android Keyguard; the app never reads, stores, logs or transmits credentials.
+- Backup is disabled in the manifest.
+- No Accessibility service, overlay-based key interception, root exploit or hidden persistence is used.
 
 ## State integrity
-- State transitions are serialized through a process-wide lock in ProtectionStore.
-- Triggered state is monotonic against charger events; only successful Android owner authentication clears it.
-- State and authentication cooldown are synchronously persisted in private app preferences.
-- Countdown uses elapsedRealtime and Android boot count while the device remains in the same boot, so wall-clock changes cannot accelerate or extend the active countdown.
-- After reboot, the persisted wall-clock deadline is used because elapsedRealtime resets at boot.
-- AlarmDeadlineReceiver rechecks the deadline before triggering and reschedules early deliveries.
+- State transitions are serialized through ProtectionStore.
+- Triggered state is monotonic against charger events; only successful Keyguard or BiometricPrompt authentication clears it.
+- State and throttle are synchronously persisted.
+- Countdown uses elapsedRealtime and boot count during the same boot; wall-clock fallback is used after reboot.
+- AlarmDeadlineReceiver rechecks the deadline and reschedules early delivery.
+- Exact alarm scheduling handles permission revocation races and falls back to inexact delivery when exact access is unavailable.
 
 ## Authentication
-- Device PIN, pattern, and password are verified only by Android Keyguard.
+- Device PIN, pattern and password are verified only by Android Keyguard.
 - Fingerprint and face are accepted only through BIOMETRIC_STRONG.
-- Five consecutive biometric failure callbacks start a persisted 30-second cooldown. After it expires, the next five failures can start another cooldown.
-- Authentication cancellation is not counted as a biometric failure.
-- Android does not disclose incorrect device-credential attempts to third-party apps. Keyguard's own anti-brute-force lockout applies to PIN/pattern/password. The app does not collect credentials.
-- Only a successful Keyguard or BiometricPrompt result can clear ALARM_TRIGGERED.
+- Five consecutive biometric failure callbacks start a persisted 30-second cooldown. After it expires, another five failures can start another cooldown.
+- Cancellation is not a failed attempt and never clears the alarm.
+- Android does not disclose incorrect device-credential attempts to third-party apps; Keyguard's own lockout applies.
+- Only successful Keyguard or BiometricPrompt results clear ALARM_TRIGGERED.
 
 ## Audio and lockscreen
-- Uses the exact user-uploaded Ogg Opus audio asset in res/raw and loops it with MediaPlayer.
-- Uses ToneGenerator only if the platform decoder cannot load the supplied Opus file.
-- Requests the maximum available alarm stream volume; Android/OEM policy can still constrain output.
-- Alarm notification is ongoing and its content action opens the lockscreen-capable authentication Activity.
-- The Activity is configured to show when locked and turn the screen on.
-- Audio playback uses USAGE_ALARM; DND alarm exceptions remain controlled by Android settings.
-- No claim is made for 105% volume, global volume-key interception, or global power-menu blocking.
+- Exact uploaded Ogg Opus asset is played in a loop; ToneGenerator is fallback only if decoder initialization fails.
+- Audio uses USAGE_ALARM and requests maximum available alarm-stream volume.
+- Prior alarm volume is saved and restored after successful disarm. If service is destroyed while alarm remains latched, it does not restore volume prematurely.
+- Notification is ongoing and opens a show-when-locked authentication Activity.
+- DND is not silently changed. Users configure alarm exceptions in Android settings.
+- Android/OEM policies can constrain sound output and background execution.
 
-## Permissions and privacy
-- No INTERNET permission, backend, analytics or advertising SDK.
-- Notifications are requested at runtime on Android 13+.
-- Exact-alarm special access is user-controlled on Android 12+; inexact fallback may delay the nominal deadline.
-- A permanent wake lock is not held while merely armed. MediaPlayer uses a playback wake mode while the alarm is playing.
+## Android Enterprise / Device Owner mode
+- Dedicated DeviceAdminReceiver is declared.
+- App never self-assigns Device Owner.
+- Only an already provisioned Device Owner can explicitly enable managed policies.
+- Lock Task allowlist includes only this app.
+- Lock Task features keep Keyguard available but omit GLOBAL_ACTIONS, hiding the normal power dialog while kiosk mode is active on supported Android builds.
+- Selected restrictions block Settings factory reset, safe boot, debugging, adding users and USB file transfer.
+- In-app rollback stops Lock Task and clears each restriction and allowlist.
+- This does not block physical long-press shutdown, hardware key combinations, bootloader/recovery reset or OEM firmware controls.
+
+## Android 15+ boot behavior
+Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPlayback foreground service for target API 35. For a latched alarm, BootReceiver now schedules an immediate exact alarm. Android documents exact-alarm delivery as exempt from foreground-service background-start restrictions. This route requires user-granted SCHEDULE_EXACT_ALARM access; without it, an inexact fallback is attempted and playback timing cannot be guaranteed.
+
+## Compatibility
+- Minimum SDK 26 (Android 8.0).
+- Target SDK 35.
+- Material Components UI adapts through a scrollable layout and SP text sizing.
+- Biometric availability depends on hardware, enrollment and Android strength classification.
+- Device Owner APIs and restrictions depend on Android version, provisioning state and OEM build.
+- HONOR/MagicOS, Xiaomi/HyperOS, Samsung/One UI and other OEM battery managers may require user-side background/autostart configuration. No universal public API disables all OEM power management.
 
 ## Remaining verification
-1. Confirm GitHub Actions passes on the latest branch head.
-2. Install and exercise on physical Android 14/15/16 devices.
-3. Verify exact Opus decode, loop and fallback behavior.
-4. Test all device credential and strong biometric paths.
-5. Test the five-failure cooldown repeatedly and cancellation semantics.
-6. Test alarm behavior with screen locked, DND, silent mode, Bluetooth and headphones.
-7. Test app process death, force-stop limitations, reboot, exact-alarm access revocation and OEM battery management.
-8. Do not describe the application as unstoppable or production-certified until device tests pass.
+1. Latest GitHub Actions must pass on current branch head.
+2. Test Android 8 through Android 16 compatibility paths where devices are available.
+3. Test target HONOR device specifically, including battery optimization and autostart.
+4. Test Opus decoding, loop, fallback and volume restoration.
+5. Test screen locked, notification permission denied, DND, silent mode, Bluetooth and headphones.
+6. Test exact alarm access granted/revoked and Android 15+ reboot recovery.
+7. Test process death, force-stop limitations, reboot and app update.
+8. Test Device Owner only on a backed-up, factory-reset test device, including successful in-app rollback.
+9. Do not describe app as unstoppable or production-certified until physical-device tests pass.
