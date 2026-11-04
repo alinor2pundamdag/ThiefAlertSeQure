@@ -69,7 +69,9 @@ object ProtectionEngine {
         ProtectionMode.COUNTDOWN -> if (isCharging) {
             chargerConnected(s, nowEpochMs)
         } else {
-            evaluateDeadline(s, nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
+            // The monotonic clock resets on reboot. Do not trust a wall-clock fallback:
+            // if the charger is still absent, fail closed and latch the alarm immediately.
+            ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, nowEpochMs, 0L, currentBootCount)
         }
         ProtectionMode.ARMED -> if (isCharging) s else
             chargerDisconnected(s, nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
