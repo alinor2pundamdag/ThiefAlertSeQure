@@ -1,7 +1,6 @@
 package com.thiefalertsequre.app
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class ProtectionEngineTest {
@@ -46,6 +45,5 @@ class ProtectionEngineTest {
         val armed = ProtectionState(ProtectionMode.ARMED, 0, 1_000)
         assertEquals(ProtectionMode.DISARMED, ProtectionEngine.authenticated(alarm, 12_000).mode)
         assertEquals(armed, ProtectionEngine.authenticated(armed, 12_000))
-        assertNotEquals(ProtectionMode.DISARMED, ProtectionEngine.authenticated(alarm, 12_000).mode)
     }
 }
