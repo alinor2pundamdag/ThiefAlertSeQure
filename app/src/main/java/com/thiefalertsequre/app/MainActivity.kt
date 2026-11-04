@@ -118,16 +118,18 @@ class MainActivity : FragmentActivity() {
         val charging = getSystemService(BatteryManager::class.java).isCharging
         val store = ProtectionStore(this)
         val now = System.currentTimeMillis()
+        val elapsed = ProtectionClock.elapsedRealtime()
+        val boot = ProtectionClock.bootCount(this)
         val next = store.update { old ->
             when {
                 charging -> ProtectionEngine.chargerConnected(old, now)
-                old.mode == ProtectionMode.ARMED -> ProtectionEngine.chargerDisconnected(old, now)
-                old.mode == ProtectionMode.COUNTDOWN -> ProtectionEngine.evaluateDeadline(old, now)
+                old.mode == ProtectionMode.ARMED -> ProtectionEngine.chargerDisconnected(old, now, elapsed, boot)
+                old.mode == ProtectionMode.COUNTDOWN -> ProtectionEngine.evaluateDeadline(old, now, elapsed, boot)
                 else -> old
             }
         }
         when (next.mode) {
-            ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(this, next.deadlineEpochMs)
+            ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(this, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
             ProtectionMode.ALARM_TRIGGERED -> runCatching {
                 ContextCompat.startForegroundService(
                     this,
@@ -175,7 +177,7 @@ class MainActivity : FragmentActivity() {
             ProtectionMode.DISARMED -> "Connect the charger to arm protection automatically."
             ProtectionMode.ARMED -> "Charger connected. Unplugging starts a 10-second countdown."
             ProtectionMode.COUNTDOWN -> "Remaining: " +
-                (((state.deadlineEpochMs - now).coerceAtLeast(0L) + 999) / 1000) + " seconds"
+                ((ProtectionEngine.remainingMs(state, now, ProtectionClock.elapsedRealtime(), ProtectionClock.bootCount(this)) + 999) / 1000) + " seconds"
             ProtectionMode.ALARM_TRIGGERED ->
                 "Use the phone's own PIN, pattern, password, fingerprint, or supported strong face authentication to stop the alarm."
         }
