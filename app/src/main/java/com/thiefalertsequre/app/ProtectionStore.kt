@@ -16,18 +16,14 @@ class ProtectionStore(context: Context) {
     }
 
     fun readAuthenticationThrottle(now: Long): AuthThrottleState = synchronized(LOCK) {
-        val current = AuthThrottleState(
-            failedAttempts = prefs.getInt(KEY_AUTH_FAILURES, 0).coerceIn(0, AuthenticationThrottle.MAX_FAILURES),
-            cooldownUntilEpochMs = prefs.getLong(KEY_AUTH_COOLDOWN, 0L)
-        )
+        val current = readThrottleUnlocked()
         val normalized = AuthenticationThrottle.normalize(current, now)
         if (normalized != current) writeThrottleUnlocked(normalized)
         normalized
     }
 
     fun recordAuthenticationFailure(now: Long): AuthThrottleState = synchronized(LOCK) {
-        val current = readThrottleUnlocked()
-        val next = AuthenticationThrottle.onFailure(current, now)
+        val next = AuthenticationThrottle.onFailure(readThrottleUnlocked(), now)
         writeThrottleUnlocked(next)
         next
     }
@@ -46,13 +42,17 @@ class ProtectionStore(context: Context) {
         mode = runCatching { ProtectionMode.valueOf(prefs.getString("mode", "DISARMED")!!) }
             .getOrDefault(ProtectionMode.DISARMED),
         deadlineEpochMs = prefs.getLong("deadline", 0L),
-        changedAtEpochMs = prefs.getLong("changed", 0L)
+        changedAtEpochMs = prefs.getLong("changed", 0L),
+        deadlineElapsedRealtimeMs = prefs.getLong("deadline_elapsed", 0L),
+        bootCount = prefs.getInt("boot_count", -1)
     )
 
     private fun writeUnlocked(state: ProtectionState): Boolean = prefs.edit()
         .putString("mode", state.mode.name)
         .putLong("deadline", state.deadlineEpochMs)
         .putLong("changed", state.changedAtEpochMs)
+        .putLong("deadline_elapsed", state.deadlineElapsedRealtimeMs)
+        .putInt("boot_count", state.bootCount)
         .commit()
 
     private fun readThrottleUnlocked() = AuthThrottleState(
