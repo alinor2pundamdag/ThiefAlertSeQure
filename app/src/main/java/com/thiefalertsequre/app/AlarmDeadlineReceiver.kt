@@ -1,4 +1,4 @@
-package com.thiefalertseq ure.app
+package com.thiefalertsequre.app
 
 import android.content.BroadcastReceiver
 import android.content.Context
