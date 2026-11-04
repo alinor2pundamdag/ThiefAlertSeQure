@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.BatteryManager
+import android.os.Build
+import androidx.core.content.ContextCompat
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -22,7 +24,16 @@ class BootReceiver : BroadcastReceiver() {
             )
             ProtectionMode.ALARM_TRIGGERED -> {
                 // Android 15+ restricts mediaPlayback foreground-service starts from BOOT_COMPLETED.
-                // Persist the latched alarm; playback resumes when the owner opens the app.
+                // On earlier releases, attempt recovery; on Android 15+, keep the alarm latched
+                // and resume playback when the owner opens the app.
+                if (Build.VERSION.SDK_INT < 35) {
+                    runCatching {
+                        ContextCompat.startForegroundService(
+                            context,
+                            Intent(context, AlarmService::class.java).setAction(AlarmService.ACTION_START)
+                        )
+                    }
+                }
             }
             else -> AlarmScheduler.cancel(context)
         }
