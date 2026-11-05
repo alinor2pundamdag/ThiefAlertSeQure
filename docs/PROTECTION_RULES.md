@@ -32,7 +32,7 @@ No other event may clear ALARM_TRIGGERED.
 ## 3. Countdown integrity
 
 - Use elapsedRealtime plus boot count on the same boot. This clock is not affected by user wall-clock changes.
-- If reboot occurs during COUNTDOWN, fail closed: trigger ALARM_TRIGGERED immediately when the charger remains absent; if the charger is connected at boot, return to ARMED. Do not trust a mutable wall clock to extend the grace period across reboot.
+- If reboot occurs during COUNTDOWN, revalidate the live charger state. If connected, return to ARMED. If disconnected, restart a full 10-second grace period. If charger state or boot identity is unknown, do not expire the old deadline; wait for reliable state/boot identity. Never use wall-clock expiry for a persisted monotonic deadline when boot identity cannot be verified.
 - Re-check the deadline inside AlarmDeadlineReceiver before changing state.
 - Prefer setExactAndAllowWhileIdle when Android permits it.
 - Android 12+ requires user-granted SCHEDULE_EXACT_ALARM access for this app's exact-alarm route.
