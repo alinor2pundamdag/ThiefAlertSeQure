@@ -13,7 +13,7 @@ class BootReceiver : BroadcastReceiver() {
         PowerTransitionCoordinator.initializeBaseline(context)
         if (intent.action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED) {
             if (Build.VERSION.SDK_INT >= 31 && context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()) {
-                val state = ProtectionStore(context).read()
+                val state = enforceMonitorOptOut(context)
                 when (state.mode) {
                     ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
                     ProtectionMode.ALARM_TRIGGERED -> scheduleAlarmRecovery(
@@ -31,12 +31,18 @@ class BootReceiver : BroadcastReceiver() {
         }
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
 
+        val stateBeforeRestore = enforceMonitorOptOut(context)
         val charging = ExternalPowerState.readConnected(context)
         val now = System.currentTimeMillis()
         val elapsed = ProtectionClock.elapsedRealtime()
         val boot = ProtectionClock.bootCount(context)
         val next = ProtectionStore(context).update { old ->
-            if (charging == null) old else ProtectionEngine.restoreAfterBoot(old, charging, now, elapsed, boot)
+            when {
+                old.mode == ProtectionMode.ALARM_TRIGGERED -> old
+                !monitorEnabled(context) -> stateBeforeRestore
+                charging == null -> old
+                else -> ProtectionEngine.restoreAfterBoot(old, charging, now, elapsed, boot)
+            }
         }
         when (next.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
@@ -50,7 +56,7 @@ class BootReceiver : BroadcastReceiver() {
 
     /** Package replacement preserves the current boot's monotonic countdown deadline. */
     private fun restoreAfterAppUpdate(context: Context) {
-        val state = ProtectionStore(context).read()
+        val state = enforceMonitorOptOut(context)
         when (state.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
             ProtectionMode.ALARM_TRIGGERED -> scheduleAlarmRecovery(
@@ -75,6 +81,14 @@ class BootReceiver : BroadcastReceiver() {
         }.onFailure {
             LocalTamperHistory.record(context, "${source}_monitor_start_failed", it.javaClass.simpleName + ": " + it.message)
             AlarmRecoveryNotice.show(context, "Background charger monitoring could not start; open the app to restore it")
+        }
+    }
+
+    private fun enforceMonitorOptOut(context: Context): ProtectionState {
+        if (monitorEnabled(context)) return ProtectionStore(context).read()
+        return ProtectionStore(context).update { current ->
+            if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
+            else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
         }
     }
 
