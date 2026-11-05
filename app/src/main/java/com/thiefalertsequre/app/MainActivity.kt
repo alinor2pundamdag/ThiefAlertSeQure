@@ -420,8 +420,11 @@ class MainActivity : FragmentActivity() {
         }
         when (state.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(this, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
-            ProtectionMode.ALARM_TRIGGERED -> runCatching {
-                ContextCompat.startForegroundService(this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START))
+            ProtectionMode.ALARM_TRIGGERED -> {
+                AlarmScheduler.cancel(this)
+                runCatching {
+                    ContextCompat.startForegroundService(this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START))
+                }
             }
             else -> AlarmScheduler.cancel(this)
         }
