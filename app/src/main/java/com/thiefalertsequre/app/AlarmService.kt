@@ -52,6 +52,7 @@ class AlarmService : Service() {
             LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active")
         } catch (error: Exception) {
             LocalTamperHistory.record(this, "alarm_service_start_failed", error.javaClass.simpleName + ": " + error.message)
+            AlarmRecoveryNotice.show(this, "Android refused to keep the alarm foreground service running")
             stopSelf()
             return START_NOT_STICKY
         }
