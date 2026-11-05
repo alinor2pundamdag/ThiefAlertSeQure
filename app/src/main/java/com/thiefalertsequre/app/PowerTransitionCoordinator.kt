@@ -41,6 +41,7 @@ object PowerTransitionCoordinator {
         if (connected) {
             confirmConnectedAndArm(context, "Connected power snapshot reconciled")
         }
+        Unit
     }
 
     fun onPowerConnected(context: Context): ProtectionState =
