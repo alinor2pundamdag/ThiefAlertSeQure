@@ -11,7 +11,7 @@ A local-only Android charging anti-theft alarm. Installed application name: **Th
 - Rebooting during COUNTDOWN requires a fresh live charger-state check. If still disconnected, a new full 10-second grace period starts; if connected, protection returns to ARMED. An unknown charger or boot state never expires the old deadline.
 - At the deadline, ALARM_TRIGGERED is latched. Reconnecting the charger cannot clear it.
 - Only successful Android Keyguard device-credential verification or AndroidX BIOMETRIC_STRONG authentication clears the triggered state.
-- Cancelled and failed authentication never clear the alarm.
+- Cancelled and failed authentication never clear the alarm. Explicitly disabling background monitoring cancels a pending countdown and disarms protection, but cannot clear an active alarm.
 - Five consecutive biometric failures start a 30-second cooldown. After the cooldown, a new group of five failures can start another cooldown.
 - Android controls incorrect PIN, pattern and password lockout. The app never reads or stores device credentials.
 
