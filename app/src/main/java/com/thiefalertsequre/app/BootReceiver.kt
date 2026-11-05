@@ -9,6 +9,8 @@ import androidx.core.content.ContextCompat
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // Run migration/baseline initialization for every boot receiver entry path.
+        PowerTransitionCoordinator.initializeBaseline(context)
         if (intent.action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED) {
             if (Build.VERSION.SDK_INT >= 31 && context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()) {
                 val state = ProtectionStore(context).read()
@@ -29,7 +31,6 @@ class BootReceiver : BroadcastReceiver() {
         }
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
 
-        PowerTransitionCoordinator.initializeBaseline(context)
         val charging = ExternalPowerState.readConnected(context)
         val now = System.currentTimeMillis()
         val elapsed = ProtectionClock.elapsedRealtime()
@@ -49,7 +50,6 @@ class BootReceiver : BroadcastReceiver() {
 
     /** Package replacement preserves the current boot's monotonic countdown deadline. */
     private fun restoreAfterAppUpdate(context: Context) {
-        PowerTransitionCoordinator.initializeBaseline(context)
         val state = ProtectionStore(context).read()
         when (state.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
