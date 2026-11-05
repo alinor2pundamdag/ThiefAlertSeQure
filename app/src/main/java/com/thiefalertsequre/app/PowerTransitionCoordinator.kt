@@ -57,6 +57,20 @@ object PowerTransitionCoordinator {
         if (connected) confirmConnectedAndArmLocked(context, "Connected power snapshot reconciled")
     }
 
+    /** Establish a fresh non-transition baseline when the owner re-enables monitoring. */
+    fun resetBaselineToCurrentPower(context: Context, reason: String) = synchronized(lock) {
+        val connected = ExternalPowerState.readConnected(context) ?: return@synchronized
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putBoolean(KNOWN, true)
+            .putBoolean(CONNECTED, connected)
+            .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
+            .putLong(GENERATION, prefs.getLong(GENERATION, 0L) + 1L)
+            .commit()
+        if (connected) confirmConnectedAndArmLocked(context, reason)
+        else LocalTamperHistory.record(context, "power_baseline_reset", "$reason; disconnected state recorded without creating a countdown")
+    }
+
     fun onPowerConnected(context: Context): ProtectionState =
         confirmConnectedAndArm(context, "System power-connected transition received")
 
