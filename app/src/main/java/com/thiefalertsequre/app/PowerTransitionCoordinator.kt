@@ -49,6 +49,8 @@ object PowerTransitionCoordinator {
     }
 
     fun onPowerDisconnected(context: Context) = synchronized(lock) {
+        // Ensure pre-upgrade countdowns are sanitized before considering this event.
+        initializeBaseline(context)
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (!prefs.getBoolean(KNOWN, false) || !prefs.getBoolean(CONNECTED, false)) {
             val observed = ExternalPowerState.readConnected(context)
