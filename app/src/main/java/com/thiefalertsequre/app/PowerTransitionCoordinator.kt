@@ -135,16 +135,24 @@ object PowerTransitionCoordinator {
             .putLong(GENERATION, prefs.getLong(GENERATION, 0L) + 1L)
             .commit()
 
+        val monitorEnabled = context.getSharedPreferences(
+            ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
+        ).getBoolean(
+            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
         val state = ProtectionStore(context).update { current ->
-            if (current.mode == ProtectionMode.ARMED || current.mode == ProtectionMode.ALARM_TRIGGERED) {
-                current
-            } else {
-                ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
+            when {
+                current.mode == ProtectionMode.ALARM_TRIGGERED -> current
+                !monitorEnabled -> ProtectionState(
+                    ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1
+                )
+                current.mode == ProtectionMode.ARMED -> current
+                else -> ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
             }
         }
         if (state.mode != ProtectionMode.ALARM_TRIGGERED) {
             AlarmScheduler.cancel(context)
-            notifyMonitorStateChanged(context)
+            if (monitorEnabled) notifyMonitorStateChanged(context)
         }
         LocalTamperHistory.record(context, "charger_connected_confirmed", reason)
         return state
