@@ -79,6 +79,29 @@ class ProtectionEngineTest {
         val connected = ProtectionEngine.reconcileCountdown(previousBoot, true, 50_000L, 500L, 8)
         assertEquals(ProtectionMode.ARMED, connected.mode)
     }
+
+    @Test fun unknownBootIdentityCannotExpireMonotonicCountdownUsingWallClock() {
+        val countdown = ProtectionState(ProtectionMode.COUNTDOWN, 11_000L, 1_000L, 15_000L, 7)
+        val result = ProtectionEngine.reconcileCountdown(countdown, false, 99_000_000L, 99_000L, -1)
+        assertEquals(ProtectionMode.COUNTDOWN, result.mode)
+        assertEquals(15_000L, result.deadlineElapsedRealtimeMs)
+        assertEquals(ProtectionMode.COUNTDOWN, ProtectionEngine.evaluateDeadline(countdown, 99_000_000L, 99_000L, -1).mode)
+    }
+
+    @Test fun unknownBootIdentityCanCancelCountdownWhenChargerIsConfirmedConnected() {
+        val countdown = ProtectionState(ProtectionMode.COUNTDOWN, 11_000L, 1_000L, 15_000L, 7)
+        val result = ProtectionEngine.reconcileCountdown(countdown, true, 99_000_000L, 99_000L, -1)
+        assertEquals(ProtectionMode.ARMED, result.mode)
+    }
+
+    @Test fun countdownCreatedWithoutBootIdentityIsRebasedWhenIdentityBecomesAvailable() {
+        val countdown = ProtectionState(ProtectionMode.COUNTDOWN, 11_000L, 1_000L, 15_000L, -1)
+        val result = ProtectionEngine.reconcileCountdown(countdown, false, 50_000L, 500L, 8)
+        assertEquals(ProtectionMode.COUNTDOWN, result.mode)
+        assertEquals(60_000L, result.deadlineEpochMs)
+        assertEquals(10_500L, result.deadlineElapsedRealtimeMs)
+        assertEquals(8, result.bootCount)
+    }
     @Test fun authenticatedAlarmWaitsForPlugThenUnplugBeforeNextCycle() {
         val alarm = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
         val disarmed = ProtectionEngine.authenticated(alarm, 12_000)
