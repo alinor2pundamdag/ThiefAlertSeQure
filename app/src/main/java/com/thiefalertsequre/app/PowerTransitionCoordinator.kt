@@ -136,6 +136,23 @@ object PowerTransitionCoordinator {
         }
     }
 
+
+    /**
+     * An unplug candidate is not authoritative until stable physical-state
+     * sampling succeeds. Restore the prior connected baseline only when this
+     * candidate still owns the generation; a newer connect event must win.
+     */
+    private fun restoreDisconnectCandidateLocked(context: Context, expectedGeneration: Long) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (prefs.getLong(GENERATION, -1L) != expectedGeneration ||
+            prefs.getBoolean(CONNECTED, true)
+        ) return
+        prefs.edit()
+            .putBoolean(CONNECTED, true)
+            .putLong(GENERATION, expectedGeneration + 1L)
+            .commit()
+    }
+
     private fun notifyMonitorStateChanged(context: Context) {
         context.applicationContext.sendBroadcast(
             Intent(ProtectionMonitorService.ACTION_REFRESH).setPackage(context.packageName)
@@ -233,7 +250,10 @@ object PowerTransitionCoordinator {
                     Thread.sleep(350L)
                 } catch (_: InterruptedException) {
                     Thread.currentThread().interrupt()
-                    LocalTamperHistory.record(appContext, "charger_unplug_rejected", "Debounce sampling interrupted")
+                    synchronized(lock) {
+                        restoreDisconnectCandidateLocked(appContext, candidateGeneration)
+                    }
+                    LocalTamperHistory.record(appContext, "charger_unplug_rejected", "Debounce sampling interrupted; connected baseline restored for a future genuine transition")
                     return ProtectionStore(appContext).read()
                 }
             }
@@ -241,6 +261,10 @@ object PowerTransitionCoordinator {
         if (consecutiveDisconnected < 3) {
             if (lastObserved == true) {
                 confirmConnectedAndArm(appContext, "Final debounce sample confirms external power is connected")
+            } else {
+                synchronized(lock) {
+                    restoreDisconnectCandidateLocked(appContext, candidateGeneration)
+                }
             }
             LocalTamperHistory.record(
                 appContext, "charger_unplug_rejected",
@@ -263,7 +287,8 @@ object PowerTransitionCoordinator {
                 if (finalConnected == true) {
                     confirmConnectedAndArmLocked(appContext, "Final connected snapshot invalidated unplug candidate")
                 } else {
-                    LocalTamperHistory.record(appContext, "charger_unplug_rejected", "Final power-state sample was unknown")
+                    restoreDisconnectCandidateLocked(appContext, candidateGeneration)
+                    LocalTamperHistory.record(appContext, "charger_unplug_rejected", "Final power-state sample was unknown; connected baseline restored for a future genuine transition")
                 }
                 return@synchronized ProtectionStore(appContext).read()
             }
