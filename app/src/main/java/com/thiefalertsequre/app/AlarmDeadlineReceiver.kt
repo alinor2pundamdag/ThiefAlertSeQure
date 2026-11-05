@@ -39,11 +39,24 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         }
 
         var transitionedToAlarm = false
+        var callbackStillCurrent = false
         val updated = ProtectionStore(context).update { current ->
+            // Revalidate the token under the same store lock as the transition.
+            // A newer countdown may have replaced it after the initial read above.
+            if (!ProtectionEngine.isCurrentDeadline(
+                    current, tokenDeadline, tokenElapsed, tokenBoot
+                )
+            ) return@update current
+
+            callbackStillCurrent = true
             val next = ProtectionEngine.reconcileCountdown(current, connected, now, elapsed, boot)
             transitionedToAlarm = current.mode == ProtectionMode.COUNTDOWN &&
                 next.mode == ProtectionMode.ALARM_TRIGGERED
             next
+        }
+        if (!callbackStillCurrent) {
+            LocalTamperHistory.record(context, "stale_deadline_rejected", "Countdown changed while deadline callback was validating")
+            return
         }
 
         when (updated.mode) {
