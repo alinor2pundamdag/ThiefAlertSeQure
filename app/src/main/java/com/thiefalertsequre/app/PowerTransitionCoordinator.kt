@@ -13,13 +13,13 @@ object PowerTransitionCoordinator {
     fun initializeBaseline(context: Context) = synchronized(lock) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (prefs.getBoolean(KNOWN, false)) return@synchronized
-        val value = ExternalPowerState.readConnected(context) ?: return@synchronized
-        prefs.edit().putBoolean(CONNECTED, value).putBoolean(KNOWN, true).commit()
-        // Migration guard: a COUNTDOWN persisted by older snapshot-based code has
-        // no trustworthy transition provenance. Discard it instead of firing it.
-        val prior = ProtectionStore(context).read()
+
+        // Migration must run even when Android has not supplied a battery snapshot.
+        // Old COUNTDOWN states have no trusted unplug-event provenance.
+        val store = ProtectionStore(context)
+        val prior = store.read()
         if (prior.mode == ProtectionMode.COUNTDOWN) {
-            ProtectionStore(context).update { current ->
+            store.update { current ->
                 if (current.mode == ProtectionMode.COUNTDOWN) {
                     ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
                 } else current
@@ -27,6 +27,9 @@ object PowerTransitionCoordinator {
             AlarmScheduler.cancel(context)
             LocalTamperHistory.record(context, "legacy_countdown_discarded", "Unverifiable pre-transition countdown discarded during migration")
         }
+
+        val value = ExternalPowerState.readConnected(context) ?: return@synchronized
+        prefs.edit().putBoolean(CONNECTED, value).putBoolean(KNOWN, true).commit()
         LocalTamperHistory.record(context, "power_baseline_initialized", "Initial state recorded; no transition inferred")
     }
 
