@@ -12,7 +12,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 
 ## State integrity
 - State transitions are serialized through ProtectionStore.
-- Triggered state is monotonic against charger events; only successful Keyguard or BiometricPrompt authentication clears it.
+- Triggered state is monotonic against charger events and owner monitoring opt-out; only successful Keyguard or BiometricPrompt authentication clears it. Explicitly disabling monitoring can disarm non-triggered states and cancels their pending deadline.
 - State and throttle are synchronously persisted.
 - Countdown uses elapsedRealtime plus a verified boot count. If a countdown was pending at reboot and the charger remains absent, restart a full 10-second grace period; if charging, protection returns to ARMED. If boot identity is unavailable, never use wall-clock time to expire a monotonic deadline.
 - AlarmDeadlineReceiver rechecks the deadline and reschedules early delivery.
