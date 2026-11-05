@@ -15,6 +15,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
 import androidx.fragment.app.FragmentActivity
 import com.google.android.material.button.MaterialButton
@@ -143,9 +144,68 @@ class SettingsActivity : FragmentActivity() {
         root.addView(action("Stop audio preview") { stopPreview() })
         root.addView(space(6))
         root.addView(text(
-            "The main alarm selection is used by the alarm service. The secondary alert selection is stored and validated, but is not yet connected to a separate warning trigger.",
-            12f, R.color.tas_warning
+            "The main alarm selection is used for theft alarms. The secondary alert selection is used for the optional battery-threshold alert.",
+            12f, R.color.tas_muted
         ))
+        root.addView(space(18))
+        root.addView(text("BACKGROUND PROTECTION MONITOR", 11f, R.color.tas_primary, true))
+        root.addView(space(8))
+        root.addView(text(
+            "This user-enabled foreground service monitors movement and battery threshold crossings while its persistent notification is visible. It can be stopped from the notification. Android and device manufacturers may still stop it.",
+            13f, R.color.tas_muted
+        ))
+        val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+        val monitorEnabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, false)
+        root.addView(action(if (monitorEnabled) "Disable background monitoring" else "Enable background monitoring") {
+            val enabled = !monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, false)
+            monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).apply()
+            if (enabled && ProtectionStore(this).read().mode == ProtectionMode.ARMED) {
+                runCatching {
+                    ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
+                }.onFailure {
+                    android.widget.Toast.makeText(this, "Monitor could not start: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+                }
+            } else if (!enabled) {
+                stopService(Intent(this, ProtectionMonitorService::class.java))
+            } else {
+                android.widget.Toast.makeText(this, "Saved. Open the dashboard while protection is armed to start monitoring.", android.widget.Toast.LENGTH_LONG).show()
+            }
+            render()
+        })
+        val sensitivity = MotionSensitivity.fromStored(
+            monitorPrefs.getString(ProtectionMonitorService.KEY_SENSITIVITY, MotionSensitivity.MEDIUM.name)
+        )
+        root.addView(action("Motion sensitivity: ${sensitivity.name.lowercase()}") {
+            val choices = MotionSensitivity.values().map { it.name.lowercase() }.toTypedArray()
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Motion sensitivity")
+                .setSingleChoiceItems(choices, MotionSensitivity.values().indexOf(sensitivity)) { dialog, which ->
+                    monitorPrefs.edit().putString(ProtectionMonitorService.KEY_SENSITIVITY, MotionSensitivity.values()[which].name).apply()
+                    dialog.dismiss()
+                    render()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        })
+        val batteryAlertEnabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BATTERY_ALERT_ENABLED, false)
+        root.addView(action("Battery threshold alert: ${if (batteryAlertEnabled) "ON" else "OFF"}") {
+            monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_BATTERY_ALERT_ENABLED, !batteryAlertEnabled).apply()
+            render()
+        })
+        val threshold = monitorPrefs.getInt(ProtectionMonitorService.KEY_BATTERY_THRESHOLD, 80)
+        root.addView(action("Battery alert threshold: ${threshold}%") {
+            val choices = arrayOf("80%", "85%", "90%", "95%", "100%")
+            val values = intArrayOf(80, 85, 90, 95, 100)
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Battery alert threshold")
+                .setSingleChoiceItems(choices, values.indexOf(threshold).coerceAtLeast(0)) { dialog, which ->
+                    monitorPrefs.edit().putInt(ProtectionMonitorService.KEY_BATTERY_THRESHOLD, values[which]).apply()
+                    dialog.dismiss()
+                    render()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        })
         root.addView(space(22))
 
         root.addView(text("LOCAL TAMPER HISTORY", 11f, R.color.tas_primary, true))

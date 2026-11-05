@@ -352,6 +352,22 @@ class MainActivity : FragmentActivity() {
             }
             else -> AlarmScheduler.cancel(this)
         }
+        syncProtectionMonitor(next)
+    }
+
+    private fun syncProtectionMonitor(state: ProtectionState) {
+        val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+        val enabled = prefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, false)
+        if (enabled && (state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN)) {
+            runCatching {
+                ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
+            }.onFailure {
+                LocalTamperHistory.record(this, "monitor_start_blocked", it.javaClass.simpleName + ": " + it.message)
+                prefs.edit().putBoolean(ProtectionMonitorService.KEY_RUNNING, false).apply()
+            }
+        } else if (!enabled || state.mode == ProtectionMode.DISARMED || state.mode == ProtectionMode.ALARM_TRIGGERED) {
+            stopService(Intent(this, ProtectionMonitorService::class.java))
+        }
     }
 
     private fun requestExactAlarmAccess() {
@@ -445,7 +461,13 @@ class MainActivity : FragmentActivity() {
         } else {
             "Main alarm sound: NOT CONFIGURED — protection arming is blocked."
         }
-        details.text = listOf(stateMessage, soundMessage, attemptMessage, exactAlarmMessage, notificationMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
+        val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+        val monitorMessage = if (monitorPrefs.getBoolean(ProtectionMonitorService.KEY_RUNNING, false)) {
+            "Background motion/battery monitor: ACTIVE"
+        } else {
+            "Background motion/battery monitor: INACTIVE (enable it in Settings)"
+        }
+        details.text = listOf(stateMessage, soundMessage, monitorMessage, attemptMessage, exactAlarmMessage, notificationMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
 
         val alarmActive = state.mode == ProtectionMode.ALARM_TRIGGERED
         val biometricAvailable = BiometricManager.from(this)

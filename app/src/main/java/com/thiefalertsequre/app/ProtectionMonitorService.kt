@@ -1,0 +1,365 @@
+package com.thiefalertsequre.app
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.os.Build
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+
+/**
+ * User-enabled, user-visible anti-theft monitor. It keeps accelerometer and
+ * battery broadcasts active while its foreground notification is present.
+ * AlarmManager remains the process-death/reboot backup for charger deadlines.
+ */
+class ProtectionMonitorService : Service(), SensorEventListener {
+    private val handler = Handler(Looper.getMainLooper())
+    private val gravity = FloatArray(3)
+    private var gravityInitialized = false
+    private var samplesAboveThreshold = 0
+    private var lastMotionTriggerElapsed = 0L
+    private var sensorManager: SensorManager? = null
+    private var accelerometer: Sensor? = null
+    private var sensorRegistered = false
+    private var receiverRegistered = false
+    private var alertPlayer: MediaPlayer? = null
+    private val prefs by lazy { getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
+
+    private val countdownRunnable = Runnable { evaluateCountdown() }
+
+    private val systemReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                Intent.ACTION_POWER_CONNECTED -> handlePowerConnected()
+                Intent.ACTION_POWER_DISCONNECTED -> handlePowerDisconnected()
+                Intent.ACTION_BATTERY_CHANGED -> handleBatteryChanged(intent)
+            }
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        sensorManager = getSystemService(SensorManager::class.java)
+        accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        createNotificationChannel()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP) {
+            prefs.edit().putBoolean(KEY_ENABLED, false).apply()
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        val state = ProtectionStore(this).read()
+        if (!prefs.getBoolean(KEY_ENABLED, false) ||
+            state.mode == ProtectionMode.DISARMED ||
+            state.mode == ProtectionMode.ALARM_TRIGGERED
+        ) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        try {
+            startForeground(NOTIFICATION_ID, buildNotification())
+            prefs.edit().putBoolean(KEY_RUNNING, true).apply()
+        } catch (error: Exception) {
+            LocalTamperHistory.record(this, "monitor_fgs_start_failed", error.javaClass.simpleName + ": " + error.message)
+            prefs.edit().putBoolean(KEY_RUNNING, false).apply()
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        registerSystemReceiver()
+        syncMotionSensor()
+        if (state.mode == ProtectionMode.COUNTDOWN) scheduleCountdown(state)
+        LocalTamperHistory.record(this, "monitor_started", "User-enabled foreground motion and battery monitor active")
+        return START_STICKY
+    }
+
+    private fun registerSystemReceiver() {
+        if (receiverRegistered) return
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_BATTERY_CHANGED)
+            addAction(Intent.ACTION_POWER_CONNECTED)
+            addAction(Intent.ACTION_POWER_DISCONNECTED)
+        }
+        ContextCompat.registerReceiver(this, systemReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        receiverRegistered = true
+    }
+
+    private fun handlePowerConnected() {
+        prefs.edit()
+            .putBoolean(KEY_BATTERY_ALERT_FIRED, false)
+            .putInt(KEY_LAST_BATTERY_LEVEL, -1)
+            .apply()
+        val now = System.currentTimeMillis()
+        val next = ProtectionStore(this).update { old ->
+            if (old.mode == ProtectionMode.COUNTDOWN ||
+                (old.mode == ProtectionMode.DISARMED && AlarmSoundStore.hasAlarmSound(this))
+            ) ProtectionEngine.chargerConnected(old, now) else old
+        }
+        handler.removeCallbacks(countdownRunnable)
+        if (next.mode == ProtectionMode.ARMED) syncMotionSensor()
+    }
+
+    private fun handlePowerDisconnected() {
+        val now = System.currentTimeMillis()
+        val elapsed = ProtectionClock.elapsedRealtime()
+        val boot = ProtectionClock.bootCount(this)
+        val next = ProtectionStore(this).update { old ->
+            if (old.mode == ProtectionMode.ARMED) {
+                ProtectionEngine.chargerDisconnected(old, now, elapsed, boot)
+            } else old
+        }
+        unregisterMotionSensor()
+        if (next.mode == ProtectionMode.COUNTDOWN) scheduleCountdown(next)
+    }
+
+    private fun scheduleCountdown(state: ProtectionState) {
+        handler.removeCallbacks(countdownRunnable)
+        val remaining = ProtectionEngine.remainingMs(
+            state, System.currentTimeMillis(), ProtectionClock.elapsedRealtime(), ProtectionClock.bootCount(this)
+        )
+        handler.postDelayed(countdownRunnable, remaining.coerceAtLeast(0L))
+    }
+
+    private fun evaluateCountdown() {
+        val now = System.currentTimeMillis()
+        val elapsed = ProtectionClock.elapsedRealtime()
+        val boot = ProtectionClock.bootCount(this)
+        val next = ProtectionStore(this).update { ProtectionEngine.evaluateDeadline(it, now, elapsed, boot) }
+        if (next.mode == ProtectionMode.ALARM_TRIGGERED) {
+            AlarmScheduler.cancel(this)
+            LocalTamperHistory.record(this, "monitor_countdown_expired", "Foreground monitor reached the monotonic ten-second deadline")
+            startTheftAlarm()
+        } else if (next.mode == ProtectionMode.COUNTDOWN) {
+            scheduleCountdown(next)
+        }
+    }
+
+    private fun syncMotionSensor() {
+        if (ProtectionStore(this).read().mode != ProtectionMode.ARMED || sensorRegistered) return
+        val sensor = accelerometer
+        if (sensor == null) {
+            LocalTamperHistory.record(this, "motion_sensor_unavailable", "No accelerometer is available")
+            return
+        }
+        sensorRegistered = sensorManager?.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL) == true
+        if (!sensorRegistered) LocalTamperHistory.record(this, "motion_sensor_register_failed")
+    }
+
+    private fun unregisterMotionSensor() {
+        if (sensorRegistered) sensorManager?.unregisterListener(this)
+        sensorRegistered = false
+        gravityInitialized = false
+        samplesAboveThreshold = 0
+    }
+
+    override fun onSensorChanged(event: SensorEvent) {
+        if (event.sensor.type != Sensor.TYPE_ACCELEROMETER) return
+        if (ProtectionStore(this).read().mode != ProtectionMode.ARMED) {
+            unregisterMotionSensor()
+            return
+        }
+        val values = event.values
+        if (!gravityInitialized) {
+            for (i in 0..2) gravity[i] = values[i]
+            gravityInitialized = true
+            return
+        }
+        val alpha = 0.8f
+        for (i in 0..2) gravity[i] = alpha * gravity[i] + (1f - alpha) * values[i]
+        val x = values[0] - gravity[0]
+        val y = values[1] - gravity[1]
+        val z = values[2] - gravity[2]
+        val sensitivity = MotionSensitivity.fromStored(
+            getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_SENSITIVITY, MotionSensitivity.MEDIUM.name)
+        )
+        if (MotionDetection.exceedsThreshold(x, y, z, sensitivity)) {
+            samplesAboveThreshold++
+            val elapsed = android.os.SystemClock.elapsedRealtime()
+            if (samplesAboveThreshold >= 2 && elapsed - lastMotionTriggerElapsed >= MOTION_COOLDOWN_MS) {
+                lastMotionTriggerElapsed = elapsed
+                triggerMotionAlarm(sensitivity)
+            }
+        } else {
+            samplesAboveThreshold = 0
+        }
+    }
+
+    private fun triggerMotionAlarm(sensitivity: MotionSensitivity) {
+        val now = System.currentTimeMillis()
+        val next = ProtectionStore(this).update { old ->
+            if (old.mode == ProtectionMode.ARMED) {
+                ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, now, 0L, ProtectionClock.bootCount(this))
+            } else old
+        }
+        if (next.mode == ProtectionMode.ALARM_TRIGGERED) {
+            LocalTamperHistory.record(this, "motion_alarm_triggered", "Motion threshold exceeded; sensitivity=${sensitivity.name}")
+            unregisterMotionSensor()
+            startTheftAlarm()
+        }
+    }
+
+    private fun handleBatteryChanged(intent: Intent) {
+        if (!prefs.getBoolean(KEY_BATTERY_ALERT_ENABLED, false)) return
+        val plugged = intent.getIntExtra(Intent.EXTRA_PLUGGED, 0) != 0
+        val level = intent.getIntExtra("level", -1)
+        val scale = intent.getIntExtra("scale", -1)
+        if (!plugged || level < 0 || scale <= 0) return
+        val percent = (level * 100f / scale).toInt()
+        val previous = prefs.getInt(KEY_LAST_BATTERY_LEVEL, -1)
+        val threshold = prefs.getInt(KEY_BATTERY_THRESHOLD, 80).coerceIn(50, 100)
+        if (previous >= 0 && previous < threshold && percent >= threshold &&
+            !prefs.getBoolean(KEY_BATTERY_ALERT_FIRED, false)
+        ) {
+            prefs.edit().putBoolean(KEY_BATTERY_ALERT_FIRED, true).putInt(KEY_LAST_BATTERY_LEVEL, percent).apply()
+            LocalTamperHistory.record(this, "battery_threshold_reached", "Battery crossed configured threshold: ${threshold}%")
+            playBatteryAlert()
+        } else {
+            prefs.edit().putInt(KEY_LAST_BATTERY_LEVEL, percent).apply()
+        }
+    }
+
+    private fun playBatteryAlert() {
+        val uri = AlarmSoundStore.uri(this, AlarmSoundStore.ALERT)
+        if (uri == null) {
+            LocalTamperHistory.record(this, "battery_alert_sound_missing", "No secondary alert audio selected")
+            vibrateOnce()
+            return
+        }
+        runCatching {
+            MediaPlayer().apply {
+                alertPlayer = this
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                setDataSource(this@ProtectionMonitorService, uri)
+                setOnPreparedListener { runCatching { it.start() }.onFailure { _ -> vibrateOnce() } }
+                setOnCompletionListener { releaseAlertPlayer() }
+                setOnErrorListener { _, what, extra ->
+                    LocalTamperHistory.record(this@ProtectionMonitorService, "battery_alert_audio_failed", "MediaPlayer error $what/$extra")
+                    releaseAlertPlayer()
+                    vibrateOnce()
+                    true
+                }
+                prepareAsync()
+            }
+        }.onFailure {
+            LocalTamperHistory.record(this, "battery_alert_audio_open_failed", it.javaClass.simpleName + ": " + it.message)
+            vibrateOnce()
+        }
+    }
+
+    private fun releaseAlertPlayer() {
+        runCatching { alertPlayer?.release() }
+        alertPlayer = null
+    }
+
+    private fun vibrateOnce() {
+        val deviceVibrator = getSystemService(Vibrator::class.java) ?: return
+        if (!deviceVibrator.hasVibrator()) return
+        runCatching {
+            if (Build.VERSION.SDK_INT >= 26) {
+                deviceVibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 350, 200, 350), -1))
+            } else {
+                @Suppress("DEPRECATION")
+                deviceVibrator.vibrate(longArrayOf(0, 350, 200, 350), -1)
+            }
+        }
+    }
+
+    private fun startTheftAlarm() {
+        runCatching {
+            ContextCompat.startForegroundService(
+                this,
+                Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START)
+            )
+        }.onFailure {
+            LocalTamperHistory.record(this, "monitor_alarm_service_start_failed", it.javaClass.simpleName + ": " + it.message)
+            AlarmScheduler.scheduleImmediateRecovery(this)
+        }
+        stopSelf()
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= 26) {
+            getSystemService(NotificationManager::class.java).createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, "Protection monitoring", NotificationManager.IMPORTANCE_LOW).apply {
+                    description = "Visible notification while motion and battery protection monitoring is enabled"
+                    setSound(null, null)
+                }
+            )
+        }
+    }
+
+    private fun buildNotification(): Notification {
+        val open = PendingIntent.getActivity(
+            this, 501, Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val stop = PendingIntent.getService(
+            this, 502, Intent(this, ProtectionMonitorService::class.java).setAction(ACTION_STOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentTitle("ThiefAlertSeQure protection monitor")
+            .setContentText("Motion, charger and optional battery-threshold monitoring are active.")
+            .setContentIntent(open)
+            .addAction(android.R.drawable.ic_media_pause, "Stop monitoring", stop)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+
+    override fun onDestroy() {
+        handler.removeCallbacks(countdownRunnable)
+        unregisterMotionSensor()
+        if (receiverRegistered) runCatching { unregisterReceiver(systemReceiver) }
+        receiverRegistered = false
+        releaseAlertPlayer()
+        prefs.edit().putBoolean(KEY_RUNNING, false).apply()
+        LocalTamperHistory.record(this, "monitor_stopped")
+        super.onDestroy()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    companion object {
+        const val PREFS = "protection_monitor_v1"
+        const val KEY_ENABLED = "monitor_enabled"
+        const val KEY_RUNNING = "monitor_running"
+        const val KEY_SENSITIVITY = "motion_sensitivity"
+        const val KEY_BATTERY_ALERT_ENABLED = "battery_alert_enabled"
+        const val KEY_BATTERY_THRESHOLD = "battery_threshold"
+        private const val KEY_BATTERY_ALERT_FIRED = "battery_alert_fired"
+        private const val KEY_LAST_BATTERY_LEVEL = "last_battery_level"
+        private const val CHANNEL_ID = "protection_monitor"
+        private const val NOTIFICATION_ID = 501
+        const val ACTION_STOP = "com.thiefalertsequre.STOP_MONITOR"
+        private const val MOTION_COOLDOWN_MS = 5_000L
+    }
+}

@@ -52,7 +52,19 @@ class BootReceiver : BroadcastReceiver() {
                     }
                 }
             }
-            else -> AlarmScheduler.cancel(context)
+            else -> {
+                AlarmScheduler.cancel(context)
+                if (next.mode == ProtectionMode.ARMED &&
+                    context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+                        .getBoolean(ProtectionMonitorService.KEY_ENABLED, false)
+                ) {
+                    runCatching {
+                        ContextCompat.startForegroundService(context, Intent(context, ProtectionMonitorService::class.java))
+                    }.onFailure {
+                        LocalTamperHistory.record(context, "boot_monitor_start_failed", it.javaClass.simpleName + ": " + it.message)
+                    }
+                }
+            }
         }
     }
 }
