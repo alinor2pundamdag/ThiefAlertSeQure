@@ -346,6 +346,9 @@ class MainActivity : FragmentActivity() {
         } else if (keyguard.isDeviceSecure) {
             authenticateDeviceCredential()
         } else {
+            // Do not latch the one-shot prompt guard when the owner has not yet
+            // configured a secure credential. Re-check automatically on resume.
+            autoAuthenticationRequested = false
             details.text = "No secure device credential is configured. Set a PIN, pattern or password in Android settings to enable owner verification."
             render()
         }
@@ -632,7 +635,10 @@ class MainActivity : FragmentActivity() {
         val throttle = store.readAuthenticationThrottle(now, elapsed, boot)
         if (AuthenticationThrottle.remainingMs(throttle, now, elapsed, boot) > 0L) {
             if (getSystemService(KeyguardManager::class.java).isDeviceSecure) authenticateDeviceCredential()
-            else render()
+            else {
+                autoAuthenticationRequested = false
+                render()
+            }
             return
         }
         val manager = BiometricManager.from(this)
@@ -644,7 +650,10 @@ class MainActivity : FragmentActivity() {
         }
         if (manager.canAuthenticate(allowedAuthenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
             if (keyguard.isDeviceSecure) authenticateDeviceCredential()
-            else details.text = "No enrolled strong biometric or secure device credential is available."
+            else {
+                autoAuthenticationRequested = false
+                details.text = "No enrolled strong biometric or secure device credential is available."
+            }
             return
         }
 
@@ -725,6 +734,7 @@ class MainActivity : FragmentActivity() {
             "Verify device owner", "Enter your existing phone PIN, pattern or password"
         )
         if (credentialIntent == null) {
+            autoAuthenticationRequested = false
             details.text = "Android could not open device credential verification."
             return
         }
