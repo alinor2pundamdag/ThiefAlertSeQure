@@ -79,9 +79,11 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
         try {
             startForeground(NOTIFICATION_ID, buildNotification())
+            isRunning = true
             prefs.edit().putBoolean(KEY_RUNNING, true).apply()
         } catch (error: Exception) {
             LocalTamperHistory.record(this, "monitor_fgs_start_failed", error.javaClass.simpleName + ": " + error.message)
+            isRunning = false
             prefs.edit().putBoolean(KEY_RUNNING, false).apply()
             stopSelf()
             return START_NOT_STICKY
@@ -368,6 +370,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         if (receiverRegistered) runCatching { unregisterReceiver(systemReceiver) }
         receiverRegistered = false
         releaseAlertPlayer()
+        isRunning = false
         prefs.edit().putBoolean(KEY_RUNNING, false).apply()
         LocalTamperHistory.record(this, "monitor_stopped")
         super.onDestroy()
@@ -376,6 +379,8 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
+        @Volatile var isRunning: Boolean = false
+            private set
         const val PREFS = "protection_monitor_v1"
         const val KEY_ENABLED = "monitor_enabled"
         const val KEY_RUNNING = "monitor_running"
