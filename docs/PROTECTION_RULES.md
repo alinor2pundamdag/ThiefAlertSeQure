@@ -61,8 +61,8 @@ No other event may clear ALARM_TRIGGERED.
 
 ## 5. Alarm audio policy
 
-- Play the exact supplied Opus recording in a loop.
-- Use ToneGenerator only if MediaPlayer cannot initialize the supplied audio.
+- Play the packaged Ogg Opus alarm asset in a loop through MediaPlayer.
+- If selected and packaged audio both fail, use a repeating vibration fallback; there is no ToneGenerator fallback in the current implementation.
 - Use USAGE_ALARM and request the maximum alarm-stream index reported by Android.
 - Save the prior alarm-stream volume once, before raising it.
 - Restore the prior volume only after verified disarm. Do not restore it if the service is destroyed while ALARM_TRIGGERED remains latched.
