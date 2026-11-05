@@ -51,8 +51,12 @@ object PowerTransitionCoordinator {
     fun confirmConnectedAndArm(context: Context, reason: String): ProtectionState = synchronized(lock) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(CONNECTED, true).putBoolean(KNOWN, true).commit()
-        val state = ProtectionStore(context).update {
-            ProtectionEngine.chargerConnected(it, System.currentTimeMillis())
+        val state = ProtectionStore(context).update { current ->
+            if (current.mode == ProtectionMode.ARMED || current.mode == ProtectionMode.ALARM_TRIGGERED) {
+                current
+            } else {
+                ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
+            }
         }
         AlarmScheduler.cancel(context)
         LocalTamperHistory.record(context, "charger_connected_confirmed", reason)
