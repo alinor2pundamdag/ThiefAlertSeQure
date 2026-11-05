@@ -208,12 +208,14 @@ class ProtectionMonitorService : Service(), SensorEventListener {
 
     private fun triggerMotionAlarm(sensitivity: MotionSensitivity) {
         val now = System.currentTimeMillis()
+        var transitionedByThisCall = false
         val next = ProtectionStore(this).update { old ->
             if (old.mode == ProtectionMode.ARMED) {
+                transitionedByThisCall = true
                 ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, now, 0L, ProtectionClock.bootCount(this))
             } else old
         }
-        if (next.mode == ProtectionMode.ALARM_TRIGGERED) {
+        if (transitionedByThisCall && next.mode == ProtectionMode.ALARM_TRIGGERED) {
             LocalTamperHistory.record(this, "motion_alarm_triggered", "Motion threshold exceeded; sensitivity=${sensitivity.name}")
             unregisterMotionSensor()
             startTheftAlarm()
