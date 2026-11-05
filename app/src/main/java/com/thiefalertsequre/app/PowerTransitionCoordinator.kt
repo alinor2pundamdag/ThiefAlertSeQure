@@ -33,14 +33,18 @@ object PowerTransitionCoordinator {
         LocalTamperHistory.record(context, "power_baseline_initialized", "Initial state recorded; no transition inferred")
     }
 
-    fun onPowerConnected(context: Context) = synchronized(lock) {
+    fun onPowerConnected(context: Context): ProtectionState =
+        confirmConnectedAndArm(context, "System power-connected transition received")
+
+    /** Used only after a live connected-state confirmation, including post-auth recovery. */
+    fun confirmConnectedAndArm(context: Context, reason: String): ProtectionState = synchronized(lock) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(CONNECTED, true).putBoolean(KNOWN, true).commit()
         val state = ProtectionStore(context).update {
             ProtectionEngine.chargerConnected(it, System.currentTimeMillis())
         }
         AlarmScheduler.cancel(context)
-        LocalTamperHistory.record(context, "charger_connected_event", "System power-connected transition received")
+        LocalTamperHistory.record(context, "charger_connected_confirmed", reason)
         state
     }
 
