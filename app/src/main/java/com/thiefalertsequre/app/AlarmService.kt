@@ -25,7 +25,7 @@ class AlarmService : Service() {
     private var audioFocusRequest: AudioFocusRequest? = null
     private var vibrator: Vibrator? = null
     private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { }
-    private val channelId = "anti_theft_alarm"
+    private val channelId = CHANNEL_ID
 
     override fun onCreate() {
         super.onCreate()
@@ -236,6 +236,7 @@ class AlarmService : Service() {
 
     companion object {
         private const val NOTIFICATION_ID = 42
+        const val CHANNEL_ID = "anti_theft_alarm"
         const val ACTION_START = "com.thiefalertsequre.START"
         const val ACTION_STOP_IF_AUTHENTICATED = "com.thiefalertsequre.STOP_AUTH"
     }

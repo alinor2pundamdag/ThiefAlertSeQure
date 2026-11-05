@@ -248,6 +248,10 @@ class MainActivity : FragmentActivity() {
             root.addView(fullScreenAccessButton, matchWrap())
         }
         root.addView(space(8))
+        root.addView(outlinedButton("Open alarm notification settings") { openAlarmNotificationSettings() }, matchWrap())
+        root.addView(space(8))
+        root.addView(outlinedButton("Set device PIN, pattern or password") { openDeviceSecuritySettings() }, matchWrap())
+        root.addView(space(8))
         root.addView(outlinedButton("Configure Do Not Disturb alarm exceptions") { openDndSettings() }, matchWrap())
         root.addView(space(8))
         root.addView(outlinedButton("Set battery usage to Unrestricted") { openBatteryOptimizationSettings() }, matchWrap())
@@ -459,6 +463,22 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    private fun openAlarmNotificationSettings() {
+        if (Build.VERSION.SDK_INT >= 26) {
+            runCatching {
+                startActivity(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                    putExtra(Settings.EXTRA_CHANNEL_ID, AlarmService.CHANNEL_ID)
+                })
+            }.onFailure { openAppSettings() }
+        } else openAppSettings()
+    }
+
+    private fun openDeviceSecuritySettings() {
+        runCatching { startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS)) }
+            .onFailure { showError("Android could not open device security settings: ${it.message}") }
+    }
+
     private fun openDndSettings() {
         runCatching { startActivity(Intent(Settings.ACTION_ZEN_MODE_PRIORITY_SETTINGS)) }
             .onFailure {
@@ -533,10 +553,15 @@ class MainActivity : FragmentActivity() {
         val adminComponent = ComponentName(this, ThiefAlertAdminReceiver::class.java)
         val adminActive = getSystemService(DevicePolicyManager::class.java).isAdminActive(adminComponent)
         val screenLockMessage = if (adminActive) "Automatic screen locking: ENABLED." else "Automatic screen locking: OFF; enable the device administrator in Device Hardening."
-        val fullScreenMessage = if (Build.VERSION.SDK_INT >= 34 && !getSystemService(NotificationManager::class.java).canUseFullScreenIntent()) {
+        val fullScreenMessage = if (Build.VERSION.SDK_INT >= 34 && !notificationManager.canUseFullScreenIntent()) {
             "Full-screen alarm access is OFF; enable it in Reliability & System Access."
         } else {
-            "Full-screen alarm display is available on this Android version."
+            "Full-screen alarm access is available on this Android version."
+        }
+        val alarmChannelMessage = if (!alarmChannelReady) {
+            "Alarm notification channel is below High importance; Android may suppress full-screen presentation. Open Alarm notification settings and set importance to High."
+        } else {
+            "Alarm notification channel is set to High importance or higher."
         }
         screenLockButton.text = if (adminActive) "Automatic screen lock: ENABLED" else "Enable automatic screen lock"
         if (Build.VERSION.SDK_INT >= 34) fullScreenAccessButton?.text = if (getSystemService(NotificationManager::class.java).canUseFullScreenIntent()) "Full-screen alarm access: ENABLED" else "Allow full-screen alarm and authentication"
@@ -556,6 +581,8 @@ class MainActivity : FragmentActivity() {
         val secureCredentialReady = keyguard.isDeviceSecure
         val exactAlarmReady = Build.VERSION.SDK_INT < 31 || getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
         val fullScreenReady = Build.VERSION.SDK_INT < 34 || notificationManager.canUseFullScreenIntent()
+        val alarmChannel = if (Build.VERSION.SDK_INT >= 26) notificationManager.getNotificationChannel(AlarmService.CHANNEL_ID) else null
+        val alarmChannelReady = alarmChannel == null || alarmChannel.importance >= NotificationManager.IMPORTANCE_HIGH
         val monitorRunning = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_RUNNING, false)
         val readinessIssues = mutableListOf<String>()
         if (!secureCredentialReady) readinessIssues.add("Set a device PIN, pattern or password")
@@ -563,6 +590,7 @@ class MainActivity : FragmentActivity() {
         if (!notificationsAllowed) readinessIssues.add("Allow notifications")
         if (!exactAlarmReady) readinessIssues.add("Allow Alarms & reminders for exact deadline recovery")
         if (!fullScreenReady) readinessIssues.add("Allow full-screen alarm access")
+        if (!alarmChannelReady) readinessIssues.add("Set Anti-theft alarm notification importance to High")
         if (!monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) readinessIssues.add("Enable charger monitoring")
         if (!monitorRunning) readinessIssues.add("Wait for the charger-monitor foreground service to start")
         val batteryPowerManager = getSystemService(PowerManager::class.java)
@@ -576,7 +604,7 @@ class MainActivity : FragmentActivity() {
         } else {
             "CORE READINESS: INCOMPLETE — " + readinessIssues.joinToString("; ") + "."
         }
-        details.text = listOf(stateMessage, readinessMessage, batteryOptimizationMessage, soundMessage, monitorMessage, attemptMessage, exactAlarmMessage, notificationMessage, screenLockMessage, fullScreenMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
+        details.text = listOf(stateMessage, readinessMessage, batteryOptimizationMessage, soundMessage, monitorMessage, attemptMessage, exactAlarmMessage, notificationMessage, screenLockMessage, fullScreenMessage, alarmChannelMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
 
         val alarmActive = state.mode == ProtectionMode.ALARM_TRIGGERED
         val biometricAvailable = BiometricManager.from(this)
