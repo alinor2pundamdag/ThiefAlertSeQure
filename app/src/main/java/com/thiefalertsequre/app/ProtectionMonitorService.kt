@@ -143,7 +143,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                 updated.mode == ProtectionMode.ALARM_TRIGGERED
             updated
         }
-        if (transitionedToAlarm) {
+        if (transitionedToAlarm && next.mode == ProtectionMode.ALARM_TRIGGERED) {
             AlarmScheduler.cancel(this)
             LocalTamperHistory.record(this, "monitor_countdown_expired", "Validated countdown transitioned to alarm")
             startTheftAlarm()
