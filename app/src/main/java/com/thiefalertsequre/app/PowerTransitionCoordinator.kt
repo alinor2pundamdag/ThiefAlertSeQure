@@ -54,7 +54,14 @@ object PowerTransitionCoordinator {
 
         // Connected is safe evidence to arm/cancel; disconnected is not evidence
         // that a new physical unplug happened.
-        if (connected) confirmConnectedAndArmLocked(context, "Connected power snapshot reconciled")
+        val monitorEnabled = context.getSharedPreferences(
+            ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
+        ).getBoolean(
+            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
+        if (connected && monitorEnabled) {
+            confirmConnectedAndArmLocked(context, "Connected power snapshot reconciled")
+        }
     }
 
     /** Establish a fresh non-transition baseline when the owner re-enables monitoring. */
