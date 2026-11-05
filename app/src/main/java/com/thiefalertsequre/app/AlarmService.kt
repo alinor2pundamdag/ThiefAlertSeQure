@@ -53,12 +53,20 @@ class AlarmService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED) {
+            LocalTamperHistory.record(this, "alarm_service_rejected", "Protection state was not ALARM_TRIGGERED")
             stopAlarm()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
         }
-        startForeground(NOTIFICATION_ID, notification())
+        try {
+            startForeground(NOTIFICATION_ID, notification())
+            LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active")
+        } catch (error: Exception) {
+            LocalTamperHistory.record(this, "alarm_service_start_failed", error.javaClass.simpleName + ": " + error.message)
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (player == null && fallbackTone == null) startAlarmAudio()
         return START_STICKY
     }
@@ -105,7 +113,10 @@ class AlarmService : Service() {
                 true
             }
             prepared.prepare()
+            LocalTamperHistory.record(this, "alarm_media_prepared", "Bundled OPUS decoder prepared")
             prepared
+        }.onFailure {
+            LocalTamperHistory.record(this, "alarm_media_failed", it.javaClass.simpleName + ": " + it.message)
         }.getOrNull()
         if (media == null) {
             startFallbackTone()
@@ -114,7 +125,9 @@ class AlarmService : Service() {
         try {
             player = media
             media.start()
-        } catch (_: Exception) {
+            LocalTamperHistory.record(this, "alarm_audio_playing", "Bundled alarm audio started")
+        } catch (error: Exception) {
+            LocalTamperHistory.record(this, "alarm_audio_start_failed", error.javaClass.simpleName + ": " + error.message)
             runCatching { media.release() }
             player = null
             startFallbackTone()
@@ -123,6 +136,7 @@ class AlarmService : Service() {
 
     private fun startFallbackTone() {
         if (fallbackTone != null) return
+        LocalTamperHistory.record(this, "alarm_fallback_started", "Bundled audio unavailable; system alarm tone used")
         fallbackTone = runCatching { ToneGenerator(AudioManager.STREAM_ALARM, 100) }.getOrNull()
         handler.removeCallbacks(repeatFallback)
         repeatFallback.run()
