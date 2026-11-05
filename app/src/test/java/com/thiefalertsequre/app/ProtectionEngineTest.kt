@@ -43,9 +43,18 @@ class ProtectionEngineTest {
         assertEquals(ProtectionMode.COUNTDOWN, early.mode)
         assertEquals(1L, ProtectionEngine.remainingMs(early, 99_000_000L, 14_999L, 7))
     }
-    @Test fun rebootDuringCountdownTriggersImmediatelyWhenChargerIsAbsent() {
+    @Test fun rebootDuringCountdownRestartsFullGracePeriodWhenChargerIsAbsent() {
         val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
-        assertEquals(ProtectionMode.ALARM_TRIGGERED, ProtectionEngine.restoreAfterBoot(s, false, 2_000L, 500L, 8).mode)
+        val restored = ProtectionEngine.restoreAfterBoot(s, false, 2_000L, 500L, 8)
+        assertEquals(ProtectionMode.COUNTDOWN, restored.mode)
+        assertEquals(12_000L, restored.deadlineEpochMs)
+        assertEquals(10_500L, restored.deadlineElapsedRealtimeMs)
+        assertEquals(8, restored.bootCount)
+    }
+
+    @Test fun rebootWhileArmedAndUnpluggedDoesNotInventTransition() {
+        val armed = ProtectionState(ProtectionMode.ARMED, 0L, 1_000L)
+        assertEquals(armed, ProtectionEngine.restoreAfterBoot(armed, false, 2_000L, 500L, 8))
     }
     @Test fun rebootDuringCountdownRearmsIfChargerIsConnected() {
         val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
