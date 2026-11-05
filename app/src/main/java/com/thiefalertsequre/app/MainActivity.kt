@@ -410,10 +410,12 @@ class MainActivity : FragmentActivity() {
         if (state.mode != ProtectionMode.ALARM_TRIGGERED) {
             runCatching { AlarmVolumeController.restore(this, getSystemService(android.media.AudioManager::class.java)) }
         }
-        if (state.mode == ProtectionMode.COUNTDOWN) {
-            AlarmScheduler.schedule(this, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
-        } else {
-            AlarmScheduler.cancel(this)
+        when (state.mode) {
+            ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(this, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
+            ProtectionMode.ALARM_TRIGGERED -> runCatching {
+                ContextCompat.startForegroundService(this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START))
+            }
+            else -> AlarmScheduler.cancel(this)
         }
         syncProtectionMonitor(state)
     }
