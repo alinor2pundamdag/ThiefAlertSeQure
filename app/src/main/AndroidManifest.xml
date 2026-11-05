@@ -9,8 +9,8 @@
     <uses-feature android:name="android.hardware.fingerprint" android:required="false" />
     <application
         android:allowBackup="false"
-        android:icon="@mipmap/thiefalertsequreicon"
-        android:roundIcon="@mipmap/thiefalertsequreicon"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="ThiefAlertSeQure"
         android:usesCleartextTraffic="false"
         android:theme="@style/Theme.ThiefAlertSeQure">
