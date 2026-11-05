@@ -75,7 +75,7 @@ class MainActivity : FragmentActivity() {
         }
         scroll.addView(root)
         val icon = ImageView(this).apply {
-            setImageResource(R.mipmap.thiefalertsequreicon)
+            setImageResource(R.drawable.app_logo)
             contentDescription = "ThiefAlertSeQure app icon"
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
@@ -150,7 +150,7 @@ class MainActivity : FragmentActivity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         val brandIcon = ImageView(this).apply {
-            setImageResource(R.mipmap.thiefalertsequreicon)
+            setImageResource(R.drawable.app_logo)
             contentDescription = "ThiefAlertSeQure shield and alarm icon"
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
