@@ -2,7 +2,10 @@ package com.thiefalertsequre.app
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.NotificationManager
+import android.app.admin.DevicePolicyManager
 import android.app.KeyguardManager
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -32,6 +35,7 @@ class MainActivity : FragmentActivity() {
     private lateinit var cancelButton: MaterialButton
     private lateinit var managedButton: MaterialButton
     private var biometricPrompt: BiometricPrompt? = null
+    private var autoAuthenticationRequested = false
 
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -213,6 +217,12 @@ class MainActivity : FragmentActivity() {
             13f, getColor(R.color.tas_muted), false
         ), matchWrap())
         hardeningContent.addView(space(12))
+        val deviceAdmin = getSystemService(DevicePolicyManager::class.java)
+        val adminComponent = ComponentName(this, ThiefAlertAdminReceiver::class.java)
+        hardeningContent.addView(outlinedButton(
+            if (deviceAdmin.isAdminActive(adminComponent)) "Automatic screen lock: ENABLED" else "Enable automatic screen lock"
+        ) { requestDeviceAdministrator() }, matchWrap())
+        hardeningContent.addView(space(8))
         managedButton = button("Check Device Owner eligibility") { manageDeviceOwnerMode() }
         hardeningContent.addView(managedButton, matchWrap())
         hardeningContent.addView(space(8))
@@ -227,6 +237,10 @@ class MainActivity : FragmentActivity() {
         root.addView(sectionTitle("RELIABILITY & SYSTEM ACCESS"), matchWrap())
         root.addView(space(10))
         root.addView(outlinedButton("Enable precise 10-second alarm timing") { requestExactAlarmAccess() }, matchWrap())
+        if (Build.VERSION.SDK_INT >= 34) {
+            root.addView(space(8))
+            root.addView(outlinedButton("Allow full-screen alarm and authentication") { requestFullScreenIntentAccess() }, matchWrap())
+        }
         root.addView(space(8))
         root.addView(outlinedButton("Configure Do Not Disturb alarm exceptions") { openDndSettings() }, matchWrap())
         root.addView(space(8))
@@ -249,7 +263,7 @@ class MainActivity : FragmentActivity() {
         status.removeCallbacks(ticker)
         status.post(ticker)
 
-        if (Build.VERSION.SDK_INT >= 33 &&
+        if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED && Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -262,13 +276,64 @@ class MainActivity : FragmentActivity() {
         ManagedProtectionController.startIfConfigured(this)
         if (!::status.isInitialized) return
         render()
+        launchAutomaticOwnerAuthenticationIfNeeded()
         status.removeCallbacks(ticker)
         status.post(ticker)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        launchAutomaticOwnerAuthenticationIfNeeded()
     }
 
     override fun onPause() {
         if (::status.isInitialized) status.removeCallbacks(ticker)
         super.onPause()
+    }
+
+    private fun requestDeviceAdministrator() {
+        val manager = getSystemService(DevicePolicyManager::class.java)
+        val component = ComponentName(this, ThiefAlertAdminReceiver::class.java)
+        if (manager.isAdminActive(component)) {
+            details.text = "Automatic screen locking is enabled. The device will lock when the alarm starts."
+            render()
+            return
+        }
+        val request = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+            putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, component)
+            putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Allow ThiefAlertSeQure to lock the phone when its anti-theft alarm is triggered. Android still controls the PIN, pattern, password and biometric verification.")
+        }
+        startActivity(request)
+    }
+
+    private fun requestFullScreenIntentAccess() {
+        if (Build.VERSION.SDK_INT < 34) return
+        val manager = getSystemService(NotificationManager::class.java)
+        if (manager.canUseFullScreenIntent()) {
+            details.text = "Full-screen alarm access is already enabled."
+            return
+        }
+        runCatching {
+            startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:$packageName")))
+        }.onFailure { showError("Android could not open full-screen notification access: ${it.message}") }
+    }
+
+    private fun launchAutomaticOwnerAuthenticationIfNeeded() {
+        if (autoAuthenticationRequested || !::status.isInitialized) return
+        if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED) return
+        autoAuthenticationRequested = true
+        val keyguard = getSystemService(KeyguardManager::class.java)
+        val strongBiometric = BiometricManager.from(this)
+            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
+        if ((Build.VERSION.SDK_INT >= 30 && keyguard.isDeviceSecure) || strongBiometric) {
+            authenticateBiometric()
+        } else if (keyguard.isDeviceSecure) {
+            authenticateDeviceCredential()
+        } else {
+            details.text = "No secure device credential is configured. Set a PIN, pattern or password in Android settings to enable owner verification."
+            render()
+        }
     }
 
     private fun manageDeviceOwnerMode() {
@@ -487,8 +552,15 @@ class MainActivity : FragmentActivity() {
             return
         }
         val manager = BiometricManager.from(this)
-        if (manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) != BiometricManager.BIOMETRIC_SUCCESS) {
-            details.text = "No enrolled strong biometric is available. Use your device PIN, pattern or password."
+        val keyguard = getSystemService(KeyguardManager::class.java)
+        val allowedAuthenticators = if (Build.VERSION.SDK_INT >= 30 && keyguard.isDeviceSecure) {
+            BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        } else {
+            BiometricManager.Authenticators.BIOMETRIC_STRONG
+        }
+        if (manager.canAuthenticate(allowedAuthenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
+            if (keyguard.isDeviceSecure) authenticateDeviceCredential()
+            else details.text = "No enrolled strong biometric or secure device credential is available."
             return
         }
 
@@ -533,12 +605,14 @@ class MainActivity : FragmentActivity() {
             })
 
         biometricPrompt = prompt
-        prompt.authenticate(BiometricPrompt.PromptInfo.Builder()
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Verify ThiefAlertSeQure owner")
-            .setSubtitle("Use an enrolled strong fingerprint or strong face biometric")
-            .setNegativeButtonText("Cancel")
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-            .build())
+            .setSubtitle("Authenticate with your device biometric or screen-lock credential")
+            .setAllowedAuthenticators(allowedAuthenticators)
+        if (allowedAuthenticators and BiometricManager.Authenticators.DEVICE_CREDENTIAL == 0) {
+            promptInfo.setNegativeButtonText("Cancel")
+        }
+        prompt.authenticate(promptInfo.build())
         render()
     }
 

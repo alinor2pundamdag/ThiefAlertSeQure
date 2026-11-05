@@ -1,6 +1,8 @@
 package com.thiefalertsequre.app
 
 import android.app.Notification
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -50,6 +52,7 @@ class AlarmService : Service() {
         try {
             startForeground(NOTIFICATION_ID, notification())
             LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active")
+            lockDeviceIfAdminEnabled()
         } catch (error: Exception) {
             LocalTamperHistory.record(this, "alarm_service_start_failed", error.javaClass.simpleName + ": " + error.message)
             AlarmRecoveryNotice.show(this, "Android refused to keep the alarm foreground service running")
@@ -178,12 +181,25 @@ class AlarmService : Service() {
             .setContentTitle("ThiefAlertSeQure — Alarm active")
             .setContentText("Open to authenticate with your device lock or supported biometric.")
             .setContentIntent(contentIntent)
+            .setFullScreenIntent(contentIntent, true)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setOngoing(true)
             .setAutoCancel(false)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
+    }
+
+    /** Force the keyguard before presenting the full-screen owner-authentication activity. */
+    private fun lockDeviceIfAdminEnabled() {
+        val manager = getSystemService(DevicePolicyManager::class.java)
+        val admin = ComponentName(this, ThiefAlertAdminReceiver::class.java)
+        if (!manager.isAdminActive(admin)) {
+            LocalTamperHistory.record(this, "automatic_screen_lock_unavailable", "Device administrator has not been activated")
+            return
+        }
+        runCatching { manager.lockNow() }
+            .onFailure { LocalTamperHistory.record(this, "automatic_screen_lock_failed", it.javaClass.simpleName + ": " + it.message) }
     }
 
     private fun stopAlarm() {
