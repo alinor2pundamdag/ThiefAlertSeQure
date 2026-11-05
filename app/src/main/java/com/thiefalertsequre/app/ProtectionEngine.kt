@@ -52,8 +52,15 @@ object ProtectionEngine {
         // elapsedRealtime resets on reboot. Never compare an old-boot deadline
         // against the new boot's clock or wall time; require a live power sample
         // and restart the full grace period when still unplugged.
-        val bootChanged = s.bootCount >= 0 && currentBootCount >= 0 &&
-            s.bootCount != currentBootCount
+        val hasMonotonicDeadline = s.deadlineElapsedRealtimeMs > 0L
+        val bootIdentityUnavailable = hasMonotonicDeadline && currentBootCount < 0
+        if (bootIdentityUnavailable) return s
+
+        // A countdown created before a reliable boot identity was available is
+        // untrusted once Android later supplies one. Rebase it with a fresh grace
+        // period rather than comparing its old wall-clock deadline.
+        val bootChanged = hasMonotonicDeadline &&
+            (s.bootCount < 0 || currentBootCount != s.bootCount)
         if (bootChanged) {
             return when (chargerConnected) {
                 true -> chargerConnected(s, nowEpochMs)
@@ -78,9 +85,13 @@ object ProtectionEngine {
         currentBootCount: Int = -1
     ): ProtectionState {
         if (s.mode != ProtectionMode.COUNTDOWN) return s
-        val sameBoot = s.bootCount >= 0 && currentBootCount == s.bootCount &&
-            s.deadlineElapsedRealtimeMs > 0L && nowElapsedRealtimeMs > 0L
-        val expired = if (sameBoot) {
+        val hasMonotonicDeadline = s.deadlineElapsedRealtimeMs > 0L
+        val sameBoot = s.bootCount >= 0 && currentBootCount >= 0 &&
+            currentBootCount == s.bootCount && nowElapsedRealtimeMs > 0L
+        // Never fall back to mutable wall time for a monotonic deadline when
+        // boot identity is missing or differs. That can turn reboot into a false alarm.
+        if (hasMonotonicDeadline && !sameBoot) return s
+        val expired = if (hasMonotonicDeadline) {
             nowElapsedRealtimeMs >= s.deadlineElapsedRealtimeMs
         } else {
             nowEpochMs >= s.deadlineEpochMs
@@ -95,10 +106,15 @@ object ProtectionEngine {
         currentBootCount: Int = -1
     ): Long {
         if (s.mode != ProtectionMode.COUNTDOWN) return 0L
-        val sameBoot = s.bootCount >= 0 && currentBootCount == s.bootCount &&
-            s.deadlineElapsedRealtimeMs > 0L && nowElapsedRealtimeMs > 0L
-        return if (sameBoot) {
+        val hasMonotonicDeadline = s.deadlineElapsedRealtimeMs > 0L
+        val sameBoot = s.bootCount >= 0 && currentBootCount >= 0 &&
+            currentBootCount == s.bootCount && nowElapsedRealtimeMs > 0L
+        return if (hasMonotonicDeadline && sameBoot) {
             (s.deadlineElapsedRealtimeMs - nowElapsedRealtimeMs).coerceAtLeast(0L)
+        } else if (hasMonotonicDeadline) {
+            // Until boot identity can be verified, do not display an expired
+            // wall-clock deadline as zero remaining.
+            COUNTDOWN_MS
         } else {
             (s.deadlineEpochMs - nowEpochMs).coerceAtLeast(0L)
         }
