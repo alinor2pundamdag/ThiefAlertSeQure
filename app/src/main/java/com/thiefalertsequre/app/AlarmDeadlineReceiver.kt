@@ -18,10 +18,15 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(
                 context, updated.deadlineEpochMs, updated.deadlineElapsedRealtimeMs, updated.bootCount
             )
-            ProtectionMode.ALARM_TRIGGERED -> runCatching {
-                ContextCompat.startForegroundService(
-                    context, Intent(context, AlarmService::class.java).setAction(AlarmService.ACTION_START)
-                )
+            ProtectionMode.ALARM_TRIGGERED -> {
+                LocalTamperHistory.record(context, "countdown_expired", "Alarm latched")
+                runCatching {
+                    ContextCompat.startForegroundService(
+                        context, Intent(context, AlarmService::class.java).setAction(AlarmService.ACTION_START)
+                    )
+                }.onFailure {
+                    LocalTamperHistory.record(context, "alarm_fgs_launch_failed", it.javaClass.simpleName + ": " + it.message)
+                }
             }
             else -> Unit
         }
