@@ -451,11 +451,7 @@ class MainActivity : FragmentActivity() {
         } else {
             "Standard Android mode. Device Owner kiosk controls are unavailable until the device is enrolled."
         }
-        val soundMessage = if (alarmSoundConfigured) {
-            "Main alarm sound: ${AlarmSoundStore.displayName(this, AlarmSoundStore.ALARM)}"
-        } else {
-            "Main alarm sound: NOT CONFIGURED — protection arming is blocked."
-        }
+        val soundMessage = "Main alarm sound: ${AlarmSoundStore.displayName(this, AlarmSoundStore.ALARM)} (custom override optional)"
         val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
         val monitorMessage = if (monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, false)) {
             "Background motion/battery monitoring: ENABLED by owner; keep its foreground notification visible and check Settings for service failures."

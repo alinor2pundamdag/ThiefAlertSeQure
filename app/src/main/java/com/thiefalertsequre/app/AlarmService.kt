@@ -109,6 +109,8 @@ class AlarmService : Service() {
                             runCatching { prepared.release() }
                             startAlarmAudio(defaultUri, true, defaultUri)
                         } else {
+                            if (player === prepared) player = null
+                            runCatching { prepared.release() }
                             startVibrationFallback()
                         }
                     }

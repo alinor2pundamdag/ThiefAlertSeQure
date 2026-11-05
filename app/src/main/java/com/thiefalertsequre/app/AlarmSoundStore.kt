@@ -62,12 +62,13 @@ object AlarmSoundStore {
     }
 
     fun displayName(context: Context, slot: String): String {
-        val selected = effectiveUri(context, slot) ?: return "Not selected"
+        val selected = uri(context, slot)
+            ?: return if (slot == ALARM) "Built-in default alarm" else "Not selected"
         val name = runCatching {
             context.contentResolver.query(selected, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
                 ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
         }.getOrNull()
-        return name ?: selected.lastPathSegment ?: if (slot == ALARM) "Built-in default alarm" else "Selected audio"
+        return name ?: selected.lastPathSegment ?: "Selected audio"
     }
 
     private fun key(slot: String) = "uri_$slot"
