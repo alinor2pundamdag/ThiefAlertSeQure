@@ -85,12 +85,16 @@ object ProtectionEngine {
         ProtectionMode.COUNTDOWN -> if (isCharging) {
             chargerConnected(s, nowEpochMs)
         } else {
-            // The monotonic clock resets on reboot. Do not trust a wall-clock fallback:
-            // if the charger is still absent, fail closed and latch the alarm immediately.
-            ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, nowEpochMs, 0L, currentBootCount)
+            // Reboot resets elapsedRealtime. Revalidate the existing countdown and
+            // grant a fresh full grace period; never fire immediately from a snapshot.
+            ProtectionState(
+                ProtectionMode.COUNTDOWN, nowEpochMs + COUNTDOWN_MS, nowEpochMs,
+                if (nowElapsedRealtimeMs > 0L) nowElapsedRealtimeMs + COUNTDOWN_MS else 0L,
+                currentBootCount
+            )
         }
-        ProtectionMode.ARMED -> if (isCharging) s else
-            chargerDisconnected(s, nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
+        // A disconnected boot snapshot is not evidence of a new unplug event.
+        ProtectionMode.ARMED -> s
         ProtectionMode.DISARMED -> if (isCharging) chargerConnected(s, nowEpochMs) else s
     }
 
