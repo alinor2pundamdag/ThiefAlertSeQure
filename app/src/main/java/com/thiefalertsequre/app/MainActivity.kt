@@ -598,8 +598,16 @@ class MainActivity : FragmentActivity() {
         }
         val soundMessage = "Main alarm sound: ${AlarmSoundStore.displayName(this, AlarmSoundStore.ALARM)} (custom override optional)"
         val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+        val motionAlarmEnabled = monitorPrefs.getBoolean(
+            ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED
+        )
+        val motionMessage = if (motionAlarmEnabled) {
+            "Independent motion alarm: ON; it can trigger while the charger is connected."
+        } else {
+            "Independent motion alarm: OFF; charger-removal-only behavior is active."
+        }
         val monitorMessage = if (monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
-            "Charger protection monitor: ENABLED; keep its persistent notification visible. Motion sensing is active only while armed."
+            "Charger protection monitor: ENABLED; keep its persistent notification visible. $motionMessage"
         } else {
             "Charger protection monitor: OFF by owner choice; automatic plug/unplug detection is unavailable until re-enabled."
         }
