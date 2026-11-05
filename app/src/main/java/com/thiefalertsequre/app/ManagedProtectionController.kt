@@ -25,9 +25,7 @@ object ManagedProtectionController {
     }
 
     fun enable(activity: Activity): Boolean {
-        check(Build.VERSION.SDK_INT >= 28) {
-            "Managed Lock Task feature configuration requires Android 9.0 (API 28) or later."
-        }
+        if (Build.VERSION.SDK_INT < 28) return false
         check(isDeviceOwner(activity)) {
             "Device Owner provisioning is required. Standard device-admin activation is not sufficient."
         }
