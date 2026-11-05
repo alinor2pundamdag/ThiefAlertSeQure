@@ -3,14 +3,13 @@ package com.thiefalertsequre.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.BatteryManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-        val charging = context.getSystemService(BatteryManager::class.java).isCharging
+        val charging = ExternalPowerState.isConnected(context)
         val now = System.currentTimeMillis()
         val elapsed = ProtectionClock.elapsedRealtime()
         val boot = ProtectionClock.bootCount(context)
