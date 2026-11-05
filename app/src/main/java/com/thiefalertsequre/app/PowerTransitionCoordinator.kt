@@ -58,8 +58,10 @@ object PowerTransitionCoordinator {
             return
         }
         if (connected == null) return
-        val previousConnected = prefs.getBoolean(CONNECTED, false)
-        if (!baselineKnown || newBoot || previousConnected != connected) {
+        // Only first-run or new-boot snapshots may establish a baseline.
+        // During an established boot, a disconnected snapshot must never erase
+        // CONNECTED before ACTION_POWER_DISCONNECTED is consumed by the receiver.
+        if (!baselineKnown || newBoot) {
             prefs.edit()
                 .putBoolean(CONNECTED, connected)
                 .putBoolean(KNOWN, true)
@@ -68,11 +70,7 @@ object PowerTransitionCoordinator {
                 .commit()
             LocalTamperHistory.record(
                 context,
-                when {
-                    newBoot -> "power_baseline_reinitialized_after_boot"
-                    !baselineKnown -> "power_baseline_initialized"
-                    else -> "power_baseline_reconciled"
-                },
+                if (newBoot) "power_baseline_reinitialized_after_boot" else "power_baseline_initialized",
                 if (connected) {
                     "Connected snapshot recorded as baseline; no unplug transition inferred"
                 } else {
