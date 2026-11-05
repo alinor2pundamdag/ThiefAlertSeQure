@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.core.content.ContextCompat
 
 class BootReceiver : BroadcastReceiver() {
@@ -14,7 +13,9 @@ class BootReceiver : BroadcastReceiver() {
                 val state = ProtectionStore(context).read()
                 when (state.mode) {
                     ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
-                    ProtectionMode.ALARM_TRIGGERED -> AlarmScheduler.scheduleImmediateRecovery(context)
+                    ProtectionMode.ALARM_TRIGGERED -> scheduleAlarmRecovery(
+                        context, "Protection alarm is active after reboot or app update"
+                    )
                     else -> Unit
                 }
                 LocalTamperHistory.record(context, "exact_alarm_access_granted", "Pending protection deadline re-evaluated")
@@ -34,7 +35,9 @@ class BootReceiver : BroadcastReceiver() {
         val next = ProtectionStore(context).update { ProtectionEngine.restoreAfterBoot(it, charging, now, elapsed, boot) }
         when (next.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
-            ProtectionMode.ALARM_TRIGGERED -> AlarmScheduler.scheduleImmediateRecovery(context)
+            ProtectionMode.ALARM_TRIGGERED -> scheduleAlarmRecovery(
+                        context, "Protection alarm is active after reboot or app update"
+                    )
             else -> AlarmScheduler.cancel(context)
         }
         startMonitorIfNeeded(context, next, "boot")
@@ -45,11 +48,18 @@ class BootReceiver : BroadcastReceiver() {
         val state = ProtectionStore(context).read()
         when (state.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
-            ProtectionMode.ALARM_TRIGGERED -> AlarmScheduler.scheduleImmediateRecovery(context)
+            ProtectionMode.ALARM_TRIGGERED -> scheduleAlarmRecovery(
+                        context, "Protection alarm is active after reboot or app update"
+                    )
             else -> AlarmScheduler.cancel(context)
         }
         startMonitorIfNeeded(context, state, "app_update")
         LocalTamperHistory.record(context, "app_update_state_restored", "Persisted protection state re-evaluated after package replacement")
+    }
+
+    private fun scheduleAlarmRecovery(context: Context, reason: String) {
+        val exactScheduled = AlarmScheduler.scheduleImmediateRecovery(context)
+        if (!exactScheduled) AlarmRecoveryNotice.show(context, reason)
     }
 
     private fun startMonitorIfNeeded(context: Context, state: ProtectionState, source: String) {
