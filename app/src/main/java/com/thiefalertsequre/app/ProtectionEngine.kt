@@ -29,8 +29,11 @@ object ProtectionEngine {
         s: ProtectionState,
         nowEpochMs: Long,
         nowElapsedRealtimeMs: Long = 0L,
-        currentBootCount: Int = -1
+        currentBootCount: Int = -1,
+        isCharging: Boolean = false
     ): ProtectionState {
+        // A timer can race with ACTION_POWER_CONNECTED delivery. Current cable state wins.
+        if (isCharging) return chargerConnected(s, nowEpochMs)
         if (s.mode != ProtectionMode.COUNTDOWN) return s
         val sameBoot = s.bootCount >= 0 && currentBootCount == s.bootCount &&
             s.deadlineElapsedRealtimeMs > 0L && nowElapsedRealtimeMs > 0L
@@ -40,6 +43,21 @@ object ProtectionEngine {
             nowEpochMs >= s.deadlineEpochMs
         }
         return if (expired) ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, nowEpochMs, 0L, currentBootCount) else s
+    }
+
+    fun reconcilePowerState(
+        s: ProtectionState,
+        isCharging: Boolean,
+        nowEpochMs: Long,
+        nowElapsedRealtimeMs: Long = 0L,
+        currentBootCount: Int = -1
+    ): ProtectionState = when {
+        isCharging -> chargerConnected(s, nowEpochMs)
+        s.mode == ProtectionMode.ARMED ->
+            chargerDisconnected(s, nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
+        s.mode == ProtectionMode.COUNTDOWN ->
+            evaluateDeadline(s, nowEpochMs, nowElapsedRealtimeMs, currentBootCount, false)
+        else -> s
     }
 
     fun remainingMs(

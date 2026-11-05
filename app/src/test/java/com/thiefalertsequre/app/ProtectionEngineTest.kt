@@ -22,6 +22,25 @@ class ProtectionEngineTest {
         val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
         assertEquals(ProtectionMode.ALARM_TRIGGERED, ProtectionEngine.evaluateDeadline(s, 1_010L, 15_000L, 7).mode)
     }
+    @Test fun connectedChargerAtDeadlineCancelsStaleCountdown() {
+        val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
+        val result = ProtectionEngine.evaluateDeadline(s, 11_500L, 15_500L, 7, isCharging = true)
+        assertEquals(ProtectionMode.ARMED, result.mode)
+    }
+    @Test fun staleDisconnectWhileStillPluggedDoesNotStartCountdown() {
+        val s = ProtectionState(ProtectionMode.ARMED, 0, 1_000)
+        val result = ProtectionEngine.reconcilePowerState(s, true, 2_000L, 6_000L, 7)
+        assertEquals(ProtectionMode.ARMED, result.mode)
+    }
+    @Test fun unplugAfterReconnectStartsFreshTenSecondCountdown() {
+        val rearmed = ProtectionEngine.chargerConnected(
+            ProtectionState(ProtectionMode.COUNTDOWN, 11_000L, 1_000L, 15_000L, 7), 5_000L
+        )
+        val unplugged = ProtectionEngine.reconcilePowerState(rearmed, false, 6_000L, 10_000L, 7)
+        assertEquals(ProtectionMode.COUNTDOWN, unplugged.mode)
+        assertEquals(16_000L, unplugged.deadlineEpochMs)
+        assertEquals(20_000L, unplugged.deadlineElapsedRealtimeMs)
+    }
     @Test fun wallClockChangeCannotPrematurelyTriggerDuringSameBoot() {
         val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
         val early = ProtectionEngine.evaluateDeadline(s, 99_000_000L, 14_999L, 7)
