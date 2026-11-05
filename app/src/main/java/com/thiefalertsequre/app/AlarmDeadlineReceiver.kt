@@ -17,8 +17,14 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             return
         }
 
-        val tokenDeadline = token.removePrefix("deadline:").toLongOrNull()
-        if (tokenDeadline == null || !ProtectionEngine.isCurrentDeadline(state, tokenDeadline)) {
+        val tokenParts = token.split(":")
+        val tokenDeadline = tokenParts.getOrNull(1)?.toLongOrNull()
+        val tokenElapsed = tokenParts.getOrNull(2)?.toLongOrNull()
+        val tokenBoot = tokenParts.getOrNull(3)?.toIntOrNull()
+        if (tokenParts.size != 4 || tokenParts[0] != "deadline" ||
+            tokenDeadline == null || tokenElapsed == null || tokenBoot == null ||
+            !ProtectionEngine.isCurrentDeadline(state, tokenDeadline, tokenElapsed, tokenBoot)
+        ) {
             LocalTamperHistory.record(context, "stale_deadline_rejected", "Deadline callback did not match the active countdown")
             return
         }
