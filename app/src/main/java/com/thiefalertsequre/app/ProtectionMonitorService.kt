@@ -175,7 +175,13 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     }
 
     private fun syncMotionSensor() {
-        if (ProtectionStore(this).read().mode != ProtectionMode.ARMED || sensorRegistered) return
+        val mode = ProtectionStore(this).read().mode
+        val motionEnabled = prefs.getBoolean(KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED)
+        if (!ProtectionMonitorPolicy.shouldMonitorMotion(motionEnabled, mode)) {
+            unregisterMotionSensor()
+            return
+        }
+        if (sensorRegistered) return
         val sensor = accelerometer
         if (sensor == null) {
             LocalTamperHistory.record(this, "motion_sensor_unavailable", "No accelerometer is available")
@@ -194,7 +200,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
 
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type != Sensor.TYPE_ACCELEROMETER) return
-        if (ProtectionStore(this).read().mode != ProtectionMode.ARMED) {
+        val motionEnabled = prefs.getBoolean(KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED)
+        val mode = ProtectionStore(this).read().mode
+        if (!ProtectionMonitorPolicy.shouldMonitorMotion(motionEnabled, mode)) {
             unregisterMotionSensor()
             return
         }
@@ -353,7 +361,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("ThiefAlertSeQure protection monitor")
-            .setContentText("Motion, charger and optional battery-threshold monitoring are active.")
+            .setContentText("Charger monitoring is active; motion alarm is opt-in; battery alert is optional.")
             .setContentIntent(open)
             .addAction(android.R.drawable.ic_media_pause, "Stop monitoring", stop)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
@@ -385,6 +393,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         const val KEY_ENABLED = "monitor_enabled"
         const val KEY_RUNNING = "monitor_running"
         const val KEY_SENSITIVITY = "motion_sensitivity"
+        const val KEY_MOTION_ENABLED = "motion_enabled"
         const val KEY_BATTERY_ALERT_ENABLED = "battery_alert_enabled"
         const val KEY_BATTERY_THRESHOLD = "battery_threshold"
         private const val KEY_BATTERY_ALERT_FIRED = "battery_alert_fired"
