@@ -104,6 +104,6 @@ A release candidate is acceptable only when:
 7. PIN, pattern, password and supported strong biometrics are tested.
 8. Five-failure cooldown and repeat cycle are tested.
 9. Cancel and failed authentication never clear the alarm.
-10. Android 15+ reboot recovery is tested with exact-alarm access granted and denied.
+10. Android 15+ reboot recovery is tested after first unlock with exact-alarm access granted and denied; pre-unlock Direct Boot protection is not provided.
 11. DND, notification denial, OEM battery controls and process death are tested.
 12. Device Owner mode is tested only on a prepared, backed-up test device, including the in-app rollback.
