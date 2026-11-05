@@ -11,8 +11,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-ci-${{ github.sha }}
-  cancel-in-progress: false
+  group: android-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -30,7 +30,12 @@ jobs:
       - name: Unit tests
         run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
       - name: Android lint
-        run: gradle :app:lintDebug --no-daemon --stacktrace
+        run: |
+          if ! gradle :app:lintDebug --no-daemon --stacktrace; then
+            report=app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            if [ -f "$report" ]; then cat "$report"; fi
+            exit 1
+          fi
       - name: Validate packaged assets
         run: |
           python3 - <<'PY'
