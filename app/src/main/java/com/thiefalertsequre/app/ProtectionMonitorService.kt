@@ -88,6 +88,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
 
         registerSystemReceiver()
+        PowerTransitionCoordinator.initializeBaseline(this)
         reconcileStablePowerState()
         syncMotionSensor()
         LocalTamperHistory.record(this, "monitor_started", "Persistent foreground charger monitor active; motion sensing is armed-state only")
@@ -98,47 +99,24 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         if (receiverRegistered) return
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_BATTERY_CHANGED)
-            addAction(Intent.ACTION_POWER_CONNECTED)
-            addAction(Intent.ACTION_POWER_DISCONNECTED)
         }
         ContextCompat.registerReceiver(this, systemReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         receiverRegistered = true
     }
 
     private fun reconcileStablePowerState() {
-        val connected = ExternalPowerState.readConnected(this)
-        val now = System.currentTimeMillis()
-        val next = if (connected == null) {
-            // Never infer unplugging from a missing battery snapshot.
-            ProtectionStore(this).read()
-        } else if (connected) {
-            prefs.edit()
-                .putBoolean(KEY_BATTERY_ALERT_FIRED, false)
-                .putInt(KEY_LAST_BATTERY_LEVEL, -1)
-                .apply()
-            ProtectionStore(this).update { old ->
-                when {
-                    old.mode == ProtectionMode.ALARM_TRIGGERED -> old
-                    old.mode == ProtectionMode.COUNTDOWN || old.mode == ProtectionMode.DISARMED ->
-                        ProtectionEngine.chargerConnected(old, now)
-                    else -> old
-                }
-            }
-        } else {
-            val elapsed = ProtectionClock.elapsedRealtime()
-            val boot = ProtectionClock.bootCount(this)
-            ProtectionStore(this).update { old ->
-                if (old.mode == ProtectionMode.ARMED) {
-                    ProtectionEngine.chargerDisconnected(old, now, elapsed, boot)
-                } else old
-            }
+        // Service startup/restart cannot synthesize a physical unplug transition.
+        PowerTransitionCoordinator.initializeBaseline(this)
+        if (ExternalPowerState.readConnected(this) == true) {
+            prefs.edit().putBoolean(KEY_BATTERY_ALERT_FIRED, false)
+                .putInt(KEY_LAST_BATTERY_LEVEL, -1).apply()
         }
-
-        if (next.mode == ProtectionMode.ARMED) syncMotionSensor() else unregisterMotionSensor()
-        syncDeadlineAlarm(next)
+        val state = ProtectionStore(this).read()
+        if (state.mode == ProtectionMode.ARMED) syncMotionSensor() else unregisterMotionSensor()
+        syncDeadlineAlarm(state)
     }
 
-    /** AlarmManager wakes the CPU at the stored deadline; Handler is a low-latency companion. */
+    /** AlarmManager wakes the CPU at the stored deadline; Handler is a low-latency companion. */ the CPU at the stored deadline; Handler is a low-latency companion. */
     private fun syncDeadlineAlarm(state: ProtectionState) {
         if (ProtectionEngine.shouldScheduleDeadline(state.mode)) {
             AlarmScheduler.schedule(this, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
