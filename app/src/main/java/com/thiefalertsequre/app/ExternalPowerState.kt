@@ -11,11 +11,15 @@ import android.os.BatteryManager
  * protection, thermal limits, or a full battery.
  */
 object ExternalPowerState {
-    fun isConnected(context: Context): Boolean {
+    /** Null means Android has not supplied a reliable sticky battery snapshot yet. */
+    fun readConnected(context: Context): Boolean? {
         val batteryStatus = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        val plugged = batteryStatus?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
+            ?: return null
+        val plugged = batteryStatus.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
         return isPluggedIn(plugged)
     }
+
+    fun isConnected(context: Context): Boolean = readConnected(context) == true
 
     internal fun isPluggedIn(plugged: Int): Boolean = plugged != 0
 }

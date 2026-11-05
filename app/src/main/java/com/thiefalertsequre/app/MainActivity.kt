@@ -323,16 +323,17 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun reconcileCharging() {
-        val charging = ExternalPowerState.isConnected(this)
+        val charging = ExternalPowerState.readConnected(this)
         val store = ProtectionStore(this)
         val now = System.currentTimeMillis()
         val elapsed = ProtectionClock.elapsedRealtime()
         val boot = ProtectionClock.bootCount(this)
         val next = store.update { old ->
             when {
-                charging -> ProtectionEngine.chargerConnected(old, now)
-                old.mode == ProtectionMode.ARMED -> ProtectionEngine.chargerDisconnected(old, now, elapsed, boot)
-                old.mode == ProtectionMode.COUNTDOWN -> ProtectionEngine.evaluateDeadline(old, now, elapsed, boot)
+                charging == true -> ProtectionEngine.chargerConnected(old, now)
+                charging == false && old.mode == ProtectionMode.ARMED -> ProtectionEngine.chargerDisconnected(old, now, elapsed, boot)
+                charging == false && old.mode == ProtectionMode.COUNTDOWN -> ProtectionEngine.reconcileCountdown(old, false, now, elapsed, boot)
+                charging == null -> old
                 else -> old
             }
         }

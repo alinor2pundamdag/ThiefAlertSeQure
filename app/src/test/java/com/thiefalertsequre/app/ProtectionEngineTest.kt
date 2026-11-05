@@ -18,6 +18,21 @@ class ProtectionEngineTest {
         val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
         assertEquals(ProtectionMode.ARMED, ProtectionEngine.chargerConnected(s, 5_000).mode)
     }
+    @Test fun reconnectAtDeadlineCancelsAlarmEvenIfDeadlineHasElapsed() {
+        val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
+        val next = ProtectionEngine.reconcileCountdown(s, true, 50_000L, 50_000L, 7)
+        assertEquals(ProtectionMode.ARMED, next.mode)
+    }
+    @Test fun unpluggedAtDeadlineTriggersAlarm() {
+        val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
+        val next = ProtectionEngine.reconcileCountdown(s, false, 11_000L, 15_000L, 7)
+        assertEquals(ProtectionMode.ALARM_TRIGGERED, next.mode)
+    }
+    @Test fun unknownChargerStateNeverTriggersCountdown() {
+        val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
+        val next = ProtectionEngine.reconcileCountdown(s, null, 50_000L, 50_000L, 7)
+        assertEquals(ProtectionMode.COUNTDOWN, next.mode)
+    }
     @Test fun deadlineTriggersAtMonotonicDeadline() {
         val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
         assertEquals(ProtectionMode.ALARM_TRIGGERED, ProtectionEngine.evaluateDeadline(s, 1_010L, 15_000L, 7).mode)

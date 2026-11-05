@@ -29,11 +29,13 @@ class BootReceiver : BroadcastReceiver() {
         }
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
 
-        val charging = ExternalPowerState.isConnected(context)
+        val charging = ExternalPowerState.readConnected(context)
         val now = System.currentTimeMillis()
         val elapsed = ProtectionClock.elapsedRealtime()
         val boot = ProtectionClock.bootCount(context)
-        val next = ProtectionStore(context).update { ProtectionEngine.restoreAfterBoot(it, charging, now, elapsed, boot) }
+        val next = ProtectionStore(context).update { old ->
+            if (charging == null) old else ProtectionEngine.restoreAfterBoot(old, charging, now, elapsed, boot)
+        }
         when (next.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
             ProtectionMode.ALARM_TRIGGERED -> scheduleAlarmRecovery(

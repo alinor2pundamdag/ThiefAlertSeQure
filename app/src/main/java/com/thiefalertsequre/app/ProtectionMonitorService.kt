@@ -106,9 +106,12 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     }
 
     private fun reconcileStablePowerState() {
-        val connected = ExternalPowerState.isConnected(this)
+        val connected = ExternalPowerState.readConnected(this)
         val now = System.currentTimeMillis()
-        val next = if (connected) {
+        val next = if (connected == null) {
+            // Never infer unplugging from a missing battery snapshot.
+            ProtectionStore(this).read()
+        } else if (connected) {
             prefs.edit()
                 .putBoolean(KEY_BATTERY_ALERT_FIRED, false)
                 .putInt(KEY_LAST_BATTERY_LEVEL, -1)
@@ -158,7 +161,14 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         val now = System.currentTimeMillis()
         val elapsed = ProtectionClock.elapsedRealtime()
         val boot = ProtectionClock.bootCount(this)
-        val next = ProtectionStore(this).update { ProtectionEngine.evaluateDeadline(it, now, elapsed, boot) }
+        val connected = ExternalPowerState.readConnected(this)
+        if (connected == null) {
+            handler.postDelayed(countdownRunnable, POWER_RETRY_MS)
+            return
+        }
+        val next = ProtectionStore(this).update {
+            ProtectionEngine.reconcileCountdown(it, connected, now, elapsed, boot)
+        }
         if (next.mode == ProtectionMode.ALARM_TRIGGERED) {
             AlarmScheduler.cancel(this)
             LocalTamperHistory.record(this, "monitor_countdown_expired", "Foreground monitor reached the monotonic ten-second deadline")
@@ -377,5 +387,6 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         const val ACTION_STOP = "com.thiefalertsequre.STOP_MONITOR"
         private const val MOTION_COOLDOWN_MS = 5_000L
         private const val POWER_DEBOUNCE_MS = 300L
+        private const val POWER_RETRY_MS = 1_000L
     }
 }

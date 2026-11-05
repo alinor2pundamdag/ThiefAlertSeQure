@@ -27,6 +27,20 @@ object ProtectionEngine {
         ProtectionMode.COUNTDOWN, ProtectionMode.ALARM_TRIGGERED, ProtectionMode.DISARMED -> s
     }
 
+    /** Re-check live power before allowing an expired countdown to latch the alarm. */
+    fun reconcileCountdown(
+        s: ProtectionState,
+        chargerConnected: Boolean?,
+        nowEpochMs: Long,
+        nowElapsedRealtimeMs: Long = 0L,
+        currentBootCount: Int = -1
+    ): ProtectionState = when {
+        s.mode != ProtectionMode.COUNTDOWN -> s
+        chargerConnected == true -> chargerConnected(s, nowEpochMs)
+        chargerConnected == false -> evaluateDeadline(s, nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
+        else -> s
+    }
+
     fun evaluateDeadline(
         s: ProtectionState,
         nowEpochMs: Long,

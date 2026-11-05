@@ -64,6 +64,16 @@ object AlarmScheduler {
         }
     }
 
+    /** Retry a due deadline when the current charger state is temporarily unavailable. */
+    fun scheduleRetry(context: Context, delayMs: Long) {
+        val alarmManager = context.getSystemService(AlarmManager::class.java)
+        alarmManager.setAndAllowWhileIdle(
+            AlarmManager.RTC_WAKEUP,
+            System.currentTimeMillis() + delayMs.coerceAtLeast(250L),
+            pendingIntent(context)
+        )
+    }
+
     fun cancel(context: Context) {
         context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context))
     }

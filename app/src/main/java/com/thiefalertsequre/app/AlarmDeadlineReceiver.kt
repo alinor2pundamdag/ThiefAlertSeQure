@@ -10,7 +10,14 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         val now = System.currentTimeMillis()
         val elapsed = ProtectionClock.elapsedRealtime()
         val boot = ProtectionClock.bootCount(context)
-        val updated = ProtectionStore(context).update { ProtectionEngine.evaluateDeadline(it, now, elapsed, boot) }
+        val connected = ExternalPowerState.readConnected(context)
+        if (connected == null) {
+            AlarmScheduler.scheduleRetry(context, 1_000L)
+            return
+        }
+        val updated = ProtectionStore(context).update {
+            ProtectionEngine.reconcileCountdown(it, connected, now, elapsed, boot)
+        }
         when (updated.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, updated.deadlineEpochMs, updated.deadlineElapsedRealtimeMs, updated.bootCount)
             ProtectionMode.ALARM_TRIGGERED -> {
