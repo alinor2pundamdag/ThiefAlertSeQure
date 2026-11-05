@@ -52,9 +52,13 @@ object ProtectionEngine {
         // elapsedRealtime resets on reboot. Never compare an old-boot deadline
         // against the new boot's clock or wall time; require a live power sample
         // and restart the full grace period when still unplugged.
+        if (chargerConnected == true) return chargerConnected(s, nowEpochMs)
+        if (chargerConnected == null) return s
+
         val hasMonotonicDeadline = s.deadlineElapsedRealtimeMs > 0L
-        val bootIdentityUnavailable = hasMonotonicDeadline && currentBootCount < 0
-        if (bootIdentityUnavailable) return s
+        // No valid boot identity means elapsedRealtime cannot safely be compared
+        // with a persisted deadline. Stay pending rather than inventing expiry.
+        if (hasMonotonicDeadline && currentBootCount < 0) return s
 
         // A countdown created before a reliable boot identity was available is
         // untrusted once Android later supplies one. Rebase it with a fresh grace
@@ -62,20 +66,12 @@ object ProtectionEngine {
         val bootChanged = hasMonotonicDeadline &&
             (s.bootCount < 0 || currentBootCount != s.bootCount)
         if (bootChanged) {
-            return when (chargerConnected) {
-                true -> chargerConnected(s, nowEpochMs)
-                false -> restoreAfterBoot(
-                    s, false, nowEpochMs, nowElapsedRealtimeMs, currentBootCount
-                )
-                null -> s
-            }
+            return restoreAfterBoot(
+                s, false, nowEpochMs, nowElapsedRealtimeMs, currentBootCount
+            )
         }
 
-        return when (chargerConnected) {
-            true -> chargerConnected(s, nowEpochMs)
-            false -> evaluateDeadline(s, nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
-            null -> s
-        }
+        return evaluateDeadline(s, nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
     }
 
     fun evaluateDeadline(
