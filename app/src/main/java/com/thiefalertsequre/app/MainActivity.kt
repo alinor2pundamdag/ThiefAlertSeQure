@@ -113,7 +113,7 @@ class MainActivity : FragmentActivity() {
         body.addView(label("Data and privacy", 18f, getColor(R.color.tas_text), true), matchWrap())
         body.addView(space(8))
         body.addView(label(
-            "The app is designed to work without an account, backend, analytics, advertising, or internet access. Protection state and biometric-failure cooldown counters are stored locally on this device. Your PIN, pattern, password, and biometric templates are never collected or stored by this app; Android performs verification.",
+            "The app is designed to work without an account, backend, analytics, advertising, or internet access. Protection state, biometric-failure cooldown counters, a bounded local event history, monitor preferences, and references to audio files you select are stored locally on this device. Selected audio remains with its Android document provider; the app retains only the access grant and URI. Your PIN, pattern, password, and biometric templates are never collected or stored by this app; Android performs verification.",
             14f, getColor(R.color.tas_muted), false
         ), matchWrap())
         body.addView(space(16))
