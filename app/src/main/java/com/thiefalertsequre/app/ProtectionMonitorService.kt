@@ -44,17 +44,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private val prefs by lazy { getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
 
     private val countdownRunnable = Runnable { evaluateCountdown() }
-    private val powerReconcileRunnable = Runnable { reconcileStablePowerState() }
-
     private val systemReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            when (intent.action) {
-                Intent.ACTION_POWER_CONNECTED, Intent.ACTION_POWER_DISCONNECTED -> {
-                    handler.removeCallbacks(powerReconcileRunnable)
-                    handler.postDelayed(powerReconcileRunnable, POWER_DEBOUNCE_MS)
-                }
-                Intent.ACTION_BATTERY_CHANGED -> handleBatteryChanged(intent)
-            }
+            if (intent.action == Intent.ACTION_BATTERY_CHANGED) handleBatteryChanged(intent)
         }
     }
 
@@ -144,12 +136,16 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             handler.postDelayed(countdownRunnable, POWER_RETRY_MS)
             return
         }
-        val next = ProtectionStore(this).update {
-            ProtectionEngine.reconcileCountdown(it, connected, now, elapsed, boot)
+        var transitionedToAlarm = false
+        val next = ProtectionStore(this).update { current ->
+            val updated = ProtectionEngine.reconcileCountdown(current, connected, now, elapsed, boot)
+            transitionedToAlarm = current.mode == ProtectionMode.COUNTDOWN &&
+                updated.mode == ProtectionMode.ALARM_TRIGGERED
+            updated
         }
-        if (next.mode == ProtectionMode.ALARM_TRIGGERED) {
+        if (transitionedToAlarm) {
             AlarmScheduler.cancel(this)
-            LocalTamperHistory.record(this, "monitor_countdown_expired", "Foreground monitor reached the monotonic ten-second deadline")
+            LocalTamperHistory.record(this, "monitor_countdown_expired", "Validated countdown transitioned to alarm")
             startTheftAlarm()
         } else if (next.mode == ProtectionMode.COUNTDOWN) {
             syncDeadlineAlarm(next)
@@ -366,7 +362,6 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         private const val NOTIFICATION_ID = 501
         const val ACTION_STOP = "com.thiefalertsequre.STOP_MONITOR"
         private const val MOTION_COOLDOWN_MS = 5_000L
-        private const val POWER_DEBOUNCE_MS = 300L
         private const val POWER_RETRY_MS = 1_000L
     }
 }
