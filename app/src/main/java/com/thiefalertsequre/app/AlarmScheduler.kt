@@ -11,6 +11,7 @@ object AlarmScheduler {
     private const val PREFS = "alarm_scheduler_v1"
     private const val KEY_LAST_TOKEN = "last_token"
     private const val REQUEST_CODE = 1001
+    private const val BOOT_RECONCILIATION_RETRY_MS = 5_000L
 
     fun schedule(
         context: Context,
@@ -23,11 +24,19 @@ object AlarmScheduler {
         val token = deadlineToken(deadlineEpochMs, deadlineElapsedRealtimeMs, deadlineBootCount)
         val operation = pendingIntent(context, token)
         rememberToken(context, token)
-        val sameBoot = deadlineBootCount >= 0 &&
-            ProtectionClock.bootCount(context) == deadlineBootCount &&
-            deadlineElapsedRealtimeMs > 0L
+        val currentBootCount = ProtectionClock.bootCount(context)
+        val hasMonotonicDeadline = deadlineElapsedRealtimeMs > 0L
+        val sameBoot = hasMonotonicDeadline && deadlineBootCount >= 0 &&
+            currentBootCount >= 0 && currentBootCount == deadlineBootCount
+        val needsBootReconciliation = hasMonotonicDeadline && !sameBoot
         val clockType = if (sameBoot) AlarmManager.ELAPSED_REALTIME_WAKEUP else AlarmManager.RTC_WAKEUP
-        val triggerAt = if (sameBoot) deadlineElapsedRealtimeMs else deadlineEpochMs
+        // Never schedule an old monotonic deadline against wall time when boot
+        // identity is unknown/different; wake only to revalidate and rebase it.
+        val triggerAt = when {
+            sameBoot -> deadlineElapsedRealtimeMs
+            needsBootReconciliation -> System.currentTimeMillis() + BOOT_RECONCILIATION_RETRY_MS
+            else -> deadlineEpochMs
+        }
         val exactAllowed = Build.VERSION.SDK_INT < 31 || alarmManager.canScheduleExactAlarms()
         if (exactAllowed) {
             try {
