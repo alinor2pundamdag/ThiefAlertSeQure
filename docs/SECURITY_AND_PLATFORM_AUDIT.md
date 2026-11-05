@@ -14,7 +14,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 - State transitions are serialized through ProtectionStore.
 - Triggered state is monotonic against charger events; only successful Keyguard or BiometricPrompt authentication clears it.
 - State and throttle are synchronously persisted.
-- Countdown uses elapsedRealtime and boot count during the same boot; if a countdown was pending at reboot and the charger remains absent, the alarm is triggered immediately; if charging, protection returns to ARMED.
+- Countdown uses elapsedRealtime plus a verified boot count. If a countdown was pending at reboot and the charger remains absent, restart a full 10-second grace period; if charging, protection returns to ARMED. If boot identity is unavailable, never use wall-clock time to expire a monotonic deadline.
 - AlarmDeadlineReceiver rechecks the deadline and reschedules early delivery.
 - Exact alarm scheduling handles permission revocation races and falls back to inexact delivery when exact access is unavailable.
 
@@ -27,7 +27,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 - Only successful Keyguard or BiometricPrompt results clear ALARM_TRIGGERED.
 
 ## Audio and lockscreen
-- Exact uploaded Ogg Opus asset is played in a loop; ToneGenerator is fallback only if decoder initialization fails.
+- Packaged Ogg Opus alarm asset is played in a loop through MediaPlayer. If selected and packaged audio both fail, repeating vibration is the fallback; there is no ToneGenerator implementation.
 - Audio uses USAGE_ALARM and requests maximum available alarm-stream volume.
 - Prior alarm volume is saved and restored after successful disarm. If service is destroyed while alarm remains latched, it does not restore volume prematurely.
 - Notification is ongoing and opens a show-when-locked authentication Activity.
