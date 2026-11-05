@@ -9,8 +9,8 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-feature android:name="android.hardware.fingerprint" android:required="false" />
-    <application android:allowBackup="false" android:icon="@mipmap/thiefalertsequreicon"
-        android:roundIcon="@mipmap/thiefalertsequreicon" android:label="ThiefAlertSeQure"
+    <application android:allowBackup="false" android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round" android:label="ThiefAlertSeQure"
         android:usesCleartextTraffic="false" android:theme="@style/Theme.ThiefAlertSeQure">
         <activity android:name=".MainActivity" android:exported="true" android:showWhenLocked="true"
             android:turnScreenOn="true" android:excludeFromRecents="false">
