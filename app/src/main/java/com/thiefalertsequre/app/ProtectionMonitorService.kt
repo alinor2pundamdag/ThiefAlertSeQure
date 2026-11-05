@@ -46,7 +46,10 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private val countdownRunnable = Runnable { evaluateCountdown() }
     private val systemReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == Intent.ACTION_BATTERY_CHANGED) handleBatteryChanged(intent)
+            when (intent.action) {
+                Intent.ACTION_BATTERY_CHANGED -> handleBatteryChanged(intent)
+                ACTION_REFRESH -> refreshProtectionState()
+            }
         }
     }
 
@@ -96,6 +99,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         if (receiverRegistered) return
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_BATTERY_CHANGED)
+            addAction(ACTION_REFRESH)
         }
         ContextCompat.registerReceiver(this, systemReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         receiverRegistered = true
@@ -108,6 +112,13 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             prefs.edit().putBoolean(KEY_BATTERY_ALERT_FIRED, false)
                 .putInt(KEY_LAST_BATTERY_LEVEL, -1).apply()
         }
+        val state = ProtectionStore(this).read()
+        if (state.mode == ProtectionMode.ARMED) syncMotionSensor() else unregisterMotionSensor()
+        syncDeadlineAlarm(state)
+    }
+
+    /** Refresh sensor/deadline projections after the coordinator changes persisted state. */
+    private fun refreshProtectionState() {
         val state = ProtectionStore(this).read()
         if (state.mode == ProtectionMode.ARMED) syncMotionSensor() else unregisterMotionSensor()
         syncDeadlineAlarm(state)
@@ -376,6 +387,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         private const val CHANNEL_ID = "protection_monitor"
         private const val NOTIFICATION_ID = 501
         const val ACTION_STOP = "com.thiefalertsequre.STOP_MONITOR"
+        const val ACTION_REFRESH = "com.thiefalertsequre.REFRESH_MONITOR"
         private const val MOTION_COOLDOWN_MS = 5_000L
         private const val POWER_RETRY_MS = 1_000L
     }
