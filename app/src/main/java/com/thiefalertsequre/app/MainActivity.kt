@@ -462,10 +462,10 @@ class MainActivity : FragmentActivity() {
             "Main alarm sound: NOT CONFIGURED — protection arming is blocked."
         }
         val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        val monitorMessage = if (monitorPrefs.getBoolean(ProtectionMonitorService.KEY_RUNNING, false)) {
-            "Background motion/battery monitor: ACTIVE"
+        val monitorMessage = if (monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, false)) {
+            "Background motion/battery monitoring: ENABLED by owner; keep its foreground notification visible and check Settings for service failures."
         } else {
-            "Background motion/battery monitor: INACTIVE (enable it in Settings)"
+            "Background motion/battery monitoring: OFF (enable it in Settings)"
         }
         details.text = listOf(stateMessage, soundMessage, monitorMessage, attemptMessage, exactAlarmMessage, notificationMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
 

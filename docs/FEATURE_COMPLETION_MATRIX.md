@@ -16,7 +16,7 @@
 | Same-boot clock integrity | elapsedRealtime + boot count |
 | Reboot recovery | If countdown is pending and charger remains absent, trigger immediately; if charging, return to ARMED |
 | Android 15 boot recovery | Schedules exact alarm when user granted exact-alarm access; exact-alarm delivery is an allowed FGS-start path |
-| Local-only operation | No INTERNET permission, backend, analytics or advertising SDK |
+| Local-only operation | No INTERNET permission, backend, analytics or advertising SDK |\n| Background protection monitor | User-enabled, stoppable foreground service with persistent notification; uses supported specialUse FGS declaration |\n| Local event export | CSV export through Android's system document picker |
 | Alarm foreground notification | Ongoing notification opens lockscreen-capable authentication Activity |
 | First-launch privacy notice | Accept / decline choices are recorded distinctly; both continue to the same essential local protection functions |
 | Dedicated Settings screen | Android alarm, notification, battery/background, DND, app-info and privacy-notice controls |
@@ -52,11 +52,11 @@ Strong face authentication is available only if Android reports the enrolled fac
 1. Latest GitHub Actions unit tests pass.
 2. Latest debug APK assembles.
 3. Install on physical Android 14/15/16 devices.
-4. Verify exact Opus asset decodes and loops on each test device.
-5. Verify icon and label before and after installation.
-6. Verify charger events, exact ten-second timing, reconnect and reboot.
-7. Verify PIN, pattern, password, fingerprint and supported strong face.
-8. Verify repeated five-failure / 30-second cooldown and cancellation.
-9. Verify volume restoration, DND, silent mode, notification denial and battery settings.
-10. On a factory-reset test device only, verify Device Owner enrollment, lock-task restrictions and in-app rollback.
-11. Keep the PR unmerged until CI and physical-device gates pass.
+4. Verify selected audio URI survives reboot, decodes, previews and loops; verify vibration fallback on missing/corrupt audio.\n5. Verify foreground monitor, motion sensitivity, battery threshold crossing and stop action on physical devices.
+6. Verify icon and label before and after installation.
+7. Verify charger events, ten-second timing with monitor enabled, AlarmManager backup, reconnect and reboot.
+8. Verify PIN, pattern, password, fingerprint and supported strong face.
+9. Verify repeated five-failure / 30-second cooldown and cancellation.
+10. Verify volume restoration, DND, silent mode, notification denial and battery settings.
+11. On a factory-reset test device only, verify Device Owner enrollment, lock-task restrictions and in-app rollback.
+12. Complete Google Play foreground-service declaration for specialUse; approval is not guaranteed. Keep the PR unmerged until CI and physical-device gates pass.

@@ -16,6 +16,7 @@ import android.hardware.SensorManager
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.os.Build
+import android.os.BatteryManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -219,9 +220,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
 
     private fun handleBatteryChanged(intent: Intent) {
         if (!prefs.getBoolean(KEY_BATTERY_ALERT_ENABLED, false)) return
-        val plugged = intent.getIntExtra(Intent.EXTRA_PLUGGED, 0) != 0
-        val level = intent.getIntExtra("level", -1)
-        val scale = intent.getIntExtra("scale", -1)
+        val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+        val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
         if (!plugged || level < 0 || scale <= 0) return
         val percent = (level * 100f / scale).toInt()
         val previous = prefs.getInt(KEY_LAST_BATTERY_LEVEL, -1)
