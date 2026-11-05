@@ -50,4 +50,10 @@ class ProtectionEngineTest {
         assertEquals(ProtectionMode.DISARMED, ProtectionEngine.authenticated(alarm, 12_000).mode)
         assertEquals(armed, ProtectionEngine.authenticated(armed, 12_000))
     }
+    @Test fun countdownIsTheOnlyStateThatNeedsDeadlineAlarm() {
+        assertEquals(true, ProtectionEngine.shouldScheduleDeadline(ProtectionMode.COUNTDOWN))
+        assertEquals(false, ProtectionEngine.shouldScheduleDeadline(ProtectionMode.DISARMED))
+        assertEquals(false, ProtectionEngine.shouldScheduleDeadline(ProtectionMode.ARMED))
+        assertEquals(false, ProtectionEngine.shouldScheduleDeadline(ProtectionMode.ALARM_TRIGGERED))
+    }
 }
