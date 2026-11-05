@@ -6,7 +6,6 @@ import android.app.KeyguardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -320,7 +319,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun reconcileCharging() {
-        val charging = getSystemService(BatteryManager::class.java).isCharging
+        val charging = ExternalPowerState.isConnected(this)
         val store = ProtectionStore(this)
         val now = System.currentTimeMillis()
         val elapsed = ProtectionClock.elapsedRealtime()
