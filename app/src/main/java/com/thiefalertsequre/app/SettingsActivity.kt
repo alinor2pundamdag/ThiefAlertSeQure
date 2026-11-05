@@ -177,11 +177,11 @@ class SettingsActivity : FragmentActivity() {
             } else if (!enabled) {
                 // Explicit owner opt-out stops pending charger countdowns too,
                 // but never clears a latched alarm without authentication.
-                ProtectionStore(this).update { current ->
+                val disabledState = ProtectionStore(this).update { current ->
                     if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
                     else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
                 }
-                AlarmScheduler.cancel(this)
+                if (disabledState.mode != ProtectionMode.ALARM_TRIGGERED) AlarmScheduler.cancel(this)
                 stopService(Intent(this, ProtectionMonitorService::class.java))
             } else {
                 android.widget.Toast.makeText(this, "Monitoring will resume after owner authentication.", android.widget.Toast.LENGTH_LONG).show()
