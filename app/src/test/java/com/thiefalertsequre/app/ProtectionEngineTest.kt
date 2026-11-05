@@ -86,10 +86,12 @@ class ProtectionEngineTest {
     }
     @Test fun staleDeadlineCallbackCannotMatchNewCountdown() {
         val active = ProtectionState(ProtectionMode.COUNTDOWN, 22_000L, 12_000L, 26_000L, 7)
-        assertEquals(false, ProtectionEngine.isCurrentDeadline(active, 11_000L))
-        assertEquals(true, ProtectionEngine.isCurrentDeadline(active, 22_000L))
+        assertEquals(false, ProtectionEngine.isCurrentDeadline(active, 11_000L, 15_000L, 7))
+        assertEquals(true, ProtectionEngine.isCurrentDeadline(active, 22_000L, 26_000L, 7))
+        assertEquals(false, ProtectionEngine.isCurrentDeadline(active, 22_000L, 26_001L, 7))
+        assertEquals(false, ProtectionEngine.isCurrentDeadline(active, 22_000L, 26_000L, 8))
         assertEquals(false, ProtectionEngine.isCurrentDeadline(
-            ProtectionState(ProtectionMode.ARMED, 0L, 23_000L), 22_000L
+            ProtectionState(ProtectionMode.ARMED, 0L, 23_000L), 22_000L, 26_000L, 7
         ))
     }
 
