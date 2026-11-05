@@ -166,6 +166,9 @@ class SettingsActivity : FragmentActivity() {
             monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).apply()
             val state = ProtectionStore(this).read()
             if (enabled && state.mode != ProtectionMode.ALARM_TRIGGERED) {
+                PowerTransitionCoordinator.resetBaselineToCurrentPower(
+                    this, "Owner re-enabled background monitoring"
+                )
                 runCatching {
                     ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
                 }.onFailure {
