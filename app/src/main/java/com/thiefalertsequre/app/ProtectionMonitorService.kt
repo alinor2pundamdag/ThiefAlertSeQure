@@ -226,9 +226,15 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private fun handleBatteryChanged(intent: Intent) {
         if (!prefs.getBoolean(KEY_BATTERY_ALERT_ENABLED, false)) return
         val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+        if (!plugged) {
+            // A new charge session gets its own one-shot threshold alert.
+            prefs.edit().putBoolean(KEY_BATTERY_ALERT_FIRED, false)
+                .putInt(KEY_LAST_BATTERY_LEVEL, -1).apply()
+            return
+        }
         val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
         val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-        if (!plugged || level < 0 || scale <= 0) return
+        if (level < 0 || scale <= 0) return
         val percent = (level * 100f / scale).toInt()
         val previous = prefs.getInt(KEY_LAST_BATTERY_LEVEL, -1)
         val threshold = prefs.getInt(KEY_BATTERY_THRESHOLD, 80).coerceIn(50, 100)
