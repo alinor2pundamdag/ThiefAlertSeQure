@@ -723,12 +723,20 @@ class MainActivity : FragmentActivity() {
                             store.startAuthenticationCooldown(
                                 System.currentTimeMillis(), ProtectionClock.elapsedRealtime(), ProtectionClock.bootCount(this@MainActivity)
                             )
-                            details.text = "Android biometric lockout. Switching to device credentials."
-                            if (getSystemService(KeyguardManager::class.java).isDeviceSecure) authenticateDeviceCredential()
+                            if (getSystemService(KeyguardManager::class.java).isDeviceSecure) {
+                                details.text = "Android biometric lockout. Switching to device credentials."
+                                authenticateDeviceCredential()
+                            } else {
+                                autoAuthenticationRequested = false
+                                details.text = "Android biometric lockout. Set a secure device PIN, pattern or password to recover owner access."
+                            }
                         }
                         BiometricPrompt.ERROR_NEGATIVE_BUTTON -> {
                             if (getSystemService(KeyguardManager::class.java).isDeviceSecure) authenticateDeviceCredential()
-                            else details.text = "Authentication cancelled. The alarm remains active."
+                            else {
+                                autoAuthenticationRequested = false
+                                details.text = "Authentication cancelled. The alarm remains active."
+                            }
                         }
                         BiometricPrompt.ERROR_USER_CANCELED, BiometricPrompt.ERROR_CANCELED -> {
                             autoAuthenticationRequested = false
