@@ -15,6 +15,18 @@ object PowerTransitionCoordinator {
         if (prefs.getBoolean(KNOWN, false)) return@synchronized
         val value = ExternalPowerState.readConnected(context) ?: return@synchronized
         prefs.edit().putBoolean(CONNECTED, value).putBoolean(KNOWN, true).commit()
+        // Migration guard: a COUNTDOWN persisted by older snapshot-based code has
+        // no trustworthy transition provenance. Discard it instead of firing it.
+        val prior = ProtectionStore(context).read()
+        if (prior.mode == ProtectionMode.COUNTDOWN) {
+            ProtectionStore(context).update { current ->
+                if (current.mode == ProtectionMode.COUNTDOWN) {
+                    ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
+                } else current
+            }
+            AlarmScheduler.cancel(context)
+            LocalTamperHistory.record(context, "legacy_countdown_discarded", "Unverifiable pre-transition countdown discarded during migration")
+        }
         LocalTamperHistory.record(context, "power_baseline_initialized", "Initial state recorded; no transition inferred")
     }
 
