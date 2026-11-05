@@ -1,6 +1,7 @@
 package com.thiefalertsequre.app
 
 import android.content.Context
+import android.content.Intent
 
 /** Single authority for charger transitions; snapshots alone never start countdowns. */
 object PowerTransitionCoordinator {
@@ -95,6 +96,12 @@ object PowerTransitionCoordinator {
         else LocalTamperHistory.record(context, "power_baseline_reset", "$reason; disconnected state recorded without creating a countdown")
     }
 
+    private fun notifyMonitorStateChanged(context: Context) {
+        context.applicationContext.sendBroadcast(
+            Intent(ProtectionMonitorService.ACTION_REFRESH).setPackage(context.packageName)
+        )
+    }
+
     fun onPowerConnected(context: Context): ProtectionState =
         confirmConnectedAndArm(context, "System power-connected transition received")
 
@@ -119,7 +126,10 @@ object PowerTransitionCoordinator {
                 ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
             }
         }
-        if (state.mode != ProtectionMode.ALARM_TRIGGERED) AlarmScheduler.cancel(context)
+        if (state.mode != ProtectionMode.ALARM_TRIGGERED) {
+            AlarmScheduler.cancel(context)
+            notifyMonitorStateChanged(context)
+        }
         LocalTamperHistory.record(context, "charger_connected_confirmed", reason)
         return state
     }
@@ -206,7 +216,8 @@ object PowerTransitionCoordinator {
             }
             if (next.mode == ProtectionMode.COUNTDOWN) {
                 AlarmScheduler.schedule(appContext, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
-                LocalTamperHistory.record(appContext, "charger_countdown_started", "OS unplug event confirmed by three disconnected snapshots")
+                LocalTamperHistory.record(appContext, "charger_countdown_started", "OS unplug event confirmed by five samples with three consecutive disconnected readings")
+                notifyMonitorStateChanged(appContext)
             }
             next
         }
