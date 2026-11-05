@@ -7,13 +7,33 @@ import androidx.core.content.ContextCompat
 
 class AlarmDeadlineReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
-        val token = intent?.data?.lastPathSegment ?: return
+        val callbackIntent = intent ?: return
+        val pending = goAsync()
+        Thread {
+            try {
+                handleDeadline(context.applicationContext, callbackIntent)
+            } catch (error: Exception) {
+                LocalTamperHistory.record(
+                    context, "deadline_receiver_error",
+                    error.javaClass.simpleName + ": " + error.message
+                )
+                AlarmScheduler.scheduleRetry(context, 1_000L)
+            } finally {
+                pending.finish()
+            }
+        }.start()
+    }
+
+    private fun handleDeadline(context: Context, intent: Intent) {
+        val token = intent.data?.lastPathSegment ?: return
         val state = ProtectionStore(context).read()
 
         // Recovery callbacks are distinct from countdown callbacks and may only
         // restart an already-latched alarm.
         if (token == "recovery") {
-            if (state.mode == ProtectionMode.ALARM_TRIGGERED) startAlarm(context, "Latched alarm recovery callback")
+            if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
+                startAlarm(context, "Latched alarm recovery callback")
+            }
             return
         }
 
@@ -29,20 +49,23 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             return
         }
 
-        val now = System.currentTimeMillis()
-        val elapsed = ProtectionClock.elapsedRealtime()
-        val boot = ProtectionClock.bootCount(context)
-        val connected = ExternalPowerState.readConnected(context)
+        // Recheck physical power over time at the deadline. A single stale
+        // BATTERY_CHANGED snapshot must not be enough to activate the alarm.
+        val connected = readStableConnected(context)
         if (connected == null) {
+            LocalTamperHistory.record(context, "deadline_validation_inconclusive", "Power state did not produce three consecutive disconnected samples")
             AlarmScheduler.scheduleRetry(context, 1_000L)
             return
         }
 
+        val now = System.currentTimeMillis()
+        val elapsed = ProtectionClock.elapsedRealtime()
+        val boot = ProtectionClock.bootCount(context)
         var transitionedToAlarm = false
         var callbackStillCurrent = false
         val updated = ProtectionStore(context).update { current ->
             // Revalidate the token under the same store lock as the transition.
-            // A newer countdown may have replaced it after the initial read above.
+            // A newer countdown or reconnect may have replaced it during sampling.
             if (!ProtectionEngine.isCurrentDeadline(
                     current, tokenDeadline, tokenElapsed, tokenBoot
                 )
@@ -66,11 +89,35 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             ProtectionMode.ALARM_TRIGGERED -> if (transitionedToAlarm) {
                 AlarmScheduler.cancel(context)
                 context.stopService(Intent(context, ProtectionMonitorService::class.java))
-                LocalTamperHistory.record(context, "countdown_expired", "Validated countdown transitioned to alarm")
+                LocalTamperHistory.record(context, "countdown_expired", "Stable unplug samples and deadline validation transitioned to alarm")
                 startAlarm(context, "Countdown deadline validated")
             }
-            ProtectionMode.ARMED, ProtectionMode.DISARMED -> AlarmScheduler.cancel(context)
+            ProtectionMode.ARMED, ProtectionMode.DISARMED -> {
+                AlarmScheduler.cancel(context)
+                if (connected) {
+                    PowerTransitionCoordinator.confirmConnectedAndArm(
+                        context, "Stable deadline samples confirmed external power"
+                    )
+                }
+            }
             else -> Unit
+        }
+    }
+
+    /** true=connected, false=stably disconnected, null=unknown/unstable. */
+    private fun readStableConnected(context: Context): Boolean? {
+        var consecutiveDisconnected = 0
+        var lastObserved: Boolean? = null
+        repeat(5) { index ->
+            val observed = ExternalPowerState.readConnected(context)
+            lastObserved = observed
+            consecutiveDisconnected = if (observed == false) consecutiveDisconnected + 1 else 0
+            if (index < 4) Thread.sleep(200L)
+        }
+        return when {
+            consecutiveDisconnected >= 3 -> false
+            lastObserved == true -> true
+            else -> null
         }
     }
 
