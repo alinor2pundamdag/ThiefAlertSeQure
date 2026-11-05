@@ -63,11 +63,11 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             prefs.edit().putBoolean(KEY_ENABLED, false).apply()
-            ProtectionStore(this).update { current ->
+            val disabledState = ProtectionStore(this).update { current ->
                 if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
                 else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
             }
-            AlarmScheduler.cancel(this)
+            if (disabledState.mode != ProtectionMode.ALARM_TRIGGERED) AlarmScheduler.cancel(this)
             stopSelf()
             return START_NOT_STICKY
         }
