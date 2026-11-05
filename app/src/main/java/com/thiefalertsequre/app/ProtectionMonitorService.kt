@@ -24,6 +24,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * User-visible, persistent charger monitor. It remains active while DISARMED,
@@ -43,7 +44,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private var alertPlayer: MediaPlayer? = null
     private val prefs by lazy { getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
 
-    private val countdownRunnable = Runnable { evaluateCountdown() }
+    private val countdownValidationRunning = AtomicBoolean(false)
+    @Volatile private var countdownExpected: ProtectionState? = null
+    private val countdownRunnable = Runnable { countdownExpected?.let(::evaluateCountdown) }
     private val systemReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
@@ -132,12 +135,14 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             AlarmScheduler.schedule(this, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
             scheduleCountdown(state)
         } else {
+            countdownExpected = null
             AlarmScheduler.cancel(this)
             handler.removeCallbacks(countdownRunnable)
         }
     }
 
     private fun scheduleCountdown(state: ProtectionState) {
+        countdownExpected = state
         handler.removeCallbacks(countdownRunnable)
         val remaining = ProtectionEngine.remainingMs(
             state, System.currentTimeMillis(), ProtectionClock.elapsedRealtime(), ProtectionClock.bootCount(this)
@@ -145,37 +150,90 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         handler.postDelayed(countdownRunnable, remaining.coerceAtLeast(0L))
     }
 
-    private fun evaluateCountdown() {
-        val now = System.currentTimeMillis()
-        val elapsed = ProtectionClock.elapsedRealtime()
-        val boot = ProtectionClock.bootCount(this)
-        val connected = ExternalPowerState.readConnected(this)
-        if (connected == null) {
-            handler.postDelayed(countdownRunnable, POWER_RETRY_MS)
-            return
-        }
-        var transitionedToAlarm = false
-        val next = ProtectionStore(this).update { current ->
-            val updated = ProtectionEngine.reconcileCountdown(current, connected, now, elapsed, boot)
-            transitionedToAlarm = current.mode == ProtectionMode.COUNTDOWN &&
-                updated.mode == ProtectionMode.ALARM_TRIGGERED
-            updated
-        }
-        if (transitionedToAlarm && next.mode == ProtectionMode.ALARM_TRIGGERED) {
-            AlarmScheduler.cancel(this)
-            LocalTamperHistory.record(this, "monitor_countdown_expired", "Validated countdown transitioned to alarm")
-            startTheftAlarm()
-        } else if (next.mode == ProtectionMode.COUNTDOWN) {
-            syncDeadlineAlarm(next)
-        } else if (next.mode == ProtectionMode.ALARM_TRIGGERED) {
-            // Preserve any recovery callback for the already-latched alarm.
-            handler.removeCallbacks(countdownRunnable)
-            unregisterMotionSensor()
-        } else {
-            AlarmScheduler.cancel(this)
-            handler.removeCallbacks(countdownRunnable)
-            if (next.mode == ProtectionMode.ARMED) syncMotionSensor()
-        }
+    /** The Handler is only a timer; charger validation runs off the main thread. */
+    private fun evaluateCountdown(expected: ProtectionState) {
+        if (!countdownValidationRunning.compareAndSet(false, true)) return
+        Thread {
+            try {
+                var consecutiveDisconnected = 0
+                var lastObserved: Boolean? = null
+                repeat(5) { index ->
+                    val observed = ExternalPowerState.readConnected(this)
+                    lastObserved = observed
+                    consecutiveDisconnected = if (observed == false) consecutiveDisconnected + 1 else 0
+                    if (index < 4) Thread.sleep(200L)
+                }
+                val connected = when {
+                    consecutiveDisconnected >= 3 -> false
+                    lastObserved == true -> true
+                    else -> null
+                }
+                if (connected == null) {
+                    handler.post {
+                        if (isExpectedCountdownCurrent(expected)) {
+                            handler.postDelayed(countdownRunnable, POWER_RETRY_MS)
+                        }
+                    }
+                    return@Thread
+                }
+
+                val now = System.currentTimeMillis()
+                val elapsed = ProtectionClock.elapsedRealtime()
+                val boot = ProtectionClock.bootCount(this)
+                var callbackStillCurrent = false
+                var transitionedToAlarm = false
+                val next = ProtectionStore(this).update { current ->
+                    if (!ProtectionEngine.isCurrentDeadline(
+                            current, expected.deadlineEpochMs,
+                            expected.deadlineElapsedRealtimeMs, expected.bootCount
+                        )
+                    ) return@update current
+                    callbackStillCurrent = true
+                    val updated = ProtectionEngine.reconcileCountdown(current, connected, now, elapsed, boot)
+                    transitionedToAlarm = current.mode == ProtectionMode.COUNTDOWN &&
+                        updated.mode == ProtectionMode.ALARM_TRIGGERED
+                    updated
+                }
+                if (!callbackStillCurrent) return@Thread
+
+                handler.post {
+                    if (transitionedToAlarm && next.mode == ProtectionMode.ALARM_TRIGGERED) {
+                        countdownExpected = null
+                        AlarmScheduler.cancel(this)
+                        LocalTamperHistory.record(this, "monitor_countdown_expired", "Stable charger samples and current deadline transitioned to alarm")
+                        startTheftAlarm()
+                    } else if (next.mode == ProtectionMode.COUNTDOWN) {
+                        syncDeadlineAlarm(next)
+                    } else if (next.mode == ProtectionMode.ALARM_TRIGGERED) {
+                        countdownExpected = null
+                        handler.removeCallbacks(countdownRunnable)
+                        unregisterMotionSensor()
+                    } else {
+                        countdownExpected = null
+                        AlarmScheduler.cancel(this)
+                        handler.removeCallbacks(countdownRunnable)
+                        if (next.mode == ProtectionMode.ARMED) syncMotionSensor()
+                    }
+                }
+            } catch (error: Exception) {
+                LocalTamperHistory.record(this, "monitor_countdown_validation_failed", error.javaClass.simpleName + ": " + error.message)
+                handler.post {
+                    if (isExpectedCountdownCurrent(expected)) {
+                        handler.postDelayed(countdownRunnable, POWER_RETRY_MS)
+                    }
+                }
+            } finally {
+                countdownValidationRunning.set(false)
+            }
+        }.start()
+    }
+
+    private fun isExpectedCountdownCurrent(expected: ProtectionState): Boolean {
+        val current = ProtectionStore(this).read()
+        return ProtectionEngine.isCurrentDeadline(
+            current, expected.deadlineEpochMs,
+            expected.deadlineElapsedRealtimeMs, expected.bootCount
+        )
     }
 
     private fun syncMotionSensor() {
