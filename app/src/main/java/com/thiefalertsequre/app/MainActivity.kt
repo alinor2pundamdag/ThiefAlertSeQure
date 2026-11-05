@@ -413,7 +413,7 @@ class MainActivity : FragmentActivity() {
         val state = if (current.mode == ProtectionMode.DISARMED &&
             ExternalPowerState.readConnected(this) == true
         ) {
-            store.update { ProtectionEngine.chargerConnected(it, System.currentTimeMillis()) }
+            PowerTransitionCoordinator.confirmConnectedAndArm(this, "Connected power confirmed during app reconciliation")
         } else current
         if (state.mode != ProtectionMode.ALARM_TRIGGERED) {
             runCatching { AlarmVolumeController.restore(this, getSystemService(android.media.AudioManager::class.java)) }
@@ -740,16 +740,29 @@ class MainActivity : FragmentActivity() {
 
     private fun completeOwnerAuthentication() {
         val store = ProtectionStore(this)
-        val next = store.update { ProtectionEngine.authenticated(it, System.currentTimeMillis()) }
-        if (next.mode == ProtectionMode.DISARMED) {
+        val authenticated = store.update { ProtectionEngine.authenticated(it, System.currentTimeMillis()) }
+        if (authenticated.mode == ProtectionMode.DISARMED) {
             autoAuthenticationRequested = false
             store.resetAuthenticationFailures()
             AlarmScheduler.cancel(this)
             stopService(Intent(this, AlarmService::class.java))
             runCatching { AlarmVolumeController.restore(this, getSystemService(android.media.AudioManager::class.java)) }
-            details.text = "Owner authenticated. Alarm stopped."
+
+            // If the owner reconnected power before authenticating, preserve the
+            // required next-cycle behavior: authentication stops the alarm, then
+            // the confirmed connected state arms protection for the next unplug.
+            val next = if (ExternalPowerState.readConnected(this) == true) {
+                PowerTransitionCoordinator.confirmConnectedAndArm(this, "Charger is connected after owner authentication")
+            } else authenticated
+            details.text = if (next.mode == ProtectionMode.ARMED) {
+                "Owner authenticated. Alarm stopped. Protection re-armed because the charger is connected."
+            } else {
+                "Owner authenticated. Alarm stopped. Protection remains disarmed until the charger is reconnected."
+            }
+            syncProtectionMonitor(next)
+        } else {
+            syncProtectionMonitor(authenticated)
         }
-        syncProtectionMonitor(next)
         render()
     }
 
