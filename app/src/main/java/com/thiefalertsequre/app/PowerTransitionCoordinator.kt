@@ -188,16 +188,16 @@ object PowerTransitionCoordinator {
                 )
                 return@synchronized null
             }
+            if (ExternalPowerState.readConnected(appContext) == true) {
+                confirmConnectedAndArmLocked(appContext, "Disconnect broadcast arrived while live snapshot still shows connected power")
+                LocalTamperHistory.record(appContext, "charger_unplug_rejected", "Live power snapshot still reports connected")
+                return@synchronized null
+            }
             if (!prefs.getBoolean(CONNECTED, false)) {
                 LocalTamperHistory.record(
                     appContext, "charger_unplug_rejected",
                     "No previously confirmed connected baseline; disconnected snapshots never create transitions"
                 )
-                return@synchronized null
-            }
-            if (ExternalPowerState.readConnected(appContext) == true) {
-                confirmConnectedAndArmLocked(appContext, "Disconnect broadcast arrived while live snapshot still shows connected power")
-                LocalTamperHistory.record(appContext, "charger_unplug_rejected", "Live power snapshot still reports connected")
                 return@synchronized null
             }
             val nextGeneration = prefs.getLong(GENERATION, 0L) + 1L
