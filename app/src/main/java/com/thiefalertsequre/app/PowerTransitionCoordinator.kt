@@ -63,13 +63,19 @@ object PowerTransitionCoordinator {
         val connected = ExternalPowerState.readConnected(context)
         val generation = prefs.getLong(GENERATION, 0L) + 1L
         if (connected == null) {
-            prefs.edit()
-                .putBoolean(KNOWN, false)
-                .putBoolean(CONNECTED, false)
-                .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
-                .putLong(GENERATION, generation)
-                .commit()
-            LocalTamperHistory.record(context, "power_baseline_unknown", "$reason; no transition accepted until a reliable power state is available")
+            // Preserve an already-valid countdown; clearing KNOWN would make
+            // first-run migration discard it on the monitor's next startup.
+            if (ProtectionStore(context).read().mode != ProtectionMode.COUNTDOWN) {
+                prefs.edit()
+                    .putBoolean(KNOWN, false)
+                    .putBoolean(CONNECTED, false)
+                    .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
+                    .putLong(GENERATION, generation)
+                    .commit()
+            } else {
+                prefs.edit().putLong(GENERATION, generation).commit()
+            }
+            LocalTamperHistory.record(context, "power_baseline_unknown", "$reason; no new transition accepted until a reliable power state is available")
             return@synchronized
         }
         prefs.edit()
