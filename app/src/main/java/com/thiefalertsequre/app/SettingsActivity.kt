@@ -156,7 +156,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(text("BACKGROUND PROTECTION MONITOR", 11f, R.color.tas_primary, true))
         root.addView(space(8))
         root.addView(text(
-            "The charger-protection monitor is enabled by default and must remain running to detect plug/unplug events while the app is closed. Its persistent notification stays visible; motion sensing runs only while armed and battery-threshold alerts are optional. You can disable monitoring, but automatic charger detection will stop. Android and device manufacturers may still stop it.",
+            "The charger-protection monitor is enabled by default and must remain running to detect plug/unplug events while the app is closed. Its persistent notification stays visible; the independent motion alarm is OFF by default and can trigger while charging if explicitly enabled. Battery-threshold alerts are optional. You can disable monitoring, but automatic charger detection will stop. Android and device manufacturers may still stop it.",
             13f, R.color.tas_muted
         ))
         val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
