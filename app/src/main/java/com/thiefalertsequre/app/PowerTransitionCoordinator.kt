@@ -5,7 +5,9 @@ import android.content.Intent
 
 /** Single authority for charger transitions; snapshots alone never start countdowns. */
 object PowerTransitionCoordinator {
-    private const val PREFS = "charger_transition_v1"
+    // v2 intentionally resets the old snapshot-derived baseline. Any legacy
+    // COUNTDOWN from earlier builds lacks trustworthy transition provenance.
+    private const val PREFS = "charger_transition_v2"
     private const val KNOWN = "baseline_known"
     private const val CONNECTED = "baseline_connected"
     private const val BASELINE_BOOT_COUNT = "baseline_boot_count"
