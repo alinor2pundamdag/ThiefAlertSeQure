@@ -167,6 +167,10 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             startTheftAlarm()
         } else if (next.mode == ProtectionMode.COUNTDOWN) {
             syncDeadlineAlarm(next)
+        } else if (next.mode == ProtectionMode.ALARM_TRIGGERED) {
+            // Preserve any recovery callback for the already-latched alarm.
+            handler.removeCallbacks(countdownRunnable)
+            unregisterMotionSensor()
         } else {
             AlarmScheduler.cancel(this)
             handler.removeCallbacks(countdownRunnable)
