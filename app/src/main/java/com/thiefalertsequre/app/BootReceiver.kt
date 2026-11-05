@@ -1,5 +1,6 @@
 package com.thiefalertsequre.app
 
+import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -8,6 +9,22 @@ import androidx.core.content.ContextCompat
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED) {
+            if (Build.VERSION.SDK_INT >= 31 &&
+                context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
+            ) {
+                val state = ProtectionStore(context).read()
+                when (state.mode) {
+                    ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(
+                        context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount
+                    )
+                    ProtectionMode.ALARM_TRIGGERED -> AlarmScheduler.scheduleImmediateRecovery(context)
+                    else -> Unit
+                }
+                LocalTamperHistory.record(context, "exact_alarm_access_granted", "Pending protection deadline re-evaluated")
+            }
+            return
+        }
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
         val charging = ExternalPowerState.isConnected(context)
         val now = System.currentTimeMillis()
@@ -15,15 +32,14 @@ class BootReceiver : BroadcastReceiver() {
         val boot = ProtectionClock.bootCount(context)
         val store = ProtectionStore(context)
         val next = store.update { ProtectionEngine.restoreAfterBoot(it, charging, now, elapsed, boot) }
-
         when (next.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(
                 context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount
             )
             ProtectionMode.ALARM_TRIGGERED -> {
                 if (Build.VERSION.SDK_INT >= 35) {
-                    // Exact alarms are exempt from the Android 15 BOOT_COMPLETED mediaPlayback-FGS restriction.
-                    // If the user has not granted exact-alarm access, a best-effort inexact recovery is scheduled.
+                    // Android 15+ blocks BOOT_COMPLETED -> mediaPlayback FGS.
+                    // Exact alarm is the documented recovery path; inexact is best effort.
                     AlarmScheduler.scheduleImmediateRecovery(context)
                 } else {
                     runCatching {
@@ -31,6 +47,8 @@ class BootReceiver : BroadcastReceiver() {
                             context,
                             Intent(context, AlarmService::class.java).setAction(AlarmService.ACTION_START)
                         )
+                    }.onFailure {
+                        LocalTamperHistory.record(context, "boot_alarm_start_failed", it.javaClass.simpleName + ": " + it.message)
                     }
                 }
             }
