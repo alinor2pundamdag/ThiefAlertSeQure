@@ -56,9 +56,9 @@ jobs:
               payload = image.read_bytes()
               assert payload, f"{image} is empty"
               if image.suffix.lower() == ".png":
-                  assert payload.startswith(b"\\x89PNG\\r\\n\\x1a\\n"), f"{image} is not a PNG"
+                  assert payload.startswith(b"\x89PNG\r\n\x1a\n"), f"{image} is not a PNG"
               elif image.suffix.lower() in (".jpg", ".jpeg"):
-                  assert payload.startswith(b"\\xff\\xd8\\xff"), f"{image} is not a JPEG"
+                  assert payload.startswith(b"\xff\xd8\xff"), f"{image} is not a JPEG"
           print(f"Validated Ogg Opus alarm ({len(data)} bytes) and {len(images)} image assets.")
           PY
       - name: Assemble debug APK
