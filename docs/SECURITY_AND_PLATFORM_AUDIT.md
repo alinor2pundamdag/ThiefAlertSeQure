@@ -44,7 +44,9 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 - In-app rollback stops Lock Task and clears each restriction and allowlist.
 - This does not block physical long-press shutdown, hardware key combinations, bootloader/recovery reset or OEM firmware controls.
 
-## Android 15+ boot behavior
+## Android boot and Direct Boot behavior
+The app listens for BOOT_COMPLETED and is not Direct-Boot-aware. Android normally delivers BOOT_COMPLETED after the first user unlock, so this app cannot promise protection before that unlock following a reboot.
+
 Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPlayback foreground service for target API 35. For a latched alarm, BootReceiver now schedules an immediate exact alarm. Android documents exact-alarm delivery as exempt from foreground-service background-start restrictions. This route requires user-granted SCHEDULE_EXACT_ALARM access; without it, an inexact fallback is attempted and playback timing cannot be guaranteed.
 
 ## Compatibility
