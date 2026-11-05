@@ -9,7 +9,7 @@
 | Original alarm sound | Packaged Ogg Opus asset in res/raw, looping MediaPlayer (resource filename must use `.ogg`) |
 | Audio fallback | Repeating vibration if selected and packaged audio both fail |
 | Alarm volume | Saves prior alarm-stream volume, raises to device maximum during alarm, restores after successful disarm |
-| Charger auto-arm | PowerReceiver |
+| Charger auto-arm | Manifest-declared PowerTransitionReceiver plus persisted connected-baseline validation |
 | 10-second unplug countdown | ProtectionEngine + AlarmScheduler |
 | Reconnect before deadline | Returns to ARMED |
 | Reconnect after trigger | Cannot clear ALARM_TRIGGERED |
