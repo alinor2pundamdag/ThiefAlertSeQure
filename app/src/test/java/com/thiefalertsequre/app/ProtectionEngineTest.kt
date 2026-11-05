@@ -63,6 +63,14 @@ class ProtectionEngineTest {
         val s = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
         assertEquals(s, ProtectionEngine.restoreAfterBoot(s, true, 20_000))
     }
+    @Test fun successfulAuthenticationRearmsWhenChargerIsAlreadyConnected() {
+        val alarm = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
+        assertEquals(ProtectionMode.ARMED, ProtectionEngine.authenticated(alarm, 12_000, true).mode)
+    }
+    @Test fun successfulAuthenticationDisarmsWhenChargerIsAbsent() {
+        val alarm = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
+        assertEquals(ProtectionMode.DISARMED, ProtectionEngine.authenticated(alarm, 12_000, false).mode)
+    }
     @Test fun onlyTriggeredStateCanBeClearedByAuthentication() {
         val alarm = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
         val armed = ProtectionState(ProtectionMode.ARMED, 0, 1_000)

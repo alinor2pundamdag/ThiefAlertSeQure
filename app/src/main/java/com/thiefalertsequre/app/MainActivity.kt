@@ -552,7 +552,9 @@ class MainActivity : FragmentActivity() {
 
     private fun completeOwnerAuthentication() {
         val store = ProtectionStore(this)
-        val next = store.update { ProtectionEngine.authenticated(it, System.currentTimeMillis()) }
+        val next = store.update {
+            ProtectionEngine.authenticated(it, System.currentTimeMillis(), ExternalPowerState.isConnected(this))
+        }
         if (next.mode == ProtectionMode.DISARMED) {
             store.resetAuthenticationFailures()
             AlarmScheduler.cancel(this)

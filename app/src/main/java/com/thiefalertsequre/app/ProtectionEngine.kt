@@ -96,7 +96,15 @@ object ProtectionEngine {
         ProtectionMode.DISARMED -> if (isCharging) chargerConnected(s, nowEpochMs) else s
     }
 
-    fun authenticated(s: ProtectionState, now: Long): ProtectionState =
-        if (s.mode == ProtectionMode.ALARM_TRIGGERED)
-            ProtectionState(ProtectionMode.DISARMED, 0L, now, 0L, -1) else s
+    fun authenticated(
+        s: ProtectionState,
+        now: Long,
+        isCharging: Boolean = false
+    ): ProtectionState =
+        if (s.mode == ProtectionMode.ALARM_TRIGGERED) {
+            // If the cable was reconnected while the alarm was sounding, successful
+            // owner authentication completes that cycle and immediately re-arms.
+            if (isCharging) ProtectionState(ProtectionMode.ARMED, 0L, now, 0L, -1)
+            else ProtectionState(ProtectionMode.DISARMED, 0L, now, 0L, -1)
+        } else s
 }
