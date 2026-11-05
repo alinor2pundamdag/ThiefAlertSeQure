@@ -46,11 +46,29 @@ object ProtectionEngine {
         nowEpochMs: Long,
         nowElapsedRealtimeMs: Long = 0L,
         currentBootCount: Int = -1
-    ): ProtectionState = when {
-        s.mode != ProtectionMode.COUNTDOWN -> s
-        chargerConnected == true -> chargerConnected(s, nowEpochMs)
-        chargerConnected == false -> evaluateDeadline(s, nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
-        else -> s
+    ): ProtectionState {
+        if (s.mode != ProtectionMode.COUNTDOWN) return s
+
+        // elapsedRealtime resets on reboot. Never compare an old-boot deadline
+        // against the new boot's clock or wall time; require a live power sample
+        // and restart the full grace period when still unplugged.
+        val bootChanged = s.bootCount >= 0 && currentBootCount >= 0 &&
+            s.bootCount != currentBootCount
+        if (bootChanged) {
+            return when (chargerConnected) {
+                true -> chargerConnected(s, nowEpochMs)
+                false -> restoreAfterBoot(
+                    s, false, nowEpochMs, nowElapsedRealtimeMs, currentBootCount
+                )
+                null -> s
+            }
+        }
+
+        return when (chargerConnected) {
+            true -> chargerConnected(s, nowEpochMs)
+            false -> evaluateDeadline(s, nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
+            null -> s
+        }
     }
 
     fun evaluateDeadline(
