@@ -146,19 +146,13 @@ object PowerTransitionCoordinator {
             nextGeneration
         } ?: return ProtectionStore(appContext).read()
 
-        repeat(3) { index ->
+        var consecutiveDisconnected = 0
+        var lastObserved: Boolean? = null
+        repeat(5) { index ->
             val observed = ExternalPowerState.readConnected(appContext)
-            if (observed != false) {
-                if (observed == true) {
-                    confirmConnectedAndArm(appContext, "Connected snapshot invalidated unplug candidate")
-                }
-                LocalTamperHistory.record(
-                    appContext, "charger_unplug_rejected",
-                    "Power state connected/unknown during sample ${index + 1}"
-                )
-                return ProtectionStore(appContext).read()
-            }
-            if (index < 2) {
+            lastObserved = observed
+            consecutiveDisconnected = if (observed == false) consecutiveDisconnected + 1 else 0
+            if (index < 4) {
                 try {
                     Thread.sleep(350L)
                 } catch (_: InterruptedException) {
@@ -167,6 +161,16 @@ object PowerTransitionCoordinator {
                     return ProtectionStore(appContext).read()
                 }
             }
+        }
+        if (consecutiveDisconnected < 3) {
+            if (lastObserved == true) {
+                confirmConnectedAndArm(appContext, "Final debounce sample confirms external power is connected")
+            }
+            LocalTamperHistory.record(
+                appContext, "charger_unplug_rejected",
+                "Five-sample debounce did not produce three consecutive disconnected readings; final=$lastObserved"
+            )
+            return ProtectionStore(appContext).read()
         }
 
         return synchronized(lock) {
