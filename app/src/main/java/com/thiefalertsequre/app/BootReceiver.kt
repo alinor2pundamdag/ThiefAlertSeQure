@@ -34,31 +34,10 @@ class BootReceiver : BroadcastReceiver() {
         val next = ProtectionStore(context).update { ProtectionEngine.restoreAfterBoot(it, charging, now, elapsed, boot) }
         when (next.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
-            ProtectionMode.ALARM_TRIGGERED -> {
-                if (Build.VERSION.SDK_INT >= 35) {
-                    // Android 15+ forbids BOOT_COMPLETED -> mediaPlayback foreground service.
-                    // Use the exact-alarm exemption when granted; inexact recovery is best effort.
-                    AlarmScheduler.scheduleImmediateRecovery(context)
-                } else {
-                    runCatching {
-                        ContextCompat.startForegroundService(context, Intent(context, AlarmService::class.java).setAction(AlarmService.ACTION_START))
-                    }.onFailure {
-                        LocalTamperHistory.record(context, "boot_alarm_start_failed", it.javaClass.simpleName + ": " + it.message)
-                        AlarmRecoveryNotice.show(context, "Boot recovery could not start the alarm foreground service")
-                    }
-                }
-            }
-            else -> {
-                AlarmScheduler.cancel(context)
-                if (next.mode == ProtectionMode.ARMED && monitorEnabled(context)) {
-                    runCatching {
-                        ContextCompat.startForegroundService(context, Intent(context, ProtectionMonitorService::class.java))
-                    }.onFailure {
-                        LocalTamperHistory.record(context, "boot_monitor_start_failed", it.javaClass.simpleName + ": " + it.message)
-                    }
-                }
-            }
+            ProtectionMode.ALARM_TRIGGERED -> AlarmScheduler.scheduleImmediateRecovery(context)
+            else -> AlarmScheduler.cancel(context)
         }
+        startMonitorIfNeeded(context, next, "boot")
     }
 
     /** Package replacement preserves the current boot's monotonic countdown deadline. */
@@ -66,23 +45,25 @@ class BootReceiver : BroadcastReceiver() {
         val state = ProtectionStore(context).read()
         when (state.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
-            ProtectionMode.ALARM_TRIGGERED -> {
-                AlarmScheduler.scheduleImmediateRecovery(context)
-                LocalTamperHistory.record(context, "app_update_alarm_recovery_scheduled")
-            }
-            ProtectionMode.ARMED -> if (monitorEnabled(context)) {
-                runCatching {
-                    ContextCompat.startForegroundService(context, Intent(context, ProtectionMonitorService::class.java))
-                }.onFailure {
-                    LocalTamperHistory.record(context, "update_monitor_start_failed", it.javaClass.simpleName + ": " + it.message)
-                }
-            }
-            ProtectionMode.DISARMED -> AlarmScheduler.cancel(context)
+            ProtectionMode.ALARM_TRIGGERED -> AlarmScheduler.scheduleImmediateRecovery(context)
+            else -> AlarmScheduler.cancel(context)
         }
+        startMonitorIfNeeded(context, state, "app_update")
         LocalTamperHistory.record(context, "app_update_state_restored", "Persisted protection state re-evaluated after package replacement")
+    }
+
+    private fun startMonitorIfNeeded(context: Context, state: ProtectionState, source: String) {
+        val enabled = monitorEnabled(context)
+        if (!ProtectionMonitorPolicy.shouldRun(enabled, state.mode)) return
+        runCatching {
+            ContextCompat.startForegroundService(context, Intent(context, ProtectionMonitorService::class.java))
+        }.onFailure {
+            LocalTamperHistory.record(context, "${source}_monitor_start_failed", it.javaClass.simpleName + ": " + it.message)
+            AlarmRecoveryNotice.show(context, "Background charger monitoring could not start; open the app to restore it")
+        }
     }
 
     private fun monitorEnabled(context: Context): Boolean =
         context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
-            .getBoolean(ProtectionMonitorService.KEY_ENABLED, false)
+            .getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
 }

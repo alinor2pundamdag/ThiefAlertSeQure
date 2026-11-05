@@ -14,6 +14,8 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         when (updated.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, updated.deadlineEpochMs, updated.deadlineElapsedRealtimeMs, updated.bootCount)
             ProtectionMode.ALARM_TRIGGERED -> {
+                AlarmScheduler.cancel(context)
+                context.stopService(Intent(context, ProtectionMonitorService::class.java))
                 LocalTamperHistory.record(context, "countdown_expired", "Alarm latched")
                 runCatching {
                     ContextCompat.startForegroundService(context, Intent(context, AlarmService::class.java).setAction(AlarmService.ACTION_START))

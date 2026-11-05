@@ -156,15 +156,16 @@ class SettingsActivity : FragmentActivity() {
         root.addView(text("BACKGROUND PROTECTION MONITOR", 11f, R.color.tas_primary, true))
         root.addView(space(8))
         root.addView(text(
-            "This user-enabled foreground service monitors movement and battery threshold crossings while its persistent notification is visible. It can be stopped from the notification. Android and device manufacturers may still stop it.",
+            "The charger-protection monitor is enabled by default and must remain running to detect plug/unplug events while the app is closed. Its persistent notification stays visible; motion sensing runs only while armed and battery-threshold alerts are optional. You can disable monitoring, but automatic charger detection will stop. Android and device manufacturers may still stop it.",
             13f, R.color.tas_muted
         ))
         val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        val monitorEnabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, false)
+        val monitorEnabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         root.addView(action(if (monitorEnabled) "Disable background monitoring" else "Enable background monitoring") {
-            val enabled = !monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, false)
+            val enabled = !monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
             monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).apply()
-            if (enabled && ProtectionStore(this).read().mode == ProtectionMode.ARMED) {
+            val state = ProtectionStore(this).read()
+            if (enabled && state.mode != ProtectionMode.ALARM_TRIGGERED) {
                 runCatching {
                     ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
                 }.onFailure {
@@ -173,7 +174,7 @@ class SettingsActivity : FragmentActivity() {
             } else if (!enabled) {
                 stopService(Intent(this, ProtectionMonitorService::class.java))
             } else {
-                android.widget.Toast.makeText(this, "Saved. Open the dashboard while protection is armed to start monitoring.", android.widget.Toast.LENGTH_LONG).show()
+                android.widget.Toast.makeText(this, "Monitoring will resume after owner authentication.", android.widget.Toast.LENGTH_LONG).show()
             }
             render()
         })
@@ -200,7 +201,7 @@ class SettingsActivity : FragmentActivity() {
                 .apply()
             if (enabled) {
                 monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).apply()
-                if (ProtectionStore(this).read().mode == ProtectionMode.ARMED) {
+                if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED) {
                     runCatching {
                         ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
                     }.onFailure {

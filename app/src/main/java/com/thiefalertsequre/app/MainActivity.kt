@@ -354,8 +354,8 @@ class MainActivity : FragmentActivity() {
 
     private fun syncProtectionMonitor(state: ProtectionState) {
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        val enabled = prefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, false)
-        if (enabled && (state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN)) {
+        val enabled = prefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        if (ProtectionMonitorPolicy.shouldRun(enabled, state.mode)) {
             runCatching {
                 ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
             }.onFailure {
@@ -454,9 +454,9 @@ class MainActivity : FragmentActivity() {
         val soundMessage = "Main alarm sound: ${AlarmSoundStore.displayName(this, AlarmSoundStore.ALARM)} (custom override optional)"
         val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
         val monitorMessage = if (monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, false)) {
-            "Background motion/battery monitoring: ENABLED by owner; keep its foreground notification visible and check Settings for service failures."
+            "Charger protection monitor: ENABLED; keep its persistent notification visible. Motion sensing is active only while armed."
         } else {
-            "Background motion/battery monitoring: OFF (enable it in Settings)"
+            "Charger protection monitor: OFF by owner choice; automatic plug/unplug detection is unavailable until re-enabled."
         }
         details.text = listOf(stateMessage, soundMessage, monitorMessage, attemptMessage, exactAlarmMessage, notificationMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
 
@@ -586,6 +586,7 @@ class MainActivity : FragmentActivity() {
             runCatching { AlarmVolumeController.restore(this, getSystemService(android.media.AudioManager::class.java)) }
             details.text = "Owner authenticated. Alarm stopped."
         }
+        syncProtectionMonitor(next)
         render()
     }
 

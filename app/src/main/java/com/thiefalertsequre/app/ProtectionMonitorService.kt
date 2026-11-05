@@ -26,9 +26,9 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 
 /**
- * User-enabled, user-visible anti-theft monitor. It keeps accelerometer and
- * battery broadcasts active while its foreground notification is present.
- * AlarmManager remains the process-death/reboot backup for charger deadlines.
+ * User-visible, persistent charger monitor. It remains active while DISARMED,
+ * ARMED or COUNTDOWN so plug/unplug transitions are detected without an Activity.
+ * Motion sensing is still registered only while protection is ARMED.
  */
 class ProtectionMonitorService : Service(), SensorEventListener {
     private val handler = Handler(Looper.getMainLooper())
@@ -72,10 +72,8 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             return START_NOT_STICKY
         }
         val state = ProtectionStore(this).read()
-        if (!prefs.getBoolean(KEY_ENABLED, false) ||
-            state.mode == ProtectionMode.DISARMED ||
-            state.mode == ProtectionMode.ALARM_TRIGGERED
-        ) {
+        val enabled = prefs.getBoolean(KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        if (!ProtectionMonitorPolicy.shouldRun(enabled, state.mode)) {
             stopSelf()
             return START_NOT_STICKY
         }
@@ -92,7 +90,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         registerSystemReceiver()
         reconcileStablePowerState()
         syncMotionSensor()
-        LocalTamperHistory.record(this, "monitor_started", "User-enabled foreground motion and battery monitor active")
+        LocalTamperHistory.record(this, "monitor_started", "Persistent foreground charger monitor active; motion sensing is armed-state only")
         return START_STICKY
     }
 
@@ -110,33 +108,41 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private fun reconcileStablePowerState() {
         val connected = ExternalPowerState.isConnected(this)
         val now = System.currentTimeMillis()
-        if (connected) {
+        val next = if (connected) {
             prefs.edit()
                 .putBoolean(KEY_BATTERY_ALERT_FIRED, false)
                 .putInt(KEY_LAST_BATTERY_LEVEL, -1)
                 .apply()
-            val soundReady = AlarmSoundStore.hasAlarmSound(this)
-            val next = ProtectionStore(this).update { old ->
+            ProtectionStore(this).update { old ->
                 when {
                     old.mode == ProtectionMode.ALARM_TRIGGERED -> old
-                    !soundReady -> ProtectionState(ProtectionMode.DISARMED, 0L, now, 0L, -1)
                     old.mode == ProtectionMode.COUNTDOWN || old.mode == ProtectionMode.DISARMED ->
                         ProtectionEngine.chargerConnected(old, now)
                     else -> old
                 }
             }
-            handler.removeCallbacks(countdownRunnable)
-            if (next.mode == ProtectionMode.ARMED) syncMotionSensor() else unregisterMotionSensor()
         } else {
             val elapsed = ProtectionClock.elapsedRealtime()
             val boot = ProtectionClock.bootCount(this)
-            val next = ProtectionStore(this).update { old ->
+            ProtectionStore(this).update { old ->
                 if (old.mode == ProtectionMode.ARMED) {
                     ProtectionEngine.chargerDisconnected(old, now, elapsed, boot)
                 } else old
             }
-            unregisterMotionSensor()
-            if (next.mode == ProtectionMode.COUNTDOWN) scheduleCountdown(next)
+        }
+
+        if (next.mode == ProtectionMode.ARMED) syncMotionSensor() else unregisterMotionSensor()
+        syncDeadlineAlarm(next)
+    }
+
+    /** AlarmManager wakes the CPU at the stored deadline; Handler is a low-latency companion. */
+    private fun syncDeadlineAlarm(state: ProtectionState) {
+        if (ProtectionEngine.shouldScheduleDeadline(state.mode)) {
+            AlarmScheduler.schedule(this, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
+            scheduleCountdown(state)
+        } else {
+            AlarmScheduler.cancel(this)
+            handler.removeCallbacks(countdownRunnable)
         }
     }
 
@@ -158,7 +164,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             LocalTamperHistory.record(this, "monitor_countdown_expired", "Foreground monitor reached the monotonic ten-second deadline")
             startTheftAlarm()
         } else if (next.mode == ProtectionMode.COUNTDOWN) {
-            scheduleCountdown(next)
+            syncDeadlineAlarm(next)
         }
     }
 

@@ -3,6 +3,8 @@ package com.thiefalertsequre.app
 const val COUNTDOWN_MS = 10_000L
 
 object ProtectionEngine {
+    fun shouldScheduleDeadline(mode: ProtectionMode): Boolean = mode == ProtectionMode.COUNTDOWN
+
     fun chargerConnected(s: ProtectionState, now: Long): ProtectionState = when (s.mode) {
         ProtectionMode.ALARM_TRIGGERED -> s
         ProtectionMode.DISARMED, ProtectionMode.ARMED, ProtectionMode.COUNTDOWN ->
