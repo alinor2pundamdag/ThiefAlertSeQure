@@ -34,6 +34,8 @@ class MainActivity : FragmentActivity() {
     private lateinit var credentialButton: MaterialButton
     private lateinit var cancelButton: MaterialButton
     private lateinit var managedButton: MaterialButton
+    private lateinit var screenLockButton: MaterialButton
+    private var fullScreenAccessButton: MaterialButton? = null
     private var biometricPrompt: BiometricPrompt? = null
     private var autoAuthenticationRequested = false
 
@@ -219,9 +221,10 @@ class MainActivity : FragmentActivity() {
         hardeningContent.addView(space(12))
         val deviceAdmin = getSystemService(DevicePolicyManager::class.java)
         val adminComponent = ComponentName(this, ThiefAlertAdminReceiver::class.java)
-        hardeningContent.addView(outlinedButton(
+        screenLockButton = outlinedButton(
             if (deviceAdmin.isAdminActive(adminComponent)) "Automatic screen lock: ENABLED" else "Enable automatic screen lock"
-        ) { requestDeviceAdministrator() }, matchWrap())
+        ) { requestDeviceAdministrator() }
+        hardeningContent.addView(screenLockButton, matchWrap())
         hardeningContent.addView(space(8))
         managedButton = button("Check Device Owner eligibility") { manageDeviceOwnerMode() }
         hardeningContent.addView(managedButton, matchWrap())
@@ -239,7 +242,8 @@ class MainActivity : FragmentActivity() {
         root.addView(outlinedButton("Enable precise 10-second alarm timing") { requestExactAlarmAccess() }, matchWrap())
         if (Build.VERSION.SDK_INT >= 34) {
             root.addView(space(8))
-            root.addView(outlinedButton("Allow full-screen alarm and authentication") { requestFullScreenIntentAccess() }, matchWrap())
+            fullScreenAccessButton = outlinedButton("Allow full-screen alarm and authentication") { requestFullScreenIntentAccess() }
+            root.addView(fullScreenAccessButton, matchWrap())
         }
         root.addView(space(8))
         root.addView(outlinedButton("Configure Do Not Disturb alarm exceptions") { openDndSettings() }, matchWrap())
@@ -512,6 +516,16 @@ class MainActivity : FragmentActivity() {
         } else {
             "Alarm notification access is available."
         }
+        val adminComponent = ComponentName(this, ThiefAlertAdminReceiver::class.java)
+        val adminActive = getSystemService(DevicePolicyManager::class.java).isAdminActive(adminComponent)
+        val screenLockMessage = if (adminActive) "Automatic screen locking: ENABLED." else "Automatic screen locking: OFF; enable the device administrator in Device Hardening."
+        val fullScreenMessage = if (Build.VERSION.SDK_INT >= 34 && !getSystemService(NotificationManager::class.java).canUseFullScreenIntent()) {
+            "Full-screen alarm access is OFF; enable it in Reliability & System Access."
+        } else {
+            "Full-screen alarm display is available on this Android version."
+        }
+        screenLockButton.text = if (adminActive) "Automatic screen lock: ENABLED" else "Enable automatic screen lock"
+        if (Build.VERSION.SDK_INT >= 34) fullScreenAccessButton?.text = if (getSystemService(NotificationManager::class.java).canUseFullScreenIntent()) "Full-screen alarm access: ENABLED" else "Allow full-screen alarm and authentication"
         val ownerMessage = if (ManagedProtectionController.isDeviceOwner(this)) {
             if (ManagedProtectionController.isPolicyConfigured(this)) "Managed Device Owner lockdown is configured." else "Device Owner is enrolled; managed lockdown is not enabled."
         } else {
@@ -524,7 +538,7 @@ class MainActivity : FragmentActivity() {
         } else {
             "Charger protection monitor: OFF by owner choice; automatic plug/unplug detection is unavailable until re-enabled."
         }
-        details.text = listOf(stateMessage, soundMessage, monitorMessage, attemptMessage, exactAlarmMessage, notificationMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
+        details.text = listOf(stateMessage, soundMessage, monitorMessage, attemptMessage, exactAlarmMessage, notificationMessage, screenLockMessage, fullScreenMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
 
         val alarmActive = state.mode == ProtectionMode.ALARM_TRIGGERED
         val biometricAvailable = BiometricManager.from(this)
@@ -598,7 +612,11 @@ class MainActivity : FragmentActivity() {
                             details.text = "Android biometric lockout. Switching to device credentials."
                             if (getSystemService(KeyguardManager::class.java).isDeviceSecure) authenticateDeviceCredential()
                         }
-                        BiometricPrompt.ERROR_USER_CANCELED, BiometricPrompt.ERROR_CANCELED, BiometricPrompt.ERROR_NEGATIVE_BUTTON -> {
+                        BiometricPrompt.ERROR_NEGATIVE_BUTTON -> {
+                            if (getSystemService(KeyguardManager::class.java).isDeviceSecure) authenticateDeviceCredential()
+                            else details.text = "Authentication cancelled. The alarm remains active."
+                        }
+                        BiometricPrompt.ERROR_USER_CANCELED, BiometricPrompt.ERROR_CANCELED -> {
                             details.text = "Authentication cancelled. The alarm remains active."
                         }
                         else -> details.text = "$errString. The alarm remains active."
@@ -613,7 +631,7 @@ class MainActivity : FragmentActivity() {
             .setSubtitle("Authenticate with your device biometric or screen-lock credential")
             .setAllowedAuthenticators(allowedAuthenticators)
         if ((allowedAuthenticators and BiometricManager.Authenticators.DEVICE_CREDENTIAL) == 0) {
-            promptInfo.setNegativeButtonText("Cancel")
+            promptInfo.setNegativeButtonText(if (keyguard.isDeviceSecure) "Use device PIN or password" else "Cancel")
         }
         prompt.authenticate(promptInfo.build())
         render()
