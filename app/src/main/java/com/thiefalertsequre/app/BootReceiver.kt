@@ -19,7 +19,7 @@ class BootReceiver : BroadcastReceiver() {
                     ProtectionMode.ALARM_TRIGGERED -> scheduleAlarmRecovery(
                         context, "Protection alarm is active after reboot or app update"
                     )
-                    else -> Unit
+                    else -> AlarmScheduler.cancel(context)
                 }
                 LocalTamperHistory.record(context, "exact_alarm_access_granted", "Pending protection deadline re-evaluated")
             }
