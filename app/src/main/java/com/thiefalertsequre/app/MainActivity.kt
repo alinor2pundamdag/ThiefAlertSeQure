@@ -610,7 +610,7 @@ class MainActivity : FragmentActivity() {
         val monitorEnabled = monitorPrefs.getBoolean(
             ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
-        val monitorRunning = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_RUNNING, false)
+        val monitorRunning = ProtectionMonitorService.isRunning
         val bootIdentityReady = ProtectionClock.bootCount(this) >= 0
         val bootIdentityMessage = if (bootIdentityReady) {
             "Boot identity: available for monotonic countdown recovery."
