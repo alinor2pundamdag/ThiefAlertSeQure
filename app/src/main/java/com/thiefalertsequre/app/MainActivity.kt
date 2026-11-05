@@ -719,7 +719,14 @@ class MainActivity : FragmentActivity() {
                             autoAuthenticationRequested = false
                             details.text = "Authentication dismissed. The alarm remains active; owner verification will be presented again."
                         }
-                        else -> details.text = "$errString. The alarm remains active."
+                        else -> {
+                            if (getSystemService(KeyguardManager::class.java).isDeviceSecure) {
+                                authenticateDeviceCredential()
+                            } else {
+                                autoAuthenticationRequested = false
+                                details.text = "$errString. The alarm remains active."
+                            }
+                        }
                     }
                     render()
                 }
@@ -748,6 +755,7 @@ class MainActivity : FragmentActivity() {
         // PIN/pattern/password retry throttling and remains the independent recovery path.
         val keyguard = getSystemService(KeyguardManager::class.java)
         if (!keyguard.isDeviceSecure) {
+            autoAuthenticationRequested = false
             details.text = "Set a secure device PIN, pattern or password in Android settings first."
             return
         }
