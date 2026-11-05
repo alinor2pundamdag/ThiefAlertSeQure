@@ -56,7 +56,8 @@ object PowerTransitionCoordinator {
             return
         }
         if (connected == null) return
-        if (!baselineKnown || newBoot) {
+        val previousConnected = prefs.getBoolean(CONNECTED, false)
+        if (!baselineKnown || newBoot || previousConnected != connected) {
             prefs.edit()
                 .putBoolean(CONNECTED, connected)
                 .putBoolean(KNOWN, true)
@@ -64,13 +65,22 @@ object PowerTransitionCoordinator {
                 .putLong(GENERATION, prefs.getLong(GENERATION, 0L) + 1L)
                 .commit()
             LocalTamperHistory.record(
-                context, if (newBoot) "power_baseline_reinitialized_after_boot" else "power_baseline_initialized",
-                "Current power state recorded as baseline; no unplug transition inferred"
+                context,
+                when {
+                    newBoot -> "power_baseline_reinitialized_after_boot"
+                    !baselineKnown -> "power_baseline_initialized"
+                    else -> "power_baseline_reconciled"
+                },
+                if (connected) {
+                    "Connected snapshot recorded as baseline; no unplug transition inferred"
+                } else {
+                    "Disconnected snapshot recorded as baseline without creating a countdown"
+                }
             )
         }
 
-        // Connected is safe evidence to arm/cancel; disconnected is not evidence
-        // that a new physical unplug happened.
+        // Connected is safe evidence to arm/cancel; disconnected is baseline
+        // evidence only and never creates a countdown by itself.
         val monitorEnabled = context.getSharedPreferences(
             ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
         ).getBoolean(
@@ -166,10 +176,28 @@ object PowerTransitionCoordinator {
     fun onPowerDisconnected(context: Context): ProtectionState {
         val appContext = context.applicationContext
         val candidateGeneration = synchronized(lock) {
-            initializeBaselineLocked(appContext)
             val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            if (!prefs.getBoolean(KNOWN, false) || !prefs.getBoolean(CONNECTED, false)) {
-                LocalTamperHistory.record(appContext, "charger_unplug_rejected", "No previously confirmed connected baseline")
+            val currentBoot = ProtectionClock.bootCount(appContext)
+            val priorBoot = prefs.getInt(BASELINE_BOOT_COUNT, -1)
+            val bootChanged = currentBoot >= 0 && currentBoot != priorBoot
+            if (!prefs.getBoolean(KNOWN, false) || bootChanged) {
+                initializeBaselineLocked(appContext)
+                LocalTamperHistory.record(
+                    appContext, "charger_unplug_rejected",
+                    "No current-boot connected baseline is available"
+                )
+                return@synchronized null
+            }
+            if (!prefs.getBoolean(CONNECTED, false)) {
+                LocalTamperHistory.record(
+                    appContext, "charger_unplug_rejected",
+                    "No previously confirmed connected baseline; disconnected snapshots never create transitions"
+                )
+                return@synchronized null
+            }
+            if (ExternalPowerState.readConnected(appContext) == true) {
+                confirmConnectedAndArmLocked(appContext, "Disconnect broadcast arrived while live snapshot still shows connected power")
+                LocalTamperHistory.record(appContext, "charger_unplug_rejected", "Live power snapshot still reports connected")
                 return@synchronized null
             }
             val nextGeneration = prefs.getLong(GENERATION, 0L) + 1L
