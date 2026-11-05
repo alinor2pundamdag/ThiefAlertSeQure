@@ -14,6 +14,9 @@ The app stores only the operational information needed to provide its functions:
 - Biometric failure count and temporary cooldown deadline.
 - The user's privacy-notice choice and the time it was recorded.
 - The previous alarm-stream volume while an alarm is active, so it can be restored after successful disarm.
+- A bounded local protection event history (up to 100 entries), which the owner can review or export as CSV.
+- Monitor preferences such as enablement, motion sensitivity and optional battery-alert threshold.
+- URI references and Android read-access grants for owner-selected alarm and secondary-alert audio. The app stores references/permissions, not a second copy of the selected audio file.
 
 This information is stored in the app's private local preferences. The app does not upload it.
 
@@ -29,6 +32,7 @@ Depending on Android version and the user's choices, the app may use:
 - Alarm scheduling; precise alarm access is a special Android setting on supported versions.
 - Notifications and a foreground media-playback service while an alarm is active.
 - Alarm-stream volume control to temporarily raise the alarm volume and restore the previous level after successful disarm.
+- Android's Storage Access Framework document/folder picker to read audio files explicitly selected by the owner and to write an event-history CSV only when the owner chooses an export destination.
 - Device Owner / Lock Task APIs only if the device has been separately provisioned as a fully managed device and the user explicitly enables managed mode.
 
 Android settings, manufacturer power-management behavior, notification controls, exact-alarm access, and DND policies remain under Android/device-owner control.
