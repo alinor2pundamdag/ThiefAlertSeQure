@@ -410,7 +410,7 @@ class MainActivity : FragmentActivity() {
         val current = store.read()
         // A confirmed connected state may arm a disarmed installation. A
         // disconnected snapshot is never allowed to create a countdown.
-        val state = if (current.mode == ProtectionMode.DISARMED &&
+        val state = if (current.mode != ProtectionMode.ALARM_TRIGGERED &&
             ExternalPowerState.readConnected(this) == true
         ) {
             PowerTransitionCoordinator.confirmConnectedAndArm(this, "Connected power confirmed during app reconciliation")
