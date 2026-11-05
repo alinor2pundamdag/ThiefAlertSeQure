@@ -84,6 +84,15 @@ class ProtectionEngineTest {
         assertEquals(ProtectionMode.DISARMED, ProtectionEngine.authenticated(alarm, 12_000).mode)
         assertEquals(armed, ProtectionEngine.authenticated(armed, 12_000))
     }
+    @Test fun staleDeadlineCallbackCannotMatchNewCountdown() {
+        val active = ProtectionState(ProtectionMode.COUNTDOWN, 22_000L, 12_000L, 26_000L, 7)
+        assertEquals(false, ProtectionEngine.isCurrentDeadline(active, 11_000L))
+        assertEquals(true, ProtectionEngine.isCurrentDeadline(active, 22_000L))
+        assertEquals(false, ProtectionEngine.isCurrentDeadline(
+            ProtectionState(ProtectionMode.ARMED, 0L, 23_000L), 22_000L
+        ))
+    }
+
     @Test fun countdownIsTheOnlyStateThatNeedsDeadlineAlarm() {
         assertEquals(true, ProtectionEngine.shouldScheduleDeadline(ProtectionMode.COUNTDOWN))
         assertEquals(false, ProtectionEngine.shouldScheduleDeadline(ProtectionMode.DISARMED))
