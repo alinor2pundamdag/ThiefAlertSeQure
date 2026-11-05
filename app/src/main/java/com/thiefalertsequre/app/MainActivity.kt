@@ -406,7 +406,15 @@ class MainActivity : FragmentActivity() {
         // A battery snapshot is state evidence, not proof of a physical transition.
         // Only PowerTransitionReceiver may create a charger countdown.
         PowerTransitionCoordinator.initializeBaseline(this)
-        val state = ProtectionStore(this).read()
+        val store = ProtectionStore(this)
+        val current = store.read()
+        // A confirmed connected state may arm a disarmed installation. A
+        // disconnected snapshot is never allowed to create a countdown.
+        val state = if (current.mode == ProtectionMode.DISARMED &&
+            ExternalPowerState.readConnected(this) == true
+        ) {
+            store.update { ProtectionEngine.chargerConnected(it, System.currentTimeMillis()) }
+        } else current
         if (state.mode != ProtectionMode.ALARM_TRIGGERED) {
             runCatching { AlarmVolumeController.restore(this, getSystemService(android.media.AudioManager::class.java)) }
         }
