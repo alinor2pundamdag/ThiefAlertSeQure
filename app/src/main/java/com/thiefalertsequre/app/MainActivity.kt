@@ -403,34 +403,19 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun reconcileCharging() {
-        val charging = ExternalPowerState.readConnected(this)
-        val store = ProtectionStore(this)
-        val now = System.currentTimeMillis()
-        val elapsed = ProtectionClock.elapsedRealtime()
-        val boot = ProtectionClock.bootCount(this)
-        val next = store.update { old ->
-            when {
-                charging == true -> ProtectionEngine.chargerConnected(old, now)
-                charging == false && old.mode == ProtectionMode.ARMED -> ProtectionEngine.chargerDisconnected(old, now, elapsed, boot)
-                charging == false && old.mode == ProtectionMode.COUNTDOWN -> ProtectionEngine.reconcileCountdown(old, false, now, elapsed, boot)
-                charging == null -> old
-                else -> old
-            }
-        }
-        if (next.mode != ProtectionMode.ALARM_TRIGGERED) {
+        // A battery snapshot is state evidence, not proof of a physical transition.
+        // Only PowerTransitionReceiver may create a charger countdown.
+        PowerTransitionCoordinator.initializeBaseline(this)
+        val state = ProtectionStore(this).read()
+        if (state.mode != ProtectionMode.ALARM_TRIGGERED) {
             runCatching { AlarmVolumeController.restore(this, getSystemService(android.media.AudioManager::class.java)) }
         }
-        when (next.mode) {
-            ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(this, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
-            ProtectionMode.ALARM_TRIGGERED -> runCatching {
-                ContextCompat.startForegroundService(
-                    this,
-                    Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START)
-                )
-            }
-            else -> AlarmScheduler.cancel(this)
+        if (state.mode == ProtectionMode.COUNTDOWN) {
+            AlarmScheduler.schedule(this, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
+        } else {
+            AlarmScheduler.cancel(this)
         }
-        syncProtectionMonitor(next)
+        syncProtectionMonitor(state)
     }
 
     private fun syncProtectionMonitor(state: ProtectionState) {
