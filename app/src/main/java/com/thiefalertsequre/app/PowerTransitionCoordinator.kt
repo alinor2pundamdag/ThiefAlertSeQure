@@ -118,8 +118,22 @@ object PowerTransitionCoordinator {
             .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
             .putLong(GENERATION, generation)
             .commit()
-        if (connected) confirmConnectedAndArmLocked(context, reason)
-        else LocalTamperHistory.record(context, "power_baseline_reset", "$reason; disconnected state recorded without creating a countdown")
+        if (connected) {
+            confirmConnectedAndArmLocked(context, reason)
+        } else {
+            val disarmed = ProtectionStore(context).update { current ->
+                if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
+                else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+            }
+            if (disarmed.mode != ProtectionMode.ALARM_TRIGGERED) {
+                AlarmScheduler.cancel(context)
+                notifyMonitorStateChanged(context)
+            }
+            LocalTamperHistory.record(
+                context, "power_baseline_reset",
+                "$reason; disconnected state recorded without creating a countdown; protection remains DISARMED until a new connect event"
+            )
+        }
     }
 
     private fun notifyMonitorStateChanged(context: Context) {
