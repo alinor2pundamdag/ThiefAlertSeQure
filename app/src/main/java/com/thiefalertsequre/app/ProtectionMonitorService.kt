@@ -116,7 +116,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         syncDeadlineAlarm(state)
     }
 
-    /** AlarmManager wakes the CPU at the stored deadline; Handler is a low-latency companion. */ the CPU at the stored deadline; Handler is a low-latency companion. */
+    /** AlarmManager wakes the CPU at the stored deadline; Handler is a low-latency companion. */
     private fun syncDeadlineAlarm(state: ProtectionState) {
         if (ProtectionEngine.shouldScheduleDeadline(state.mode)) {
             AlarmScheduler.schedule(this, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
