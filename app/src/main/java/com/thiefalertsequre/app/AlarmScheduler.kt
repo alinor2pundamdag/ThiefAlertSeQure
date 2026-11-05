@@ -22,7 +22,7 @@ object AlarmScheduler {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val token = deadlineToken(deadlineEpochMs, deadlineElapsedRealtimeMs, deadlineBootCount)
         val operation = pendingIntent(context, token)
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_LAST_TOKEN, token).commit()
+        rememberToken(context, token)
         val sameBoot = deadlineBootCount >= 0 &&
             ProtectionClock.bootCount(context) == deadlineBootCount &&
             deadlineElapsedRealtimeMs > 0L
@@ -44,7 +44,7 @@ object AlarmScheduler {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val token = "recovery"
         val operation = pendingIntent(context, token)
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_LAST_TOKEN, token).commit()
+        rememberToken(context, token)
         if (Build.VERSION.SDK_INT >= 31 && !alarmManager.canScheduleExactAlarms()) {
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 1_000L, operation)
             return false
@@ -64,7 +64,7 @@ object AlarmScheduler {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val token = deadlineToken(state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
         val operation = pendingIntent(context, token)
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_LAST_TOKEN, token).commit()
+        rememberToken(context, token)
         alarmManager.setAndAllowWhileIdle(
             AlarmManager.RTC_WAKEUP,
             System.currentTimeMillis() + delayMs.coerceAtLeast(250L),
@@ -85,6 +85,16 @@ object AlarmScheduler {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
         )
+    }
+
+    private fun rememberToken(context: Context, token: String) {
+        val alarmManager = context.getSystemService(AlarmManager::class.java)
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val previous = prefs.getString(KEY_LAST_TOKEN, null)
+        if (previous != null && previous != token) {
+            alarmManager.cancel(pendingIntent(context, previous))
+        }
+        prefs.edit().putString(KEY_LAST_TOKEN, token).commit()
     }
 
     private fun deadlineToken(epochMs: Long, elapsedRealtimeMs: Long, bootCount: Int): String =
