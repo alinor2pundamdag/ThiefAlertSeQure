@@ -39,7 +39,23 @@ object PowerTransitionCoordinator {
             }
         }
 
-        val connected = ExternalPowerState.readConnected(context) ?: return
+        val connected = ExternalPowerState.readConnected(context)
+        if (newBoot && connected == null) {
+            // A previous-boot CONNECTED baseline must never authorize an unplug
+            // candidate after reboot when the new boot's live state is unknown.
+            prefs.edit()
+                .putBoolean(CONNECTED, false)
+                .putBoolean(KNOWN, true)
+                .putInt(BASELINE_BOOT_COUNT, currentBoot)
+                .putLong(GENERATION, prefs.getLong(GENERATION, 0L) + 1L)
+                .commit()
+            LocalTamperHistory.record(
+                context, "power_baseline_unknown_after_boot",
+                "Previous-boot charger baseline invalidated; waiting for current-boot power confirmation"
+            )
+            return
+        }
+        if (connected == null) return
         if (!baselineKnown || newBoot) {
             prefs.edit()
                 .putBoolean(CONNECTED, connected)
