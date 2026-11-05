@@ -31,7 +31,13 @@ class BootReceiver : BroadcastReceiver() {
         val elapsed = ProtectionClock.elapsedRealtime()
         val boot = ProtectionClock.bootCount(context)
         val store = ProtectionStore(context)
-        val next = store.update { ProtectionEngine.restoreAfterBoot(it, charging, now, elapsed, boot) }
+        val next = store.update { old ->
+            if (charging && !AlarmSoundStore.hasAlarmSound(context) && old.mode != ProtectionMode.ALARM_TRIGGERED) {
+                ProtectionState(ProtectionMode.DISARMED, 0L, now, 0L, -1)
+            } else {
+                ProtectionEngine.restoreAfterBoot(old, charging, now, elapsed, boot)
+            }
+        }
         when (next.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(
                 context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount

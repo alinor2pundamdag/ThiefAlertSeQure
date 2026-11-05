@@ -110,10 +110,13 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             .putInt(KEY_LAST_BATTERY_LEVEL, -1)
             .apply()
         val now = System.currentTimeMillis()
+        val soundReady = AlarmSoundStore.hasAlarmSound(this)
         val next = ProtectionStore(this).update { old ->
-            if (old.mode == ProtectionMode.COUNTDOWN ||
-                (old.mode == ProtectionMode.DISARMED && AlarmSoundStore.hasAlarmSound(this))
-            ) ProtectionEngine.chargerConnected(old, now) else old
+            if (old.mode == ProtectionMode.COUNTDOWN && !soundReady) {
+                ProtectionState(ProtectionMode.DISARMED, 0L, now, 0L, -1)
+            } else if (soundReady && (old.mode == ProtectionMode.COUNTDOWN || old.mode == ProtectionMode.DISARMED)) {
+                ProtectionEngine.chargerConnected(old, now)
+            } else old
         }
         handler.removeCallbacks(countdownRunnable)
         if (next.mode == ProtectionMode.ARMED) syncMotionSensor()

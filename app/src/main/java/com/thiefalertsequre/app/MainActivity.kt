@@ -331,8 +331,9 @@ class MainActivity : FragmentActivity() {
         val soundConfigured = AlarmSoundStore.hasAlarmSound(this)
         val next = store.update { old ->
             when {
-                !soundConfigured && old.mode != ProtectionMode.COUNTDOWN && old.mode != ProtectionMode.ALARM_TRIGGERED ->
+                !soundConfigured && charging && old.mode != ProtectionMode.ALARM_TRIGGERED ->
                     ProtectionState(ProtectionMode.DISARMED, 0L, now, 0L, -1)
+                !soundConfigured && old.mode == ProtectionMode.DISARMED -> old
                 charging -> ProtectionEngine.chargerConnected(old, now)
                 old.mode == ProtectionMode.ARMED -> ProtectionEngine.chargerDisconnected(old, now, elapsed, boot)
                 old.mode == ProtectionMode.COUNTDOWN -> ProtectionEngine.evaluateDeadline(old, now, elapsed, boot)

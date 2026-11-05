@@ -189,7 +189,20 @@ class SettingsActivity : FragmentActivity() {
         })
         val batteryAlertEnabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BATTERY_ALERT_ENABLED, false)
         root.addView(action("Battery threshold alert: ${if (batteryAlertEnabled) "ON" else "OFF"}") {
-            monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_BATTERY_ALERT_ENABLED, !batteryAlertEnabled).apply()
+            val enabled = !batteryAlertEnabled
+            monitorPrefs.edit()
+                .putBoolean(ProtectionMonitorService.KEY_BATTERY_ALERT_ENABLED, enabled)
+                .apply()
+            if (enabled) {
+                monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).apply()
+                if (ProtectionStore(this).read().mode == ProtectionMode.ARMED) {
+                    runCatching {
+                        ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
+                    }.onFailure {
+                        android.widget.Toast.makeText(this, "Battery monitor could not start: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
             render()
         })
         val threshold = monitorPrefs.getInt(ProtectionMonitorService.KEY_BATTERY_THRESHOLD, 80)
