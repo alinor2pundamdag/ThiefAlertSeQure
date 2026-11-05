@@ -25,6 +25,10 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
     }
 
     private fun handleDeadline(context: Context, intent: Intent) {
+        // Run baseline migration/reconciliation before any persisted deadline can
+        // transition state, including callbacks left over from an older APK.
+        PowerTransitionCoordinator.initializeBaseline(context)
+
         val token = intent.data?.lastPathSegment ?: return
         val state = ProtectionStore(context).read()
 
@@ -34,6 +38,20 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
                 startAlarm(context, "Latched alarm recovery callback")
             }
+            return
+        }
+
+        val monitorEnabled = context.getSharedPreferences(
+            ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
+        ).getBoolean(
+            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
+        if (!monitorEnabled && state.mode != ProtectionMode.ALARM_TRIGGERED) {
+            ProtectionStore(context).update { current ->
+                if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
+                else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+            }
+            AlarmScheduler.cancel(context)
             return
         }
 
