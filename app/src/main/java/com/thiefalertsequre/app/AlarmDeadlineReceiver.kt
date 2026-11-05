@@ -17,8 +17,8 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             return
         }
 
-        val expectedToken = "deadline:${state.deadlineEpochMs}"
-        if (state.mode != ProtectionMode.COUNTDOWN || token != expectedToken) {
+        val tokenDeadline = token.removePrefix("deadline:").toLongOrNull()
+        if (tokenDeadline == null || !ProtectionEngine.isCurrentDeadline(state, tokenDeadline)) {
             LocalTamperHistory.record(context, "stale_deadline_rejected", "Deadline callback did not match the active countdown")
             return
         }
