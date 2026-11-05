@@ -411,13 +411,24 @@ class MainActivity : FragmentActivity() {
         PowerTransitionCoordinator.initializeBaseline(this)
         val store = ProtectionStore(this)
         val current = store.read()
-        // A confirmed connected state may arm a disarmed installation. A
-        // disconnected snapshot is never allowed to create a countdown.
-        val state = if (current.mode != ProtectionMode.ALARM_TRIGGERED &&
-            ExternalPowerState.readConnected(this) == true
-        ) {
-            PowerTransitionCoordinator.confirmConnectedAndArm(this, "Connected power confirmed during app reconciliation")
-        } else current
+        val monitorEnabled = getSharedPreferences(
+            ProtectionMonitorService.PREFS, MODE_PRIVATE
+        ).getBoolean(
+            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
+        // Owner opt-out is authoritative for every non-triggered state. A
+        // connected snapshot may arm only while monitoring is enabled.
+        val state = when {
+            !monitorEnabled && current.mode != ProtectionMode.ALARM_TRIGGERED ->
+                store.update { old ->
+                    if (old.mode == ProtectionMode.ALARM_TRIGGERED) old
+                    else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+                }
+            monitorEnabled && current.mode != ProtectionMode.ALARM_TRIGGERED &&
+                ExternalPowerState.readConnected(this) == true ->
+                PowerTransitionCoordinator.confirmConnectedAndArm(this, "Connected power confirmed during app reconciliation")
+            else -> current
+        }
         if (state.mode != ProtectionMode.ALARM_TRIGGERED) {
             runCatching { AlarmVolumeController.restore(this, getSystemService(android.media.AudioManager::class.java)) }
         }
