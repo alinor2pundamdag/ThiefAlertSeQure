@@ -175,6 +175,13 @@ class SettingsActivity : FragmentActivity() {
                     android.widget.Toast.makeText(this, "Monitor could not start: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
                 }
             } else if (!enabled) {
+                // Explicit owner opt-out stops pending charger countdowns too,
+                // but never clears a latched alarm without authentication.
+                ProtectionStore(this).update { current ->
+                    if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
+                    else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+                }
+                AlarmScheduler.cancel(this)
                 stopService(Intent(this, ProtectionMonitorService::class.java))
             } else {
                 android.widget.Toast.makeText(this, "Monitoring will resume after owner authentication.", android.widget.Toast.LENGTH_LONG).show()
@@ -205,6 +212,9 @@ class SettingsActivity : FragmentActivity() {
             if (enabled) {
                 monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).apply()
                 if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED) {
+                    PowerTransitionCoordinator.resetBaselineToCurrentPower(
+                        this, "Battery threshold alert enabled background monitoring"
+                    )
                     runCatching {
                         ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
                     }.onFailure {
