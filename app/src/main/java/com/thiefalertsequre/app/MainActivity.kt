@@ -548,7 +548,8 @@ class MainActivity : FragmentActivity() {
         val boot = ProtectionClock.bootCount(this)
         val throttle = store.readAuthenticationThrottle(now, elapsed, boot)
         if (AuthenticationThrottle.remainingMs(throttle, now, elapsed, boot) > 0L) {
-            render()
+            if (getSystemService(KeyguardManager::class.java).isDeviceSecure) authenticateDeviceCredential()
+            else render()
             return
         }
         val manager = BiometricManager.from(this)
@@ -579,7 +580,8 @@ class MainActivity : FragmentActivity() {
                     if (AuthenticationThrottle.remainingMs(next, failedAt, failedElapsed, failedBoot) > 0L) {
                         biometricPrompt?.cancelAuthentication()
                         biometricPrompt = null
-                        details.text = "Five consecutive biometric failures. Wait 30 seconds before trying again."
+                        details.text = "Five consecutive biometric failures. Use your device PIN, pattern or password."
+                        if (getSystemService(KeyguardManager::class.java).isDeviceSecure) authenticateDeviceCredential()
                     } else {
                         details.text = "Biometric not recognized. Failed attempts: ${next.failedAttempts}/5."
                     }
@@ -593,7 +595,8 @@ class MainActivity : FragmentActivity() {
                             store.startAuthenticationCooldown(
                                 System.currentTimeMillis(), ProtectionClock.elapsedRealtime(), ProtectionClock.bootCount(this@MainActivity)
                             )
-                            details.text = "Android biometric lockout. Wait 30 seconds or use device credentials if Android permits."
+                            details.text = "Android biometric lockout. Switching to device credentials."
+                            if (getSystemService(KeyguardManager::class.java).isDeviceSecure) authenticateDeviceCredential()
                         }
                         BiometricPrompt.ERROR_USER_CANCELED, BiometricPrompt.ERROR_CANCELED, BiometricPrompt.ERROR_NEGATIVE_BUTTON -> {
                             details.text = "Authentication cancelled. The alarm remains active."
@@ -609,7 +612,7 @@ class MainActivity : FragmentActivity() {
             .setTitle("Verify ThiefAlertSeQure owner")
             .setSubtitle("Authenticate with your device biometric or screen-lock credential")
             .setAllowedAuthenticators(allowedAuthenticators)
-        if (allowedAuthenticators and BiometricManager.Authenticators.DEVICE_CREDENTIAL == 0) {
+        if ((allowedAuthenticators and BiometricManager.Authenticators.DEVICE_CREDENTIAL) == 0) {
             promptInfo.setNegativeButtonText("Cancel")
         }
         prompt.authenticate(promptInfo.build())
