@@ -78,6 +78,25 @@ class SettingsActivity : FragmentActivity() {
         })
         root.addView(space(22))
 
+        root.addView(text("LOCAL TAMPER HISTORY", 11f, R.color.tas_primary, true))
+        root.addView(space(8))
+        val historyText = LocalTamperHistory.read(this, 20).ifEmpty {
+            listOf("No recorded protection events yet.")
+        }.joinToString("\\n")
+        root.addView(text(historyText, 12f, R.color.tas_text))
+        root.addView(space(8))
+        root.addView(action("Clear local event history") {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Clear local history?")
+                .setMessage("This permanently clears the on-device protection event log. It does not change protection state.")
+                .setNegativeButton("Keep history", null)
+                .setPositiveButton("Clear") { _, _ ->
+                    LocalTamperHistory.clear(this)
+                    render()
+                }.show()
+        })
+        root.addView(space(22))
+
         root.addView(text("PRIVACY & DATA", 11f, R.color.tas_primary, true))
         root.addView(space(10))
         root.addView(text(
