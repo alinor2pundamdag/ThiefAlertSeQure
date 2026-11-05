@@ -70,6 +70,7 @@ object PowerTransitionCoordinator {
         prefs.edit()
             .putBoolean(CONNECTED, true)
             .putBoolean(KNOWN, true)
+            .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
             .putLong(GENERATION, prefs.getLong(GENERATION, 0L) + 1L)
             .commit()
 
