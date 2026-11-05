@@ -131,13 +131,23 @@ class ProtectionMonitorService : Service(), SensorEventListener {
 
     /** AlarmManager wakes the CPU at the stored deadline; Handler is a low-latency companion. */
     private fun syncDeadlineAlarm(state: ProtectionState) {
-        if (ProtectionEngine.shouldScheduleDeadline(state.mode)) {
-            AlarmScheduler.schedule(this, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
-            scheduleCountdown(state)
-        } else {
-            countdownExpected = null
-            AlarmScheduler.cancel(this)
-            handler.removeCallbacks(countdownRunnable)
+        when (state.mode) {
+            ProtectionMode.COUNTDOWN -> {
+                AlarmScheduler.schedule(this, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
+                scheduleCountdown(state)
+            }
+            ProtectionMode.ALARM_TRIGGERED -> {
+                // The AlarmManager recovery callback is the only restart path if
+                // Android/OEM stops the alarm service. Never cancel it here.
+                countdownExpected = null
+                handler.removeCallbacks(countdownRunnable)
+                unregisterMotionSensor()
+            }
+            ProtectionMode.ARMED, ProtectionMode.DISARMED -> {
+                countdownExpected = null
+                AlarmScheduler.cancel(this)
+                handler.removeCallbacks(countdownRunnable)
+            }
         }
     }
 
