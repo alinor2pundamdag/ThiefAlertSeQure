@@ -29,6 +29,7 @@ class BootReceiver : BroadcastReceiver() {
         }
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
 
+        PowerTransitionCoordinator.initializeBaseline(context)
         val charging = ExternalPowerState.readConnected(context)
         val now = System.currentTimeMillis()
         val elapsed = ProtectionClock.elapsedRealtime()
@@ -48,6 +49,7 @@ class BootReceiver : BroadcastReceiver() {
 
     /** Package replacement preserves the current boot's monotonic countdown deadline. */
     private fun restoreAfterAppUpdate(context: Context) {
+        PowerTransitionCoordinator.initializeBaseline(context)
         val state = ProtectionStore(context).read()
         when (state.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
