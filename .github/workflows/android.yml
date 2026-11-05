@@ -29,6 +29,38 @@ jobs:
           gradle-version: "8.9"
       - name: Unit tests
         run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
+      - name: Android lint
+        run: gradle :app:lintDebug --no-daemon --stacktrace
+      - name: Validate packaged assets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("app/src/main")
+          alarm = root / "res/raw/default_alarm.ogg"
+          data = alarm.read_bytes()
+          assert data.startswith(b"OggS"), "default_alarm.ogg is not an Ogg container"
+          assert b"OpusHead" in data[:512], "default_alarm.ogg does not contain an Opus identification header"
+          assert len(data) > 1024, "default alarm asset is unexpectedly small"
+
+          images = [
+              root / "res/drawable-nodpi/app_logo.png",
+              root / "res/mipmap-mdpi/ic_launcher.png",
+              root / "res/mipmap-hdpi/ic_launcher.png",
+              root / "res/mipmap-xhdpi/ic_launcher.png",
+              root / "res/mipmap-xxhdpi/ic_launcher.png",
+              root / "res/mipmap-xxxhdpi/ic_launcher.png",
+              Path("ThiefAlertSeQureIcon.jpg"),
+          ]
+          for image in images:
+              payload = image.read_bytes()
+              assert payload, f"{image} is empty"
+              if image.suffix.lower() == ".png":
+                  assert payload.startswith(b"\\x89PNG\\r\\n\\x1a\\n"), f"{image} is not a PNG"
+              elif image.suffix.lower() in (".jpg", ".jpeg"):
+                  assert payload.startswith(b"\\xff\\xd8\\xff"), f"{image} is not a JPEG"
+          print(f"Validated Ogg Opus alarm ({len(data)} bytes) and {len(images)} image assets.")
+          PY
       - name: Assemble debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace
       - name: Name release candidate APK
