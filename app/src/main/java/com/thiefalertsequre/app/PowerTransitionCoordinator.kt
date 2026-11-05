@@ -7,6 +7,7 @@ object PowerTransitionCoordinator {
     private const val PREFS = "charger_transition_v1"
     private const val KNOWN = "baseline_known"
     private const val CONNECTED = "baseline_connected"
+    private const val BASELINE_BOOT_COUNT = "baseline_boot_count"
     private const val GENERATION = "transition_generation"
     private val lock = Any()
 
@@ -17,8 +18,13 @@ object PowerTransitionCoordinator {
     private fun initializeBaselineLocked(context: Context) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val baselineKnown = prefs.getBoolean(KNOWN, false)
+        val currentBoot = ProtectionClock.bootCount(context)
+        val priorBoot = prefs.getInt(BASELINE_BOOT_COUNT, -1)
+        val newBoot = currentBoot >= 0 && currentBoot != priorBoot
 
-        // Old COUNTDOWN states have no trusted unplug-event provenance.
+        // Old COUNTDOWN states have no trusted unplug-event provenance. Only
+        // discard them on first migration; a valid reboot countdown is recovered
+        // by BootReceiver with a fresh grace period.
         if (!baselineKnown) {
             val store = ProtectionStore(context)
             if (store.read().mode == ProtectionMode.COUNTDOWN) {
@@ -33,13 +39,17 @@ object PowerTransitionCoordinator {
         }
 
         val connected = ExternalPowerState.readConnected(context) ?: return
-        if (!baselineKnown) {
+        if (!baselineKnown || newBoot) {
             prefs.edit()
                 .putBoolean(CONNECTED, connected)
                 .putBoolean(KNOWN, true)
+                .putInt(BASELINE_BOOT_COUNT, currentBoot)
                 .putLong(GENERATION, prefs.getLong(GENERATION, 0L) + 1L)
                 .commit()
-            LocalTamperHistory.record(context, "power_baseline_initialized", "Initial state recorded; no unplug transition inferred")
+            LocalTamperHistory.record(
+                context, if (newBoot) "power_baseline_reinitialized_after_boot" else "power_baseline_initialized",
+                "Current power state recorded as baseline; no unplug transition inferred"
+            )
         }
 
         // Connected is safe evidence to arm/cancel; disconnected is not evidence
