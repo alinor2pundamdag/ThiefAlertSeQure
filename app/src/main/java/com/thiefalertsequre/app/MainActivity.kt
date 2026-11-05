@@ -756,8 +756,16 @@ class MainActivity : FragmentActivity() {
             // If the owner reconnected power before authenticating, preserve the
             // required next-cycle behavior: authentication stops the alarm, then
             // the confirmed connected state arms protection for the next unplug.
-            val next = if (ExternalPowerState.readConnected(this) == true) {
-                PowerTransitionCoordinator.confirmConnectedAndArm(this, "Charger is connected after owner authentication")
+            val monitorEnabled = getSharedPreferences(
+                ProtectionMonitorService.PREFS, MODE_PRIVATE
+            ).getBoolean(
+                ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+            )
+            val next = if (monitorEnabled) {
+                PowerTransitionCoordinator.resetBaselineToCurrentPower(
+                    this, "Owner authentication completed; current charger state re-baselined"
+                )
+                store.read()
             } else authenticated
             details.text = if (next.mode == ProtectionMode.ARMED) {
                 "Owner authenticated. Alarm stopped. Protection re-armed because the charger is connected."
