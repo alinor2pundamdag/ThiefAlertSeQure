@@ -600,16 +600,26 @@ class MainActivity : FragmentActivity() {
         val secureCredentialReady = keyguard.isDeviceSecure
         val exactAlarmReady = Build.VERSION.SDK_INT < 31 || getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
         val fullScreenReady = Build.VERSION.SDK_INT < 34 || notificationManager.canUseFullScreenIntent()
+        val monitorEnabled = monitorPrefs.getBoolean(
+            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
         val monitorRunning = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_RUNNING, false)
+        val bootIdentityReady = ProtectionClock.bootCount(this) >= 0
+        val bootIdentityMessage = if (bootIdentityReady) {
+            "Boot identity: available for monotonic countdown recovery."
+        } else {
+            "Boot identity: UNAVAILABLE — countdown expiry is held fail-safe; verify Android system integrity/compatibility."
+        }
         val readinessIssues = mutableListOf<String>()
+        if (!bootIdentityReady) readinessIssues.add("Wait for Android boot identity before relying on automatic countdown expiry")
         if (!secureCredentialReady) readinessIssues.add("Set a device PIN, pattern or password")
         if (!adminActive) readinessIssues.add("Activate device administrator for automatic screen locking")
         if (!notificationsAllowed) readinessIssues.add("Allow notifications")
         if (!exactAlarmReady) readinessIssues.add("Allow Alarms & reminders for exact deadline recovery")
         if (!fullScreenReady) readinessIssues.add("Allow full-screen alarm access")
         if (!alarmChannelReady) readinessIssues.add("Set Anti-theft alarm notification importance to High")
-        if (!monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) readinessIssues.add("Enable charger monitoring")
-        if (!monitorRunning) readinessIssues.add("Wait for the charger-monitor foreground service to start")
+        if (!monitorEnabled) readinessIssues.add("Enable charger monitoring")
+        if (monitorEnabled && !monitorRunning) readinessIssues.add("Wait for the charger-monitor foreground service to start")
         val batteryPowerManager = getSystemService(PowerManager::class.java)
         val batteryOptimizationMessage = if (Build.VERSION.SDK_INT >= 23 && !batteryPowerManager.isIgnoringBatteryOptimizations(packageName)) {
             "Battery optimization is still active. Set ThiefAlertSeQure to Unrestricted in Android battery settings for better OEM background reliability."
@@ -621,7 +631,7 @@ class MainActivity : FragmentActivity() {
         } else {
             "CORE READINESS: INCOMPLETE — " + readinessIssues.joinToString("; ") + "."
         }
-        details.text = listOf(stateMessage, readinessMessage, batteryOptimizationMessage, soundMessage, monitorMessage, attemptMessage, exactAlarmMessage, notificationMessage, screenLockMessage, fullScreenMessage, alarmChannelMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
+        details.text = listOf(stateMessage, readinessMessage, bootIdentityMessage, batteryOptimizationMessage, soundMessage, monitorMessage, attemptMessage, exactAlarmMessage, notificationMessage, screenLockMessage, fullScreenMessage, alarmChannelMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
 
         val alarmActive = state.mode == ProtectionMode.ALARM_TRIGGERED
         val biometricAvailable = BiometricManager.from(this)
