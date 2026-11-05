@@ -6,15 +6,15 @@
 |---|---|
 | Installed app name | Exact label ThiefAlertSeQure |
 | Original launcher icon | Original JPG copied without image edits |
-| Original alarm sound | Original Soundfizz Ogg Opus asset in res/raw, looping MediaPlayer |
-| Audio fallback | ToneGenerator if platform decoder cannot load Opus |
+| Original alarm sound | Packaged Ogg Opus asset in res/raw, looping MediaPlayer (resource filename must use `.ogg`) |
+| Audio fallback | Repeating vibration if selected and packaged audio both fail |
 | Alarm volume | Saves prior alarm-stream volume, raises to device maximum during alarm, restores after successful disarm |
 | Charger auto-arm | PowerReceiver |
 | 10-second unplug countdown | ProtectionEngine + AlarmScheduler |
 | Reconnect before deadline | Returns to ARMED |
 | Reconnect after trigger | Cannot clear ALARM_TRIGGERED |
 | Same-boot clock integrity | elapsedRealtime + boot count |
-| Reboot recovery | If countdown is pending and charger remains absent, trigger immediately; if charging, return to ARMED |
+| Reboot recovery | Revalidate charger state; if still disconnected, restart a full 10-second grace period; if connected, return to ARMED; unknown state/boot identity never expires the old deadline |
 | Android 15 boot recovery | Schedules exact alarm when user granted exact-alarm access; exact-alarm delivery is an allowed FGS-start path |
 | Local-only operation | No INTERNET permission, backend, analytics or advertising SDK |\n| Background protection monitor | User-enabled, stoppable foreground service with persistent notification; uses supported specialUse FGS declaration |\n| Local event export | CSV export through Android's system document picker |
 | Alarm foreground notification | Ongoing notification opens lockscreen-capable authentication Activity |
