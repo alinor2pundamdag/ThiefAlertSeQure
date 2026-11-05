@@ -26,7 +26,6 @@ class PowerReceiver : BroadcastReceiver() {
 
     private fun reconcileStablePowerState(context: Context) {
         val connected = ExternalPowerState.isConnected(context)
-        val alarmReady = AlarmSoundStore.hasAlarmSound(context)
         val now = System.currentTimeMillis()
         val elapsed = ProtectionClock.elapsedRealtime()
         val boot = ProtectionClock.bootCount(context)
@@ -35,7 +34,6 @@ class PowerReceiver : BroadcastReceiver() {
         val next = store.update { old ->
             when {
                 old.mode == ProtectionMode.ALARM_TRIGGERED -> old
-                connected && !alarmReady -> ProtectionState(ProtectionMode.DISARMED, 0L, now, 0L, -1)
                 connected && (old.mode == ProtectionMode.DISARMED || old.mode == ProtectionMode.COUNTDOWN) ->
                     ProtectionEngine.chargerConnected(old, now)
                 !connected && old.mode == ProtectionMode.ARMED ->
@@ -48,8 +46,6 @@ class PowerReceiver : BroadcastReceiver() {
             LocalTamperHistory.record(context, "charger_connected_stable")
         } else if (!connected && before.mode == ProtectionMode.ARMED && next.mode == ProtectionMode.COUNTDOWN) {
             LocalTamperHistory.record(context, "charger_disconnected_stable")
-        } else if (connected && !alarmReady && before.mode != ProtectionMode.ALARM_TRIGGERED) {
-            LocalTamperHistory.record(context, "arming_blocked_no_alarm_sound")
         }
 
         when (next.mode) {

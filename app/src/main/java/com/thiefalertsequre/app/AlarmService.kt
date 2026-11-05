@@ -10,6 +10,7 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.os.VibrationEffect
@@ -59,12 +60,12 @@ class AlarmService : Service() {
     }
 
     private fun startAlarmAudio() {
-        val soundUri = AlarmSoundStore.uri(this, AlarmSoundStore.ALARM)
-        if (soundUri == null) {
-            LocalTamperHistory.record(this, "alarm_audio_missing", "No user-selected main alarm sound is configured")
-            startVibrationFallback()
-            return
-        }
+        val defaultUri = Uri.parse("android.resource://$packageName/${R.raw.default_alarm}")
+        val selectedUri = AlarmSoundStore.uri(this, AlarmSoundStore.ALARM)
+        startAlarmAudio(selectedUri ?: defaultUri, selectedUri == null, defaultUri)
+    }
+
+    private fun startAlarmAudio(soundUri: Uri, usingDefault: Boolean, defaultUri: Uri) {
         val audio = getSystemService(AudioManager::class.java)
         audioManager = audio
         AlarmVolumeController.raiseToMaximum(this, audio)
@@ -73,7 +74,7 @@ class AlarmService : Service() {
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
             .build()
         if (Build.VERSION.SDK_INT >= 26) {
-            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                 .setAudioAttributes(attributes)
                 .setOnAudioFocusChangeListener(audioFocusListener)
                 .setWillPauseWhenDucked(false)
@@ -82,48 +83,63 @@ class AlarmService : Service() {
             runCatching { audio.requestAudioFocus(request) }
         } else {
             @Suppress("DEPRECATION")
-            runCatching { audio.requestAudioFocus(audioFocusListener, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT) }
+            runCatching { audio.requestAudioFocus(audioFocusListener, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN) }
         }
 
-        val media = runCatching {
-            MediaPlayer().apply {
-                setAudioAttributes(attributes)
-                setDataSource(this@AlarmService, soundUri)
-                setWakeMode(this@AlarmService, android.os.PowerManager.PARTIAL_WAKE_LOCK)
-                isLooping = true
-                setOnPreparedListener { prepared ->
-                    if (ProtectionStore(this@AlarmService).read().mode == ProtectionMode.ALARM_TRIGGERED) {
-                        runCatching {
-                            prepared.start()
-                            LocalTamperHistory.record(this@AlarmService, "alarm_audio_playing", "User-selected audio started")
-                        }.onFailure {
-                            LocalTamperHistory.record(this@AlarmService, "alarm_audio_start_failed", it.javaClass.simpleName + ": " + it.message)
+        val media = MediaPlayer()
+        player = media
+        try {
+            media.setAudioAttributes(attributes)
+            media.setDataSource(this, soundUri)
+            media.setWakeMode(this, android.os.PowerManager.PARTIAL_WAKE_LOCK)
+            media.isLooping = true
+            media.setOnPreparedListener { prepared ->
+                if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                    runCatching {
+                        prepared.start()
+                        LocalTamperHistory.record(
+                            this,
+                            "alarm_audio_playing",
+                            if (usingDefault) "Built-in default alarm started and looping" else "Owner-selected alarm started and looping"
+                        )
+                    }.onFailure {
+                        LocalTamperHistory.record(this, "alarm_audio_start_failed", it.javaClass.simpleName + ": " + it.message)
+                        if (!usingDefault) {
+                            if (player === prepared) player = null
+                            runCatching { prepared.release() }
+                            startAlarmAudio(defaultUri, true, defaultUri)
+                        } else {
                             startVibrationFallback()
                         }
-                    } else {
-                        runCatching { prepared.release() }
-                        player = null
                     }
+                } else {
+                    if (player === prepared) player = null
+                    runCatching { prepared.release() }
                 }
-                setOnErrorListener { failed, what, extra ->
-                    LocalTamperHistory.record(this@AlarmService, "alarm_audio_decode_failed", "MediaPlayer error $what/$extra")
-                    runCatching { failed.release() }
-                    if (player === failed) player = null
-                    startVibrationFallback()
-                    true
-                }
-                prepareAsync()
             }
-        }.onFailure {
-            LocalTamperHistory.record(this, "alarm_audio_open_failed", it.javaClass.simpleName + ": " + it.message)
-        }.getOrNull()
-
-        if (media == null) {
-            startVibrationFallback()
-            return
+            media.setOnErrorListener { failed, what, extra ->
+                LocalTamperHistory.record(this, "alarm_audio_decode_failed", "MediaPlayer error $what/$extra")
+                if (player === failed) player = null
+                runCatching { failed.release() }
+                if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED && !usingDefault) {
+                    startAlarmAudio(defaultUri, true, defaultUri)
+                } else if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                    startVibrationFallback()
+                }
+                true
+            }
+            media.prepareAsync()
+            LocalTamperHistory.record(
+                this,
+                "alarm_audio_preparing",
+                if (usingDefault) "Preparing built-in default alarm" else "Preparing owner-selected alarm override"
+            )
+        } catch (error: Exception) {
+            if (player === media) player = null
+            runCatching { media.release() }
+            LocalTamperHistory.record(this, "alarm_audio_open_failed", error.javaClass.simpleName + ": " + error.message)
+            if (!usingDefault) startAlarmAudio(defaultUri, true, defaultUri) else startVibrationFallback()
         }
-        player = media
-        LocalTamperHistory.record(this, "alarm_audio_preparing", "Preparing user-selected alarm audio")
     }
 
     private fun startVibrationFallback() {

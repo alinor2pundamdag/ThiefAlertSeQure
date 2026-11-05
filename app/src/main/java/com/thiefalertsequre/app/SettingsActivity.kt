@@ -113,15 +113,20 @@ class SettingsActivity : FragmentActivity() {
         root.addView(action("Do Not Disturb settings") { openDndSettings() })
         root.addView(space(22))
 
-        root.addView(text("USER-SELECTED ALARM SOUNDS", 11f, R.color.tas_primary, true))
+        root.addView(text("BUILT-IN DEFAULT + OPTIONAL CUSTOM ALARM SOUNDS", 11f, R.color.tas_primary, true))
         root.addView(space(8))
         root.addView(text(
-            "Choose audio files yourself. File access is limited to the file or folder you select; Android does not grant this app access to every private app directory. Folder search includes accessible subfolders and is capped to protect the device from very large trees.",
+            "The packaged ThiefAlertSeQure alarm is the default and loops while an alarm is active. You can optionally choose a custom main alarm to override it. File access is limited to the file or folder you select.",
             13f, R.color.tas_muted
         ))
         root.addView(space(8))
         root.addView(text("Main alarm: " + AlarmSoundStore.displayName(this, AlarmSoundStore.ALARM), 13f, R.color.tas_text))
-        root.addView(action("Choose main alarm audio file") {
+        root.addView(action("Use built-in default alarm (clear custom override)") {
+            AlarmSoundStore.clear(this, AlarmSoundStore.ALARM)
+            android.widget.Toast.makeText(this, "Built-in default alarm selected.", android.widget.Toast.LENGTH_SHORT).show()
+            render()
+        })
+        root.addView(action("Choose custom main alarm audio file") {
             soundSlot = AlarmSoundStore.ALARM
             pickSoundFile.launch(arrayOf("audio/*"))
         })
@@ -353,9 +358,9 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun previewSound(slot: String) {
-        val uri = AlarmSoundStore.uri(this, slot)
+        val uri = AlarmSoundStore.effectiveUri(this, slot)
         if (uri == null) {
-            android.widget.Toast.makeText(this, "Select a sound first.", android.widget.Toast.LENGTH_LONG).show()
+            android.widget.Toast.makeText(this, "No sound is configured for this slot.", android.widget.Toast.LENGTH_LONG).show()
             return
         }
         ioExecutor.execute {

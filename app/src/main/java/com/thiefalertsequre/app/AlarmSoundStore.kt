@@ -18,7 +18,26 @@ object AlarmSoundStore {
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(key(slot), null)?.let { runCatching { Uri.parse(it) }.getOrNull() }
 
-    fun hasAlarmSound(context: Context): Boolean = uri(context, ALARM) != null
+    fun hasAlarmSound(context: Context): Boolean = effectiveUri(context, ALARM) != null
+
+    /** A custom owner-selected sound overrides the packaged default alarm. */
+    fun effectiveUri(context: Context, slot: String): Uri? =
+        uri(context, slot) ?: if (slot == ALARM) {
+            Uri.parse("android.resource://${context.packageName}/${R.raw.default_alarm}")
+        } else null
+
+    fun clear(context: Context, slot: String) {
+        require(slot == ALARM || slot == ALERT)
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val granted = prefs.getString("grant_uri_$slot", null)
+        prefs.edit().remove(key(slot)).remove("grant_uri_$slot").commit()
+        if (granted != null) runCatching {
+            context.contentResolver.releasePersistableUriPermission(
+                Uri.parse(granted),
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        }
+    }
 
     fun save(context: Context, slot: String, soundUri: Uri, permissionUri: Uri): Boolean {
         require(slot == ALARM || slot == ALERT)
@@ -43,12 +62,12 @@ object AlarmSoundStore {
     }
 
     fun displayName(context: Context, slot: String): String {
-        val selected = uri(context, slot) ?: return "Not selected"
+        val selected = effectiveUri(context, slot) ?: return "Not selected"
         val name = runCatching {
             context.contentResolver.query(selected, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
                 ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
         }.getOrNull()
-        return name ?: selected.lastPathSegment ?: "Selected audio"
+        return name ?: selected.lastPathSegment ?: if (slot == ALARM) "Built-in default alarm" else "Selected audio"
     }
 
     private fun key(slot: String) = "uri_$slot"

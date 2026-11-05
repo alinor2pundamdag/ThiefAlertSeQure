@@ -328,12 +328,8 @@ class MainActivity : FragmentActivity() {
         val now = System.currentTimeMillis()
         val elapsed = ProtectionClock.elapsedRealtime()
         val boot = ProtectionClock.bootCount(this)
-        val soundConfigured = AlarmSoundStore.hasAlarmSound(this)
         val next = store.update { old ->
             when {
-                !soundConfigured && charging && old.mode != ProtectionMode.ALARM_TRIGGERED ->
-                    ProtectionState(ProtectionMode.DISARMED, 0L, now, 0L, -1)
-                !soundConfigured && old.mode == ProtectionMode.DISARMED -> old
                 charging -> ProtectionEngine.chargerConnected(old, now)
                 old.mode == ProtectionMode.ARMED -> ProtectionEngine.chargerDisconnected(old, now, elapsed, boot)
                 old.mode == ProtectionMode.COUNTDOWN -> ProtectionEngine.evaluateDeadline(old, now, elapsed, boot)
@@ -410,9 +406,8 @@ class MainActivity : FragmentActivity() {
         val cooldownMs = AuthenticationThrottle.remainingMs(throttle, now, elapsed, boot)
         val coolingDown = cooldownMs > 0L
 
-        val alarmSoundConfigured = AlarmSoundStore.hasAlarmSound(this)
         status.text = when (state.mode) {
-            ProtectionMode.DISARMED -> if (alarmSoundConfigured) "Protection ready" else "Setup required"
+            ProtectionMode.DISARMED -> "Protection ready"
             ProtectionMode.ARMED -> "Protection armed"
             ProtectionMode.COUNTDOWN -> "Charger removed"
             ProtectionMode.ALARM_TRIGGERED -> "ALARM TRIGGERED"
@@ -425,8 +420,7 @@ class MainActivity : FragmentActivity() {
         }))
 
         val stateMessage = when (state.mode) {
-            ProtectionMode.DISARMED -> if (alarmSoundConfigured) "Connect the charger to arm protection automatically."
-                else "Select and validate a main alarm sound in Settings before protection can arm."
+            ProtectionMode.DISARMED -> "Connect the charger to arm protection automatically. The built-in alarm is ready; a custom sound is optional."
             ProtectionMode.ARMED -> "Charger connected. Disconnecting it starts the 10-second grace period."
             ProtectionMode.COUNTDOWN -> "Alarm starts in " +
                 ((ProtectionEngine.remainingMs(state, now, elapsed, boot) + 999) / 1000) + " seconds. Reconnect the charger to cancel this countdown."
