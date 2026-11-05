@@ -60,9 +60,9 @@ object PowerTransitionCoordinator {
         }
         // Final live-state gate immediately before committing the countdown.
         // This catches a reconnect racing the tail of the debounce samples.
-        if (ExternalPowerState.readConnected(context) != false) {
-            val latest = ExternalPowerState.readConnected(context)
-            if (latest == true) prefs.edit().putBoolean(CONNECTED, true).commit()
+        val finalConnected = ExternalPowerState.readConnected(context)
+        if (finalConnected != false) {
+            if (finalConnected == true) prefs.edit().putBoolean(CONNECTED, true).commit()
             LocalTamperHistory.record(context, "charger_unplug_rejected", "Final power-state confirmation was connected or unknown")
             return@synchronized ProtectionStore(context).read()
         }
