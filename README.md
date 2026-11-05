@@ -8,7 +8,7 @@ A local-only Android charging anti-theft alarm. Installed application name: **Th
 - Connecting a charger automatically changes protection to ARMED.
 - Disconnecting while ARMED starts a 10-second countdown.
 - Reconnecting before the deadline returns the state to ARMED.
-- Rebooting during COUNTDOWN triggers the alarm immediately if the charger remains disconnected; if charging is present at boot, protection returns to ARMED.
+- Rebooting during COUNTDOWN requires a fresh live charger-state check. If still disconnected, a new full 10-second grace period starts; if connected, protection returns to ARMED. An unknown charger or boot state never expires the old deadline.
 - At the deadline, ALARM_TRIGGERED is latched. Reconnecting the charger cannot clear it.
 - Only successful Android Keyguard device-credential verification or AndroidX BIOMETRIC_STRONG authentication clears the triggered state.
 - Cancelled and failed authentication never clear the alarm.
