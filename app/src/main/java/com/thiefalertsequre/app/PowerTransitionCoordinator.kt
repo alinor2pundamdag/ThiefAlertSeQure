@@ -59,13 +59,24 @@ object PowerTransitionCoordinator {
 
     /** Establish a fresh non-transition baseline when the owner re-enables monitoring. */
     fun resetBaselineToCurrentPower(context: Context, reason: String) = synchronized(lock) {
-        val connected = ExternalPowerState.readConnected(context) ?: return@synchronized
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val connected = ExternalPowerState.readConnected(context)
+        val generation = prefs.getLong(GENERATION, 0L) + 1L
+        if (connected == null) {
+            prefs.edit()
+                .putBoolean(KNOWN, false)
+                .putBoolean(CONNECTED, false)
+                .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
+                .putLong(GENERATION, generation)
+                .commit()
+            LocalTamperHistory.record(context, "power_baseline_unknown", "$reason; no transition accepted until a reliable power state is available")
+            return@synchronized
+        }
         prefs.edit()
             .putBoolean(KNOWN, true)
             .putBoolean(CONNECTED, connected)
             .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
-            .putLong(GENERATION, prefs.getLong(GENERATION, 0L) + 1L)
+            .putLong(GENERATION, generation)
             .commit()
         if (connected) confirmConnectedAndArmLocked(context, reason)
         else LocalTamperHistory.record(context, "power_baseline_reset", "$reason; disconnected state recorded without creating a countdown")
