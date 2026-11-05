@@ -60,6 +60,25 @@ class ProtectionEngineTest {
         val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
         assertEquals(ProtectionMode.ARMED, ProtectionEngine.restoreAfterBoot(s, true, 2_000L, 500L, 8).mode)
     }
+
+    @Test fun countdownDeadlineFromPreviousBootIsNeverEvaluatedAgainstNewBootClock() {
+        val previousBoot = ProtectionState(ProtectionMode.COUNTDOWN, 11_000L, 1_000L, 15_000L, 7)
+        val unknown = ProtectionEngine.reconcileCountdown(previousBoot, null, 50_000L, 500L, 8)
+        assertEquals(ProtectionMode.COUNTDOWN, unknown.mode)
+        assertEquals(11_000L, unknown.deadlineEpochMs)
+
+        val unplugged = ProtectionEngine.reconcileCountdown(previousBoot, false, 50_000L, 500L, 8)
+        assertEquals(ProtectionMode.COUNTDOWN, unplugged.mode)
+        assertEquals(60_000L, unplugged.deadlineEpochMs)
+        assertEquals(10_500L, unplugged.deadlineElapsedRealtimeMs)
+        assertEquals(8, unplugged.bootCount)
+    }
+
+    @Test fun countdownFromPreviousBootCancelsWhenChargerIsConnected() {
+        val previousBoot = ProtectionState(ProtectionMode.COUNTDOWN, 11_000L, 1_000L, 15_000L, 7)
+        val connected = ProtectionEngine.reconcileCountdown(previousBoot, true, 50_000L, 500L, 8)
+        assertEquals(ProtectionMode.ARMED, connected.mode)
+    }
     @Test fun authenticatedAlarmWaitsForPlugThenUnplugBeforeNextCycle() {
         val alarm = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
         val disarmed = ProtectionEngine.authenticated(alarm, 12_000)
