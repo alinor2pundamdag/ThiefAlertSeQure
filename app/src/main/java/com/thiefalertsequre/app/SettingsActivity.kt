@@ -65,18 +65,36 @@ class SettingsActivity : FragmentActivity() {
         root.addView(statusCard, matchWrap())
         root.addView(space(22))
 
-        root.addView(text("SYSTEM ACCESS", 11f, R.color.tas_primary, true))
+        root.addView(text("HONOR / MAGICOS BACKGROUND PROTECTION", 11f, R.color.tas_primary, true))
+        root.addView(space(8))
+        root.addView(text(
+            "Open HONOR system settings, find App launch, select ThiefAlertSeQure, turn Manage automatically OFF, then enable all three switches: Auto-launch, Secondary launch, and Run in background. Save with OK. MagicOS does not expose a documented public deep link for these individual switches, so Android opens Settings instead of pretending to change them automatically.",
+            13f, R.color.tas_muted
+        ))
         root.addView(space(10))
-        root.addView(action("Alarms & reminders access") { openExactAlarmSettings() })
-        root.addView(action("Notifications permission") { requestNotifications() })
-        root.addView(action("App notification settings") {
+        root.addView(action("Auto-launch settings (HONOR)") { openHonorAppLaunchSettings("Auto-launch") })
+        root.addView(action("Secondary launch settings (HONOR)") { openHonorAppLaunchSettings("Secondary launch") })
+        root.addView(action("Run in background settings (HONOR)") { openHonorAppLaunchSettings("Run in background") })
+        root.addView(action("Battery optimization — allow unrestricted") { requestIgnoreBatteryOptimization() })
+        root.addView(action("Lock app in Recent apps — instructions") {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Keep ThiefAlertSeQure in Recent apps")
+                .setMessage("Open Recent apps, find ThiefAlertSeQure, then swipe its app card down (or use the card menu) until the lock icon appears. The exact gesture can vary by MagicOS version.")
+                .setPositiveButton("OK", null)
+                .show()
+        })
+        root.addView(space(22))
+
+        root.addView(text("SYSTEM ACCESS & PERMISSIONS", 11f, R.color.tas_primary, true))
+        root.addView(space(10))
+        root.addView(action("Grant notifications permission") { requestNotifications() })
+        root.addView(action("Alarms & reminders / exact alarm access") { openExactAlarmSettings() })
+        root.addView(action("All app permissions and app information") { openAppInfo() })
+        root.addView(action("App notification channels and settings") {
             open(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
         })
         root.addView(action("Battery and background restrictions") { openBatterySettings() })
         root.addView(action("Do Not Disturb settings") { openDndSettings() })
-        root.addView(action("Android app information") {
-            open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
-        })
         root.addView(space(22))
 
         root.addView(text("LOCAL TAMPER HISTORY", 11f, R.color.tas_primary, true))
@@ -116,10 +134,7 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun renderStatus() {
-        if (::root.isInitialized) {
-            // Recreate the screen so permission status is read from Android's current state.
-            render()
-        }
+        if (::root.isInitialized) render()
     }
 
     private fun statusSummary(): String {
@@ -133,7 +148,41 @@ class SettingsActivity : FragmentActivity() {
         } else {
             "Notifications: disabled in Android settings or permission not granted"
         }
-        return "$alarm\n$notifications\nMinimum supported Android: 8.0 (API 26)"
+        val batteryUnrestricted = if (Build.VERSION.SDK_INT >= 23) {
+            if (getSystemService(android.os.PowerManager::class.java).isIgnoringBatteryOptimizations(packageName))
+                "Battery optimization: unrestricted" else "Battery optimization: may restrict background work"
+        } else "Battery optimization: not applicable"
+        return "$alarm\n$notifications\n$batteryUnrestricted\nMinimum supported Android: 8.0 (API 26)"
+    }
+
+    private fun openHonorAppLaunchSettings(option: String) {
+        android.widget.Toast.makeText(
+            this,
+            "In Settings, search for App launch. Select ThiefAlertSeQure, turn Manage automatically OFF, enable Auto-launch, Secondary launch and Run in background, then tap OK.",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+        open(Intent(Settings.ACTION_SETTINGS))
+    }
+
+    private fun requestIgnoreBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= 23) {
+            val power = getSystemService(android.os.PowerManager::class.java)
+            if (power.isIgnoringBatteryOptimizations(packageName)) {
+                android.widget.Toast.makeText(this, "Battery optimization is already unrestricted for ThiefAlertSeQure.", android.widget.Toast.LENGTH_LONG).show()
+                return
+            }
+            try {
+                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            } catch (_: Exception) {
+                openAppInfo()
+            }
+        } else {
+            openBatterySettings()
+        }
+    }
+
+    private fun openAppInfo() {
+        open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
     }
 
     private fun requestNotifications() {
