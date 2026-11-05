@@ -194,6 +194,10 @@ class AlarmService : Service() {
     private fun lockDeviceIfAdminEnabled() {
         val manager = getSystemService(DevicePolicyManager::class.java)
         val admin = ComponentName(this, ThiefAlertAdminReceiver::class.java)
+        if (!getSystemService(android.app.KeyguardManager::class.java).isDeviceSecure) {
+            LocalTamperHistory.record(this, "automatic_screen_lock_unavailable", "No secure device PIN, pattern or password is configured")
+            return
+        }
         if (!manager.isAdminActive(admin)) {
             LocalTamperHistory.record(this, "automatic_screen_lock_unavailable", "Device administrator has not been activated")
             return

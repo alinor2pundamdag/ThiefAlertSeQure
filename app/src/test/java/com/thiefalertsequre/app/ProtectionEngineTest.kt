@@ -51,6 +51,16 @@ class ProtectionEngineTest {
         val s = ProtectionState(ProtectionMode.COUNTDOWN, 11_000, 1_000, 15_000, 7)
         assertEquals(ProtectionMode.ARMED, ProtectionEngine.restoreAfterBoot(s, true, 2_000L, 500L, 8).mode)
     }
+    @Test fun authenticatedAlarmWaitsForPlugThenUnplugBeforeNextCycle() {
+        val alarm = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
+        val disarmed = ProtectionEngine.authenticated(alarm, 12_000)
+        assertEquals(ProtectionMode.DISARMED, disarmed.mode)
+        assertEquals(ProtectionMode.DISARMED, ProtectionEngine.chargerDisconnected(disarmed, 13_000).mode)
+        val rearmed = ProtectionEngine.chargerConnected(disarmed, 14_000)
+        assertEquals(ProtectionMode.ARMED, rearmed.mode)
+        assertEquals(ProtectionMode.COUNTDOWN, ProtectionEngine.chargerDisconnected(rearmed, 15_000).mode)
+    }
+
     @Test fun reconnectCannotCancelTriggeredAlarm() {
         val s = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
         assertEquals(s, ProtectionEngine.chargerConnected(s, 12_000))

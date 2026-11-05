@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
@@ -52,6 +53,7 @@ class MainActivity : FragmentActivity() {
     private val ticker = object : Runnable {
         override fun run() {
             render()
+            launchAutomaticOwnerAuthenticationIfNeeded()
             status.postDelayed(this, 1_000L)
         }
     }
@@ -248,7 +250,9 @@ class MainActivity : FragmentActivity() {
         root.addView(space(8))
         root.addView(outlinedButton("Configure Do Not Disturb alarm exceptions") { openDndSettings() }, matchWrap())
         root.addView(space(8))
-        root.addView(outlinedButton("Review battery and background settings") { openAppSettings() }, matchWrap())
+        root.addView(outlinedButton("Set battery usage to Unrestricted") { openBatteryOptimizationSettings() }, matchWrap())
+        root.addView(space(8))
+        root.addView(outlinedButton("Review app battery and background settings") { openAppSettings() }, matchWrap())
         root.addView(space(8))
         root.addView(outlinedButton("Open sound, export and advanced settings") {
             startActivity(Intent(this, SettingsActivity::class.java))
@@ -325,7 +329,10 @@ class MainActivity : FragmentActivity() {
 
     private fun launchAutomaticOwnerAuthenticationIfNeeded() {
         if (autoAuthenticationRequested || !::status.isInitialized) return
-        if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED) return
+        if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED) {
+            autoAuthenticationRequested = false
+            return
+        }
         autoAuthenticationRequested = true
         val keyguard = getSystemService(KeyguardManager::class.java)
         val strongBiometric = BiometricManager.from(this)
@@ -460,6 +467,12 @@ class MainActivity : FragmentActivity() {
             }
     }
 
+    private fun openBatteryOptimizationSettings() {
+        runCatching {
+            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+        }.onFailure { openAppSettings() }
+    }
+
     private fun openAppSettings() {
         runCatching {
             startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
@@ -509,10 +522,11 @@ class MainActivity : FragmentActivity() {
         } else {
             "Precise alarm scheduling is available on this device."
         }
-        val notificationMessage = if (Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            "Notifications are disabled; the ongoing alarm notification may not be visible."
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        val notificationsAllowed = notificationManager.areNotificationsEnabled() &&
+            (Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
+        val notificationMessage = if (!notificationsAllowed) {
+            "Notifications are disabled; enable them for alarm presentation and recovery controls."
         } else {
             "Alarm notification access is available."
         }
@@ -538,7 +552,31 @@ class MainActivity : FragmentActivity() {
         } else {
             "Charger protection monitor: OFF by owner choice; automatic plug/unplug detection is unavailable until re-enabled."
         }
-        details.text = listOf(stateMessage, soundMessage, monitorMessage, attemptMessage, exactAlarmMessage, notificationMessage, screenLockMessage, fullScreenMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
+        val keyguard = getSystemService(KeyguardManager::class.java)
+        val secureCredentialReady = keyguard.isDeviceSecure
+        val exactAlarmReady = Build.VERSION.SDK_INT < 31 || getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
+        val fullScreenReady = Build.VERSION.SDK_INT < 34 || notificationManager.canUseFullScreenIntent()
+        val monitorRunning = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_RUNNING, false)
+        val readinessIssues = mutableListOf<String>()
+        if (!secureCredentialReady) readinessIssues.add("Set a device PIN, pattern or password")
+        if (!adminActive) readinessIssues.add("Activate device administrator for automatic screen locking")
+        if (!notificationsAllowed) readinessIssues.add("Allow notifications")
+        if (!exactAlarmReady) readinessIssues.add("Allow Alarms & reminders for exact deadline recovery")
+        if (!fullScreenReady) readinessIssues.add("Allow full-screen alarm access")
+        if (!monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) readinessIssues.add("Enable charger monitoring")
+        if (!monitorRunning) readinessIssues.add("Wait for the charger-monitor foreground service to start")
+        val batteryPowerManager = getSystemService(PowerManager::class.java)
+        val batteryOptimizationMessage = if (Build.VERSION.SDK_INT >= 23 && !batteryPowerManager.isIgnoringBatteryOptimizations(packageName)) {
+            "Battery optimization is still active. Set ThiefAlertSeQure to Unrestricted in Android battery settings for better OEM background reliability."
+        } else {
+            "Battery optimization exemption is active or not required on this Android version."
+        }
+        val readinessMessage = if (readinessIssues.isEmpty()) {
+            "CORE READINESS: All required Android capabilities are currently granted. Android/OEM power policies can still interrupt background work."
+        } else {
+            "CORE READINESS: INCOMPLETE — " + readinessIssues.joinToString("; ") + "."
+        }
+        details.text = listOf(stateMessage, readinessMessage, batteryOptimizationMessage, soundMessage, monitorMessage, attemptMessage, exactAlarmMessage, notificationMessage, screenLockMessage, fullScreenMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
 
         val alarmActive = state.mode == ProtectionMode.ALARM_TRIGGERED
         val biometricAvailable = BiometricManager.from(this)
@@ -617,7 +655,8 @@ class MainActivity : FragmentActivity() {
                             else details.text = "Authentication cancelled. The alarm remains active."
                         }
                         BiometricPrompt.ERROR_USER_CANCELED, BiometricPrompt.ERROR_CANCELED -> {
-                            details.text = "Authentication cancelled. The alarm remains active."
+                            autoAuthenticationRequested = false
+                            details.text = "Authentication dismissed. The alarm remains active; owner verification will be presented again."
                         }
                         else -> details.text = "$errString. The alarm remains active."
                     }
@@ -666,7 +705,8 @@ class MainActivity : FragmentActivity() {
         if (requestCode == REQUEST_DEVICE_CREDENTIAL) {
             if (resultCode == RESULT_OK) completeOwnerAuthentication()
             else {
-                details.text = "Device authentication cancelled or unsuccessful. The alarm remains active. Android manages device-credential lockout."
+                autoAuthenticationRequested = false
+                details.text = "Device authentication dismissed or unsuccessful. The alarm remains active; owner verification will be presented again."
                 render()
             }
         }
@@ -676,6 +716,7 @@ class MainActivity : FragmentActivity() {
         val store = ProtectionStore(this)
         val next = store.update { ProtectionEngine.authenticated(it, System.currentTimeMillis()) }
         if (next.mode == ProtectionMode.DISARMED) {
+            autoAuthenticationRequested = false
             store.resetAuthenticationFailures()
             AlarmScheduler.cancel(this)
             stopService(Intent(this, AlarmService::class.java))
