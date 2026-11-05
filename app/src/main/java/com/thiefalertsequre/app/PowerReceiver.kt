@@ -6,6 +6,7 @@ import android.content.Intent
 
 class PowerReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        LocalTamperHistory.record(context, if (intent.action == Intent.ACTION_POWER_CONNECTED) "charger_connected" else "charger_disconnected")
         val store = ProtectionStore(context)
         val now = System.currentTimeMillis()
         val elapsed = ProtectionClock.elapsedRealtime()
@@ -22,7 +23,10 @@ class PowerReceiver : BroadcastReceiver() {
                 context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount
             )
             ProtectionMode.ARMED, ProtectionMode.DISARMED -> AlarmScheduler.cancel(context)
-            ProtectionMode.ALARM_TRIGGERED -> AlarmScheduler.scheduleImmediateRecovery(context)
+            ProtectionMode.ALARM_TRIGGERED -> {
+                LocalTamperHistory.record(context, "charger_event_alarm_latched")
+                AlarmScheduler.scheduleImmediateRecovery(context)
+            }
         }
     }
 }
