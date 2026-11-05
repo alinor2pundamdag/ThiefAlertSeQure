@@ -26,6 +26,7 @@ class SettingsActivity : FragmentActivity() {
     private lateinit var root: LinearLayout
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private var soundSlot = AlarmSoundStore.ALARM
+    private var previewPlayer: MediaPlayer? = null
     private val pickSoundFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) validateAndSaveSound(uri, soundSlot, uri)
     }
@@ -127,6 +128,7 @@ class SettingsActivity : FragmentActivity() {
             soundSlot = AlarmSoundStore.ALARM
             pickSoundFolder.launch(null)
         })
+        root.addView(action("Preview selected main alarm") { previewSound(AlarmSoundStore.ALARM) })
         root.addView(space(6))
         root.addView(text("Secondary alert: " + AlarmSoundStore.displayName(this, AlarmSoundStore.ALERT), 13f, R.color.tas_text))
         root.addView(action("Choose secondary alert audio file") {
@@ -137,6 +139,8 @@ class SettingsActivity : FragmentActivity() {
             soundSlot = AlarmSoundStore.ALERT
             pickSoundFolder.launch(null)
         })
+        root.addView(action("Preview selected secondary alert") { previewSound(AlarmSoundStore.ALERT) })
+        root.addView(action("Stop audio preview") { stopPreview() })
         root.addView(space(6))
         root.addView(text(
             "The main alarm selection is used by the alarm service. The secondary alert selection is stored and validated, but is not yet connected to a separate warning trigger.",
@@ -264,7 +268,8 @@ class SettingsActivity : FragmentActivity() {
                 LocalTamperHistory.read(this, 100).asReversed().forEach { event ->
                     writer.append('"')
                     writer.append(event.replace("\"", "\"\""))
-                    writer.appendLine('"')
+                    writer.append('"')
+                    writer.appendLine()
                 }
             }
         }.onSuccess {
@@ -274,7 +279,44 @@ class SettingsActivity : FragmentActivity() {
         }
     }
 
+    private fun previewSound(slot: String) {
+        val uri = AlarmSoundStore.uri(this, slot)
+        if (uri == null) {
+            android.widget.Toast.makeText(this, "Select a sound first.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        ioExecutor.execute {
+            val candidate = runCatching {
+                MediaPlayer().apply {
+                    setDataSource(this@SettingsActivity, uri)
+                    isLooping = false
+                    prepare()
+                }
+            }.getOrNull()
+            runOnUiThread {
+                if (candidate == null) {
+                    android.widget.Toast.makeText(this, "Preview failed. The file may have moved or become inaccessible.", android.widget.Toast.LENGTH_LONG).show()
+                } else {
+                    stopPreview()
+                    previewPlayer = candidate
+                    candidate.setOnCompletionListener { stopPreview() }
+                    runCatching { candidate.start() }.onFailure {
+                        stopPreview()
+                        android.widget.Toast.makeText(this, "Could not play preview: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun stopPreview() {
+        runCatching { previewPlayer?.stop() }
+        runCatching { previewPlayer?.release() }
+        previewPlayer = null
+    }
+
     override fun onDestroy() {
+        stopPreview()
         ioExecutor.shutdown()
         super.onDestroy()
     }
