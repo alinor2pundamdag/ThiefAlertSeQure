@@ -56,6 +56,7 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
                 LocalTamperHistory.record(context, "countdown_expired", "Validated countdown transitioned to alarm")
                 startAlarm(context, "Countdown deadline validated")
             }
+            ProtectionMode.ARMED, ProtectionMode.DISARMED -> AlarmScheduler.cancel(context)
             else -> Unit
         }
     }
