@@ -424,6 +424,11 @@ class MainActivity : FragmentActivity() {
                 AlarmScheduler.cancel(this)
                 runCatching {
                     ContextCompat.startForegroundService(this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START))
+                }.onFailure {
+                    LocalTamperHistory.record(this, "activity_alarm_restore_failed", it.javaClass.simpleName + ": " + it.message)
+                    if (!AlarmScheduler.scheduleImmediateRecovery(this)) {
+                        AlarmRecoveryNotice.show(this, "The active protection alarm could not restart automatically")
+                    }
                 }
             }
             else -> AlarmScheduler.cancel(this)
