@@ -558,6 +558,8 @@ class MainActivity : FragmentActivity() {
         } else {
             "Full-screen alarm access is available on this Android version."
         }
+        val alarmChannel = if (Build.VERSION.SDK_INT >= 26) notificationManager.getNotificationChannel(AlarmService.CHANNEL_ID) else null
+        val alarmChannelReady = alarmChannel == null || alarmChannel.importance >= NotificationManager.IMPORTANCE_HIGH
         val alarmChannelMessage = if (!alarmChannelReady) {
             "Alarm notification channel is below High importance; Android may suppress full-screen presentation. Open Alarm notification settings and set importance to High."
         } else {
@@ -581,8 +583,6 @@ class MainActivity : FragmentActivity() {
         val secureCredentialReady = keyguard.isDeviceSecure
         val exactAlarmReady = Build.VERSION.SDK_INT < 31 || getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
         val fullScreenReady = Build.VERSION.SDK_INT < 34 || notificationManager.canUseFullScreenIntent()
-        val alarmChannel = if (Build.VERSION.SDK_INT >= 26) notificationManager.getNotificationChannel(AlarmService.CHANNEL_ID) else null
-        val alarmChannelReady = alarmChannel == null || alarmChannel.importance >= NotificationManager.IMPORTANCE_HIGH
         val monitorRunning = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_RUNNING, false)
         val readinessIssues = mutableListOf<String>()
         if (!secureCredentialReady) readinessIssues.add("Set a device PIN, pattern or password")
