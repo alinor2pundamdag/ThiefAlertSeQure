@@ -20,7 +20,7 @@ object AlarmScheduler {
     ) {
         if (deadlineEpochMs <= 0L) return
         val alarmManager = context.getSystemService(AlarmManager::class.java)
-        val token = "deadline:$deadlineEpochMs"
+        val token = deadlineToken(deadlineEpochMs, deadlineElapsedRealtimeMs, deadlineBootCount)
         val operation = pendingIntent(context, token)
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_LAST_TOKEN, token).commit()
         val sameBoot = deadlineBootCount >= 0 &&
@@ -62,7 +62,7 @@ object AlarmScheduler {
         val state = ProtectionStore(context).read()
         if (state.mode != ProtectionMode.COUNTDOWN || state.deadlineEpochMs <= 0L) return
         val alarmManager = context.getSystemService(AlarmManager::class.java)
-        val token = "deadline:${state.deadlineEpochMs}"
+        val token = deadlineToken(state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
         val operation = pendingIntent(context, token)
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_LAST_TOKEN, token).commit()
         alarmManager.setAndAllowWhileIdle(
@@ -86,6 +86,9 @@ object AlarmScheduler {
             )
         )
     }
+
+    private fun deadlineToken(epochMs: Long, elapsedRealtimeMs: Long, bootCount: Int): String =
+        "deadline:$epochMs:$elapsedRealtimeMs:$bootCount"
 
     private fun pendingIntent(context: Context, token: String): PendingIntent =
         PendingIntent.getBroadcast(
