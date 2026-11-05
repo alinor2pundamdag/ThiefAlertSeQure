@@ -16,7 +16,7 @@
 | Same-boot clock integrity | elapsedRealtime + boot count |
 | Reboot recovery | Revalidate charger state; if still disconnected, restart a full 10-second grace period; if connected, return to ARMED; unknown state/boot identity never expires the old deadline |
 | Android 15 boot recovery | Schedules exact alarm when user granted exact-alarm access; exact-alarm delivery is an allowed FGS-start path |
-| Local-only operation | No INTERNET permission, backend, analytics or advertising SDK |\n| Background protection monitor | User-enabled, stoppable foreground service with persistent notification; uses supported specialUse FGS declaration |\n| Local event export | CSV export through Android's system document picker |
+| Local-only operation | No INTERNET permission, backend, analytics or advertising SDK |\n| Background protection monitor | User-enabled, stoppable foreground service with persistent notification; disabling cancels pending countdown and disarms but cannot clear a latched alarm |\n| Local event export | CSV export through Android's system document picker |
 | Alarm foreground notification | Ongoing notification opens lockscreen-capable authentication Activity |
 | First-launch privacy notice | Accept / decline choices are recorded distinctly; both continue to the same essential local protection functions |
 | Dedicated Settings screen | Android alarm, notification, battery/background, DND, app-info and privacy-notice controls |
