@@ -188,10 +188,25 @@ class SettingsActivity : FragmentActivity() {
             }
             render()
         })
+        val motionEnabled = monitorPrefs.getBoolean(
+            ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED
+        )
+        root.addView(action("Independent motion alarm: ${if (motionEnabled) "ON" else "OFF"}") {
+            val enabled = !monitorPrefs.getBoolean(
+                ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED
+            )
+            monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_MOTION_ENABLED, enabled).apply()
+            sendBroadcast(Intent(ProtectionMonitorService.ACTION_REFRESH).setPackage(packageName))
+            render()
+        })
+        root.addView(text(
+            "Motion is a separate alarm source and can trigger while the charger is still connected. Leave it OFF for charger-removal-only protection.",
+            12f, R.color.tas_muted
+        ))
         val sensitivity = MotionSensitivity.fromStored(
             monitorPrefs.getString(ProtectionMonitorService.KEY_SENSITIVITY, MotionSensitivity.MEDIUM.name)
         )
-        root.addView(action("Motion sensitivity: ${sensitivity.name.lowercase()}") {
+        root.addView(action("Motion sensitivity (when enabled): ${sensitivity.name.lowercase()}") {
             val choices = MotionSensitivity.values().map { it.name.lowercase() }.toTypedArray()
             MaterialAlertDialogBuilder(this)
                 .setTitle("Motion sensitivity")
