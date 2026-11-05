@@ -16,7 +16,9 @@
 | Same-boot clock integrity | elapsedRealtime + boot count |
 | Reboot recovery | Revalidate charger state; if still disconnected, restart a full 10-second grace period; if connected, return to ARMED; unknown state/boot identity never expires the old deadline |
 | Android 15 boot recovery | Schedules exact alarm when user granted exact-alarm access; exact-alarm delivery is an allowed FGS-start path |
-| Local-only operation | No INTERNET permission, backend, analytics or advertising SDK |\n| Background protection monitor | User-enabled, stoppable foreground service with persistent notification; disabling cancels pending countdown and disarms but cannot clear a latched alarm |\n| Local event export | CSV export through Android's system document picker |
+| Local-only operation | No INTERNET permission, backend, analytics or advertising SDK |
+| Background protection monitor | User-enabled, stoppable foreground service with persistent notification; disabling cancels pending countdown and disarms but cannot clear a latched alarm |
+| Local event export | CSV export through Android's system document picker |
 | Alarm foreground notification | Ongoing notification opens lockscreen-capable authentication Activity |
 | First-launch privacy notice | Accept / decline choices are recorded distinctly; both continue to the same essential local protection functions |
 | Dedicated Settings screen | Android alarm, notification, battery/background, DND, app-info and privacy-notice controls |
@@ -52,7 +54,8 @@ Strong face authentication is available only if Android reports the enrolled fac
 1. Latest GitHub Actions unit tests pass.
 2. Latest debug APK assembles.
 3. Install on physical Android 14/15/16 devices.
-4. Verify selected audio URI survives reboot, decodes, previews and loops; verify vibration fallback on missing/corrupt audio.\n5. Verify foreground monitor, motion sensitivity, battery threshold crossing and stop action on physical devices.
+4. Verify selected audio URI survives reboot, decodes, previews and loops; verify vibration fallback on missing/corrupt audio.
+5. Verify foreground monitor, motion sensitivity, battery threshold crossing and stop action on physical devices.
 6. Verify icon and label before and after installation.
 7. Verify charger events, ten-second timing with monitor enabled, AlarmManager backup, reconnect and reboot.
 8. Verify PIN, pattern, password, fingerprint and supported strong face.
