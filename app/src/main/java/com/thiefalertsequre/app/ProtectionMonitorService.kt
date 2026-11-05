@@ -154,6 +154,10 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             startTheftAlarm()
         } else if (next.mode == ProtectionMode.COUNTDOWN) {
             syncDeadlineAlarm(next)
+        } else {
+            AlarmScheduler.cancel(this)
+            handler.removeCallbacks(countdownRunnable)
+            if (next.mode == ProtectionMode.ARMED) syncMotionSensor()
         }
     }
 
