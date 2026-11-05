@@ -12,25 +12,35 @@ object PowerTransitionCoordinator {
 
     fun initializeBaseline(context: Context) = synchronized(lock) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (prefs.getBoolean(KNOWN, false)) return@synchronized
+        val baselineKnown = prefs.getBoolean(KNOWN, false)
 
         // Migration must run even when Android has not supplied a battery snapshot.
         // Old COUNTDOWN states have no trusted unplug-event provenance.
-        val store = ProtectionStore(context)
-        val prior = store.read()
-        if (prior.mode == ProtectionMode.COUNTDOWN) {
-            store.update { current ->
-                if (current.mode == ProtectionMode.COUNTDOWN) {
-                    ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
-                } else current
+        if (!baselineKnown) {
+            val store = ProtectionStore(context)
+            val prior = store.read()
+            if (prior.mode == ProtectionMode.COUNTDOWN) {
+                store.update { current ->
+                    if (current.mode == ProtectionMode.COUNTDOWN) {
+                        ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
+                    } else current
+                }
+                AlarmScheduler.cancel(context)
+                LocalTamperHistory.record(context, "legacy_countdown_discarded", "Unverifiable pre-transition countdown discarded during migration")
             }
-            AlarmScheduler.cancel(context)
-            LocalTamperHistory.record(context, "legacy_countdown_discarded", "Unverifiable pre-transition countdown discarded during migration")
         }
 
-        val value = ExternalPowerState.readConnected(context) ?: return@synchronized
-        prefs.edit().putBoolean(CONNECTED, value).putBoolean(KNOWN, true).commit()
-        LocalTamperHistory.record(context, "power_baseline_initialized", "Initial state recorded; no transition inferred")
+        val connected = ExternalPowerState.readConnected(context) ?: return@synchronized
+        if (!baselineKnown) {
+            prefs.edit().putBoolean(CONNECTED, connected).putBoolean(KNOWN, true).commit()
+            LocalTamperHistory.record(context, "power_baseline_initialized", "Initial state recorded; no transition inferred")
+        }
+
+        // A connected snapshot can safely cancel a countdown and arm the next
+        // cycle. A disconnected snapshot is never accepted as an unplug event.
+        if (connected) {
+            confirmConnectedAndArm(context, "Connected power snapshot reconciled")
+        }
     }
 
     fun onPowerConnected(context: Context): ProtectionState =
