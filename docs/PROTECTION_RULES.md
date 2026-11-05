@@ -18,7 +18,7 @@ The state machine is authoritative. Notifications, UI labels, service state and 
 | DISARMED | Charger connected | ARMED | Persist state; cancel stale deadline |
 | ARMED | Charger disconnected | COUNTDOWN | Persist 10-second deadline; schedule alarm |
 | COUNTDOWN | Charger connected before deadline | ARMED | Persist re-arm; cancel deadline |
-| COUNTDOWN | Deadline reached | ALARM_TRIGGERED | Persist latch; start alarm service |
+| COUNTDOWN | Deadline reached | ALARM_TRIGGERED | Persist latch; start alarm service |\n| ARMED | Motion threshold exceeded while motion alarm is explicitly enabled | ALARM_TRIGGERED | Persist latch; record motion trigger source |
 | COUNTDOWN | Deadline receiver fires early | COUNTDOWN | Recompute remaining time and reschedule |
 | ALARM_TRIGGERED | Charger connected | ALARM_TRIGGERED | Keep alarm active |
 | ALARM_TRIGGERED | Charger disconnected | ALARM_TRIGGERED | Keep alarm active |
@@ -28,7 +28,7 @@ The state machine is authoritative. Notifications, UI labels, service state and 
 | ALARM_TRIGGERED | Device credential succeeds | DISARMED | Stop service, cancel deadline, restore prior alarm volume |
 | ALARM_TRIGGERED | Strong biometric succeeds | DISARMED | Stop service, cancel deadline, restore prior alarm volume |
 
-No other event may clear ALARM_TRIGGERED.
+Motion alarm is independent and may trigger while the charger is connected, but it is disabled by default. Keep it OFF for charger-removal-only behavior.\n\nNo other event may clear ALARM_TRIGGERED.
 
 ## 3. Countdown integrity
 
