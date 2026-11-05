@@ -30,8 +30,10 @@ object AlarmSoundStore {
         require(slot == ALARM || slot == ALERT)
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val granted = prefs.getString("grant_uri_$slot", null)
+        val otherSlot = if (slot == ALARM) ALERT else ALARM
+        val otherGrant = prefs.getString("grant_uri_$otherSlot", null)
         prefs.edit().remove(key(slot)).remove("grant_uri_$slot").commit()
-        if (granted != null) runCatching {
+        if (granted != null && granted != otherGrant) runCatching {
             context.contentResolver.releasePersistableUriPermission(
                 Uri.parse(granted),
                 Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -46,11 +48,22 @@ object AlarmSoundStore {
                 permissionUri,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
-            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit()
+            val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val oldGrant = prefs.getString("grant_uri_$slot", null)
+            val otherSlot = if (slot == ALARM) ALERT else ALARM
+            val otherGrant = prefs.getString("grant_uri_$otherSlot", null)
+            val saved = prefs.edit()
                 .putString(key(slot), soundUri.toString())
                 .putString("grant_uri_$slot", permissionUri.toString())
                 .commit()
+            if (saved && oldGrant != null && oldGrant != permissionUri.toString() && oldGrant != otherGrant) {
+                runCatching {
+                    context.contentResolver.releasePersistableUriPermission(
+                        Uri.parse(oldGrant), Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
+            }
+            saved
         }.getOrDefault(false)
     }
 
