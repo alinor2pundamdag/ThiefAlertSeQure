@@ -18,4 +18,13 @@ class ProtectionMonitorPolicyTest {
         assertEquals(false, ProtectionMonitorPolicy.shouldRun(true, ProtectionMode.ALARM_TRIGGERED))
         assertEquals(false, ProtectionMonitorPolicy.shouldRun(false, ProtectionMode.DISARMED))
     }
+
+    @Test fun motionAlarmIsOptInAndOnlyRunsWhileArmed() {
+        assertEquals(false, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED)
+        assertEquals(false, ProtectionMonitorPolicy.shouldMonitorMotion(false, ProtectionMode.ARMED))
+        assertEquals(true, ProtectionMonitorPolicy.shouldMonitorMotion(true, ProtectionMode.ARMED))
+        assertEquals(false, ProtectionMonitorPolicy.shouldMonitorMotion(true, ProtectionMode.COUNTDOWN))
+        assertEquals(false, ProtectionMonitorPolicy.shouldMonitorMotion(true, ProtectionMode.DISARMED))
+        assertEquals(false, ProtectionMonitorPolicy.shouldMonitorMotion(true, ProtectionMode.ALARM_TRIGGERED))
+    }
 }
