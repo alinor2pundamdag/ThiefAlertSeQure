@@ -7,34 +7,21 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.media.AudioAttributes
-import android.media.AudioManager
 import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaPlayer
-import android.media.ToneGenerator
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.core.app.NotificationCompat
 
 class AlarmService : Service() {
     private var player: MediaPlayer? = null
-    private var fallbackTone: ToneGenerator? = null
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
-    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { /* Keep alarm state active on focus changes. */ }
-    private val handler = Handler(Looper.getMainLooper())
-    private val repeatFallback = object : Runnable {
-        override fun run() {
-            if (ProtectionStore(this@AlarmService).read().mode != ProtectionMode.ALARM_TRIGGERED) {
-                stopAlarm()
-                stopSelf()
-                return
-            }
-            fallbackTone?.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 60_000)
-            handler.postDelayed(this, 60_000L)
-        }
-    }
+    private var vibrator: Vibrator? = null
+    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { }
     private val channelId = "anti_theft_alarm"
 
     override fun onCreate() {
@@ -67,18 +54,24 @@ class AlarmService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        if (player == null && fallbackTone == null) startAlarmAudio()
+        if (player == null) startAlarmAudio()
         return START_STICKY
     }
 
     private fun startAlarmAudio() {
+        val soundUri = AlarmSoundStore.uri(this, AlarmSoundStore.ALARM)
+        if (soundUri == null) {
+            LocalTamperHistory.record(this, "alarm_audio_missing", "No user-selected main alarm sound is configured")
+            startVibrationFallback()
+            return
+        }
         val audio = getSystemService(AudioManager::class.java)
+        audioManager = audio
         AlarmVolumeController.raiseToMaximum(this, audio)
         val attributes = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_ALARM)
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
             .build()
-        audioManager = audio
         if (Build.VERSION.SDK_INT >= 26) {
             val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
                 .setAudioAttributes(attributes)
@@ -91,55 +84,66 @@ class AlarmService : Service() {
             @Suppress("DEPRECATION")
             runCatching { audio.requestAudioFocus(audioFocusListener, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT) }
         }
+
         val media = runCatching {
-            val descriptor = resources.openRawResourceFd(R.raw.thiefalertsequre_alarm)
-            val prepared = MediaPlayer()
-            try {
-                prepared.setAudioAttributes(attributes)
-                prepared.setDataSource(
-                    descriptor.fileDescriptor,
-                    descriptor.startOffset,
-                    descriptor.length
-                )
-            } finally {
-                descriptor.close()
+            MediaPlayer().apply {
+                setAudioAttributes(attributes)
+                setDataSource(this@AlarmService, soundUri)
+                setWakeMode(this@AlarmService, android.os.PowerManager.PARTIAL_WAKE_LOCK)
+                isLooping = true
+                setOnPreparedListener { prepared ->
+                    if (ProtectionStore(this@AlarmService).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                        runCatching {
+                            prepared.start()
+                            LocalTamperHistory.record(this@AlarmService, "alarm_audio_playing", "User-selected audio started")
+                        }.onFailure {
+                            LocalTamperHistory.record(this@AlarmService, "alarm_audio_start_failed", it.javaClass.simpleName + ": " + it.message)
+                            startVibrationFallback()
+                        }
+                    } else {
+                        runCatching { prepared.release() }
+                        player = null
+                    }
+                }
+                setOnErrorListener { failed, what, extra ->
+                    LocalTamperHistory.record(this@AlarmService, "alarm_audio_decode_failed", "MediaPlayer error $what/$extra")
+                    runCatching { failed.release() }
+                    if (player === failed) player = null
+                    startVibrationFallback()
+                    true
+                }
+                prepareAsync()
             }
-            prepared.setWakeMode(this, android.os.PowerManager.PARTIAL_WAKE_LOCK)
-            prepared.isLooping = true
-            prepared.setOnErrorListener { failedPlayer, _, _ ->
-                runCatching { failedPlayer.release() }
-                if (player === failedPlayer) player = null
-                startFallbackTone()
-                true
-            }
-            prepared.prepare()
-            LocalTamperHistory.record(this, "alarm_media_prepared", "Bundled OPUS decoder prepared")
-            prepared
         }.onFailure {
-            LocalTamperHistory.record(this, "alarm_media_failed", it.javaClass.simpleName + ": " + it.message)
+            LocalTamperHistory.record(this, "alarm_audio_open_failed", it.javaClass.simpleName + ": " + it.message)
         }.getOrNull()
+
         if (media == null) {
-            startFallbackTone()
+            startVibrationFallback()
             return
         }
-        try {
-            player = media
-            media.start()
-            LocalTamperHistory.record(this, "alarm_audio_playing", "Bundled alarm audio started")
-        } catch (error: Exception) {
-            LocalTamperHistory.record(this, "alarm_audio_start_failed", error.javaClass.simpleName + ": " + error.message)
-            runCatching { media.release() }
-            player = null
-            startFallbackTone()
-        }
+        player = media
+        LocalTamperHistory.record(this, "alarm_audio_preparing", "Preparing user-selected alarm audio")
     }
 
-    private fun startFallbackTone() {
-        if (fallbackTone != null) return
-        LocalTamperHistory.record(this, "alarm_fallback_started", "Bundled audio unavailable; system alarm tone used")
-        fallbackTone = runCatching { ToneGenerator(AudioManager.STREAM_ALARM, 100) }.getOrNull()
-        handler.removeCallbacks(repeatFallback)
-        repeatFallback.run()
+    private fun startVibrationFallback() {
+        val deviceVibrator = getSystemService(Vibrator::class.java) ?: return
+        if (!deviceVibrator.hasVibrator()) {
+            LocalTamperHistory.record(this, "alarm_no_output_available", "Selected audio unavailable and device has no vibrator")
+            return
+        }
+        vibrator = deviceVibrator
+        runCatching {
+            if (Build.VERSION.SDK_INT >= 26) {
+                deviceVibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 700, 250, 700, 250), 0))
+            } else {
+                @Suppress("DEPRECATION")
+                deviceVibrator.vibrate(longArrayOf(0, 700, 250, 700, 250), 0)
+            }
+            LocalTamperHistory.record(this, "alarm_vibration_fallback", "Vibration active because selected audio could not play")
+        }.onFailure {
+            LocalTamperHistory.record(this, "alarm_vibration_failed", it.javaClass.simpleName + ": " + it.message)
+        }
     }
 
     private fun notification(): Notification {
@@ -164,13 +168,11 @@ class AlarmService : Service() {
     }
 
     private fun stopAlarm() {
-        handler.removeCallbacks(repeatFallback)
         runCatching { player?.stop() }
         runCatching { player?.release() }
         player = null
-        runCatching { fallbackTone?.stopTone() }
-        runCatching { fallbackTone?.release() }
-        fallbackTone = null
+        runCatching { vibrator?.cancel() }
+        vibrator = null
         audioManager?.let { manager ->
             if (Build.VERSION.SDK_INT >= 26) {
                 audioFocusRequest?.let { request -> runCatching { manager.abandonAudioFocusRequest(request) } }

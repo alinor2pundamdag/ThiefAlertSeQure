@@ -11,9 +11,13 @@ class PowerReceiver : BroadcastReceiver() {
         val now = System.currentTimeMillis()
         val elapsed = ProtectionClock.elapsedRealtime()
         val boot = ProtectionClock.bootCount(context)
+        val alarmReady = AlarmSoundStore.hasAlarmSound(context)
         val next = store.update { old ->
             when (intent.action) {
-                Intent.ACTION_POWER_CONNECTED -> ProtectionEngine.chargerConnected(old, now)
+                Intent.ACTION_POWER_CONNECTED -> if (alarmReady) ProtectionEngine.chargerConnected(old, now) else {
+                    LocalTamperHistory.record(context, "arming_blocked_no_alarm_sound")
+                    ProtectionState(ProtectionMode.DISARMED, 0L, now, 0L, -1)
+                }
                 Intent.ACTION_POWER_DISCONNECTED -> ProtectionEngine.chargerDisconnected(old, now, elapsed, boot)
                 else -> old
             }

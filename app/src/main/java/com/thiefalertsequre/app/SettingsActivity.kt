@@ -3,6 +3,7 @@ package com.thiefalertsequre.app
 import android.Manifest
 import android.app.AlarmManager
 import android.content.Intent
+import android.media.MediaPlayer
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -14,13 +15,26 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
+import androidx.documentfile.provider.DocumentFile
 import androidx.fragment.app.FragmentActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import java.util.concurrent.Executors
 
 class SettingsActivity : FragmentActivity() {
     private lateinit var root: LinearLayout
+    private val ioExecutor = Executors.newSingleThreadExecutor()
+    private var soundSlot = AlarmSoundStore.ALARM
+    private val pickSoundFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) validateAndSaveSound(uri, soundSlot, uri)
+    }
+    private val pickSoundFolder = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { treeUri ->
+        if (treeUri != null) searchAudioFolder(treeUri, soundSlot)
+    }
+    private val exportEvents = registerForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) exportHistory(uri)
+    }
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { renderStatus() }
@@ -97,13 +111,49 @@ class SettingsActivity : FragmentActivity() {
         root.addView(action("Do Not Disturb settings") { openDndSettings() })
         root.addView(space(22))
 
+        root.addView(text("USER-SELECTED ALARM SOUNDS", 11f, R.color.tas_primary, true))
+        root.addView(space(8))
+        root.addView(text(
+            "Choose audio files yourself. File access is limited to the file or folder you select; Android does not grant this app access to every private app directory. Folder search includes accessible subfolders and is capped to protect the device from very large trees.",
+            13f, R.color.tas_muted
+        ))
+        root.addView(space(8))
+        root.addView(text("Main alarm: " + AlarmSoundStore.displayName(this, AlarmSoundStore.ALARM), 13f, R.color.tas_text))
+        root.addView(action("Choose main alarm audio file") {
+            soundSlot = AlarmSoundStore.ALARM
+            pickSoundFile.launch(arrayOf("audio/*"))
+        })
+        root.addView(action("Search a folder and its subfolders for alarm audio") {
+            soundSlot = AlarmSoundStore.ALARM
+            pickSoundFolder.launch(null)
+        })
+        root.addView(space(6))
+        root.addView(text("Secondary alert: " + AlarmSoundStore.displayName(this, AlarmSoundStore.ALERT), 13f, R.color.tas_text))
+        root.addView(action("Choose secondary alert audio file") {
+            soundSlot = AlarmSoundStore.ALERT
+            pickSoundFile.launch(arrayOf("audio/*"))
+        })
+        root.addView(action("Search a folder and its subfolders for alert audio") {
+            soundSlot = AlarmSoundStore.ALERT
+            pickSoundFolder.launch(null)
+        })
+        root.addView(space(6))
+        root.addView(text(
+            "The main alarm selection is used by the alarm service. The secondary alert selection is stored and validated, but is not yet connected to a separate warning trigger.",
+            12f, R.color.tas_warning
+        ))
+        root.addView(space(22))
+
         root.addView(text("LOCAL TAMPER HISTORY", 11f, R.color.tas_primary, true))
         root.addView(space(8))
         val historyText = LocalTamperHistory.read(this, 20).ifEmpty {
             listOf("No recorded protection events yet.")
-        }.joinToString("\\n")
+        }.joinToString("\n")
         root.addView(text(historyText, 12f, R.color.tas_text))
         root.addView(space(8))
+        root.addView(action("Export local event history (CSV)") {
+            exportEvents.launch("thiefalertsequre-events.csv")
+        })
         root.addView(action("Clear local event history") {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Clear local history?")
@@ -111,6 +161,7 @@ class SettingsActivity : FragmentActivity() {
                 .setNegativeButton("Keep history", null)
                 .setPositiveButton("Clear") { _, _ ->
                     LocalTamperHistory.clear(this)
+                    LocalTamperHistory.record(this, "history_cleared", "Owner cleared local event history")
                     render()
                 }.show()
         })
@@ -131,6 +182,101 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(22))
         root.addView(action("Back to protection dashboard") { finish() })
         setContentView(scroll)
+    }
+
+    private fun validateAndSaveSound(uri: Uri, slot: String, permissionUri: Uri) {
+        android.widget.Toast.makeText(this, "Validating selected audio…", android.widget.Toast.LENGTH_SHORT).show()
+        ioExecutor.execute {
+            val validation = runCatching {
+                val player = MediaPlayer()
+                try {
+                    player.setDataSource(this, uri)
+                    player.prepare()
+                    check(player.duration > 0) { "Audio duration is zero or unsupported." }
+                } finally {
+                    player.release()
+                }
+            }
+            val saved = validation.isSuccess && AlarmSoundStore.save(this, slot, uri, permissionUri)
+            runOnUiThread {
+                val message = when {
+                    saved -> "Audio validated and saved: " + AlarmSoundStore.displayName(this, slot)
+                    validation.isFailure -> "Audio could not be decoded: " + (validation.exceptionOrNull()?.message ?: "unsupported file")
+                    else -> "Android did not grant persistent read access. Select the file again."
+                }
+                android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_LONG).show()
+                render()
+            }
+        }
+    }
+
+    private fun searchAudioFolder(treeUri: Uri, slot: String) {
+        runCatching {
+            contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }.onFailure {
+            android.widget.Toast.makeText(this, "Folder permission could not be retained: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        android.widget.Toast.makeText(this, "Searching selected folder and accessible subfolders…", android.widget.Toast.LENGTH_LONG).show()
+        ioExecutor.execute {
+            val matches = mutableListOf<DocumentFile>()
+            var visited = 0
+            fun walk(directory: DocumentFile, depth: Int) {
+                if (depth > 24 || visited >= 5000) return
+                val children = runCatching { directory.listFiles() }.getOrDefault(emptyArray())
+                for (child in children) {
+                    if (visited++ >= 5000) break
+                    if (child.isDirectory) walk(child, depth + 1)
+                    else if (child.isFile && isAudioDocument(child)) matches.add(child)
+                }
+            }
+            DocumentFile.fromTreeUri(this, treeUri)?.let { walk(it, 0) }
+            runOnUiThread {
+                if (matches.isEmpty()) {
+                    android.widget.Toast.makeText(this, "No supported audio files found in the selected folder.", android.widget.Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                val names = matches.mapIndexed { index, file -> file.name ?: "Audio file ${index + 1}" }.toTypedArray()
+                MaterialAlertDialogBuilder(this)
+                    .setTitle("Select audio (${matches.size} found${if (visited >= 5000) ", search capped" else ""})")
+                    .setItems(names) { _, index ->
+                        validateAndSaveSound(matches[index].uri, slot, treeUri)
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+        }
+    }
+
+    private fun isAudioDocument(file: DocumentFile): Boolean {
+        if (file.type.orEmpty().startsWith("audio/")) return true
+        val name = file.name.orEmpty().lowercase()
+        return listOf(".mp3", ".m4a", ".aac", ".wav", ".ogg", ".opus", ".flac", ".3gp", ".amr")
+            .any { name.endsWith(it) }
+    }
+
+    private fun exportHistory(uri: Uri) {
+        runCatching {
+            val output = contentResolver.openOutputStream(uri)
+                ?: error("Android could not open the selected export destination.")
+            output.bufferedWriter(Charsets.UTF_8).use { writer ->
+                writer.appendLine("event")
+                LocalTamperHistory.read(this, 100).asReversed().forEach { event ->
+                    writer.append('"')
+                    writer.append(event.replace("\"", "\"\""))
+                    writer.appendLine('"')
+                }
+            }
+        }.onSuccess {
+            android.widget.Toast.makeText(this, "Event history exported.", android.widget.Toast.LENGTH_LONG).show()
+        }.onFailure {
+            android.widget.Toast.makeText(this, "Export failed: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun onDestroy() {
+        ioExecutor.shutdown()
+        super.onDestroy()
     }
 
     private fun renderStatus() {

@@ -232,6 +232,10 @@ class MainActivity : FragmentActivity() {
         root.addView(space(8))
         root.addView(outlinedButton("Review battery and background settings") { openAppSettings() }, matchWrap())
         root.addView(space(8))
+        root.addView(outlinedButton("Open sound, export and advanced settings") {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }, matchWrap())
+        root.addView(space(8))
         root.addView(textButton("Refresh protection status") { reconcileCharging(); render() }, matchWrap())
         root.addView(space(18))
         root.addView(label(
@@ -324,8 +328,11 @@ class MainActivity : FragmentActivity() {
         val now = System.currentTimeMillis()
         val elapsed = ProtectionClock.elapsedRealtime()
         val boot = ProtectionClock.bootCount(this)
+        val soundConfigured = AlarmSoundStore.hasAlarmSound(this)
         val next = store.update { old ->
             when {
+                !soundConfigured && old.mode != ProtectionMode.COUNTDOWN && old.mode != ProtectionMode.ALARM_TRIGGERED ->
+                    ProtectionState(ProtectionMode.DISARMED, 0L, now, 0L, -1)
                 charging -> ProtectionEngine.chargerConnected(old, now)
                 old.mode == ProtectionMode.ARMED -> ProtectionEngine.chargerDisconnected(old, now, elapsed, boot)
                 old.mode == ProtectionMode.COUNTDOWN -> ProtectionEngine.evaluateDeadline(old, now, elapsed, boot)
@@ -386,8 +393,9 @@ class MainActivity : FragmentActivity() {
         val cooldownMs = AuthenticationThrottle.remainingMs(throttle, now, elapsed, boot)
         val coolingDown = cooldownMs > 0L
 
+        val alarmSoundConfigured = AlarmSoundStore.hasAlarmSound(this)
         status.text = when (state.mode) {
-            ProtectionMode.DISARMED -> "Protection ready"
+            ProtectionMode.DISARMED -> if (alarmSoundConfigured) "Protection ready" else "Setup required"
             ProtectionMode.ARMED -> "Protection armed"
             ProtectionMode.COUNTDOWN -> "Charger removed"
             ProtectionMode.ALARM_TRIGGERED -> "ALARM TRIGGERED"
@@ -400,7 +408,8 @@ class MainActivity : FragmentActivity() {
         }))
 
         val stateMessage = when (state.mode) {
-            ProtectionMode.DISARMED -> "Connect the charger to arm protection automatically."
+            ProtectionMode.DISARMED -> if (alarmSoundConfigured) "Connect the charger to arm protection automatically."
+                else "Select and validate a main alarm sound in Settings before protection can arm."
             ProtectionMode.ARMED -> "Charger connected. Disconnecting it starts the 10-second grace period."
             ProtectionMode.COUNTDOWN -> "Alarm starts in " +
                 ((ProtectionEngine.remainingMs(state, now, elapsed, boot) + 999) / 1000) + " seconds. Reconnect the charger to cancel this countdown."
@@ -431,7 +440,12 @@ class MainActivity : FragmentActivity() {
         } else {
             "Standard Android mode. Device Owner kiosk controls are unavailable until the device is enrolled."
         }
-        details.text = listOf(stateMessage, attemptMessage, exactAlarmMessage, notificationMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
+        val soundMessage = if (alarmSoundConfigured) {
+            "Main alarm sound: ${AlarmSoundStore.displayName(this, AlarmSoundStore.ALARM)}"
+        } else {
+            "Main alarm sound: NOT CONFIGURED — protection arming is blocked."
+        }
+        details.text = listOf(stateMessage, soundMessage, attemptMessage, exactAlarmMessage, notificationMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
 
         val alarmActive = state.mode == ProtectionMode.ALARM_TRIGGERED
         val biometricAvailable = BiometricManager.from(this)

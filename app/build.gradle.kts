@@ -18,9 +18,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    // AlarmService uses openRawResourceFd() for the bundled OPUS file.
-    // That API cannot read compressed APK entries, so preserve OPUS as a stored entry.
-    androidResources { noCompress += "opus" }
     testOptions { unitTests.isReturnDefaultValues = true }
 }
 dependencies {
@@ -29,6 +26,7 @@ dependencies {
     implementation("androidx.fragment:fragment-ktx:1.8.5")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+    implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("com.google.android.material:material:1.12.0")
     testImplementation("junit:junit:4.13.2")
 }
