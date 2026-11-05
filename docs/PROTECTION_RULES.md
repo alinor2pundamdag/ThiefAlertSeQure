@@ -23,7 +23,7 @@ The state machine is authoritative. Notifications, UI labels, service state and 
 | ALARM_TRIGGERED | Charger connected | ALARM_TRIGGERED | Keep alarm active |
 | ALARM_TRIGGERED | Charger disconnected | ALARM_TRIGGERED | Keep alarm active |
 | ALARM_TRIGGERED | Authentication cancelled | ALARM_TRIGGERED | Keep alarm active |
-| ALARM_TRIGGERED | Authentication fails | ALARM_TRIGGERED | Increment biometric failure count only |
+| ALARM_TRIGGERED | Authentication fails | ALARM_TRIGGERED | Increment biometric failure count only |\n| DISARMED / ARMED / COUNTDOWN | Owner disables background monitoring | DISARMED | Cancel pending deadline and stop charger/motion monitoring; never clear ALARM_TRIGGERED |
 | ALARM_TRIGGERED | Device credential succeeds | DISARMED | Stop service, cancel deadline, restore prior alarm volume |
 | ALARM_TRIGGERED | Strong biometric succeeds | DISARMED | Stop service, cancel deadline, restore prior alarm volume |
 
@@ -53,7 +53,7 @@ No other event may clear ALARM_TRIGGERED.
 - Weak face unlock is not accepted.
 - Count each onAuthenticationFailed callback.
 - On the fifth consecutive biometric failure, persist a 30-second cooldown and cancel the current prompt.
-- During cooldown, do not start another biometric or credential prompt from this app.
+- During cooldown, do not start another biometric prompt from this app; the verified Android device credential remains an allowed owner-recovery path.
 - After cooldown expires, reset the counter and permit a new group of five failures.
 - Android biometric lockout events also start the app's 30-second cooldown.
 - Cancellation is not a failure and never disarms the alarm.
