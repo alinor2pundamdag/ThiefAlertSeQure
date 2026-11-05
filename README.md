@@ -5,7 +5,7 @@ A local-only Android charging anti-theft alarm. Installed application name: **Th
 ## Core protection rules
 
 - Launch the app once after installation and complete the system-access checklist.
-- Connecting a charger automatically changes protection to ARMED.
+- Connecting a charger automatically changes protection to ARMED.\n- The independent motion alarm is OFF by default because it can trigger while the charger remains connected; enable it explicitly only if that behavior is wanted.
 - Disconnecting while ARMED starts a 10-second countdown.
 - Reconnecting before the deadline returns the state to ARMED.
 - Rebooting during COUNTDOWN requires a fresh live charger-state check. If still disconnected, a new full 10-second grace period starts; if connected, protection returns to ARMED. An unknown charger or boot state never expires the old deadline.
