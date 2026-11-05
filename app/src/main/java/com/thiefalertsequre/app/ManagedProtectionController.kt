@@ -17,7 +17,7 @@ object ManagedProtectionController {
             .isDeviceOwnerApp(context.packageName)
 
     fun isPolicyConfigured(context: Context): Boolean {
-        if (!isDeviceOwner(context)) return false
+        if (Build.VERSION.SDK_INT < 28 || !isDeviceOwner(context)) return false
         val dpm = context.getSystemService(DevicePolicyManager::class.java)
         val admin = admin(context)
         return context.packageName in dpm.getLockTaskPackages(admin) &&
@@ -25,6 +25,9 @@ object ManagedProtectionController {
     }
 
     fun enable(activity: Activity): Boolean {
+        check(Build.VERSION.SDK_INT >= 28) {
+            "Managed Lock Task feature configuration requires Android 9.0 (API 28) or later."
+        }
         check(isDeviceOwner(activity)) {
             "Device Owner provisioning is required. Standard device-admin activation is not sufficient."
         }
@@ -62,7 +65,9 @@ object ManagedProtectionController {
         if (Build.VERSION.SDK_INT >= 28) {
             dpm.clearUserRestriction(admin, UserManager.DISALLOW_USB_FILE_TRANSFER)
         }
-        dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
+        if (Build.VERSION.SDK_INT >= 28) {
+            dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
+        }
         dpm.setLockTaskPackages(admin, emptyArray())
     }
 
