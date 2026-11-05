@@ -44,12 +44,15 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private val prefs by lazy { getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
 
     private val countdownRunnable = Runnable { evaluateCountdown() }
+    private val powerReconcileRunnable = Runnable { reconcileStablePowerState() }
 
     private val systemReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
-                Intent.ACTION_POWER_CONNECTED -> handlePowerConnected()
-                Intent.ACTION_POWER_DISCONNECTED -> handlePowerDisconnected()
+                Intent.ACTION_POWER_CONNECTED, Intent.ACTION_POWER_DISCONNECTED -> {
+                    handler.removeCallbacks(powerReconcileRunnable)
+                    handler.postDelayed(powerReconcileRunnable, POWER_DEBOUNCE_MS)
+                }
                 Intent.ACTION_BATTERY_CHANGED -> handleBatteryChanged(intent)
             }
         }
@@ -87,8 +90,8 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
 
         registerSystemReceiver()
+        reconcileStablePowerState()
         syncMotionSensor()
-        if (state.mode == ProtectionMode.COUNTDOWN) scheduleCountdown(state)
         LocalTamperHistory.record(this, "monitor_started", "User-enabled foreground motion and battery monitor active")
         return START_STICKY
     }
@@ -104,35 +107,37 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         receiverRegistered = true
     }
 
-    private fun handlePowerConnected() {
-        prefs.edit()
-            .putBoolean(KEY_BATTERY_ALERT_FIRED, false)
-            .putInt(KEY_LAST_BATTERY_LEVEL, -1)
-            .apply()
+    private fun reconcileStablePowerState() {
+        val connected = ExternalPowerState.isConnected(this)
         val now = System.currentTimeMillis()
-        val soundReady = AlarmSoundStore.hasAlarmSound(this)
-        val next = ProtectionStore(this).update { old ->
-            if (old.mode == ProtectionMode.COUNTDOWN && !soundReady) {
-                ProtectionState(ProtectionMode.DISARMED, 0L, now, 0L, -1)
-            } else if (soundReady && (old.mode == ProtectionMode.COUNTDOWN || old.mode == ProtectionMode.DISARMED)) {
-                ProtectionEngine.chargerConnected(old, now)
-            } else old
+        if (connected) {
+            prefs.edit()
+                .putBoolean(KEY_BATTERY_ALERT_FIRED, false)
+                .putInt(KEY_LAST_BATTERY_LEVEL, -1)
+                .apply()
+            val soundReady = AlarmSoundStore.hasAlarmSound(this)
+            val next = ProtectionStore(this).update { old ->
+                when {
+                    old.mode == ProtectionMode.ALARM_TRIGGERED -> old
+                    !soundReady -> ProtectionState(ProtectionMode.DISARMED, 0L, now, 0L, -1)
+                    old.mode == ProtectionMode.COUNTDOWN || old.mode == ProtectionMode.DISARMED ->
+                        ProtectionEngine.chargerConnected(old, now)
+                    else -> old
+                }
+            }
+            handler.removeCallbacks(countdownRunnable)
+            if (next.mode == ProtectionMode.ARMED) syncMotionSensor() else unregisterMotionSensor()
+        } else {
+            val elapsed = ProtectionClock.elapsedRealtime()
+            val boot = ProtectionClock.bootCount(this)
+            val next = ProtectionStore(this).update { old ->
+                if (old.mode == ProtectionMode.ARMED) {
+                    ProtectionEngine.chargerDisconnected(old, now, elapsed, boot)
+                } else old
+            }
+            unregisterMotionSensor()
+            if (next.mode == ProtectionMode.COUNTDOWN) scheduleCountdown(next)
         }
-        handler.removeCallbacks(countdownRunnable)
-        if (next.mode == ProtectionMode.ARMED) syncMotionSensor()
-    }
-
-    private fun handlePowerDisconnected() {
-        val now = System.currentTimeMillis()
-        val elapsed = ProtectionClock.elapsedRealtime()
-        val boot = ProtectionClock.bootCount(this)
-        val next = ProtectionStore(this).update { old ->
-            if (old.mode == ProtectionMode.ARMED) {
-                ProtectionEngine.chargerDisconnected(old, now, elapsed, boot)
-            } else old
-        }
-        unregisterMotionSensor()
-        if (next.mode == ProtectionMode.COUNTDOWN) scheduleCountdown(next)
     }
 
     private fun scheduleCountdown(state: ProtectionState) {
@@ -365,5 +370,6 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         private const val NOTIFICATION_ID = 501
         const val ACTION_STOP = "com.thiefalertsequre.STOP_MONITOR"
         private const val MOTION_COOLDOWN_MS = 5_000L
+        private const val POWER_DEBOUNCE_MS = 300L
     }
 }
