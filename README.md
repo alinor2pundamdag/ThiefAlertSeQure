@@ -22,7 +22,7 @@ A local-only Android charging anti-theft alarm. Installed application name: **Th
 - Target Android API: 35.
 - Fingerprint and face are available only when Android reports an enrolled BIOMETRIC_STRONG authenticator. Hardware, OEM and Android-version differences are expected.
 - Exact alarm access is user-controlled on Android 12+. Without it, the fallback alarm can be delayed.
-- Android 15+ boot recovery uses an immediate exact alarm when the user has granted exact-alarm access. Without that access, immediate background audio after reboot is not guaranteed.
+- Boot recovery runs after Android delivers BOOT_COMPLETED (normally after the first device unlock). The app is not Direct-Boot-aware, so it cannot guarantee charger monitoring or alarm playback before that first unlock. Android 15+ recovery uses an exact alarm when the user has granted exact-alarm access; without it, immediate background audio is not guaranteed.
 - Open the app after installation; grant notifications and Alarms & reminders access where requested/needed. Review app battery/background settings and OEM auto-start settings if available.
 
 ## Optional Android Enterprise mode
