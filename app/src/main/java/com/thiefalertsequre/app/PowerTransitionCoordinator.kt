@@ -58,7 +58,9 @@ object PowerTransitionCoordinator {
                 ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
             }
         }
-        AlarmScheduler.cancel(context)
+        if (state.mode != ProtectionMode.ALARM_TRIGGERED) {
+            AlarmScheduler.cancel(context)
+        }
         LocalTamperHistory.record(context, "charger_connected_confirmed", reason)
         state
     }
