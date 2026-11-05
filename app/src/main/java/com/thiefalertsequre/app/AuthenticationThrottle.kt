@@ -19,6 +19,19 @@ object AuthenticationThrottle {
     ): AuthThrottleState {
         val sameBoot = state.bootCount >= 0 && currentBootCount == state.bootCount &&
             state.cooldownUntilElapsedRealtimeMs > 0L && nowElapsedRealtimeMs > 0L
+        // Wall-clock time is user-adjustable. Never let a reboot or missing boot
+        // identity turn a persisted cooldown into an early biometric retry.
+        // Rebase one full cooldown onto the current monotonic clock on first use.
+        val hasCooldown = state.cooldownUntilEpochMs > 0L ||
+            state.cooldownUntilElapsedRealtimeMs > 0L
+        if (hasCooldown && !sameBoot && nowElapsedRealtimeMs > 0L && currentBootCount >= 0) {
+            return state.copy(
+                failedAttempts = 0,
+                cooldownUntilEpochMs = nowEpochMs + COOLDOWN_MS,
+                cooldownUntilElapsedRealtimeMs = nowElapsedRealtimeMs + COOLDOWN_MS,
+                bootCount = currentBootCount
+            )
+        }
         val remaining = if (sameBoot) {
             state.cooldownUntilElapsedRealtimeMs - nowElapsedRealtimeMs
         } else {
