@@ -48,7 +48,7 @@ Managed mode does not block hardware forced shutdown, battery removal, bootloade
 
 ## Build and test
 
-    gradle :app:testDebugUnitTest :app:assembleDebug
+    ./gradlew :app:testDebugUnitTest :app:assembleDebug
 
 CI uploads a debug APK only after unit tests and assembly pass. A passing CI build is not a substitute for physical-device tests.
 
