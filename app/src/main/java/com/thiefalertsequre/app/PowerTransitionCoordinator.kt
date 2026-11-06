@@ -14,6 +14,8 @@ object PowerTransitionCoordinator {
     private const val GENERATION = "transition_generation"
     private val lock = Any()
 
+    internal fun acceptsPowerConnectedEvent(liveConnected: Boolean?): Boolean = liveConnected == true
+
     fun initializeBaseline(context: Context) = synchronized(lock) {
         initializeBaselineLocked(context)
     }
@@ -159,8 +161,22 @@ object PowerTransitionCoordinator {
         )
     }
 
-    fun onPowerConnected(context: Context): ProtectionState =
-        confirmConnectedAndArm(context, "System power-connected transition received")
+    fun onPowerConnected(context: Context): ProtectionState = synchronized(lock) {
+        val appContext = context.applicationContext
+        // Delayed/reordered broadcasts must not let stale CONNECTED re-arm
+        // protection after the cable has already been removed.
+        when (ExternalPowerState.readConnected(appContext)) {
+            true -> confirmConnectedAndArmLocked(appContext, "Power-connected event confirmed by live external-power state")
+            false -> {
+                LocalTamperHistory.record(appContext, "stale_power_connected_rejected", "Connect broadcast rejected because live external power is disconnected")
+                ProtectionStore(appContext).read()
+            }
+            null -> {
+                LocalTamperHistory.record(appContext, "power_connected_unconfirmed", "Connect broadcast deferred because live external power state is unknown")
+                ProtectionStore(appContext).read()
+            }
+        }
+    }
 
     /** Used only after a live connected-state confirmation, including post-auth recovery. */
     fun confirmConnectedAndArm(context: Context, reason: String): ProtectionState = synchronized(lock) {
