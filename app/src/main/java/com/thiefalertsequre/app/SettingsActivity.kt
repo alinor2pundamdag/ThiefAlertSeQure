@@ -88,29 +88,21 @@ class SettingsActivity : FragmentActivity() {
             13f, R.color.tas_muted
         ))
         root.addView(space(10))
-        root.addView(action("Auto-launch settings (HONOR)") { openHonorAppLaunchSettings("Auto-launch") })
-        root.addView(action("Secondary launch settings (HONOR)") { openHonorAppLaunchSettings("Secondary launch") })
-        root.addView(action("Run in background settings (HONOR)") { openHonorAppLaunchSettings("Run in background") })
-        root.addView(action("Battery optimization — allow unrestricted") { requestIgnoreBatteryOptimization() })
-        root.addView(action("Lock app in Recent apps — instructions") {
-            MaterialAlertDialogBuilder(this)
-                .setTitle("Keep ThiefAlertSeQure in Recent apps")
-                .setMessage("Open Recent apps, find ThiefAlertSeQure, then swipe its app card down (or use the card menu) until the lock icon appears. The exact gesture can vary by MagicOS version.")
-                .setPositiveButton("OK", null)
-                .show()
-        })
+        addSystemSettingAction("Auto-launch settings (HONOR)", "Auto-launch", "Open App launch, select ThiefAlertSeQure, turn Manage automatically OFF, then enable Auto-launch and tap OK. This is an HONOR/MagicOS vendor page; other manufacturers use different labels.") { openHonorAppLaunchSettings("Auto-launch") }
+        addSystemSettingAction("Secondary launch settings (HONOR)", "Secondary launch", "In HONOR App launch for ThiefAlertSeQure, enable Secondary launch. Availability and wording vary by MagicOS release.") { openHonorAppLaunchSettings("Secondary launch") }
+        addSystemSettingAction("Run in background settings (HONOR)", "Run in background", "In HONOR App launch for ThiefAlertSeQure, enable Run in background. Keep Auto-launch and Secondary launch enabled too.") { openHonorAppLaunchSettings("Run in background") }
+        addSystemSettingAction("Battery optimization — allow unrestricted", "Battery optimization", "Choose Unrestricted / Don't optimize for ThiefAlertSeQure if offered. Android 8–10 generally expose the battery-optimization list; Android 11+ may also show per-app battery controls. OEM battery managers can add separate auto-start/background controls. This reduces Doze restrictions but cannot prevent Force stop or guarantee the OEM keeps every process alive.") { requestIgnoreBatteryOptimization() }
+        addSystemSettingAction("Lock app in Recent apps — instructions", "Recent-app lock", "Open Recents, find ThiefAlertSeQure, then use the app-card menu or manufacturer-specific swipe gesture to choose Lock / Keep open if available. This is an OEM convenience feature, not a security guarantee.") { showRecentAppsTutorial() }
         root.addView(space(22))
 
         root.addView(text("SYSTEM ACCESS & PERMISSIONS", 11f, R.color.tas_primary, true))
         root.addView(space(10))
-        root.addView(action("Grant notifications permission") { requestNotifications() })
-        root.addView(action("Alarms & reminders / exact alarm access") { openExactAlarmSettings() })
-        root.addView(action("All app permissions and app information") { openAppInfo() })
-        root.addView(action("App notification channels and settings") {
-            open(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
-        })
-        root.addView(action("Battery and background restrictions") { openBatterySettings() })
-        root.addView(action("Do Not Disturb settings") { openDndSettings() })
+        addSystemSettingAction("Grant notifications permission", "Notifications", "Android 13 (API 33)+ asks for notification permission at runtime. If denied, open App info → Notifications and enable it. Android 8–12 uses per-app notification controls without this runtime prompt. Verify the Anti-theft alarm channel is enabled and allowed to appear on the lock screen.") { requestNotifications() }
+        addSystemSettingAction("Alarms & reminders / exact alarm access", "Exact alarms", "Android 12 (API 31)+ exposes special Alarms & reminders access. Allow ThiefAlertSeQure if listed. Android 8–11 does not expose this special access. Without it, countdown delivery may use fallback scheduling and can be delayed.") { openExactAlarmSettings() }
+        addSystemSettingAction("All app permissions and app information", "App permissions", "Open App info → Permissions and review only permissions requested by this build. The local charger-alarm core does not need contacts, location, microphone, camera, SMS, or internet. Do not grant unrelated permissions.") { openAppInfo() }
+        addSystemSettingAction("App notification channels and settings", "App notifications", "This opens ThiefAlertSeQure's own notification settings. Enable app notifications and the Anti-theft alarm channel. Android 8+ uses channels; Android 13+ also requires app-level notification permission.") { open(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)) }
+        addSystemSettingAction("Battery and background restrictions", "Background activity", "Review ThiefAlertSeQure battery usage and select Unrestricted / Allow background activity where available. Android 8+ applies background execution limits; Android 9+ adds stricter standby behavior; Android 12+ exposes additional battery controls; Android 13–15 may apply OEM restrictions. Keep the persistent protection notification enabled. No setting overrides Force stop.") { openBatterySettings() }
+        addSystemSettingAction("Do Not Disturb settings", "Do Not Disturb", "Review DND mode, schedules, and permitted alarm interruptions. The alarm uses Android alarm audio usage, but DND policy, silent mode, and OEM behavior can still affect audible output. Allow alarms during DND if you require alarm audio to remain audible.") { openDndSettings() }
         root.addView(space(22))
 
         root.addView(text("BUILT-IN DEFAULT + OPTIONAL CUSTOM ALARM SOUNDS", 11f, R.color.tas_primary, true))
@@ -467,9 +459,9 @@ class SettingsActivity : FragmentActivity() {
                 return
             }
             try {
-                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).setData(Uri.parse("package:$packageName")))
             } catch (_: Exception) {
-                openAppInfo()
+                open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
             }
         } else {
             openBatterySettings()
@@ -496,11 +488,48 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun openBatterySettings() {
-        open(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+        open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")),
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
     }
 
     private fun openDndSettings() {
         open(Intent(Settings.ACTION_ZEN_MODE_PRIORITY_SETTINGS), Intent(Settings.ACTION_SOUND_SETTINGS))
+    }
+
+    private fun showRecentAppsTutorial() {
+        MaterialAlertDialogBuilder(this).setTitle("Keep ThiefAlertSeQure in Recents")
+            .setMessage(androidVersionContext() + "\n\nOpen Recents, locate ThiefAlertSeQure, then use the app-card menu or manufacturer-specific gesture to choose Lock / Keep open if available. Android may still stop the app.")
+            .setPositiveButton("OK", null).show()
+    }
+
+    private fun androidVersionContext(): String {
+        val release = Build.VERSION.RELEASE ?: "unknown"
+        val name = when (Build.VERSION.SDK_INT) {
+            26 -> "Android 8.0"; 27 -> "Android 8.1"; 28 -> "Android 9"; 29 -> "Android 10"
+            30 -> "Android 11"; 31 -> "Android 12"; 32 -> "Android 12L"; 33 -> "Android 13"
+            34 -> "Android 14"; 35 -> "Android 15"; 36 -> "Android 16"
+            else -> "Android API " + Build.VERSION.SDK_INT
+        }
+        return "$name (API " + Build.VERSION.SDK_INT + ", release $release). OEM menu names may differ."
+    }
+
+    private fun addSystemSettingAction(label: String, tutorialTitle: String, tutorial: String, click: () -> Unit) {
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
+        val launch = action(label, click).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(8) }
+        }
+        val info = MaterialButton(this).apply {
+            text = "i"; isAllCaps = false; minWidth = dp(44); minHeight = dp(48); cornerRadius = dp(14)
+            contentDescription = "Tutorial: $tutorialTitle"
+            setOnClickListener {
+                MaterialAlertDialogBuilder(this@SettingsActivity)
+                    .setTitle(tutorialTitle + " • Android " + Build.VERSION.SDK_INT)
+                    .setMessage(androidVersionContext() + "\n\n" + tutorial)
+                    .setPositiveButton("Got it", null).show()
+            }
+        }
+        row.addView(launch); row.addView(info, LinearLayout.LayoutParams(dp(48), dp(52)))
+        root.addView(row, matchWrap())
     }
 
     private fun open(primary: Intent, fallback: Intent? = null) {
