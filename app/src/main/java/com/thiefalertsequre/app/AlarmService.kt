@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.app.Service
 import android.database.ContentObserver
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.AudioFocusRequest
@@ -28,6 +30,8 @@ class AlarmService : Service() {
     private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { /* Keep alarm state active on focus changes. */ }
     private val handler = Handler(Looper.getMainLooper())
     private var alarmVolumeObserver: ContentObserver? = null
+    private val userPresentReceiver = UserPresentReceiver()
+    private var userPresentReceiverRegistered = false
     private val repeatFallback = object : Runnable {
         override fun run() {
             if (ProtectionStore(this@AlarmService).read().mode != ProtectionMode.ALARM_TRIGGERED) {
@@ -43,6 +47,17 @@ class AlarmService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        // ACTION_USER_PRESENT is registered dynamically because Android 8+ restricts
+        // most implicit manifest receivers. The alarm foreground service owns this
+        // listener for the entire time the alarm is latched.
+        val unlockFilter = IntentFilter(Intent.ACTION_USER_PRESENT)
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(userPresentReceiver, unlockFilter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(userPresentReceiver, unlockFilter)
+        }
+        userPresentReceiverRegistered = true
         val nm = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) {
             nm.createNotificationChannel(
@@ -233,6 +248,10 @@ class AlarmService : Service() {
     }
 
     override fun onDestroy() {
+        if (userPresentReceiverRegistered) {
+            runCatching { unregisterReceiver(userPresentReceiver) }
+            userPresentReceiverRegistered = false
+        }
         stopAlarm()
         super.onDestroy()
     }
