@@ -27,6 +27,15 @@ object AlarmVolumeController {
         }.getOrDefault(false)
     }
 
+    /** Reassert the alarm stream ceiling while the theft alarm remains active. */
+    fun enforceMaximum(audio: AudioManager): Boolean = runCatching {
+        val maximum = audio.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+        if (audio.getStreamVolume(AudioManager.STREAM_ALARM) != maximum) {
+            audio.setStreamVolume(AudioManager.STREAM_ALARM, maximum, 0)
+        }
+        true
+    }.getOrDefault(false)
+
     fun restore(context: Context, audio: AudioManager): Boolean {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (!prefs.contains(KEY_ORIGINAL)) return true
