@@ -120,6 +120,26 @@ class ProtectionEngineTest {
         val s = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
         assertEquals(s, ProtectionEngine.restoreAfterBoot(s, true, 20_000))
     }
+    @Test fun secureUnlockedKeyguardCanCompleteLatchedAlarm() {
+        val alarm = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, 11_000L)
+        assertEquals(true, ProtectionEngine.canAcceptSystemUnlock(alarm, true, false))
+    }
+
+    @Test fun insecureDeviceCannotUseSystemUnlockToClearAlarm() {
+        val alarm = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, 11_000L)
+        assertEquals(false, ProtectionEngine.canAcceptSystemUnlock(alarm, false, false))
+    }
+
+    @Test fun stillLockedKeyguardCannotClearAlarm() {
+        val alarm = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, 11_000L)
+        assertEquals(false, ProtectionEngine.canAcceptSystemUnlock(alarm, true, true))
+    }
+
+    @Test fun ordinaryUnlockDoesNotClearNonAlarmState() {
+        val armed = ProtectionState(ProtectionMode.ARMED, 0L, 1_000L)
+        assertEquals(false, ProtectionEngine.canAcceptSystemUnlock(armed, true, false))
+    }
+
     @Test fun onlyTriggeredStateCanBeClearedByAuthentication() {
         val alarm = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
         val armed = ProtectionState(ProtectionMode.ARMED, 0, 1_000)
