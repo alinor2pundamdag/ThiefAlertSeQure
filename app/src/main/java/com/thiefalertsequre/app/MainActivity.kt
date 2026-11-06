@@ -248,22 +248,29 @@ class MainActivity : FragmentActivity() {
 
         root.addView(sectionTitle("RELIABILITY & SYSTEM ACCESS"), matchWrap())
         root.addView(space(10))
-        root.addView(outlinedButton("Enable precise 10-second alarm timing") { requestExactAlarmAccess() }, matchWrap())
+        root.addView(systemSettingRow("Enable precise 10-second alarm timing", "Exact alarms",
+            "Android 12 (API 31)+ requires special Alarms & reminders access for exact scheduling. Allow ThiefAlertSeQure if listed. Android 8–11 has no separate exact-alarm access page; timing uses the platform's available alarm behavior.") { requestExactAlarmAccess() }, matchWrap())
         if (Build.VERSION.SDK_INT >= 34) {
             root.addView(space(8))
             fullScreenAccessButton = outlinedButton("Allow full-screen alarm and authentication") { requestFullScreenIntentAccess() }
-            root.addView(fullScreenAccessButton, matchWrap())
+            root.addView(systemSettingRow("Allow full-screen alarm and authentication", "Full-screen intent",
+                "Android 14 (API 34)+ controls full-screen intent access separately. Allow it if Android offers the option. Android may still display a heads-up notification instead of launching full-screen, and app eligibility can be restricted by system/store policy.") { requestFullScreenIntentAccess() }, matchWrap())
         }
         root.addView(space(8))
-        root.addView(outlinedButton("Open alarm notification settings") { openAlarmNotificationSettings() }, matchWrap())
+        root.addView(systemSettingRow("Open alarm notification settings", "Alarm notifications",
+            "Open the Anti-theft alarm notification channel and enable it. Keep channel importance high and allow lock-screen display. Android 13+ also needs app-level notification permission.") { openAlarmNotificationSettings() }, matchWrap())
         root.addView(space(8))
-        root.addView(outlinedButton("Set device PIN, pattern or password") { openDeviceSecuritySettings() }, matchWrap())
+        root.addView(systemSettingRow("Set device PIN, pattern or password", "Secure screen lock",
+            "Set a secure PIN, pattern, or password in Android Security settings. ThiefAlertSeQure relies on Android Keyguard for credential verification and never reads or stores the credential.") { openDeviceSecuritySettings() }, matchWrap())
         root.addView(space(8))
-        root.addView(outlinedButton("Configure Do Not Disturb alarm exceptions") { openDndSettings() }, matchWrap())
+        root.addView(systemSettingRow("Configure Do Not Disturb alarm exceptions", "Do Not Disturb",
+            "Review DND schedules and allow alarms to interrupt if you need audible theft alerts during DND. The OS and OEM still control sound routing and interruption policy.") { openDndSettings() }, matchWrap())
         root.addView(space(8))
-        root.addView(outlinedButton("Set battery usage to Unrestricted") { openBatteryOptimizationSettings() }, matchWrap())
+        root.addView(systemSettingRow("Set battery usage to Unrestricted", "Battery optimization",
+            "Choose Unrestricted / Don't optimize for ThiefAlertSeQure where available. This reduces Doze restrictions but cannot prevent Force stop, uninstall, shutdown, or all OEM background limits.") { openBatteryOptimizationSettings() }, matchWrap())
         root.addView(space(8))
-        root.addView(outlinedButton("Review app battery and background settings") { openAppSettings() }, matchWrap())
+        root.addView(systemSettingRow("Review app battery and background settings", "App battery and background",
+            "Open ThiefAlertSeQure App info and review Battery / App battery usage. Choose Unrestricted or Allow background activity where offered. HONOR, Xiaomi, OPPO, vivo, Samsung and other OEMs may expose additional auto-start controls.") { openAppSettings() }, matchWrap())
         root.addView(space(8))
         root.addView(outlinedButton("Open sound, export and advanced settings") {
             startActivity(Intent(this, SettingsActivity::class.java))
@@ -512,9 +519,50 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun openBatteryOptimizationSettings() {
+        val power = getSystemService(PowerManager::class.java)
+        if (Build.VERSION.SDK_INT >= 23 && power.isIgnoringBatteryOptimizations(packageName)) {
+            details.text = "Battery optimization is already unrestricted for ThiefAlertSeQure."
+            return
+        }
         runCatching {
-            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                .setData(Uri.parse("package:$packageName")))
         }.onFailure { openAppSettings() }
+    }
+
+    private fun systemSettingRow(
+        title: String,
+        tutorialTitle: String,
+        tutorial: String,
+        click: () -> Unit
+    ): LinearLayout {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val launch = outlinedButton(title, click).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(8)
+            }
+        }
+        val info = MaterialButton(this).apply {
+            text = "i"
+            isAllCaps = false
+            minWidth = dp(44)
+            minHeight = dp(48)
+            cornerRadius = dp(14)
+            contentDescription = "Tutorial: $tutorialTitle"
+            setOnClickListener {
+                MaterialAlertDialogBuilder(this@MainActivity)
+                    .setTitle(tutorialTitle + " • Android " + Build.VERSION.SDK_INT)
+                    .setMessage("Android API " + Build.VERSION.SDK_INT + " (" + Build.VERSION.RELEASE + "). Manufacturer settings may differ.\n\n" + tutorial)
+                    .setPositiveButton("Got it", null)
+                    .show()
+            }
+        }
+        row.addView(launch)
+        row.addView(info, LinearLayout.LayoutParams(dp(48), dp(52)))
+        return row
     }
 
     private fun openAppSettings() {
