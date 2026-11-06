@@ -32,12 +32,13 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 - Five consecutive biometric failure callbacks start a persisted 30-second cooldown. After it expires, another five failures can start another cooldown.
 - Cancellation is not a failed attempt and never clears the alarm.
 - Android does not disclose incorrect device-credential attempts to third-party apps; Keyguard's own lockout applies.
-- Only successful Keyguard or BiometricPrompt results clear ALARM_TRIGGERED.
+- In-app Keyguard/BiometricPrompt success or a secure, unlocked Android keyguard dismissal (`ACTION_USER_PRESENT`) clears ALARM_TRIGGERED through one shared coordinator. Android does not expose the exact authentication modality for system lockscreen unlocks; OEM trusted-unlock flows may also dismiss the keyguard.
 
 ## Audio and lockscreen
 - Packaged Ogg Opus alarm asset is played in a loop through MediaPlayer. If selected and packaged audio both fail, repeating vibration is the fallback; there is no ToneGenerator implementation.
 - Audio uses USAGE_ALARM and requests maximum available alarm-stream volume.
 - Prior alarm volume is saved and restored after successful disarm. If service is destroyed while alarm remains latched, it does not restore volume prematurely.
+- While AlarmService is active, the alarm stream maximum is reasserted every 500 ms; this is best-effort volume control, not hardware-key interception.
 - Notification is ongoing and opens a show-when-locked authentication Activity.
 - DND is not silently changed. Users configure alarm exceptions in Android settings.
 - Android/OEM policies can constrain sound output and background execution.
