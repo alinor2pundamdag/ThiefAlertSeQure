@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.database.ContentObserver
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioManager
@@ -15,6 +16,8 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.net.Uri
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 
 class AlarmService : Service() {
@@ -24,6 +27,7 @@ class AlarmService : Service() {
     private var audioFocusRequest: AudioFocusRequest? = null
     private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { /* Keep alarm state active on focus changes. */ }
     private val handler = Handler(Looper.getMainLooper())
+    private var alarmVolumeObserver: ContentObserver? = null
     private val repeatFallback = object : Runnable {
         override fun run() {
             if (ProtectionStore(this@AlarmService).read().mode != ProtectionMode.ALARM_TRIGGERED) {
@@ -67,8 +71,46 @@ class AlarmService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        enforceAlarmVolumeWhileActive()
         if (player == null && fallbackTone == null) startAlarmAudio()
         return START_STICKY
+    }
+
+    /**
+     * Keep STREAM_ALARM at its maximum while this foreground alarm is active.
+     * The observer reasserts the level if the hardware volume keys lower it.
+     */
+    private fun enforceAlarmVolumeWhileActive() {
+        if (alarmVolumeObserver == null) {
+            val observer = object : ContentObserver(handler) {
+                override fun onChange(selfChange: Boolean, uri: Uri?) {
+                    if (ProtectionStore(this@AlarmService).read().mode != ProtectionMode.ALARM_TRIGGERED) return
+                    val audio = getSystemService(AudioManager::class.java)
+                    val current = audio.getStreamVolume(AudioManager.STREAM_ALARM)
+                    val maximum = audio.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+                    if (current < maximum) {
+                        runCatching { AlarmVolumeController.raiseToMaximum(this@AlarmService, audio) }
+                    }
+                }
+            }
+            alarmVolumeObserver = observer
+            runCatching {
+                contentResolver.registerContentObserver(
+                    Settings.System.getUriFor("volume_alarm"),
+                    false,
+                    observer
+                )
+            }.onFailure {
+                LocalTamperHistory.record(
+                    this,
+                    "alarm_volume_observer_unavailable",
+                    it.javaClass.simpleName + ": " + it.message
+                )
+            }
+        }
+        runCatching {
+            AlarmVolumeController.raiseToMaximum(this, getSystemService(AudioManager::class.java))
+        }
     }
 
     private fun startAlarmAudio() {
@@ -164,6 +206,10 @@ class AlarmService : Service() {
     }
 
     private fun stopAlarm() {
+        alarmVolumeObserver?.let { observer ->
+            runCatching { contentResolver.unregisterContentObserver(observer) }
+        }
+        alarmVolumeObserver = null
         handler.removeCallbacks(repeatFallback)
         runCatching { player?.stop() }
         runCatching { player?.release() }
