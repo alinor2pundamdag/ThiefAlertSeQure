@@ -53,7 +53,7 @@ No other event may clear ALARM_TRIGGERED.
 - Weak face unlock is not accepted.
 - Count each onAuthenticationFailed callback.
 - On the fifth consecutive biometric failure, persist a 30-second cooldown and cancel the current prompt.
-- During cooldown, do not start another biometric or credential prompt from this app.
+- During the app cooldown, block another biometric prompt. Device PIN, pattern or password remains available through Android Keyguard; Android independently enforces credential lockout and does not expose failed credential attempts to ordinary apps.
 - After cooldown expires, reset the counter and permit a new group of five failures.
 - Android biometric lockout events also start the app's 30-second cooldown.
 - Cancellation is not a failure and never disarms the alarm.
