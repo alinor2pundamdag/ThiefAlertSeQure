@@ -531,6 +531,22 @@ class MainActivity : FragmentActivity() {
         }.onFailure { openAppSettings() }
     }
 
+    private fun androidVersionGuide(): String {
+        val route = when (Build.VERSION.SDK_INT) {
+            26, 27 -> "Android 8.x: App info is usually Settings → Apps & notifications → App info → ThiefAlertSeQure. Battery optimization is under Settings → Battery."
+            28 -> "Android 9: App info → Battery; optimization allowlist is usually Apps & notifications → Special app access → Battery optimization."
+            29 -> "Android 10: Settings → Apps → ThiefAlertSeQure → Battery; Special app access contains Battery optimization."
+            30 -> "Android 11: App info → Battery; review Unrestricted and Background restriction if present."
+            31, 32 -> "Android 12/12L: Settings → Apps → ThiefAlertSeQure → App battery usage. Exact alarms are under Apps → Special app access → Alarms & reminders."
+            33 -> "Android 13: App info → Notifications and Battery. Notification permission is runtime-controlled."
+            34 -> "Android 14: Apps → Special app access → Full-screen notifications; review app Notifications and Battery."
+            35 -> "Android 15: Apps → Special app access → Full-screen notifications / Alarms & reminders; review App info → Battery and Notifications."
+            36 -> "Android 16: Use Apps → Special app access and App info → Battery / Notifications; exact labels can vary by system update."
+            else -> "Use Settings search for ThiefAlertSeQure, Battery, Notifications, Alarms & reminders, and Full-screen notifications."
+        }
+        return "Detected Android API " + Build.VERSION.SDK_INT + " (" + Build.VERSION.RELEASE + ").\n$route\nOEM menu labels may differ; use Settings search if needed."
+    }
+
     private fun systemSettingRow(
         title: String,
         tutorialTitle: String,
@@ -556,7 +572,7 @@ class MainActivity : FragmentActivity() {
             setOnClickListener {
                 MaterialAlertDialogBuilder(this@MainActivity)
                     .setTitle(tutorialTitle + " • Android " + Build.VERSION.SDK_INT)
-                    .setMessage("Android API " + Build.VERSION.SDK_INT + " (" + Build.VERSION.RELEASE + "). Manufacturer settings may differ.\n\n" + tutorial)
+                    .setMessage(androidVersionGuide() + "\n\n" + tutorial)
                     .setPositiveButton("Got it", null)
                     .show()
             }
