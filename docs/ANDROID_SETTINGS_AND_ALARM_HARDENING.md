@@ -1,0 +1,73 @@
+# Android settings and alarm hardening
+
+Date: 2026-11-06
+
+## Scope
+
+The app supports Android 8.0 / API 26 and newer. The dashboard and Settings screen detect the running OS using `Build.VERSION.SDK_INT` and show an OS/API-specific navigation hint in each system-setting tutorial dialog.
+
+## System-setting entries
+
+Each system-setting action has a separate `i` tutorial card. The user-facing routes include:
+
+- App notification settings and the anti-theft alarm notification channel.
+- Android 13+ notification runtime permission.
+- Android 12+ exact-alarm / Alarms & reminders access.
+- App info, permissions, battery use, and background restrictions.
+- Battery-optimization exemption request.
+- Do Not Disturb / alarm interruption settings.
+- Android 14+ full-screen intent access.
+- Secure screen-lock settings.
+- Explicit Device Administrator enrollment for `lockNow()`.
+- Alarm volume and sound settings.
+- HONOR / MagicOS App launch, secondary launch, background execution, and Recent-app lock guidance.
+
+System setting actions use public Android Settings actions where available. OEM-only pages are not deep-linked through undocumented component names; the user is sent to Settings and given vendor-specific instructions instead.
+
+## Charger-event reliability
+
+- Power receiver work is serialized on a single-thread executor so connect/disconnect tasks do not race on independent worker threads.
+- A CONNECTED event is accepted only when the live external-power state is positively confirmed as connected.
+- Disconnected or unknown live state does not overwrite the persisted baseline or re-arm protection.
+- A unit test covers true / false / unknown acceptance policy.
+- Existing disconnect debounce, generation checks, countdown, reboot recovery, and alarm deadline validation are preserved.
+
+## Alarm volume behavior
+
+- The existing controller stores the pre-alarm alarm-stream volume and raises it to the stream maximum when the alarm starts.
+- While `ALARM_TRIGGERED` remains latched, AlarmService reasserts the maximum alarm-stream volume every 500 ms.
+- The saved volume is restored only after the protection state has left `ALARM_TRIGGERED` (the authenticated disarm path).
+- This is best-effort enforcement, not a hardware volume-key lock. Android/OEM policy, fixed-volume devices, routing, external devices, or privileged system behavior can still limit the result.
+
+## Lock-screen behavior
+
+- MainActivity already uses `showWhenLocked` and `turnScreenOn`; the alarm notification requests a full-screen intent.
+- Android 14+ full-screen intent access is exposed through the matching system settings page when available.
+- Device Administrator enrollment is optional and user-approved; when active and the device has a secure credential, AlarmService can call `DevicePolicyManager.lockNow()`.
+- The app does not repeatedly re-lock while the owner is authenticating. It cannot guarantee persistent screen wake, bypass Keyguard, or prevent hardware/firmware shutdown.
+
+## Permission and distribution policy
+
+The manifest declares the permissions needed by the implemented functions, including notifications, exact alarms, full-screen intents, wake lock, audio settings, foreground services, boot recovery, and the battery-optimization exemption request.
+
+`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` is a special user-facing exemption request. Android documentation warns that most apps should not request it; the app must justify it as essential anti-theft background functionality and must pass any distribution-store policy review. Full-screen intent access is also subject to Android 14+ eligibility and user/system controls.
+
+## Integration and verification status
+
+- Source branch: `feat/custom-audio-and-reliability`.
+- Latest source commit at document creation: see Git history / PR #2.
+- PR #1 was closed because it pointed to the stale `feat/local-anti-theft-core` branch; no branch or commit was deleted.
+- Draft PR #2 tracks the current source branch.
+- `main` and the source branch are diverged; GitHub reported 4 commits unique to `main` and the PR was not mergeable. Do not merge until those changes and conflicts are reviewed.
+- No successful CI result has yet been verified for the current head. A blank combined-status response is not a passing build.
+- No physical-device acceptance test has been performed. Required checks include plug/unplug timing, rapid reconnect, alarm volume-key behavior, lock-screen/full-screen presentation, Android 8–16 settings routes, OEM background restrictions, reboot recovery, and Device Administrator enrollment/rollback.
+
+## Acceptance criteria
+
+1. A genuine confirmed unplug starts exactly one 10-second countdown.
+2. Reconnection cancels the countdown; unknown charger state never starts or completes one.
+3. A stale connect event cannot re-arm the app while live external power is disconnected.
+4. Alarm remains latched until Android owner authentication succeeds.
+5. Alarm stream is repeatedly driven toward maximum while latched; original volume is restored after authenticated disarm.
+6. Every system-setting entry has an `i` tutorial, and each destination is guarded with an Android-supported fallback.
+7. CI passes on the current PR head and physical-device checks are recorded before release.
