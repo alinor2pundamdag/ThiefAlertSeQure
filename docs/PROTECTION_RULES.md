@@ -1,3 +1,11 @@
+<div align="right">
+  <a href="../README.md"><img src="../ThiefAlertSeQureIcon.jpg" alt="ThiefAlertSeQure icon" width="64" /></a>
+</div>
+
+[← Back to ThiefAlertSeQure overview](../README.md)
+
+---
+
 # Protection Rules, State Machine and Operational Policies
 
 ## 1. Authoritative state
