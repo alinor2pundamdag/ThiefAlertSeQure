@@ -232,6 +232,10 @@ class MainActivity : FragmentActivity() {
         root.addView(space(8))
         root.addView(outlinedButton("Review battery and background settings") { openAppSettings() }, matchWrap())
         root.addView(space(8))
+        root.addView(outlinedButton("Open settings & local event history") {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }, matchWrap())
+        root.addView(space(8))
         root.addView(textButton("Refresh protection status") { reconcileCharging(); render() }, matchWrap())
         root.addView(space(18))
         root.addView(label(
