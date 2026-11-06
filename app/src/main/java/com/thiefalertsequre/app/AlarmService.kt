@@ -21,6 +21,7 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 
 class AlarmService : Service() {
     private var player: MediaPlayer? = null
