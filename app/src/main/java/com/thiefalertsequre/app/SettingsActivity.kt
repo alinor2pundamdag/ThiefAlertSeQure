@@ -83,7 +83,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(8))
         val historyText = LocalTamperHistory.read(this, 20).ifEmpty {
             listOf("No recorded protection events yet.")
-        }.joinToString("\\n")
+        }.joinToString("\n")
         root.addView(text(historyText, 12f, R.color.tas_text))
         root.addView(space(8))
         root.addView(action("Clear local event history") {
