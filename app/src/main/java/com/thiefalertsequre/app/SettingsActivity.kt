@@ -107,6 +107,8 @@ class SettingsActivity : FragmentActivity() {
             "Android 14 (API 34)+ restricts full-screen intent access. Open the system page and allow full-screen notifications for ThiefAlertSeQure if the option is available. Android 8–13 do not expose this special access page. Even when granted, Android may choose a heads-up notification instead of launching over the lock screen.") { openFullScreenIntentSettings() }
         addSystemSettingAction("Secure lock screen settings", "Secure device lock",
             "Set a PIN, pattern, or password in Android Security settings. ThiefAlertSeQure can request the keyguard through the optional active Device Administrator, but it cannot create or read your credential. Keep a secure screen lock configured for owner authentication.") { open(Intent(Settings.ACTION_SECURITY_SETTINGS)) }
+        addSystemSettingAction("Enable automatic alarm screen lock", "Device Administrator",
+            "This opens Android's explicit Device Administrator consent screen. Activate ThiefAlertSeQure only if you want it to call lockNow() when the theft alarm starts. Android may show a warning because the app can lock the screen. You can deactivate it later in Android Security settings. This is not Device Owner enrollment and does not provide kiosk-level control.") { requestDeviceAdministrator() }
         addSystemSettingAction("Alarm volume and sound settings", "Alarm volume",
             "Set the device alarm stream to an audible level and review silent/DND policies. During an active theft alarm, the app saves the previous alarm volume and repeatedly requests the maximum alarm-stream level. Android/OEM policy, fixed-volume hardware, Bluetooth routing, and external audio devices can still limit output.") { open(Intent(Settings.ACTION_SOUND_SETTINGS)) }
         root.addView(space(22))
@@ -517,6 +519,15 @@ class SettingsActivity : FragmentActivity() {
             open(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                 .putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
         }
+    }
+
+    private fun requestDeviceAdministrator() {
+        val component = android.content.ComponentName(this, ThiefAlertAdminReceiver::class.java)
+        val intent = Intent(android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
+            .putExtra(android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN, component)
+            .putExtra(android.app.admin.DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                "Allow ThiefAlertSeQure to lock the screen when its anti-theft alarm is triggered.")
+        open(intent, Intent(Settings.ACTION_SECURITY_SETTINGS))
     }
 
     private fun showRecentAppsTutorial() {
