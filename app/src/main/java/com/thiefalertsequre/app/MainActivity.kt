@@ -252,9 +252,10 @@ class MainActivity : FragmentActivity() {
             "Android 12 (API 31)+ requires special Alarms & reminders access for exact scheduling. Allow ThiefAlertSeQure if listed. Android 8–11 has no separate exact-alarm access page; timing uses the platform's available alarm behavior.") { requestExactAlarmAccess() }, matchWrap())
         if (Build.VERSION.SDK_INT >= 34) {
             root.addView(space(8))
-            fullScreenAccessButton = outlinedButton("Allow full-screen alarm and authentication") { requestFullScreenIntentAccess() }
-            root.addView(systemSettingRow("Allow full-screen alarm and authentication", "Full-screen intent",
-                "Android 14 (API 34)+ controls full-screen intent access separately. Allow it if Android offers the option. Android may still display a heads-up notification instead of launching full-screen, and app eligibility can be restricted by system/store policy.") { requestFullScreenIntentAccess() }, matchWrap())
+            val fullScreenRow = systemSettingRow("Allow full-screen alarm and authentication", "Full-screen intent",
+                "Android 14 (API 34)+ controls full-screen intent access separately. Allow it if Android offers the option. Android may still display a heads-up notification instead of launching full-screen, and app eligibility can be restricted by system/store policy.") { requestFullScreenIntentAccess() }
+            fullScreenAccessButton = fullScreenRow.getChildAt(0) as? MaterialButton
+            root.addView(fullScreenRow, matchWrap())
         }
         root.addView(space(8))
         root.addView(systemSettingRow("Open alarm notification settings", "Alarm notifications",
