@@ -13,6 +13,9 @@ object ExternalPowerState {
     fun isConnected(context: Context): Boolean {
         val batteryStatus = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         val plugged = batteryStatus?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
-        return plugged != 0
+        return isConnected(plugged)
     }
+
+    /** Pure mapping kept separate so plugged-state semantics can be unit tested. */
+    fun isConnected(pluggedState: Int): Boolean = pluggedState != 0
 }
