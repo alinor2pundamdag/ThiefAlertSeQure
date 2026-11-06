@@ -40,6 +40,7 @@ It is a practical deterrent and awareness tool—not a guarantee against theft, 
 | Automatic arming | Connecting the charger arms protection automatically. |
 | Reconnect grace period | Reconnect within 10 seconds to cancel the pending alarm. |
 | Authentication to disarm | A triggered alarm is cleared only after successful Android device-credential or supported strong-biometric verification. |
+| Lock-screen unlock recovery | While the alarm service is active, Android keyguard dismissal on a secured device runs the same alarm-stop and charger-recovery flow; Android does not expose the exact unlock method to ordinary apps. |
 | Persistent triggered state | Plugging the charger back in does not silence an already-triggered alarm. |
 | Local-first privacy | No account, cloud backend, analytics service, advertising SDK, or Internet permission is configured. |
 | Your own alarm sound | Choose supported audio through Android's system file picker; the packaged alarm is available as the built-in option. |
