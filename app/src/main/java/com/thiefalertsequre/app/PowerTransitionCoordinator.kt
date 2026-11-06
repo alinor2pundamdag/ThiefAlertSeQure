@@ -165,16 +165,16 @@ object PowerTransitionCoordinator {
         val appContext = context.applicationContext
         // Delayed/reordered broadcasts must not let stale CONNECTED re-arm
         // protection after the cable has already been removed.
-        when (ExternalPowerState.readConnected(appContext)) {
-            true -> confirmConnectedAndArmLocked(appContext, "Power-connected event confirmed by live external-power state")
-            false -> {
+        val liveConnected = ExternalPowerState.readConnected(appContext)
+        if (acceptsPowerConnectedEvent(liveConnected)) {
+            confirmConnectedAndArmLocked(appContext, "Power-connected event confirmed by live external-power state")
+        } else {
+            if (liveConnected == false) {
                 LocalTamperHistory.record(appContext, "stale_power_connected_rejected", "Connect broadcast rejected because live external power is disconnected")
-                ProtectionStore(appContext).read()
-            }
-            null -> {
+            } else {
                 LocalTamperHistory.record(appContext, "power_connected_unconfirmed", "Connect broadcast deferred because live external power state is unknown")
-                ProtectionStore(appContext).read()
             }
+            ProtectionStore(appContext).read()
         }
     }
 
