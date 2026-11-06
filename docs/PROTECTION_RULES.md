@@ -68,7 +68,7 @@ No other event may clear ALARM_TRIGGERED.
 - During cooldown, do not start another biometric prompt from this app; the verified Android device credential remains an allowed owner-recovery path.
 - After cooldown expires, reset the counter and permit a new group of five failures.
 - Android biometric lockout events also start the app's 30-second cooldown.
-- Cancellation is not a failure and never disarms the alarm.
+- Cancellation is not a failure and never disarms the alarm.\n- While the alarm foreground service is active, register a dynamic receiver for the system-only `ACTION_USER_PRESENT` event. Require `KeyguardManager.isDeviceSecure == true` and `isKeyguardLocked == false`, then use the same owner-authentication coordinator as in-app biometric/device-credential callbacks.\n- Android reports keyguard dismissal, not the exact authentication modality. This can also follow OEM trusted-unlock flows; ordinary apps cannot obtain a universal PIN/fingerprint proof callback for authentication performed outside their own prompt. Do not collect credentials to work around this platform boundary.
 
 ## 5. Alarm audio policy
 
@@ -76,7 +76,7 @@ No other event may clear ALARM_TRIGGERED.
 - If selected and packaged audio both fail, use a repeating vibration fallback; there is no ToneGenerator fallback in the current implementation.
 - Use USAGE_ALARM and request the maximum alarm-stream index reported by Android.
 - Save the prior alarm-stream volume once, before raising it.
-- Restore the prior volume only after verified disarm. Do not restore it if the service is destroyed while ALARM_TRIGGERED remains latched.
+- Restore the prior volume only after owner authentication changes the persisted state out of ALARM_TRIGGERED. Do not restore it if the service is destroyed while ALARM_TRIGGERED remains latched.\n- While the alarm foreground service is active, reassert the reported maximum alarm-stream volume every 500 ms. This counters volume-down attempts where Android/OEM policy allows app volume control; it does not intercept or disable the physical keys.
 - Do not claim 105% volume, hardware volume-key interception, or guaranteed sound output.
 - Do not silently modify global DND settings. The user configures alarm exceptions in Android settings.
 
@@ -112,9 +112,9 @@ A release candidate is acceptable only when:
 4. The original icon and app label are exact.
 5. Charger state transitions and deadline are tested physically.
 6. The original Opus audio decodes, loops and restores volume.
-7. PIN, pattern, password and supported strong biometrics are tested.
-8. Five-failure cooldown and repeat cycle are tested.
-9. Cancel and failed authentication never clear the alarm.
-10. Android 15+ reboot recovery is tested after first unlock with exact-alarm access granted and denied; pre-unlock Direct Boot protection is not provided.
-11. DND, notification denial, OEM battery controls and process death are tested.
-12. Device Owner mode is tested only on a prepared, backed-up test device, including the in-app rollback.
+7. PIN, pattern, password and supported strong biometrics are tested inside the app and directly from the device lock screen.\n8. A secure lock-screen unlock stops the alarm, removes its ongoing notification, restores the previous alarm volume, and restarts monitoring with the correct charger baseline.
+9. Five-failure cooldown and repeat cycle are tested.
+10. Cancel and failed authentication never clear the alarm.
+11. Android 15+ reboot recovery is tested after first unlock with exact-alarm access granted and denied; pre-unlock Direct Boot protection is not provided.
+12. DND, notification denial, OEM battery controls and process death are tested.
+13. Device Owner mode is tested only on a prepared, backed-up test device, including the in-app rollback.
