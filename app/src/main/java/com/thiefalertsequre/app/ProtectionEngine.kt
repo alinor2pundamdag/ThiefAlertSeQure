@@ -140,6 +140,16 @@ object ProtectionEngine {
         ProtectionMode.DISARMED -> if (isCharging) chargerConnected(s, nowEpochMs) else s
     }
 
+    /** Accept a system keyguard-dismissal event only for a latched alarm and a secured, unlocked device. */
+    fun canAcceptSystemUnlock(
+        state: ProtectionState,
+        deviceHasSecureCredential: Boolean,
+        keyguardStillLocked: Boolean
+    ): Boolean =
+        state.mode == ProtectionMode.ALARM_TRIGGERED &&
+            deviceHasSecureCredential &&
+            !keyguardStillLocked
+
     fun authenticated(s: ProtectionState, now: Long): ProtectionState =
         if (s.mode == ProtectionMode.ALARM_TRIGGERED)
             ProtectionState(ProtectionMode.DISARMED, 0L, now, 0L, -1) else s
