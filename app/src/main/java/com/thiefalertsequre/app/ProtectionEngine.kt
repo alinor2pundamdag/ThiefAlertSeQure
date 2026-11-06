@@ -96,6 +96,15 @@ object ProtectionEngine {
         ProtectionMode.DISARMED -> if (isCharging) chargerConnected(s, nowEpochMs) else s
     }
 
+    fun canAcceptSystemUnlock(
+        state: ProtectionState,
+        deviceHasSecureCredential: Boolean,
+        keyguardStillLocked: Boolean
+    ): Boolean =
+        state.mode == ProtectionMode.ALARM_TRIGGERED &&
+            deviceHasSecureCredential &&
+            !keyguardStillLocked
+
     fun authenticated(
         s: ProtectionState,
         now: Long,
