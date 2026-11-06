@@ -873,37 +873,16 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun completeOwnerAuthentication() {
-        val store = ProtectionStore(this)
-        val authenticated = store.update { ProtectionEngine.authenticated(it, System.currentTimeMillis()) }
-        if (authenticated.mode == ProtectionMode.DISARMED) {
+        val next = OwnerAuthenticationCoordinator.complete(this, "in_app_authentication")
+        if (next != null) {
             autoAuthenticationRequested = false
-            store.resetAuthenticationFailures()
-            AlarmScheduler.cancel(this)
-            stopService(Intent(this, AlarmService::class.java))
-            runCatching { AlarmVolumeController.restore(this, getSystemService(android.media.AudioManager::class.java)) }
-
-            // If the owner reconnected power before authenticating, preserve the
-            // required next-cycle behavior: authentication stops the alarm, then
-            // the confirmed connected state arms protection for the next unplug.
-            val monitorEnabled = getSharedPreferences(
-                ProtectionMonitorService.PREFS, MODE_PRIVATE
-            ).getBoolean(
-                ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
-            )
-            val next = if (monitorEnabled) {
-                PowerTransitionCoordinator.resetBaselineToCurrentPower(
-                    this, "Owner authentication completed; current charger state re-baselined"
-                )
-                store.read()
-            } else authenticated
             details.text = if (next.mode == ProtectionMode.ARMED) {
                 "Owner authenticated. Alarm stopped. Protection re-armed because the charger is connected."
             } else {
                 "Owner authenticated. Alarm stopped. Protection remains disarmed until the charger is reconnected."
             }
-            syncProtectionMonitor(next)
         } else {
-            syncProtectionMonitor(authenticated)
+            syncProtectionMonitor(ProtectionStore(this).read())
         }
         render()
     }
