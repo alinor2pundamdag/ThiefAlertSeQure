@@ -554,16 +554,13 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun completeOwnerAuthentication() {
-        val store = ProtectionStore(this)
-        val next = store.update {
-            ProtectionEngine.authenticated(it, System.currentTimeMillis(), ExternalPowerState.isConnected(this))
-        }
-        if (next.mode == ProtectionMode.DISARMED) {
-            store.resetAuthenticationFailures()
-            AlarmScheduler.cancel(this)
-            stopService(Intent(this, AlarmService::class.java))
-            runCatching { AlarmVolumeController.restore(this, getSystemService(android.media.AudioManager::class.java)) }
-            details.text = "Owner authenticated. Alarm stopped."
+        val next = OwnerAuthenticationCoordinator.complete(this, "in_app_authentication")
+        if (next != null) {
+            details.text = if (next.mode == ProtectionMode.ARMED) {
+                "Owner authenticated. Alarm stopped and protection re-armed because the charger is connected."
+            } else {
+                "Owner authenticated. Alarm stopped."
+            }
         }
         render()
     }
