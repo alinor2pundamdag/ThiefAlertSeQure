@@ -8,6 +8,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.IntentFilter
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -29,6 +30,8 @@ class AlarmService : Service() {
     private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { }
     private val channelId = CHANNEL_ID
     private val volumeHandler = Handler(Looper.getMainLooper())
+    private val userPresentReceiver = UserPresentReceiver()
+    private var userPresentReceiverRegistered = false
     private val volumeEnforcement = object : Runnable {
         override fun run() {
             if (ProtectionStore(this@AlarmService).read().mode != ProtectionMode.ALARM_TRIGGERED) return
@@ -39,6 +42,22 @@ class AlarmService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        // Keep the system keyguard-dismissal listener alive for the entire alarm
+        // foreground-service lifetime. Android 8+ restricts most manifest receivers.
+        runCatching {
+            ContextCompat.registerReceiver(
+                this,
+                userPresentReceiver,
+                IntentFilter(Intent.ACTION_USER_PRESENT),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            userPresentReceiverRegistered = true
+        }.onFailure {
+            LocalTamperHistory.record(
+                this, "keyguard_unlock_receiver_register_failed",
+                it.javaClass.simpleName + ": " + it.message
+            )
+        }
         val nm = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) {
             nm.createNotificationChannel(
@@ -241,6 +260,10 @@ class AlarmService : Service() {
 
     override fun onDestroy() {
         volumeHandler.removeCallbacks(volumeEnforcement)
+        if (userPresentReceiverRegistered) {
+            runCatching { unregisterReceiver(userPresentReceiver) }
+            userPresentReceiverRegistered = false
+        }
         stopAlarm()
         super.onDestroy()
     }
