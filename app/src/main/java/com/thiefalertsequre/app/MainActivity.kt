@@ -560,7 +560,11 @@ class MainActivity : FragmentActivity() {
             36 -> "Android 16: Use Apps → Special app access and App info → Battery / Notifications; exact labels can vary by system update."
             else -> "Use Settings search for ThiefAlertSeQure, Battery, Notifications, Alarms & reminders, and Full-screen notifications."
         }
-        return "Detected Android API " + Build.VERSION.SDK_INT + " (" + Build.VERSION.RELEASE + ").\n$route\nOEM menu labels may differ; use Settings search if needed."
+        val device = AndroidDeviceCompatibility.deviceSummary(
+            Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.VERSION.RELEASE, Build.VERSION.SDK_INT
+        )
+        val oemGuide = AndroidDeviceCompatibility.backgroundSettingsGuide(Build.MANUFACTURER, Build.BRAND)
+        return "$device\n$route\n\n$oemGuide\n\nOEM menu labels may differ; use Settings search if needed."
     }
 
     private fun systemSettingRow(
