@@ -41,6 +41,8 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private var accelerometer: Sensor? = null
     private var sensorRegistered = false
     private var receiverRegistered = false
+    private var powerReceiverRegistered = false
+    private val powerTransitionReceiver = PowerTransitionReceiver()
     private var alertPlayer: MediaPlayer? = null
     private val prefs by lazy { getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
 
@@ -93,6 +95,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
 
         registerSystemReceiver()
+        registerPowerTransitionReceiver()
         PowerTransitionCoordinator.initializeBaseline(this)
         reconcileStablePowerState()
         syncMotionSensor()
@@ -108,6 +111,25 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
         ContextCompat.registerReceiver(this, systemReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         receiverRegistered = true
+    }
+
+    /**
+     * Power connected/disconnected are implicit broadcasts. Register them at runtime
+     * from this persistent foreground service; a manifest-only receiver is not
+     * reliable for apps targeting Android 8+.
+     */
+    private fun registerPowerTransitionReceiver() {
+        if (powerReceiverRegistered) return
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_POWER_CONNECTED)
+            addAction(Intent.ACTION_POWER_DISCONNECTED)
+        }
+        // These actions are protected system broadcasts; third-party apps cannot send them.
+        ContextCompat.registerReceiver(
+            this, powerTransitionReceiver, filter, ContextCompat.RECEIVER_EXPORTED
+        )
+        powerReceiverRegistered = true
+        LocalTamperHistory.record(this, "power_event_receiver_registered", "Runtime charger connect/disconnect receiver active")
     }
 
     private fun reconcileStablePowerState() {
@@ -449,6 +471,8 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         unregisterMotionSensor()
         if (receiverRegistered) runCatching { unregisterReceiver(systemReceiver) }
         receiverRegistered = false
+        if (powerReceiverRegistered) runCatching { unregisterReceiver(powerTransitionReceiver) }
+        powerReceiverRegistered = false
         releaseAlertPlayer()
         isRunning = false
         prefs.edit().putBoolean(KEY_RUNNING, false).apply()

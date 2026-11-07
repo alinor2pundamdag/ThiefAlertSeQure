@@ -14,8 +14,7 @@
     <application android:allowBackup="false" android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round" android:label="ThiefAlertSeQure"
         android:usesCleartextTraffic="false" android:theme="@style/Theme.ThiefAlertSeQure">
-        <activity android:name=".MainActivity" android:exported="true" android:showWhenLocked="true"
-            android:turnScreenOn="true" android:excludeFromRecents="false">
+        <activity android:name=".MainActivity" android:exported="true" android:excludeFromRecents="false">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -32,12 +31,6 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-            </intent-filter>
-        </receiver>
-        <receiver android:name=".PowerTransitionReceiver" android:enabled="true" android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
-                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
             </intent-filter>
         </receiver>
         <receiver android:name=".AlarmDeadlineReceiver" android:enabled="true" android:exported="false" />

@@ -104,6 +104,9 @@ class AlarmService : Service() {
             return START_NOT_STICKY
         }
         try {
+            // Promote immediately before locking the device; lockNow() may
+            // turn the display off and must not delay the FGS startup deadline.
+            startForeground(NOTIFICATION_ID, notification())
             val alarmStartedAt = ProtectionStore(this).read().changedAtEpochMs
             lockDeviceIfAdminEnabled(alarmStartedAt)
             if (!keyguardMonitorInitialized) {
@@ -115,8 +118,7 @@ class AlarmService : Service() {
             }
             volumeHandler.removeCallbacks(keyguardUnlockMonitor)
             volumeHandler.postDelayed(keyguardUnlockMonitor, KEYGUARD_POLL_INTERVAL_MS)
-            startForeground(NOTIFICATION_ID, notification())
-            LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active")
+            LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active; device-lock request issued")
         } catch (error: Exception) {
             LocalTamperHistory.record(this, "alarm_service_start_failed", error.javaClass.simpleName + ": " + error.message)
             AlarmRecoveryNotice.show(this, "Android refused to keep the alarm foreground service running")

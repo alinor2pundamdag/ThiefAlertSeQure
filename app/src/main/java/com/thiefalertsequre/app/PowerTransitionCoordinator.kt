@@ -161,20 +161,27 @@ object PowerTransitionCoordinator {
         )
     }
 
-    fun onPowerConnected(context: Context): ProtectionState = synchronized(lock) {
+    fun onPowerConnected(context: Context): ProtectionState {
         val appContext = context.applicationContext
-        // Delayed/reordered broadcasts must not let stale CONNECTED re-arm
-        // protection after the cable has already been removed.
-        val liveConnected = ExternalPowerState.readConnected(appContext)
-        if (acceptsPowerConnectedEvent(liveConnected)) {
-            confirmConnectedAndArmLocked(appContext, "Power-connected event confirmed by live external-power state")
-        } else {
-            if (liveConnected == false) {
-                LocalTamperHistory.record(appContext, "stale_power_connected_rejected", "Connect broadcast rejected because live external power is disconnected")
-            } else {
-                LocalTamperHistory.record(appContext, "power_connected_unconfirmed", "Connect broadcast deferred because live external power state is unknown")
-            }
-            ProtectionStore(appContext).read()
+        // The power event can arrive just before the sticky BATTERY_CHANGED
+        // snapshot is refreshed. Debounce instead of rejecting its first sample.
+        var consecutiveConnected = 0
+        var lastObserved: Boolean? = null
+        repeat(5) { index ->
+            val observed = ExternalPowerState.readConnected(appContext)
+            lastObserved = observed
+            consecutiveConnected = if (observed == true) consecutiveConnected + 1 else 0
+            if (index < 4) Thread.sleep(200L)
+        }
+        if (consecutiveConnected < 3 || ExternalPowerState.readConnected(appContext) != true) {
+            LocalTamperHistory.record(
+                appContext, "power_connected_unconfirmed",
+                "Connect event did not produce three consecutive connected samples; final=$lastObserved"
+            )
+            return ProtectionStore(appContext).read()
+        }
+        return synchronized(lock) {
+            confirmConnectedAndArmLocked(appContext, "Power-connected event confirmed by five stable live-state samples")
         }
     }
 
@@ -235,11 +242,9 @@ object PowerTransitionCoordinator {
                 )
                 return@synchronized null
             }
-            if (ExternalPowerState.readConnected(appContext) == true) {
-                confirmConnectedAndArmLocked(appContext, "Disconnect broadcast arrived while live snapshot still shows connected power")
-                LocalTamperHistory.record(appContext, "charger_unplug_rejected", "Live power snapshot still reports connected")
-                return@synchronized null
-            }
+            // Do not reject on the first live snapshot: some devices update
+            // ACTION_BATTERY_CHANGED just after ACTION_POWER_DISCONNECTED.
+            // The stable five-sample debounce below is authoritative.
             if (!prefs.getBoolean(CONNECTED, false)) {
                 LocalTamperHistory.record(
                     appContext, "charger_unplug_rejected",
