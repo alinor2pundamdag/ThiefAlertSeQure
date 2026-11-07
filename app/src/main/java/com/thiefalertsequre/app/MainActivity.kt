@@ -271,7 +271,7 @@ class MainActivity : FragmentActivity() {
             "Choose Unrestricted / Don't optimize for ThiefAlertSeQure where available. This reduces Doze restrictions but cannot prevent Force stop, uninstall, shutdown, or all OEM background limits.") { openBatteryOptimizationSettings() }, matchWrap())
         root.addView(space(8))
         root.addView(systemSettingRow("Review app battery and background settings", "App battery and background",
-            "Open ThiefAlertSeQure App info and review Battery / App battery usage. Choose Unrestricted or Allow background activity where offered. HONOR, Xiaomi, OPPO, vivo, Samsung and other OEMs may expose additional auto-start controls.") { openAppSettings() }, matchWrap())
+            AndroidDeviceCompatibility.backgroundSettingsGuide(Build.MANUFACTURER, Build.BRAND)) { openAppSettings() }, matchWrap())
         root.addView(space(8))
         root.addView(outlinedButton("Open sound, export and advanced settings") {
             startActivity(Intent(this, SettingsActivity::class.java))
@@ -331,7 +331,7 @@ class MainActivity : FragmentActivity() {
             putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, component)
             putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Allow ThiefAlertSeQure to lock the phone when its anti-theft alarm is triggered. Android still controls the PIN, pattern, password and biometric verification.")
         }
-        startActivity(request)
+        AndroidDeviceCompatibility.open(this, request, Intent(Settings.ACTION_SECURITY_SETTINGS))
     }
 
     private fun requestFullScreenIntentAccess() {
@@ -341,9 +341,11 @@ class MainActivity : FragmentActivity() {
             details.text = "Full-screen alarm access is already enabled."
             return
         }
-        runCatching {
-            startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:$packageName")))
-        }.onFailure { showError("Android could not open full-screen notification access: ${it.message}") }
+        AndroidDeviceCompatibility.open(
+            this,
+            Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:$packageName")),
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+        )
     }
 
     private fun launchAutomaticOwnerAuthenticationIfNeeded() {
@@ -513,16 +515,16 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun openDeviceSecuritySettings() {
-        runCatching { startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS)) }
-            .onFailure { showError("Android could not open device security settings: ${it.message}") }
+        AndroidDeviceCompatibility.open(this, Intent(Settings.ACTION_SECURITY_SETTINGS), Intent(Settings.ACTION_SETTINGS))
     }
 
     private fun openDndSettings() {
-        runCatching { startActivity(Intent(Settings.ACTION_ZEN_MODE_PRIORITY_SETTINGS)) }
-            .onFailure {
-                runCatching { startActivity(Intent(Settings.ACTION_SOUND_SETTINGS)) }
-                    .onFailure { showError("Open Settings > Sound & vibration > Do Not Disturb, then allow alarms for ThiefAlertSeQure where your device provides that control.") }
-            }
+        AndroidDeviceCompatibility.open(
+            this,
+            Intent(Settings.ACTION_ZEN_MODE_PRIORITY_SETTINGS),
+            Intent(Settings.ACTION_SOUND_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS)
+        )
     }
 
     private fun openBatteryOptimizationSettings() {
@@ -531,10 +533,12 @@ class MainActivity : FragmentActivity() {
             details.text = "Battery optimization is already unrestricted for ThiefAlertSeQure."
             return
         }
-        runCatching {
-            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                .setData(Uri.parse("package:$packageName")))
-        }.onFailure { openAppSettings() }
+        AndroidDeviceCompatibility.open(
+            this,
+            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                .setData(Uri.parse("package:$packageName")),
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+        )
     }
 
     private fun androidVersionGuide(): String {
@@ -589,9 +593,11 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun openAppSettings() {
-        runCatching {
-            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
-        }
+        AndroidDeviceCompatibility.open(
+            this,
+            AndroidDeviceCompatibility.appInfoIntent(packageName),
+            Intent(Settings.ACTION_SETTINGS)
+        )
     }
 
     private fun render() {
