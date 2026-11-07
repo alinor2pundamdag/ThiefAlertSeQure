@@ -43,9 +43,9 @@ The app's current build configuration is **minSdk 26, compileSdk 35, targetSdk 3
 The app detects the device's reported manufacturer and brand and selects matching instructions. These settings are user-controlled and are not automatically toggled by the app.
 
 ### Samsung One UI
-- Open App info → Battery → choose Unrestricted if available.
-- Review Battery → Background usage limits.
-- Add ThiefAlertSeQure to Never sleeping apps if that list exists on the installed One UI version.
+- Open Settings → Battery (or Battery and device care → Battery) → Background usage limits.
+- Add ThiefAlertSeQure to Never sleeping apps; do not put it in Sleeping or Deep sleeping apps.
+- Review App info → Battery for an Unrestricted option if the installed One UI version offers it.
 - Keep app notifications and the alarm channel enabled.
 
 ### HONOR MagicOS / Huawei EMUI
@@ -55,14 +55,14 @@ The app detects the device's reported manufacturer and brand and selects matchin
 - Also review battery optimization.
 
 ### Xiaomi / Redmi / POCO (MIUI / HyperOS)
-- App info → Battery saver → No restrictions, where offered.
-- Search Settings / Security for Autostart or Background autostart.
-- Allow ThiefAlertSeQure if the control exists on that model and region.
+- App info → Battery saver / Power → No restrictions, where offered.
+- Settings → Apps → Permissions → Background autostart (or Autostart) → allow ThiefAlertSeQure.
+- Lock the app in Recents if that option exists on the installed build.
 
 ### OPPO / realme / OnePlus
-- Review App battery management and allow background activity.
-- Search Settings for Auto launch, Startup manager, or App auto-launch.
-- ColorOS, realme UI, and OxygenOS can use different labels and availability.
+- OPPO / realme: review App battery management and allow foreground activity, background activity, and auto-launch where offered. Some releases put auto-launch under Phone Manager → Privacy Permissions → Auto-launch apps.
+- OnePlus / OxygenOS: search Settings → Apps → Auto launch.
+- Lock the app in Recents if the option exists. ColorOS, realme UI, and OxygenOS labels vary.
 
 ### vivo / iQOO
 - Review Background power consumption management.
@@ -95,6 +95,22 @@ Version-specific examples:
 - Battery optimization exemption: API 23+; check `PowerManager.isIgnoringBatteryOptimizations()`. Android advises most apps not to request exemption unless the use case genuinely requires it.
 - Do Not Disturb: use the public priority-settings action, then Sound settings, then general Settings. The app does not silently change DND policy.
 - Device credential: use Android Keyguard; never collect the PIN, pattern, password, or biometric template.
+
+## Official manufacturer references
+
+These vendor support pages confirm the kinds of background controls described above. They are examples, not a guarantee that every model exposes the same labels:
+
+- [Samsung: Galaxy Battery optimization](https://www.samsung.com/us/support/galaxy-battery/optimization/) — Background usage limits and Never sleeping apps.
+- [Samsung Developer: Application Management](https://developer.samsung.com/mobile/app-management.html) — Samsung documents sleeping/deep-sleeping restrictions and the Never sleeping apps exception.
+- [HONOR: Apps launch slowly / allow background running](https://www.honor.com/sa-en/support/content/en-us00406923/) — App launch, Manage automatically, Auto-launch, Secondary launch, and Run in background.
+- [Xiaomi: Background autostart on Xiaomi 14T Pro](https://www.mi.com/ph/support/faq/details/KA-507611/) — Settings → Apps → Permissions → Background autostart.
+- [Xiaomi: Background autostart on Redmi 13C](https://www.mi.com/global/support/faq/details/KA-497677/) — confirms the same control on another product family.
+- [Xiaomi: Background permissions and no restrictions](https://www.mi.com/global/support/faq/details/KA-694585/) — no restrictions, app autostart, and locking in Recents.
+- [OPPO: Battery usage by app](https://support.oppo.com/en/answer/?aid=2171043) — ColorOS app battery usage and background activity.
+- [realme: Troubleshooting and notification/background permissions](https://www.realme.com/global/support/troubleshooting) — foreground/background activity, auto-launch, and Startup Manager.
+- [OnePlus: OxygenOS 14 User Manual](https://service.oneplus.com/content/dam/support/user-manuals/common/OxygenOS_14.0_User_Manual.pdf) — Settings → Apps → Auto launch.
+
+vivo's support site lists a dedicated “Background app power consumption management” FAQ, but exact instructions depend on the device and Funtouch OS / OriginOS version. The app therefore directs users to Settings search rather than claiming a single universal path.
 
 ## Core protection architecture
 
