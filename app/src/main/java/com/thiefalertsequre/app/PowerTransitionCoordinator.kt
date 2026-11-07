@@ -227,7 +227,12 @@ object PowerTransitionCoordinator {
      * Sampling happens outside the coordinator lock. A generation token ensures
      * a concurrent connect event invalidates this candidate before it can commit.
      */
-    fun onPowerDisconnected(context: Context): ProtectionState {
+    fun onPowerDisconnected(
+        context: Context,
+        eventEpochMs: Long = System.currentTimeMillis(),
+        eventElapsedRealtimeMs: Long = ProtectionClock.elapsedRealtime(),
+        eventBootCount: Int = ProtectionClock.bootCount(context)
+    ): ProtectionState {
         val appContext = context.applicationContext
         val candidateGeneration = synchronized(lock) {
             val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -323,7 +328,7 @@ object PowerTransitionCoordinator {
 
             val next = store.update { old ->
                 if (old.mode == ProtectionMode.ARMED) ProtectionEngine.chargerDisconnected(
-                    old, System.currentTimeMillis(), ProtectionClock.elapsedRealtime(), ProtectionClock.bootCount(appContext)
+                    old, eventEpochMs, eventElapsedRealtimeMs, eventBootCount
                 ) else old
             }
             if (next.mode == ProtectionMode.COUNTDOWN) {
