@@ -97,6 +97,29 @@ class SettingsActivity : FragmentActivity() {
         addSystemSettingAction("Lock app in Recent apps — instructions", "Recent-app lock", "Open Recents, find ThiefAlertSeQure, then use the app-card menu or manufacturer-specific swipe gesture to choose Lock / Keep open if available. This is an OEM convenience feature, not a security guarantee.") { showRecentAppsTutorial() }
         root.addView(space(22))
 
+        root.addView(text("ALARM PRESENTATION", 11f, R.color.tas_primary, true))
+        root.addView(space(8))
+        root.addView(text(
+            "Choose whether ThiefAlertSeQure may show its own alarm dashboard over the Android lock screen and wake the display. OFF keeps the native Android lock screen in front; the alarm service, sound, countdown, and device lock continue independently.",
+            13f, R.color.tas_muted
+        ))
+        val alarmDisplayPrefs = getSharedPreferences(MainActivity.ALARM_DISPLAY_PREFS, MODE_PRIVATE)
+        val showAlarmScreenOverLockScreen = alarmDisplayPrefs.getBoolean(
+            MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false
+        )
+        root.addView(action(
+            "Full-screen app alarm dashboard: ${if (showAlarmScreenOverLockScreen) "ON" else "OFF"}"
+        ) {
+            val enabled = !alarmDisplayPrefs.getBoolean(
+                MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false
+            )
+            alarmDisplayPrefs.edit()
+                .putBoolean(MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, enabled)
+                .apply()
+            render()
+        })
+        root.addView(space(22))
+
         root.addView(text("SYSTEM ACCESS & PERMISSIONS", 11f, R.color.tas_primary, true))
         root.addView(space(10))
         addSystemSettingAction("Grant notifications permission", "Notifications", "Android 13 (API 33)+ asks for notification permission at runtime. If denied, open App info → Notifications and enable it. Android 8–12 uses per-app notification controls without this runtime prompt. Verify the Anti-theft alarm channel is enabled and allowed to appear on the lock screen.") { requestNotifications() }
@@ -105,8 +128,8 @@ class SettingsActivity : FragmentActivity() {
         addSystemSettingAction("App notification channels and settings", "App notifications", "This opens ThiefAlertSeQure's own notification settings. Enable app notifications and the Anti-theft alarm channel. Android 8+ uses channels; Android 13+ also requires app-level notification permission.") { open(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)) }
         addSystemSettingAction("Battery and background restrictions", "Background activity", "Review ThiefAlertSeQure battery usage and select Unrestricted / Allow background activity where available. Android 8+ applies background execution limits; Android 9+ adds stricter standby behavior; Android 12+ exposes additional battery controls; Android 13–15 may apply OEM restrictions. Keep the persistent protection notification enabled. No setting overrides Force stop.") { openBatterySettings() }
         addSystemSettingAction("Do Not Disturb settings", "Do Not Disturb", "Review DND mode, schedules, and permitted alarm interruptions. The alarm uses Android alarm audio usage, but DND policy, silent mode, and OEM behavior can still affect audible output. Allow alarms during DND if you require alarm audio to remain audible.") { openDndSettings() }
-        addSystemSettingAction("Full-screen alarm display permission", "Full-screen alarm display",
-            "Android 14 (API 34)+ restricts full-screen intent access. Open the system page and allow full-screen notifications for ThiefAlertSeQure if the option is available. Android 8–13 do not expose this special access page. Even when granted, Android may choose a heads-up notification instead of launching over the lock screen.") { openFullScreenIntentSettings() }
+        addSystemSettingAction("Android full-screen intent access (system permission)", "Full-screen intent permission",
+            "This is Android's separate system permission for notifications that use a full-screen PendingIntent. It does not control the app-dashboard-over-lock-screen switch above. ThiefAlertSeQure's alarm notification does not need this permission for its normal sound, countdown, or native device lock.") { openFullScreenIntentSettings() }
         addSystemSettingAction("Secure lock screen settings", "Secure device lock",
             "Set a PIN, pattern, or password in Android Security settings. ThiefAlertSeQure can request the keyguard through the optional active Device Administrator, but it cannot create or read your credential. Keep a secure screen lock configured for owner authentication.") { open(Intent(Settings.ACTION_SECURITY_SETTINGS)) }
         addSystemSettingAction("Enable automatic alarm screen lock", "Device Administrator",

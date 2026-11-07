@@ -61,16 +61,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (Build.VERSION.SDK_INT >= 27) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-        } else {
-            @Suppress("DEPRECATION")
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-            )
-        }
+        applyAlarmWindowPolicy()
 
         if (!getSharedPreferences("privacy_notice_v1", MODE_PRIVATE).contains("decision")) {
             showPrivacyScreen()
@@ -301,6 +292,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        applyAlarmWindowPolicy()
         reconcileCharging()
         ManagedProtectionController.startIfConfigured(this)
         if (!::status.isInitialized) return
@@ -319,6 +311,20 @@ class MainActivity : FragmentActivity() {
     override fun onPause() {
         if (::status.isInitialized) status.removeCallbacks(ticker)
         super.onPause()
+    }
+
+    private fun applyAlarmWindowPolicy() {
+        val showOverLockScreen = getSharedPreferences(ALARM_DISPLAY_PREFS, MODE_PRIVATE)
+            .getBoolean(KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
+        if (Build.VERSION.SDK_INT >= 27) {
+            setShowWhenLocked(showOverLockScreen)
+            setTurnScreenOn(showOverLockScreen)
+        } else {
+            @Suppress("DEPRECATION")
+            val flags = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            if (showOverLockScreen) window.addFlags(flags) else window.clearFlags(flags)
+        }
     }
 
     private fun requestDeviceAdministrator() {
@@ -967,6 +973,8 @@ class MainActivity : FragmentActivity() {
     }
 
     companion object {
+        const val ALARM_DISPLAY_PREFS = "alarm_display_settings_v1"
+        const val KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN = "show_alarm_screen_over_lockscreen"
         private const val REQUEST_DEVICE_CREDENTIAL = 4102
     }
 }
