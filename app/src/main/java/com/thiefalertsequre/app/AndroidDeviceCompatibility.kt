@@ -5,6 +5,9 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
+import android.view.View
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 /**
  * OEM-aware guidance and resilient navigation for Android Settings.
@@ -48,6 +51,31 @@ object AndroidDeviceCompatibility {
     fun deviceSummary(manufacturer: String, brand: String, model: String, release: String, sdk: Int): String {
         val device = listOf(manufacturer, model).filter { it.isNotBlank() }.distinct().joinToString(" ")
         return "${familyLabel(manufacturer, brand)} • ${device.ifBlank { "Android device" }} • Android ${release.ifBlank { "unknown" }} (API $sdk)"
+    }
+
+    /**
+     * Android 15 enforces edge-to-edge for apps targeting API 35. Apply system-bar
+     * and cutout insets to the outer scroll container so controls remain reachable
+     * on gesture navigation, three-button navigation, and display cutouts.
+     */
+    fun applySystemBarInsets(view: View) {
+        val baseLeft = view.paddingLeft
+        val baseTop = view.paddingTop
+        val baseRight = view.paddingRight
+        val baseBottom = view.paddingBottom
+        ViewCompat.setOnApplyWindowInsetsListener(view) { target, windowInsets ->
+            val insets = windowInsets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            target.setPadding(
+                baseLeft + insets.left,
+                baseTop + insets.top,
+                baseRight + insets.right,
+                baseBottom + insets.bottom
+            )
+            windowInsets
+        }
+        ViewCompat.requestApplyInsets(view)
     }
 
     fun backgroundSettingsGuide(manufacturer: String, brand: String): String {
