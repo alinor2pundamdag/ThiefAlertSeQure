@@ -1,0 +1,126 @@
+name: Android build and tests
+
+on:
+  push:
+    branches: [main, 'feat/**', 'fix/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Debug signing is only a development fallback. It is not a permanent release identity.
+      - name: Restore cached debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
+
+      - name: Prepare persistent release signing key
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [[ -n "$ANDROID_KEYSTORE_BASE64" && -n "$ANDROID_KEYSTORE_PASSWORD" && -n "$ANDROID_KEY_ALIAS" && -n "$ANDROID_KEY_PASSWORD" ]]; then
+            KEYSTORE_PATH="$RUNNER_TEMP/thiefalertsequre-release.jks"
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+            test -s "$KEYSTORE_PATH"
+            echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+            echo "RELEASE_SIGNING_CONFIGURED=true" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+            echo "Release signing secrets are not configured; only a development debug APK can be built."
+          fi
+
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Android lint
+        run: |
+          if ! ./gradlew :app:lintDebug --no-daemon --stacktrace; then
+            report=app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            if [ -f "$report" ]; then cat "$report"; fi
+            exit 1
+          fi
+
+      - name: Validate packaged assets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("app/src/main")
+          alarm = root / "res/raw/default_alarm.ogg"
+          data = alarm.read_bytes()
+          assert data.startswith(b"OggS"), "default_alarm.ogg is not an Ogg container"
+          assert b"OpusHead" in data[:512], "default_alarm.ogg does not contain an Opus identification header"
+          assert len(data) > 1024, "default alarm asset is unexpectedly small"
+          assert not (root / "res/raw/default_alarm.mp3").exists(), "Ogg Opus asset must not use an .mp3 extension"
+          images = [
+              path for path in Path(".").rglob("*")
+              if path.is_file()
+              and path.suffix.lower() in (".png", ".jpg", ".jpeg")
+              and ".git" not in path.parts
+          ]
+          assert len(images) >= 10, f"Expected launcher and app image assets; found only {len(images)}"
+          for image in images:
+              payload = image.read_bytes()
+              assert payload, f"{image} is empty"
+              if image.suffix.lower() == ".png":
+                  assert payload.startswith(b"\x89PNG\r\n\x1a\n"), f"{image} is not a PNG"
+              elif image.suffix.lower() in (".jpg", ".jpeg"):
+                  assert payload.startswith(b"\xff\xd8\xff"), f"{image} is not a JPEG"
+          print(f"Validated Ogg Opus alarm ({len(data)} bytes) and {len(images)} image assets.")
+          PY
+
+      - name: Assemble distributable APK
+        shell: bash
+        run: |
+          mkdir -p dist
+          if [[ "$RELEASE_SIGNING_CONFIGURED" == "true" ]]; then
+            ./gradlew :app:assembleRelease --no-daemon --stacktrace
+            cp app/build/outputs/apk/release/app-release.apk dist/ThiefAlertSeQure-v1.1.1-release.apk
+            echo "APK_PATH=dist/ThiefAlertSeQure-v1.1.1-release.apk" >> "$GITHUB_ENV"
+            echo "APK_ARTIFACT_NAME=ThiefAlertSeQure-release-apk" >> "$GITHUB_ENV"
+          else
+            ./gradlew :app:assembleDebug --no-daemon --stacktrace
+            cp app/build/outputs/apk/debug/app-debug.apk dist/ThiefAlertSeQure-v1.1.1-debug.apk
+            echo "APK_PATH=dist/ThiefAlertSeQure-v1.1.1-debug.apk" >> "$GITHUB_ENV"
+            echo "APK_ARTIFACT_NAME=ThiefAlertSeQure-debug-apk" >> "$GITHUB_ENV"
+          fi
+
+      - name: Verify APK package, version, and signer
+        shell: bash
+        run: |
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$BUILD_TOOLS/aapt" dump badging "$APK_PATH" | grep -F "package: name='com.thiefalertsequre.app' versionCode='3' versionName='1.1.1'"
+          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK_PATH"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK_ARTIFACT_NAME }}
+          path: ${{ env.APK_PATH }}
+          if-no-files-found: error
+          retention-days: 14
