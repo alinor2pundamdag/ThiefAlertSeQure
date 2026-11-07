@@ -82,13 +82,13 @@ object AndroidDeviceCompatibility {
         val common = "First open App info for ThiefAlertSeQure and review Battery / App battery usage. Choose Unrestricted, Allow background activity, or the least restrictive option your Android build offers. Keep notifications enabled. Menu names and availability vary by model and OS update."
         val vendor = when (family(manufacturer, brand)) {
             Family.SAMSUNG ->
-                "Samsung One UI: App info → Battery → Unrestricted (where offered). Also inspect Settings → Battery → Background usage limits and add ThiefAlertSeQure to Never sleeping apps if that list exists. Samsung may move these controls between One UI releases."
+                "Samsung One UI: Settings → Battery (or Battery and device care → Battery) → Background usage limits → Never sleeping apps → add ThiefAlertSeQure. Also check App info → Battery for an Unrestricted option if your One UI release offers it. Do not place the app in Sleeping or Deep sleeping apps. Samsung may move these controls between One UI releases."
             Family.HONOR_HUAWEI ->
                 "HONOR MagicOS / Huawei EMUI: Settings → Apps → App launch (or Launch management) → ThiefAlertSeQure. If Manage automatically is available, turn it off and enable Auto-launch, Secondary launch, and Run in background. Also review Battery optimization / App launch settings. Some releases use different labels."
             Family.XIAOMI ->
-                "Xiaomi / Redmi / POCO: App info → Battery saver → No restrictions (where offered). Then look in Security / Settings → Apps → Permissions → Autostart (or Background autostart) and allow ThiefAlertSeQure if that control exists. HyperOS and MIUI menus differ by release and region."
+                "Xiaomi / Redmi / POCO: App info → Battery saver / Power → No restrictions (where offered). Then Settings → Apps → Permissions → Background autostart (or Autostart) → allow ThiefAlertSeQure. If available, lock the app in Recents. HyperOS and MIUI menus differ by release and region."
             Family.OPPO_REALME_ONEPLUS ->
-                "OPPO / realme / OnePlus: App info → Battery usage / App battery management; allow background activity or unrestricted use where offered. Also search Settings for Auto launch, Startup manager, or App auto-launch and allow ThiefAlertSeQure if present. ColorOS, realme UI, and OxygenOS labels differ."
+                "OPPO / realme: Settings → Battery → App battery management; allow foreground activity, background activity, and auto-launch where offered. Some releases place this under Phone Manager → Privacy Permissions → Auto-launch apps. OnePlus / OxygenOS: also search Settings → Apps → Auto launch. Lock the app in Recents if the option exists. Labels vary by OS release."
             Family.VIVO_IQOO ->
                 "vivo / iQOO: Review Settings → Battery → Background power consumption management, then search Settings for Autostart / Background start and allow ThiefAlertSeQure where available. Funtouch OS and OriginOS menus vary."
             Family.GOOGLE_PIXEL ->
