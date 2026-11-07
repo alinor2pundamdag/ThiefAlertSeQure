@@ -34,6 +34,7 @@ class AlarmService : Service() {
     private val userPresentReceiver = UserPresentReceiver()
     private var userPresentReceiverRegistered = false
     private var keyguardLockedObserved = false
+    private var keyguardMonitorInitialized = false
     private val keyguardUnlockMonitor = object : Runnable {
         override fun run() {
             if (ProtectionStore(this@AlarmService).read().mode != ProtectionMode.ALARM_TRIGGERED) return
@@ -99,7 +100,10 @@ class AlarmService : Service() {
         try {
             val alarmStartedAt = ProtectionStore(this).read().changedAtEpochMs
             lockDeviceIfAdminEnabled(alarmStartedAt)
-            keyguardLockedObserved = getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
+            if (!keyguardMonitorInitialized) {
+                keyguardLockedObserved = getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
+                keyguardMonitorInitialized = true
+            }
             volumeHandler.removeCallbacks(keyguardUnlockMonitor)
             volumeHandler.postDelayed(keyguardUnlockMonitor, KEYGUARD_POLL_INTERVAL_MS)
             startForeground(NOTIFICATION_ID, notification())
