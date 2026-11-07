@@ -130,10 +130,10 @@ Read the complete [Privacy Policy](docs/PRIVACY_POLICY.md).
 ## 📱 Android and manufacturer compatibility
 
 - **Minimum Android:** 8.0 (API 26).
-- **Compile / target Android:** API 35 / API 35.
+- **Compile / target Android:** API 36 / API 36 (Android 16 target; Android 17 runtime compatibility).
 - **Manufacturer-aware setup:** Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO, OPPO, realme, OnePlus, vivo / iQOO, Google Pixel, Motorola, and generic Android guidance.
 - **Settings fallback:** Public Android Settings action → app-specific settings → general Settings.
-- **Android 15+:** Edge-to-edge safe insets are applied to the app's scrollable screens.
+- **Android 15+:** Edge-to-edge safe insets are applied to the app's scrollable screens.\n- **Android 17:** Background alarm audio remains inside the qualifying foreground-service architecture; Android 17 hardening still requires physical/emulator verification.
 
 - **Interface:** Material-based dark UI with a scrollable layout, readable text sizing, and large touch targets.
 
