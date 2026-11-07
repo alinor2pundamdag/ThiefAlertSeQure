@@ -30,7 +30,9 @@ Each system-setting action has a separate `i` tutorial card. The user-facing rou
 - Alarm volume and sound settings.
 - HONOR / MagicOS App launch, secondary launch, background execution, and Recent-app lock guidance.
 
-System setting actions use public Android Settings actions where available. OEM-only pages are not deep-linked through undocumented component names; the user is sent to Settings and given vendor-specific instructions instead.
+System setting actions use public Android Settings actions where available. Each action falls back to app-specific settings and then general Settings when the OEM build does not provide the requested page. The `AndroidDeviceCompatibility` helper detects the reported manufacturer/brand and displays manual guidance for Samsung One UI, HONOR/MagicOS, Huawei/EMUI, Xiaomi/Redmi/POCO, OPPO/realme/OnePlus, vivo/iQOO, Pixel, Motorola, and other Android devices. OEM-only pages are not deep-linked through undocumented component names; Android does not provide a universal public API for changing private auto-start controls.
+
+Scrollable screens apply system-bar and display-cutout insets to handle Android 15 edge-to-edge enforcement for target API 35.
 
 ## Charger-event reliability
 
@@ -63,12 +65,14 @@ The manifest declares the permissions needed by the implemented functions, inclu
 ## Integration and verification status
 
 - Source branch: `feat/custom-audio-and-reliability`.
-- Latest source commit at document creation: see Git history / PR #2.
-- PR #1 was closed because it pointed to the stale `feat/local-anti-theft-core` branch; no branch or commit was deleted.
-- Draft PR #2 tracks the current source branch.
-- `main` and the source branch are diverged; GitHub reported 4 commits unique to `main` and the PR was not mergeable. Do not merge until those changes and conflicts are reviewed.
-- No successful CI result has yet been verified for the current head. A blank combined-status response is not a passing build.
-- No physical-device acceptance test has been performed. Required checks include plug/unplug timing, rapid reconnect, alarm volume-key behavior, lock-screen/full-screen presentation, Android 8–16 settings routes, OEM background restrictions, reboot recovery, and Device Administrator enrollment/rollback.
+- Draft PR #2 tracks the active source branch; PR #1 is obsolete and closed.
+- Manufacturer-aware guidance and fallback Settings navigation are implemented in `AndroidDeviceCompatibility.kt`.
+- Samsung, HONOR/Huawei, Xiaomi/Redmi/POCO, OPPO/realme/OnePlus, vivo/iQOO, Pixel, Motorola, and generic Android guidance is selected from the device's reported manufacturer and brand.
+- Public Settings actions fall back to app info and general Settings; undocumented OEM component names are intentionally not used.
+- Scrollable screens apply system-bar and cutout insets for Android 15 edge-to-edge behavior.
+- A source-level compatibility matrix is maintained in `docs/ANDROID_DEVICE_COMPATIBILITY.md`.
+- CI must pass on the latest branch head before distributing a new APK. A blank workflow/status response is not a passing build.
+- No physical-device acceptance test has been performed. Test settings navigation, plug/unplug timing, rapid reconnect, alarm volume-key behavior, lock-screen/full-screen presentation, OEM background restrictions, reboot recovery, and Device Administrator enrollment/rollback.
 
 ## Acceptance criteria
 
