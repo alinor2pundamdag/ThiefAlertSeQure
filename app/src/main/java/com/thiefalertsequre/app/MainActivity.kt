@@ -557,7 +557,8 @@ class MainActivity : FragmentActivity() {
             33 -> "Android 13: App info → Notifications and Battery. Notification permission is runtime-controlled."
             34 -> "Android 14: Apps → Special app access → Full-screen notifications; review app Notifications and Battery."
             35 -> "Android 15: Apps → Special app access → Full-screen notifications / Alarms & reminders; review App info → Battery and Notifications."
-            36 -> "Android 16: Use Apps → Special app access and App info → Battery / Notifications; exact labels can vary by system update."
+            36 -> "Android 16: Use Apps → Special app access and App info → Battery / Notifications; large-screen layouts must adapt to resizing and orientation changes." 
+            37 -> "Android 17: Keep alarm audio inside the active foreground service; test background-audio hardening and large-screen resizing."
             else -> "Use Settings search for ThiefAlertSeQure, Battery, Notifications, Alarms & reminders, and Full-screen notifications."
         }
         val device = AndroidDeviceCompatibility.deviceSummary(
