@@ -67,9 +67,10 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             return
         }
 
-        // Recheck physical power over time at the deadline. A single stale
-        // BATTERY_CHANGED snapshot must not be enough to activate the alarm.
-        val connected = readStableConnected(context)
+        // The physical unplug was already confirmed before the countdown began.
+        // Re-read live power at the deadline without adding a second multi-sample
+        // debounce that would make the ten-second grace period run long.
+        val connected = ExternalPowerState.readConnected(context)
         if (connected == null) {
             LocalTamperHistory.record(context, "deadline_validation_inconclusive", "Power state did not produce three consecutive disconnected samples")
             AlarmScheduler.scheduleRetry(context, 1_000L)
@@ -119,23 +120,6 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
                 }
             }
             else -> Unit
-        }
-    }
-
-    /** true=connected, false=stably disconnected, null=unknown/unstable. */
-    private fun readStableConnected(context: Context): Boolean? {
-        var consecutiveDisconnected = 0
-        var lastObserved: Boolean? = null
-        repeat(5) { index ->
-            val observed = ExternalPowerState.readConnected(context)
-            lastObserved = observed
-            consecutiveDisconnected = if (observed == false) consecutiveDisconnected + 1 else 0
-            if (index < 4) Thread.sleep(200L)
-        }
-        return when {
-            consecutiveDisconnected >= 3 -> false
-            lastObserved == true -> true
-            else -> null
         }
     }
 
