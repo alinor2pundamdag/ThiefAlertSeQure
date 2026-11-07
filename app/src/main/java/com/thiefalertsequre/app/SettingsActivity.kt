@@ -551,7 +551,7 @@ class SettingsActivity : FragmentActivity() {
         val name = when (Build.VERSION.SDK_INT) {
             26 -> "Android 8.0"; 27 -> "Android 8.1"; 28 -> "Android 9"; 29 -> "Android 10"
             30 -> "Android 11"; 31 -> "Android 12"; 32 -> "Android 12L"; 33 -> "Android 13"
-            34 -> "Android 14"; 35 -> "Android 15"; 36 -> "Android 16"
+            34 -> "Android 14"; 35 -> "Android 15"; 36 -> "Android 16"; 37 -> "Android 17"
             else -> "Android API " + Build.VERSION.SDK_INT
         }
         val route = when (Build.VERSION.SDK_INT) {
@@ -562,7 +562,7 @@ class SettingsActivity : FragmentActivity() {
             31, 32 -> "Typical route: Settings → Apps → ThiefAlertSeQure → App battery usage. Exact alarms are under Settings → Apps → Special app access → Alarms & reminders."
             33 -> "Typical route: Settings → Apps → ThiefAlertSeQure → Notifications and Battery. Notification permission is runtime-controlled; exact alarms remain under Special app access."
             34 -> "Typical route: Settings → Apps → Special app access → Full-screen notifications, and Settings → Apps → ThiefAlertSeQure → Notifications / Battery."
-            35, 36 -> "Typical route: Settings → Apps → Special app access → Full-screen notifications / Alarms & reminders, and App info → ThiefAlertSeQure → Notifications / Battery. Foreground-service and background policies remain system-controlled."
+            35, 36, 37 -> "Typical route: Settings → Apps → Special app access → Full-screen notifications / Alarms & reminders, and App info → ThiefAlertSeQure → Notifications / Battery. Android 17 also requires background audio to run with a qualifying foreground service."
             else -> "Use Settings search for ThiefAlertSeQure, Battery, Notifications, Alarms & reminders, or Full-screen notifications."
         }
         val device = AndroidDeviceCompatibility.deviceSummary(
