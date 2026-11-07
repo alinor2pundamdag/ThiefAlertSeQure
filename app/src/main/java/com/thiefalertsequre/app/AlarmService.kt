@@ -42,6 +42,9 @@ class AlarmService : Service() {
             if (keyguard.isDeviceSecure) {
                 if (keyguard.isKeyguardLocked) {
                     keyguardLockedObserved = true
+                    val alarmStartedAt = ProtectionStore(this@AlarmService).read().changedAtEpochMs
+                    getSharedPreferences("alarm_service_lock_v1", MODE_PRIVATE).edit()
+                        .putLong(KEY_KEYGUARD_LOCKED_FOR_ALARM_AT, alarmStartedAt).apply()
                 } else if (keyguardLockedObserved) {
                     // Fallback to the broadcast: detect the actual locked -> unlocked
                     // transition without asking the owner to authenticate a second time.
@@ -104,7 +107,10 @@ class AlarmService : Service() {
             val alarmStartedAt = ProtectionStore(this).read().changedAtEpochMs
             lockDeviceIfAdminEnabled(alarmStartedAt)
             if (!keyguardMonitorInitialized) {
-                keyguardLockedObserved = getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
+                val keyguard = getSystemService(android.app.KeyguardManager::class.java)
+                val lockPrefs = getSharedPreferences("alarm_service_lock_v1", MODE_PRIVATE)
+                keyguardLockedObserved = keyguard.isKeyguardLocked ||
+                    lockPrefs.getLong(KEY_KEYGUARD_LOCKED_FOR_ALARM_AT, 0L) == alarmStartedAt
                 keyguardMonitorInitialized = true
             }
             volumeHandler.removeCallbacks(keyguardUnlockMonitor)
@@ -323,5 +329,6 @@ class AlarmService : Service() {
         private const val VOLUME_ENFORCEMENT_INTERVAL_MS = 500L
         private const val KEYGUARD_POLL_INTERVAL_MS = 150L
         private const val KEY_LOCK_REQUESTED_FOR_ALARM_AT = "lock_requested_for_alarm_started_at"
+        private const val KEY_KEYGUARD_LOCKED_FOR_ALARM_AT = "keyguard_locked_for_alarm_started_at"
     }
 }
