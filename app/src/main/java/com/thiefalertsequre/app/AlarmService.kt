@@ -68,7 +68,10 @@ class AlarmService : Service() {
                 this,
                 userPresentReceiver,
                 IntentFilter(Intent.ACTION_USER_PRESENT),
-                ContextCompat.RECEIVER_NOT_EXPORTED
+                // ACTION_USER_PRESENT is a protected system broadcast. Android's
+                // guidance requires EXPORTED to receive system broadcasts emitted
+                // by highly privileged framework components.
+                ContextCompat.RECEIVER_EXPORTED
             )
             userPresentReceiverRegistered = true
         }.onFailure {
