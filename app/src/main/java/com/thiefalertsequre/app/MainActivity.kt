@@ -352,8 +352,14 @@ class MainActivity : FragmentActivity() {
             autoAuthenticationRequested = false
             return
         }
-        autoAuthenticationRequested = true
         val keyguard = getSystemService(KeyguardManager::class.java)
+        if (keyguard.isKeyguardLocked) {
+            // Android's own lock screen is the single authentication surface while
+            // the phone is locked. Do not stack an in-app BiometricPrompt over it.
+            autoAuthenticationRequested = false
+            return
+        }
+        autoAuthenticationRequested = true
         val strongBiometric = BiometricManager.from(this)
             .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
         if ((Build.VERSION.SDK_INT >= 30 && keyguard.isDeviceSecure) || strongBiometric) {
