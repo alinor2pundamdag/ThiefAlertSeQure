@@ -81,6 +81,6 @@ Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPl
 
 - `DevicePolicyManager.lockNow()` is idempotent per alarm episode, keyed to the persisted alarm transition timestamp. Repeated service starts must not relock an already-unlocked phone.
 - `MainActivity` does not launch an app-owned biometric prompt while Android reports the device keyguard as locked; this avoids competing authentication surfaces.
-- `AlarmService` observes the keyguard locked-to-unlocked transition as a fallback to `ACTION_USER_PRESENT`, then invokes the same authenticated alarm-stop coordinator.
+- `AlarmService` registers protected `ACTION_USER_PRESENT` with `RECEIVER_EXPORTED` as required for system broadcasts from highly privileged framework components, and observes the keyguard locked-to-unlocked transition as a fallback. Both invoke the same authenticated alarm-stop coordinator.
 - The system credential and biometric remain entirely Android-managed. The app receives only the successful keyguard-dismissal signal and never accesses credential material.
 - These changes require a fresh physical test on the target HONOR device; CI cannot verify OEM keyguard behavior.
