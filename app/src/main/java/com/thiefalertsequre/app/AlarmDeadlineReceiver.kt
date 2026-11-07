@@ -72,7 +72,7 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         // debounce that would make the ten-second grace period run long.
         val connected = ExternalPowerState.readConnected(context)
         if (connected == null) {
-            LocalTamperHistory.record(context, "deadline_validation_inconclusive", "Power state did not produce three consecutive disconnected samples")
+            LocalTamperHistory.record(context, "deadline_validation_inconclusive", "Live charger state was unavailable at the countdown deadline")
             AlarmScheduler.scheduleRetry(context, 1_000L)
             return
         }
