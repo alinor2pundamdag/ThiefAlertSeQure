@@ -20,13 +20,21 @@ class PowerTransitionReceiver : BroadcastReceiver() {
         )
         if (!monitorEnabled) return
 
+        // Capture the physical event time before serialized debounce work. Otherwise
+        // the five-sample confirmation (~1.4 s) is incorrectly added before the
+        // user's ten-second grace period even begins.
+        val eventEpochMs = System.currentTimeMillis()
+        val eventElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime()
+        val eventBootCount = ProtectionClock.bootCount(context)
         val pending = goAsync()
         try {
             powerEventExecutor.execute {
                 try {
                     when (action) {
                         Intent.ACTION_POWER_CONNECTED -> PowerTransitionCoordinator.onPowerConnected(context.applicationContext)
-                        Intent.ACTION_POWER_DISCONNECTED -> PowerTransitionCoordinator.onPowerDisconnected(context.applicationContext)
+                        Intent.ACTION_POWER_DISCONNECTED -> PowerTransitionCoordinator.onPowerDisconnected(
+                            context.applicationContext, eventEpochMs, eventElapsedRealtimeMs, eventBootCount
+                        )
                     }
                 } catch (error: Exception) {
                     LocalTamperHistory.record(context, "power_transition_processing_failed",
