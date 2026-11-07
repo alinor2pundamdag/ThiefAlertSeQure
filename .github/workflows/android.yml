@@ -28,7 +28,6 @@ jobs:
 
       # Debug signing is only a development fallback. It is not a permanent release identity.
       - name: Restore cached debug signing key
-        if: ${{ vars.ENABLE_DEBUG_APK_FALLBACK == 'true' }}
         uses: actions/cache@v4
         with:
           path: ~/.android/debug.keystore
