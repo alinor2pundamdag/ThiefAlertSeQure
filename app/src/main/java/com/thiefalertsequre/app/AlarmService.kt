@@ -249,7 +249,6 @@ class AlarmService : Service() {
             .setContentTitle("ThiefAlertSeQure — Alarm active")
             .setContentText("Open to authenticate with your device lock or supported biometric.")
             .setContentIntent(contentIntent)
-            .setFullScreenIntent(contentIntent, true)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setOngoing(true)
