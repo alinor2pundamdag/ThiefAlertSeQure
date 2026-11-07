@@ -81,16 +81,18 @@ class SettingsActivity : FragmentActivity() {
         root.addView(statusCard, matchWrap())
         root.addView(space(22))
 
-        root.addView(text("HONOR / MAGICOS BACKGROUND PROTECTION", 11f, R.color.tas_primary, true))
+        root.addView(text("MANUFACTURER BACKGROUND PROTECTION", 11f, R.color.tas_primary, true))
         root.addView(space(8))
         root.addView(text(
-            "Open HONOR system settings, find App launch, select ThiefAlertSeQure, turn Manage automatically OFF, then enable all three switches: Auto-launch, Secondary launch, and Run in background. Save with OK. MagicOS does not expose a documented public deep link for these individual switches, so Android opens Settings instead of pretending to change them automatically.",
+            AndroidDeviceCompatibility.backgroundSettingsGuide(Build.MANUFACTURER, Build.BRAND),
             13f, R.color.tas_muted
         ))
         root.addView(space(10))
-        addSystemSettingAction("Auto-launch settings (HONOR)", "Auto-launch", "Open App launch, select ThiefAlertSeQure, turn Manage automatically OFF, then enable Auto-launch and tap OK. This is an HONOR/MagicOS vendor page; other manufacturers use different labels.") { openHonorAppLaunchSettings("Auto-launch") }
-        addSystemSettingAction("Secondary launch settings (HONOR)", "Secondary launch", "In HONOR App launch for ThiefAlertSeQure, enable Secondary launch. Availability and wording vary by MagicOS release.") { openHonorAppLaunchSettings("Secondary launch") }
-        addSystemSettingAction("Run in background settings (HONOR)", "Run in background", "In HONOR App launch for ThiefAlertSeQure, enable Run in background. Keep Auto-launch and Secondary launch enabled too.") { openHonorAppLaunchSettings("Run in background") }
+        addSystemSettingAction(
+            "Open manufacturer background settings",
+            "Background and auto-start controls",
+            AndroidDeviceCompatibility.backgroundSettingsGuide(Build.MANUFACTURER, Build.BRAND)
+        ) { openManufacturerBackgroundSettings() }
         addSystemSettingAction("Battery optimization — allow unrestricted", "Battery optimization", "Choose Unrestricted / Don't optimize for ThiefAlertSeQure if offered. Android 8–10 generally expose the battery-optimization list; Android 11+ may also show per-app battery controls. OEM battery managers can add separate auto-start/background controls. This reduces Doze restrictions but cannot prevent Force stop or guarantee the OEM keeps every process alive.") { requestIgnoreBatteryOptimization() }
         addSystemSettingAction("Lock app in Recent apps — instructions", "Recent-app lock", "Open Recents, find ThiefAlertSeQure, then use the app-card menu or manufacturer-specific swipe gesture to choose Lock / Keep open if available. This is an OEM convenience feature, not a security guarantee.") { showRecentAppsTutorial() }
         root.addView(space(22))
@@ -447,16 +449,23 @@ class SettingsActivity : FragmentActivity() {
             if (getSystemService(android.os.PowerManager::class.java).isIgnoringBatteryOptimizations(packageName))
                 "Battery optimization: unrestricted" else "Battery optimization: may restrict background work"
         } else "Battery optimization: not applicable"
-        return "$alarm\n$notifications\n$batteryUnrestricted\nMinimum supported Android: 8.0 (API 26)"
+        val device = AndroidDeviceCompatibility.deviceSummary(
+            Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.VERSION.RELEASE, Build.VERSION.SDK_INT
+        )
+        return "$device\n$alarm\n$notifications\n$batteryUnrestricted\nMinimum supported Android: 8.0 (API 26)"
     }
 
-    private fun openHonorAppLaunchSettings(option: String) {
+    private fun openManufacturerBackgroundSettings() {
         android.widget.Toast.makeText(
             this,
-            "In Settings, search for App launch. Select ThiefAlertSeQure, turn Manage automatically OFF, enable Auto-launch, Secondary launch and Run in background, then tap OK.",
+            AndroidDeviceCompatibility.backgroundSettingsGuide(Build.MANUFACTURER, Build.BRAND),
             android.widget.Toast.LENGTH_LONG
         ).show()
-        open(Intent(Settings.ACTION_SETTINGS))
+        AndroidDeviceCompatibility.open(
+            this,
+            AndroidDeviceCompatibility.appInfoIntent(packageName),
+            Intent(Settings.ACTION_SETTINGS)
+        )
     }
 
     private fun requestIgnoreBatteryOptimization() {
@@ -578,16 +587,10 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun open(primary: Intent, fallback: Intent? = null) {
-        try {
-            startActivity(primary)
-        } catch (_: Exception) {
-            if (fallback != null) {
-                try { startActivity(fallback) } catch (_: Exception) {
-                    android.widget.Toast.makeText(this, "This settings page is not available on this device.", android.widget.Toast.LENGTH_LONG).show()
-                }
-            } else {
-                android.widget.Toast.makeText(this, "This settings page is not available on this device.", android.widget.Toast.LENGTH_LONG).show()
-            }
+        if (fallback == null) {
+            AndroidDeviceCompatibility.open(this, primary)
+        } else {
+            AndroidDeviceCompatibility.open(this, primary, fallback)
         }
     }
 
