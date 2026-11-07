@@ -187,19 +187,11 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         if (!countdownValidationRunning.compareAndSet(false, true)) return
         Thread {
             try {
-                var consecutiveDisconnected = 0
-                var lastObserved: Boolean? = null
-                repeat(5) { index ->
-                    val observed = ExternalPowerState.readConnected(this)
-                    lastObserved = observed
-                    consecutiveDisconnected = if (observed == false) consecutiveDisconnected + 1 else 0
-                    if (index < 4) Thread.sleep(200L)
-                }
-                val connected = when {
-                    consecutiveDisconnected >= 3 -> false
-                    lastObserved == true -> true
-                    else -> null
-                }
+                // The unplug transition was already confirmed by the coordinator's
+                // five-sample debounce before COUNTDOWN was persisted. At the deadline,
+                // read the live state once so validation does not add another ~800 ms
+                // to the user's ten-second grace period. Unknown remains fail-safe.
+                val connected = ExternalPowerState.readConnected(this)
                 if (connected == null) {
                     handler.post {
                         if (isExpectedCountdownCurrent(expected)) {
