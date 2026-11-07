@@ -135,12 +135,11 @@ Read the complete [Privacy Policy](docs/PRIVACY_POLICY.md).
 - **Settings fallback:** Public Android Settings action → app-specific settings → general Settings.
 - **Android 15+:** Edge-to-edge safe insets are applied to the app's scrollable screens.
 
-See the full [Android Device Compatibility Matrix](docs/ANDROID_DEVICE_COMPATIBILITY.md) for API 26–36 behavior, OEM background controls, system-setting fallbacks, limitations, and physical-device acceptance tests.
 - **Interface:** Material-based dark UI with a scrollable layout, readable text sizing, and large touch targets.
-- **Redmi / Xiaomi / HyperOS / MIUI:** Android background execution and battery-management rules can vary by model and OS version. If protection is interrupted, review the app's battery, background activity, notification, and autostart settings where your device provides them.
-- **Other manufacturers:** HONOR/MagicOS, Samsung/One UI, and other Android builds may also apply their own background restrictions.
 
-No app can use one universal setting to override every manufacturer's power manager. The setup instructions in the app and Android settings are important.
+See the full [Android Device Compatibility Matrix](docs/ANDROID_DEVICE_COMPATIBILITY.md) for API 26–36 behavior, OEM background controls, system-setting fallbacks, limitations, official manufacturer references, and physical-device acceptance tests.
+
+No ordinary app can use one universal setting to override every manufacturer's power manager.
 
 ### Important Android system requirements
 
