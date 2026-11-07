@@ -147,6 +147,7 @@ class MainActivity : FragmentActivity() {
         root.addView(space(16))
         root.addView(label("LOCAL-FIRST • NO ACCOUNT • NO CLOUD SYNC", 10f, getColor(R.color.tas_muted), true), matchWrap())
         setContentView(scroll)
+        AndroidDeviceCompatibility.applySystemBarInsets(scroll)
     }
 
     private fun buildDashboard() {
@@ -285,6 +286,7 @@ class MainActivity : FragmentActivity() {
         ), matchWrap())
 
         setContentView(scroll)
+        AndroidDeviceCompatibility.applySystemBarInsets(scroll)
         reconcileCharging()
         render()
         status.removeCallbacks(ticker)
