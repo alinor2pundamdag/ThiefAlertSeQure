@@ -295,6 +295,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(22))
         root.addView(action("Back to protection dashboard") { finish() })
         setContentView(scroll)
+        AndroidDeviceCompatibility.applySystemBarInsets(scroll)
     }
 
     private fun validateAndSaveSound(uri: Uri, slot: String, permissionUri: Uri) {
