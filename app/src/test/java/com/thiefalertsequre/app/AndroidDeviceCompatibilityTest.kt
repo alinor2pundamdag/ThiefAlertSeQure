@@ -38,6 +38,26 @@ class AndroidDeviceCompatibilityTest {
         assertTrue(AndroidDeviceCompatibility.backgroundSettingsGuide("ExampleOEM", "Example").contains("Other Android brands"))
     }
 
+
+    @Test fun honorManualGuidesNameAllThreeRequiredControls() {
+        val guides = AndroidDeviceCompatibility.LaunchControl.values().map {
+            AndroidDeviceCompatibility.launchControlGuide("HONOR", "HONOR", it)
+        }
+        listOf("Manage automatically OFF", "Auto-launch", "Secondary launch", "Run in background")
+            .forEach { expected -> assertTrue(guides.any { it.contains(expected, ignoreCase = true) }) }
+    }
+
+    @Test fun everyRecognizedFamilyHasGuidanceForAllThreeControls() {
+        val devices = listOf("Samsung", "HONOR", "Huawei", "Xiaomi", "OPPO", "realme",
+            "OnePlus", "vivo", "iQOO", "Google", "Motorola", "Unknown")
+        devices.forEach { brand ->
+            AndroidDeviceCompatibility.LaunchControl.values().forEach { control ->
+                assertTrue("$brand / " + control.title + " should have guidance",
+                    AndroidDeviceCompatibility.launchControlGuide(brand, brand, control).isNotBlank())
+            }
+        }
+    }
+
     @Test fun allGuidesWarnThatOemControlsAreManual() {
         val brands = listOf(
             "Samsung", "HONOR", "Xiaomi", "OPPO", "vivo", "Google", "Motorola", "Unknown"

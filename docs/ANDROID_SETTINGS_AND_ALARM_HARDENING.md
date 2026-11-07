@@ -34,6 +34,14 @@ System setting actions use public Android Settings actions where available. Each
 
 Scrollable screens apply system-bar and display-cutout insets to handle Android 15+ edge-to-edge enforcement for target API 36.
 
+## App Launch management UI
+
+- Settings includes a locally persisted Manage automatically / Manage manually guide selector.
+- Manual mode displays separate Auto-launch, Secondary launch, and Run in background cards with OEM-aware guidance.
+- On HONOR/Huawei, users are directed to open Settings → App launch, disable Manage automatically, enable all three manual controls, and confirm.
+- The in-app selector changes only the displayed guide; it does not change or report the OEM's private system switch state.
+- Each action opens a supported Settings entry point. Undocumented OEM component intents are deliberately avoided because they are firmware-specific and can break across updates.
+
 ## Charger-event reliability
 
 - Power receiver work is serialized on a single-thread executor so connect/disconnect tasks do not race on independent worker threads.

@@ -88,6 +88,7 @@ class SettingsActivity : FragmentActivity() {
             13f, R.color.tas_muted
         ))
         root.addView(space(10))
+        renderAppLaunchManagementSection()
         addSystemSettingAction(
             "Open app battery/background settings",
             "Background and auto-start controls",
@@ -477,6 +478,110 @@ class SettingsActivity : FragmentActivity() {
             Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.VERSION.RELEASE, Build.VERSION.SDK_INT
         )
         return "$device\n$alarm\n$notifications\n$batteryUnrestricted\nMinimum supported Android: 8.0 (API 26)"
+    }
+
+
+    /**
+     * This preference changes only which setup guide is expanded in this app.
+     * It never pretends to toggle an OEM's private App launch controls.
+     */
+    private fun renderAppLaunchManagementSection() {
+        val prefs = getSharedPreferences("app_launch_setup_v1", MODE_PRIVATE)
+        val honorFamily = AndroidDeviceCompatibility.family(Build.MANUFACTURER, Build.BRAND) ==
+            AndroidDeviceCompatibility.Family.HONOR_HUAWEI
+        val manual = prefs.getBoolean("show_manual_controls", honorFamily)
+        val card = MaterialCardView(this).apply {
+            radius = dp(18).toFloat()
+            cardElevation = 0f
+            strokeWidth = dp(1)
+            strokeColor = getColor(R.color.tas_surface_variant)
+            setCardBackgroundColor(getColor(R.color.tas_surface))
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+        content.addView(text("APP LAUNCH MANAGEMENT", 11f, R.color.tas_primary, true))
+        content.addView(space(8))
+        content.addView(text(
+            AndroidDeviceCompatibility.deviceSummary(
+                Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.VERSION.RELEASE, Build.VERSION.SDK_INT
+            ),
+            12f, R.color.tas_muted
+        ))
+        content.addView(space(8))
+        content.addView(text(
+            "Choose which setup guide to show. This in-app choice does not change the phone's Manage automatically switch or grant permissions. Android/OEM settings remain user-controlled.",
+            13f, R.color.tas_muted
+        ))
+        content.addView(space(10))
+        content.addView(action(if (!manual) "Manage automatically  •  SELECTED" else "Manage automatically") {
+            prefs.edit().putBoolean("show_manual_controls", false).apply()
+            render()
+        })
+        content.addView(action(if (manual) "Manage manually  •  SELECTED" else "Manage manually") {
+            prefs.edit().putBoolean("show_manual_controls", true).apply()
+            render()
+        })
+        content.addView(space(4))
+        if (manual) {
+            content.addView(text("MANUAL DEVICE CONTROLS", 11f, R.color.tas_primary, true))
+            content.addView(space(6))
+            AndroidDeviceCompatibility.LaunchControl.values().forEach { control ->
+                val item = MaterialCardView(this).apply {
+                    radius = dp(14).toFloat()
+                    cardElevation = 0f
+                    strokeWidth = dp(1)
+                    strokeColor = getColor(R.color.tas_surface_variant)
+                    setCardBackgroundColor(getColor(R.color.tas_background))
+                }
+                val itemContent = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(12), dp(12), dp(12), dp(8))
+                }
+                itemContent.addView(text(control.title, 15f, R.color.tas_text, true))
+                itemContent.addView(space(5))
+                itemContent.addView(text(
+                    AndroidDeviceCompatibility.launchControlGuide(Build.MANUFACTURER, Build.BRAND, control),
+                    12f, R.color.tas_muted
+                ))
+                itemContent.addView(space(6))
+                itemContent.addView(action("Open device settings for " + control.title) {
+                    openLaunchControlSettings()
+                })
+                item.addView(itemContent)
+                content.addView(item, matchWrap())
+                content.addView(space(8))
+            }
+        } else {
+            content.addView(text(
+                "Automatic management leaves startup and background decisions to the phone. If charger monitoring is stopped or delayed, switch to Manage manually where your device supports it and review the three controls.",
+                12f, R.color.tas_muted
+            ))
+            content.addView(space(8))
+            content.addView(action("Open device App launch / app settings") {
+                openLaunchControlSettings()
+            })
+        }
+        content.addView(space(4))
+        content.addView(text(
+            "The app cannot verify OEM-only switch states. After changing them, return here and test charger removal with the screen off and while another app is open.",
+            11f, R.color.tas_muted
+        ))
+        card.addView(content)
+        root.addView(card, matchWrap())
+    }
+
+    private fun openLaunchControlSettings() {
+        val primary = AndroidDeviceCompatibility.launchControlSettingsIntent(
+            Build.MANUFACTURER, Build.BRAND, packageName
+        )
+        AndroidDeviceCompatibility.open(
+            this,
+            primary,
+            AndroidDeviceCompatibility.appInfoIntent(packageName),
+            Intent(Settings.ACTION_SETTINGS)
+        )
     }
 
     private fun openAppBatterySettings() {

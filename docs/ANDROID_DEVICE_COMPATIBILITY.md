@@ -79,6 +79,16 @@ The app detects the device's reported manufacturer and brand and selects matchin
 
 **There is no public Android API that universally opens or changes every OEM's private auto-start and background-management controls.** The app therefore opens standard App info / Settings and supplies manufacturer-specific manual instructions. Menu names change across releases, regions, and individual models.
 
+## In-app App Launch management guide
+
+The Settings screen includes an App Launch Management card with two guide views: **Manage automatically** and **Manage manually**. The selected view is stored locally as a presentation preference only; it does not alter the OEM's similarly named switch.
+
+The manual view contains three separate cards—**Auto-launch**, **Secondary launch**, and **Run in background**—with manufacturer-specific instructions and an action to open the closest supported Android Settings destination. On HONOR/Huawei, the action opens Settings so the user can search for **App launch**, select ThiefAlertSeQure, turn **Manage automatically** off, enable all three manual controls, and confirm. The manual view is selected by default on detected HONOR/Huawei devices.
+
+For Samsung, Xiaomi/Redmi/POCO, OPPO/realme/OnePlus, vivo/iQOO, Pixel, Motorola, and other Android devices, the cards describe the closest available control and explicitly identify controls that do not exist consistently. Buttons open the app's public App info page or the Settings home as appropriate.
+
+The app does not claim to read or change OEM-only switch states. There is no public Android API for universally reading or toggling these vendor controls, and undocumented component intents are intentionally avoided. A successful Settings launch is not proof that the user changed a setting.
+
 ## System Settings navigation strategy
 
 All system-setting actions should use this fallback order:

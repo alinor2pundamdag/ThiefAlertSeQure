@@ -101,6 +101,62 @@ object AndroidDeviceCompatibility {
         return "${familyLabel(manufacturer, brand)} guidance:\n$vendor\n\n$common\n\nIf a named menu is missing, use the Settings search box with the terms above. These are manual OEM controls; Android does not provide a public API that lets an ordinary app switch them on automatically."
     }
 
+
+    enum class LaunchControl(val title: String) {
+        AUTO_LAUNCH("Auto-launch"),
+        SECONDARY_LAUNCH("Secondary launch"),
+        RUN_IN_BACKGROUND("Run in background")
+    }
+
+    /**
+     * HONOR/Huawei expose App launch as a vendor Settings page with no public
+     * Android action, so open Settings home and let the user search for App launch.
+     * Other families open this app's public App info page. No undocumented OEM
+     * component names are launched.
+     */
+    fun launchControlSettingsIntent(manufacturer: String, brand: String, packageName: String): Intent =
+        when (family(manufacturer, brand)) {
+            Family.HONOR_HUAWEI -> Intent(Settings.ACTION_SETTINGS)
+            else -> appInfoIntent(packageName)
+        }
+
+    fun launchControlGuide(manufacturer: String, brand: String, control: LaunchControl): String {
+        return when (family(manufacturer, brand)) {
+            Family.HONOR_HUAWEI ->
+                "Settings → Apps → App launch → ThiefAlertSeQure (or Settings → Battery → App launch on some MagicOS/EMUI versions). Turn Manage automatically OFF. In the Manage manually box, enable Auto-launch, Secondary launch, and Run in background, then tap OK. This is the recommended three-switch configuration on supported HONOR/Huawei builds. The app cannot read or change these OEM switches itself."
+            Family.SAMSUNG -> when (control) {
+                LaunchControl.AUTO_LAUNCH -> "Samsung One UI has no universal Auto-launch switch for ordinary apps. Open Settings → Battery and device care → Battery → Background usage limits → Never sleeping apps, then add ThiefAlertSeQure if available."
+                LaunchControl.SECONDARY_LAUNCH -> "Samsung One UI does not expose a universal Secondary launch switch. Keep ThiefAlertSeQure out of Sleeping and Deep sleeping apps; review App info → Battery for background-use options."
+                LaunchControl.RUN_IN_BACKGROUND -> "Open Settings → Battery and device care → Battery → Background usage limits → Never sleeping apps and add ThiefAlertSeQure. Also review App info → Battery and allow unrestricted/background use where offered."
+            }
+            Family.XIAOMI -> when (control) {
+                LaunchControl.AUTO_LAUNCH -> "Open Settings → Apps → Permissions → Background autostart (or Autostart) and allow ThiefAlertSeQure. MIUI/HyperOS labels and availability vary."
+                LaunchControl.SECONDARY_LAUNCH -> "Xiaomi/Redmi/POCO builds do not consistently expose a separate Secondary launch switch. Allow Background autostart and review any app-specific background-start permission shown by your ROM."
+                LaunchControl.RUN_IN_BACKGROUND -> "Open App info → Battery saver / Battery → No restrictions where available. Lock ThiefAlertSeQure in Recents if your device offers that option."
+            }
+            Family.OPPO_REALME_ONEPLUS -> when (control) {
+                LaunchControl.AUTO_LAUNCH -> "Search Settings for Auto-launch / Auto-start, or open Phone Manager → Privacy Permissions → Auto-launch apps where available, and allow ThiefAlertSeQure."
+                LaunchControl.SECONDARY_LAUNCH -> "There is no consistent cross-version Secondary launch switch on OPPO/realme/OnePlus. Review app-specific background-start or associated-launch permissions if your OS exposes them."
+                LaunchControl.RUN_IN_BACKGROUND -> "Open Settings → Battery → App battery management and allow foreground/background activity. Lock ThiefAlertSeQure in Recents if offered."
+            }
+            Family.VIVO_IQOO -> when (control) {
+                LaunchControl.AUTO_LAUNCH -> "Search Settings for Autostart or Background start and allow ThiefAlertSeQure if your Funtouch OS/OriginOS version provides the control."
+                LaunchControl.SECONDARY_LAUNCH -> "A separate Secondary launch switch is not consistently available on vivo/iQOO. Use the closest Background start or associated-launch permission if offered."
+                LaunchControl.RUN_IN_BACKGROUND -> "Open Settings → Battery → Background power consumption management and allow ThiefAlertSeQure to run in the background where available."
+            }
+            Family.GOOGLE_PIXEL -> when (control) {
+                LaunchControl.AUTO_LAUNCH -> "Pixel does not provide a general OEM Auto-launch allowlist. Android may restore eligible work after reboot, subject to its background-start rules. Open App info → App battery usage to review background access."
+                LaunchControl.SECONDARY_LAUNCH -> "Pixel does not expose an OEM Secondary launch toggle. Android controls background activity launches; there is no equivalent switch to enable here."
+                LaunchControl.RUN_IN_BACKGROUND -> "Open App info → App battery usage → Allow background usage, and choose Unrestricted if available."
+            }
+            Family.MOTOROLA, Family.OTHER -> when (control) {
+                LaunchControl.AUTO_LAUNCH -> "This Android build may not provide a separate Auto-launch switch. Search Settings for Auto-start, Startup manager, or App launch. If none exists, Android manages eligible startup behavior."
+                LaunchControl.SECONDARY_LAUNCH -> "A separate Secondary launch switch may not exist on this device. Search Settings for Background start or associated app-launch permissions; do not enable unrelated permissions."
+                LaunchControl.RUN_IN_BACKGROUND -> "Open App info → App battery usage / Battery and allow background usage or Unrestricted where offered. Menu names vary by model and OS version."
+            }
+        }
+    }
+
     fun appInfoIntent(packageName: String): Intent =
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
 
