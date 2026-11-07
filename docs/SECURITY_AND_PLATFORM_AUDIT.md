@@ -8,6 +8,14 @@
 
 # Security and Android Platform Audit
 
+## Android 17 background audio compatibility
+
+Android 17 (API 37) applies background-audio hardening to all apps running on that OS, even if they target API 36. Audio playback, audio-focus requests, and volume changes must occur while an Activity is visible or while a qualifying foreground service other than SHORT_SERVICE is active. ThiefAlertSeQure keeps alarm playback and alarm-volume enforcement inside AlarmService, declared as a mediaPlayback foreground service. The monitoring service is declared as specialUse and must also remain a foreground service while its alarm-related audio work is active.
+
+For apps targeting API 37, Android adds while-in-use foreground-service capability requirements, with an exception when the app has exact-alarm access and interacts with USAGE_ALARM streams. The current app targets API 36 and does not opt into target-37 behavior changes.
+
+Android 17 test command: `adb shell cmd audio set-enable-hardening throw`. Trigger the alarm with the app backgrounded and screen off, then inspect logcat / dumpsys audio for AudioHardening failures. Disable the test override afterward with `adb shell cmd audio set-enable-hardening disable`. This test remains pending on real Android 17 hardware/emulator.
+
 ## Threat model
 Protect against casual charger removal and ordinary user-level interference. Standard mode is a normal Android app, not a system, privileged or device-owner app. Optional managed mode uses legitimate Android Enterprise Device Owner provisioning and Lock Task APIs. Neither mode can promise resistance to hardware forced shutdown, battery removal, bootloader/recovery, firmware changes or physical tampering.
 
@@ -56,7 +64,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 ## Android boot and Direct Boot behavior
 The app listens for BOOT_COMPLETED and is not Direct-Boot-aware. Android normally delivers BOOT_COMPLETED after the first user unlock, so this app cannot promise protection before that unlock following a reboot.
 
-Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPlayback foreground service for target API 35. For a latched alarm, BootReceiver now schedules an immediate exact alarm. Android documents exact-alarm delivery as exempt from foreground-service background-start restrictions. This route requires user-granted SCHEDULE_EXACT_ALARM access; without it, an inexact fallback is attempted and playback timing cannot be guaranteed.
+Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPlayback foreground service for target API 36. For a latched alarm, BootReceiver now schedules an immediate exact alarm. Android documents exact-alarm delivery as exempt from foreground-service background-start restrictions. This route requires user-granted SCHEDULE_EXACT_ALARM access; without it, an inexact fallback is attempted and playback timing cannot be guaranteed.
 
 ## Compatibility
 - Minimum SDK 26 (Android 8.0).
@@ -68,7 +76,7 @@ Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPl
 
 ## Remaining verification
 1. Latest GitHub Actions must pass on current branch head.
-2. Test Android 8 through Android 16 compatibility paths where devices are available.
+2. Test Android 8 through Android 17 compatibility paths where devices are available.
 3. Test target HONOR device specifically, including battery optimization and autostart.
 4. Test Opus decoding, loop, fallback and volume restoration.
 5. Test screen locked, notification permission denied, DND, silent mode, Bluetooth and headphones.
