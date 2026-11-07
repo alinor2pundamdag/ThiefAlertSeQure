@@ -492,9 +492,11 @@ class MainActivity : FragmentActivity() {
         if (Build.VERSION.SDK_INT >= 31) {
             val alarmManager = getSystemService(AlarmManager::class.java)
             if (!alarmManager.canScheduleExactAlarms()) {
-                runCatching {
-                    startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName")))
-                }.onFailure { showError("Android did not open exact-alarm access: ${it.message}") }
+                AndroidDeviceCompatibility.open(
+                    this,
+                    Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName")),
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+                )
             } else {
                 details.text = "Precise alarm scheduling access is already enabled."
             }
@@ -505,12 +507,14 @@ class MainActivity : FragmentActivity() {
 
     private fun openAlarmNotificationSettings() {
         if (Build.VERSION.SDK_INT >= 26) {
-            runCatching {
-                startActivity(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+            AndroidDeviceCompatibility.open(
+                this,
+                Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
                     putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
                     putExtra(Settings.EXTRA_CHANNEL_ID, AlarmService.CHANNEL_ID)
-                })
-            }.onFailure { openAppSettings() }
+                },
+                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+            )
         } else openAppSettings()
     }
 
