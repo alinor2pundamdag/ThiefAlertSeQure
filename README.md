@@ -218,3 +218,11 @@ Please test the app on your own device and confirm its permissions and backgroun
   <br />
   <sub>ThiefAlertSeQure — local Android charging anti-theft alarm</sub>
 </div>
+
+
+## 📦 Reliable APK updates
+
+- The application ID remains `com.thiefalertsequre.app`; distributable version is now `1.1.1` (version code `3`).
+- Production updates must always use the same permanent release keystore. CI supports the four GitHub Actions secrets documented in [APK installation and update safety](docs/APK_INSTALL_AND_UPDATE.md).
+- CI labels release-signed and debug-only APKs separately and verifies the package ID, version, and signing certificate before upload.
+- A debug APK is for development only. Do not alternate debug and release builds on one installed app.
