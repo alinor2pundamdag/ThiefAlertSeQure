@@ -8,7 +8,7 @@
 
 # Android device and manufacturer compatibility
 
-**Scope:** Android 8.0 (API 26) through Android 16 (API 36), including Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO MIUI and HyperOS, OPPO ColorOS, realme UI, OnePlus OxygenOS, vivo Funtouch OS / OriginOS, Google Pixel, Motorola, and other Android-derived builds.
+**Scope:** Android 8.0 (API 26) through Android 17 (API 37), including Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO MIUI and HyperOS, OPPO ColorOS, realme UI, OnePlus OxygenOS, vivo Funtouch OS / OriginOS, Google Pixel, Motorola, and other Android-derived builds.
 
 **Important:** This is a compatibility strategy and source-level audit, not a certification of every handset. Actual behavior must be tested on physical devices and OS builds.
 
@@ -34,9 +34,9 @@
 | Android 13 | 33 | Runtime notification permission; exact-alarm permission behavior | Request `POST_NOTIFICATIONS`; check notifications and exact-alarm access at runtime |
 | Android 14 | 34 | Full-screen intent special access and foreground-service type prerequisites | Check `canUseFullScreenIntent()`; expose the official app-specific Settings page when available |
 | Android 15 | 35 | Edge-to-edge enforcement for target-35 apps; BOOT_COMPLETED cannot directly start mediaPlayback foreground service | Apply system-bar/cutout insets; preserve exact-alarm recovery route for a latched alarm after boot |
-| Android 16 | 36 | Additional foreground-service/background-job policy changes | Continue to use narrowly scoped foreground services; do not rely on background jobs launched from a foreground service to bypass quotas |
+| Android 16 | 36 | Edge-to-edge enforcement and large-screen resizability/orientation changes for apps targeting API 36 | Apply insets; keep layouts adaptive and verify landscape, split-screen, foldables, and tablets |\n| Android 17 | 37 | Background audio hardening for all apps; target-37 apps have additional while-in-use FGS rules, with an exact-alarm + USAGE_ALARM exception; target-37 large-screen resizability restrictions cannot be opted out | Alarm audio and volume operations must remain inside a qualifying non-short foreground service; the project uses a mediaPlayback alarm FGS and a specialUse monitor FGS. Test Android 17 audio hardening with the platform ADB command |
 
-The app's current build configuration is **minSdk 26, compileSdk 35, targetSdk 35**. Running on Android 16 is not the same as compiling against API 36; API 36-specific APIs should not be used until compileSdk is raised and verified.
+The app's updated build configuration is **minSdk 26, compileSdk 36, targetSdk 36**, using Android Gradle Plugin 8.9.1 and Gradle 8.11.1. This meets the current Google Play target-API requirement for new apps and updates (API 36). Android 17 (API 37) is supported as a runtime OS target, but the app does not yet target or compile against API 37. Android 17 target-37-only behavior changes must be re-audited before raising targetSdk to 37.
 
 ## Manufacturer guidance
 
@@ -135,7 +135,7 @@ vivo's support site lists a dedicated “Background app power consumption manage
 - [Notification permission and time-sensitive notifications](https://developer.android.com/develop/ui/views/notifications/time-sensitive) — Android 13 notification permission and alarm notification guidance.
 - [Package visibility](https://developer.android.com/training/package-visibility/declaring) — Android 11+ visibility filtering and intent queries.
 
-## Known hard limits
+## Android 17 background-audio verification\n\nAndroid 17 applies audio restrictions even to apps that still target API 36. Any background playback, audio-focus request, or volume change must occur while an Activity is visible or while a foreground service other than `SHORT_SERVICE` is active. The alarm implementation must keep its `mediaPlayback` foreground service active before it starts the player, requests audio focus, or changes alarm volume. Do not move audio playback or volume enforcement into a receiver or ordinary background worker.\n\nFor Android 17 device/emulator testing, run:\n\n```bash\nadb shell cmd audio set-enable-hardening throw\n```\n\nTrigger an alarm with the screen off and verify audio playback, audio focus, and repeated alarm-volume enforcement. Inspect `adb logcat` or `adb shell dumpsys audio` for `AudioHardening` entries. Restore the normal setting after testing:\n\n```bash\nadb shell cmd audio set-enable-hardening disable\n```\n\nThis test has not yet been performed on physical hardware.\n\n## Known hard limits
 
 No ordinary third-party app can guarantee:
 - Survival after the user force-stops the app, disables it, uninstalls it, or powers the phone off.
