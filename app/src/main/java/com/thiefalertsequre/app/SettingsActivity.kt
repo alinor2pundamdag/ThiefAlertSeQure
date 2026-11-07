@@ -89,10 +89,10 @@ class SettingsActivity : FragmentActivity() {
         ))
         root.addView(space(10))
         addSystemSettingAction(
-            "Open manufacturer background settings",
+            "Open app battery/background settings",
             "Background and auto-start controls",
             AndroidDeviceCompatibility.backgroundSettingsGuide(Build.MANUFACTURER, Build.BRAND)
-        ) { openManufacturerBackgroundSettings() }
+        ) { openAppBatterySettings() }
         addSystemSettingAction("Battery optimization — allow unrestricted", "Battery optimization", "Choose Unrestricted / Don't optimize for ThiefAlertSeQure if offered. Android 8–10 generally expose the battery-optimization list; Android 11+ may also show per-app battery controls. OEM battery managers can add separate auto-start/background controls. This reduces Doze restrictions but cannot prevent Force stop or guarantee the OEM keeps every process alive.") { requestIgnoreBatteryOptimization() }
         addSystemSettingAction("Lock app in Recent apps — instructions", "Recent-app lock", "Open Recents, find ThiefAlertSeQure, then use the app-card menu or manufacturer-specific swipe gesture to choose Lock / Keep open if available. This is an OEM convenience feature, not a security guarantee.") { showRecentAppsTutorial() }
         root.addView(space(22))
@@ -456,12 +456,7 @@ class SettingsActivity : FragmentActivity() {
         return "$device\n$alarm\n$notifications\n$batteryUnrestricted\nMinimum supported Android: 8.0 (API 26)"
     }
 
-    private fun openManufacturerBackgroundSettings() {
-        android.widget.Toast.makeText(
-            this,
-            AndroidDeviceCompatibility.backgroundSettingsGuide(Build.MANUFACTURER, Build.BRAND),
-            android.widget.Toast.LENGTH_LONG
-        ).show()
+    private fun openAppBatterySettings() {
         AndroidDeviceCompatibility.open(
             this,
             AndroidDeviceCompatibility.appInfoIntent(packageName),
