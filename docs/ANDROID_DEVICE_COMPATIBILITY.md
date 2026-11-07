@@ -122,6 +122,19 @@ vivo's support site lists a dedicated “Background app power consumption manage
 - Alarm volume is best-effort. Android, hardware, DND, Bluetooth, wired audio, and OEM policies can limit audible output.
 - System keyguard authentication is owned by Android. The app can react to a verified keyguard-dismissal signal but cannot determine whether fingerprint, face, PIN, pattern, or password was used.
 
+## Official Android platform references
+
+- [Settings API reference](https://developer.android.com/reference/android/provider/Settings) — public Settings actions and API-level availability.
+- [Monitor battery level and charging state](https://developer.android.com/training/monitoring-device-state/battery-monitoring) — manifest receivers for power-connected and power-disconnected broadcasts.
+- [Intent API reference](https://developer.android.com/reference/android/content/Intent) — protected charger broadcasts and system-only battery broadcasts.
+- [Schedule alarms](https://developer.android.com/develop/background-work/services/alarms) — exact-alarm access and fallback behavior.
+- [Foreground-service launch restrictions](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start) — Android 12+ background-start limitations.
+- [Foreground-service types](https://developer.android.com/develop/background-work/services/fgs/service-types) — media playback and special-use service declarations.
+- [Android 15 behavior changes](https://developer.android.com/about/versions/15/behavior-changes-15) — boot receiver restrictions for mediaPlayback foreground services.
+- [Android 16 foreground-service changes](https://developer.android.com/develop/background-work/services/fgs/changes) — current background-job and foreground-service policy changes.
+- [Notification permission and time-sensitive notifications](https://developer.android.com/develop/ui/views/notifications/time-sensitive) — Android 13 notification permission and alarm notification guidance.
+- [Package visibility](https://developer.android.com/training/package-visibility/declaring) — Android 11+ visibility filtering and intent queries.
+
 ## Known hard limits
 
 No ordinary third-party app can guarantee:
