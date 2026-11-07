@@ -565,7 +565,11 @@ class SettingsActivity : FragmentActivity() {
             35, 36 -> "Typical route: Settings → Apps → Special app access → Full-screen notifications / Alarms & reminders, and App info → ThiefAlertSeQure → Notifications / Battery. Foreground-service and background policies remain system-controlled."
             else -> "Use Settings search for ThiefAlertSeQure, Battery, Notifications, Alarms & reminders, or Full-screen notifications."
         }
-        return "$name (API " + Build.VERSION.SDK_INT + ", release $release).\n$route\nManufacturer menus can differ; use Settings search if a label is unavailable."
+        val device = AndroidDeviceCompatibility.deviceSummary(
+            Build.MANUFACTURER, Build.BRAND, Build.MODEL, release, Build.VERSION.SDK_INT
+        )
+        val oemGuide = AndroidDeviceCompatibility.backgroundSettingsGuide(Build.MANUFACTURER, Build.BRAND)
+        return "$device\n$route\n\n$oemGuide\n\nManufacturer menus can differ; use Settings search if a label is unavailable."
     }
 
     private fun addSystemSettingAction(label: String, tutorialTitle: String, tutorial: String, click: () -> Unit) {
