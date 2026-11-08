@@ -110,19 +110,32 @@ jobs:
           print(f"Validated Ogg Opus alarm ({len(data)} bytes) and {len(images)} image assets.")
           PY
 
+      - name: Read application version
+        shell: bash
+        run: |
+          VERSION_CODE="$(sed -n 's/^[[:space:]]*versionCode = \\([0-9][0-9]*\\)$/\\1/p' app/build.gradle.kts | head -n 1)"
+          VERSION_NAME="$(sed -n 's/^[[:space:]]*versionName = "\\([^"]*\\)"$/\\1/p' app/build.gradle.kts | head -n 1)"
+          test -n "$VERSION_CODE"
+          test -n "$VERSION_NAME"
+          echo "APP_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "APP_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "Building application version $VERSION_NAME ($VERSION_CODE)"
+
       - name: Assemble distributable APK
         shell: bash
         run: |
           mkdir -p dist
           if [[ "$RELEASE_SIGNING_CONFIGURED" == "true" ]]; then
             ./gradlew :app:assembleRelease --no-daemon --stacktrace
-            cp app/build/outputs/apk/release/app-release.apk dist/ThiefAlertSeQure-v1.1.1-release.apk
-            echo "APK_PATH=dist/ThiefAlertSeQure-v1.1.1-release.apk" >> "$GITHUB_ENV"
+            APK_FILE="dist/ThiefAlertSeQure-v${APP_VERSION_NAME}-release.apk"
+            cp app/build/outputs/apk/release/app-release.apk "$APK_FILE"
+            echo "APK_PATH=$APK_FILE" >> "$GITHUB_ENV"
             echo "APK_ARTIFACT_NAME=ThiefAlertSeQure-release-apk" >> "$GITHUB_ENV"
           else
             ./gradlew :app:assembleDebug --no-daemon --stacktrace
-            cp app/build/outputs/apk/debug/app-debug.apk dist/ThiefAlertSeQure-v1.1.1-debug.apk
-            echo "APK_PATH=dist/ThiefAlertSeQure-v1.1.1-debug.apk" >> "$GITHUB_ENV"
+            APK_FILE="dist/ThiefAlertSeQure-v${APP_VERSION_NAME}-debug.apk"
+            cp app/build/outputs/apk/debug/app-debug.apk "$APK_FILE"
+            echo "APK_PATH=$APK_FILE" >> "$GITHUB_ENV"
             echo "APK_ARTIFACT_NAME=ThiefAlertSeQure-debug-apk" >> "$GITHUB_ENV"
           fi
 
@@ -130,7 +143,7 @@ jobs:
         shell: bash
         run: |
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          "$BUILD_TOOLS/aapt" dump badging "$APK_PATH" | grep -F "package: name='com.thiefalertsequre.app' versionCode='3' versionName='1.1.1'"
+          "$BUILD_TOOLS/aapt" dump badging "$APK_PATH" | grep -F "package: name='com.thiefalertsequre.app' versionCode='$APP_VERSION_CODE' versionName='$APP_VERSION_NAME'"
           "$BUILD_TOOLS/apksigner" verify --print-certs "$APK_PATH"
 
       - uses: actions/upload-artifact@v4
