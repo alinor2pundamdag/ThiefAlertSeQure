@@ -36,6 +36,10 @@ android {
         }
     }
     buildTypes {
+        // Temporary side-by-side test identity: preserves an installed v1.1.2 app.
+        getByName("debug") {
+            applicationIdSuffix = ".v113test"
+        }
         getByName("release") {
             isMinifyEnabled = false
             // A release APK is signed only with the persistent owner-controlled key.
