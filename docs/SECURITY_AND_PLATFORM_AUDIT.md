@@ -10,9 +10,9 @@
 
 ## Android 17 background audio compatibility
 
-Android 17 (API 37) applies background-audio hardening to all apps running on that OS, even if they target API 36. Audio playback, audio-focus requests, and volume changes must occur while an Activity is visible or while a qualifying foreground service other than SHORT_SERVICE is active. ThiefAlertSeQure keeps alarm playback and alarm-volume enforcement inside AlarmService, declared as a mediaPlayback foreground service. The monitoring service is declared as specialUse and must also remain a foreground service while its alarm-related audio work is active.
+Android 17 (API 37) applies background-audio hardening to all apps running on that OS, even if they target API 36. Audio playback, audio-focus requests, and volume changes must occur while an Activity is visible or while a foreground service other than SHORT_SERVICE is active. ThiefAlertSeQure performs alarm playback and alarm-volume enforcement inside AlarmService, declared as a mediaPlayback foreground service. The separate charger monitor is specialUse and does not own alarm playback.
 
-For apps targeting API 37, Android adds while-in-use foreground-service capability requirements, with an exception when the app has exact-alarm access and interacts with USAGE_ALARM streams. The current app targets API 36 and does not opt into target-37 behavior changes.
+For apps targeting API 37, Android adds while-in-use foreground-service capability requirements, with an exception when the app has exact-alarm access and interacts with USAGE_ALARM streams. The current app targets API 36. Exact-alarm access denial can delay the countdown callback and may prevent a background-started alarm service from starting; the inexact fallback is best-effort and is not an audible-alarm guarantee.
 
 Android 17 test command: `adb shell cmd audio set-enable-hardening throw`. Trigger the alarm with the app backgrounded and screen off, then inspect logcat / dumpsys audio for AudioHardening failures. Disable the test override afterward with `adb shell cmd audio set-enable-hardening disable`. This test remains pending on real Android 17 hardware/emulator.
 
@@ -64,11 +64,11 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 ## Android boot and Direct Boot behavior
 The app listens for BOOT_COMPLETED and is not Direct-Boot-aware. Android normally delivers BOOT_COMPLETED after the first user unlock, so this app cannot promise protection before that unlock following a reboot.
 
-Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPlayback foreground service for apps targeting API 35 and higher. For a latched alarm, BootReceiver now schedules an immediate exact alarm. Android documents exact-alarm delivery as exempt from foreground-service background-start restrictions. This route requires user-granted SCHEDULE_EXACT_ALARM access; without it, an inexact fallback is attempted and playback timing cannot be guaranteed.
+Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPlayback foreground service for apps targeting API 35 and higher. The monitor service uses specialUse, which is not in Android 15's prohibited BOOT_COMPLETED FGS-type list. For a latched alarm, BootReceiver schedules a recovery alarm rather than directly starting mediaPlayback from BOOT_COMPLETED. Exact-alarm access is user-controlled; without it, an inexact fallback is attempted and playback timing / background FGS launch cannot be guaranteed.
 
 ## Compatibility
 - Minimum SDK 26 (Android 8.0).
-- Target SDK 35.
+- Target SDK 36 (compileSdk 36; minSdk 26).
 - Material Components UI adapts through a scrollable layout and SP text sizing.
 - Biometric availability depends on hardware, enrollment and Android strength classification.
 - Device Owner APIs and restrictions depend on Android version, provisioning state and OEM build.
