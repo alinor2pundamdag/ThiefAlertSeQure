@@ -292,7 +292,15 @@ object ManagedProtectionController {
         }
         if (Build.VERSION.SDK_INT >= 28) {
             runCatching {
-                dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
+                dpm.setLockTaskFeatures(
+                    admin,
+                    DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS or
+                        DevicePolicyManager.LOCK_TASK_FEATURE_HOME or
+                        DevicePolicyManager.LOCK_TASK_FEATURE_OVERVIEW or
+                        DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS or
+                        DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO or
+                        DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD
+                )
             }.onFailure(failures::add)
         }
         runCatching { dpm.setLockTaskPackages(admin, emptyArray()) }.onFailure(failures::add)
