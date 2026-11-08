@@ -142,9 +142,22 @@ jobs:
       - name: Verify APK package, version, and signer
         shell: bash
         run: |
+          set -euo pipefail
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          "$BUILD_TOOLS/aapt" dump badging "$APK_PATH" | grep -F "package: name='com.thiefalertsequre.app' versionCode='$APP_VERSION_CODE' versionName='$APP_VERSION_NAME'"
-          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK_PATH"
+          test -s "$APK_PATH"
+          BADGING="$("$BUILD_TOOLS/aapt" dump badging "$APK_PATH")"
+          PACKAGE_LINE="$(printf '%s\\n' "$BADGING" | grep -m1 "^package:")"
+          echo "APK metadata: $PACKAGE_LINE"
+          EXPECTED_PACKAGE="name='com.thiefalertsequre.app'"
+          EXPECTED_CODE="versionCode='$APP_VERSION_CODE'"
+          EXPECTED_NAME="versionName='$APP_VERSION_NAME'"
+          for EXPECTED in "$EXPECTED_PACKAGE" "$EXPECTED_CODE" "$EXPECTED_NAME"; do
+            if [[ "$PACKAGE_LINE" != *"$EXPECTED"* ]]; then
+              echo "::error::APK metadata mismatch. Expected $EXPECTED; actual: $PACKAGE_LINE"
+              exit 1
+            fi
+          done
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK_PATH"
 
       - uses: actions/upload-artifact@v4
         with:
