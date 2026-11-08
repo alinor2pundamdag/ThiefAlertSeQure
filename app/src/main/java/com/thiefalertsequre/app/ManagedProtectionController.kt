@@ -195,16 +195,23 @@ object ManagedProtectionController {
         }
         val packages = prefs.getStringSet(KEY_PACKAGES, null)
             ?: throw IllegalStateException("Managed-policy rollback package list is missing.")
+        val snapshot = ManagedPolicySnapshot(
+            lockTaskPackages = packages.toTypedArray(),
+            lockTaskFeatures = prefs.getInt(KEY_FEATURES, 0),
+            restrictionValues = restrictions.associateWith { key ->
+                prefs.getBoolean("restriction:$key", false)
+            }
+        )
 
         val failures = mutableListOf<Throwable>()
         // Attempt every restoration independently so one OEM/API failure does
         // not prevent the remaining restrictions and navigation policy restoring.
         runCatching {
-            dpm.setLockTaskFeatures(admin, prefs.getInt(KEY_FEATURES, 0))
+            dpm.setLockTaskFeatures(admin, snapshot.lockTaskFeatures)
         }.onFailure(failures::add)
         restrictions.forEach { key ->
             runCatching {
-                if (prefs.getBoolean("restriction:$key", false)) {
+                if (snapshot.shouldKeepRestrictionEnabled(key)) {
                     dpm.addUserRestriction(admin, key)
                 } else {
                     dpm.clearUserRestriction(admin, key)
@@ -212,7 +219,7 @@ object ManagedProtectionController {
             }.onFailure(failures::add)
         }
         runCatching {
-            dpm.setLockTaskPackages(admin, packages.toTypedArray())
+            dpm.setLockTaskPackages(admin, snapshot.lockTaskPackages)
         }.onFailure(failures::add)
 
         if (failures.isNotEmpty()) {
