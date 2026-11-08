@@ -1,6 +1,6 @@
 # Requirement Traceability Matrix — ThiefAlertSeQure
 
-> Audit update: `feat/custom-audio-and-reliability` at `3f729554f26cd878785edf77ef86169fcbbba011` (2026-11-08).
+> Audit update: `feat/custom-audio-and-reliability` at `6f869659ebf1ebd3babcce95ebed49af5acc6dac` (2026-11-08).
 > Contract: [Universal Maximum Protection Specification](UNIVERSAL_MAXIMUM_PROTECTION_SPEC.md).
 > Status labels: **Implemented** means source code exists; **Unit-covered** means a named local test exists; **CI-verified** means the exact baseline commit passed GitHub Actions; **Device-unverified** means no physical-device evidence is recorded for that case. These labels are deliberately not interchangeable.
 
@@ -9,7 +9,7 @@
 | Area | Evidence at baseline | Status / limitation |
 |---|---|---|
 | Branch / PR | PR #2 is open and draft; latest audit commit is `3f729554f26cd878785edf77ef86169fcbbba011` | Not merged |
-| CI | Exact-head runs `42457915610` (push) and `42457920077` (PR) passed on prior verified commit `bba3aec8c8b9b6f553b72cbd569ea3b1f99043ec`. Earlier runs `42457873498` and `42457875251` on `b390038` were cancelled, not passed. The persistence-hardening commits after `bba3aec` require a fresh exact-head CI run | Prior head passed; new audit head CI pending |
+| CI | Prior exact-head runs 42457915610 (push) and 42457920077 (PR) passed on `bba3aec8c8b9b6f553b72cbd569ea3b1f99043ec`. New persistence-hardening changes are on `6f869659ebf1ebd3babcce95ebed49af5acc6dac`. Latest push run 42472443284 failed before Gradle startup because downloading Gradle 8.11.1 from services.gradle.org timed out; PR run 42472446467 is the current exact-head verification attempt | Previous head passed; current head awaiting a completed CI run; latest observed failure is infrastructure/network timeout, not a test assertion |
 | Unit tests | `:app:testDebugUnitTest` in workflow | Unit tests execute in CI |
 | Lint | `:app:lintDebug` in workflow | CI-verified |
 | APK | Workflow assembles release only when persistent signing secrets exist; otherwise debug APK | Packaging verified; signing mode depends on secrets |
@@ -35,7 +35,7 @@
 | CORE-12 | Only authenticated owner flow clears latched alarm | `OwnerAuthenticationCoordinator.kt`, auth coordinator, engine | auth and keyguard state tests | Unit-covered; real biometric/keyguard integration needs devices |
 | CORE-13 | Stale AlarmManager callbacks cannot affect a newer countdown | `ProtectionEngine.kt`, deadline receiver, scheduler | `staleDeadlineCallbackCannotMatchNewCountdown` | Unit-covered |
 | CORE-14 | Persistence write failures do not report an uncommitted state as saved | `ProtectionStore.kt` | `writeUnlocked` uses synchronous `commit()`; `update()` returns the prior state if commit fails | Source behavior reviewed; failure-injection test still missing |
-| CORE-15 | Corrupt or partially written state fails safely and is recoverable | `ProtectionState.fromPersisted`, `ProtectionStore.kt`, boot recovery | `ProtectionStatePersistenceTest`: unknown mode, malformed countdown, negative monotonic deadline, missing state, valid countdown, latched alarm normalization | Source fix + unit regression tests added; CI pending; Android SharedPreferences corruption/device recovery remains unverified |
+| CORE-15 | Corrupt or partially written state fails safely and is recoverable | `ProtectionState.fromPersisted`, `ProtectionStore.kt`, boot recovery | `ProtectionEngineTest.partialOrCorruptPersistedStateFailsClosed`, `validPersistedCountdownRetainsItsDeadline`; malformed preference reads are caught in store | Fail-closed decoder implemented and unit-covered; Android SharedPreferences corruption injection still needs instrumentation coverage |
 | CORE-16 | Service process death / duplicate receiver / queue saturation do not create duplicate or lost transitions | receiver, coordinator, monitor service | No instrumentation/process-death suite identified | Needs integration tests |
 | CORE-17 | Monitoring opt-out stops monitoring without clearing a latched alarm | monitor service, boot receiver, policy | `ProtectionMonitorPolicyTest` | Unit-covered; lifecycle integration unverified |
 
