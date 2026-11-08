@@ -9,8 +9,13 @@ import androidx.core.content.ContextCompat
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        // Run migration/baseline initialization for every boot receiver entry path.
-        PowerTransitionCoordinator.initializeBaseline(context)
+        // BOOT_COMPLETED is authoritative even on devices where Settings.Global.BOOT_COUNT
+        // is unreadable. Invalidate the previous boot's charger baseline before processing
+        // any later power event; package-update and exact-alarm callbacks preserve it.
+        PowerTransitionCoordinator.initializeBaseline(
+            context,
+            forceBootReconciliation = intent.action == Intent.ACTION_BOOT_COMPLETED
+        )
         if (intent.action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED) {
             if (Build.VERSION.SDK_INT >= 31 && context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()) {
                 val state = enforceMonitorOptOut(context)
@@ -40,6 +45,13 @@ class BootReceiver : BroadcastReceiver() {
             when {
                 old.mode == ProtectionMode.ALARM_TRIGGERED -> old
                 !monitorEnabled(context) -> stateBeforeRestore
+                charging == null && old.mode == ProtectionMode.COUNTDOWN -> ProtectionState(
+                    ProtectionMode.COUNTDOWN,
+                    now + 1_000L,
+                    now,
+                    0L,
+                    BOOT_RECONCILIATION_PENDING
+                )
                 charging == null -> old
                 else -> ProtectionEngine.restoreAfterBoot(old, charging, now, elapsed, boot)
             }
