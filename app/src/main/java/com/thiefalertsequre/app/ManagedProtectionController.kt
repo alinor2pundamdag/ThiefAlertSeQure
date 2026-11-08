@@ -132,39 +132,25 @@ object ManagedProtectionController {
             "Only the enrolled Device Owner can remove managed policies."
         }
 
-        // Exit kiosk first so the owner can regain navigation even if a policy
-        // restoration call below fails.
-        runCatching { activity.stopLockTask() }
-
         val dpm = activity.getSystemService(DevicePolicyManager::class.java)
         val admin = admin(activity)
         val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-        if (prefs.contains(KEY_VERSION)) {
-            check(prefs.edit().putBoolean(KEY_RECOVERY_PENDING, true).commit()) {
-                "Could not mark managed-policy rollback as pending; no policy restoration was attempted."
+        // Legacy installations have no original baseline. Persist a recovery
+        // marker before changing navigation or policy so restart cannot re-enter kiosk.
+        if (!prefs.contains(KEY_VERSION)) {
+            check(prefs.edit().putInt(KEY_VERSION, 0).commit()) {
+                "Could not persist the legacy managed-policy recovery marker."
             }
-            restorePersistedSnapshot(activity, dpm, admin)
-            return
+        }
+        check(prefs.edit().putBoolean(KEY_RECOVERY_PENDING, true).commit()) {
+            "Could not mark managed-policy rollback as pending; no policy restoration was attempted."
         }
 
-        // Compatibility recovery for installations that enabled managed mode
-        // before rollback snapshots existed. Mark recovery as pending first so
-        // the UI keeps the retry/exit action available if any DPM call fails.
-        check(prefs.edit()
-            .putInt(KEY_VERSION, 0)
-            .putBoolean(KEY_RECOVERY_PENDING, true)
-            .commit()) {
-            "Could not persist the legacy managed-policy recovery marker."
-        }
-        restoreEmergencyDefaults(
-            dpm,
-            admin,
-            prefs,
-            IllegalStateException(
-                "This installation predates rollback snapshots; the original Device Owner policy baseline is unknown."
-            )
-        )
+        // The pending marker is durable before we exit kiosk, so a process death
+        // at any point leaves the app able to reopen the recovery action.
+        runCatching { activity.stopLockTask() }
+        restorePersistedSnapshot(activity, dpm, admin)
     }
 
     fun startIfConfigured(activity: Activity) {
