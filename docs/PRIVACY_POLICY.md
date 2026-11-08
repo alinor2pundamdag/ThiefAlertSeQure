@@ -8,7 +8,7 @@
 
 # ThiefAlertSeQure Privacy Policy
 
-**Effective date:** 5 November 2026
+**Effective date:** 8 November 2026
 
 ## 1. Overview
 
@@ -24,6 +24,7 @@ The app stores only the operational information needed to provide its functions:
 - The previous alarm-stream volume while an alarm is active, so it can be restored after successful disarm.
 - A bounded local protection event history (up to 100 entries), which the owner can review or export as CSV.
 - Monitor preferences such as enablement, motion sensitivity and optional battery-alert threshold.
+- The owner's local preference for enabling or disabling the alarm flashlight.
 - URI references and Android read-access grants for owner-selected alarm and secondary-alert audio. The app stores references/permissions, not a second copy of the selected audio file.
 
 This information is stored in the app's private local preferences. The app does not upload it.
@@ -40,6 +41,7 @@ Depending on Android version and the user's choices, the app may use:
 - Alarm scheduling; precise alarm access is a special Android setting on supported versions.
 - Notifications and a foreground media-playback service while an alarm is active.
 - Alarm-stream volume control to temporarily raise the alarm volume and restore the previous level after successful disarm.
+- Android CameraManager torch control to pulse a compatible device LED only while the alarm is latched. This API does not request CAMERA permission, open the camera for capture, or collect images/video. Flash hardware is optional and may be unavailable or temporarily busy.
 - Android's Storage Access Framework document/folder picker to read audio files explicitly selected by the owner and to write an event-history CSV only when the owner chooses an export destination.
 - Device Owner / Lock Task APIs only if the device has been separately provisioned as a fully managed device and the user explicitly enables managed mode.
 
@@ -55,11 +57,11 @@ Operational preferences remain in the app's private storage until changed by the
 
 ## 7. User choice
 
-The first-launch notice provides Accept & continue and Decline & continue. The choice is recorded locally and distinctly. Both choices continue to the same essential local protection functions. Declining is not represented as consent and does not disable the core local alarm. The notice can be reviewed again from Settings.
+The first-launch notice explains local data handling, alarm behavior, optional flashlight behavior and platform limitations. The owner acknowledges the notice with “I understand & continue”; that acknowledgement is stored locally. The notice can be reviewed again from Settings.
 
 ## 8. Limitations
 
-This privacy policy does not promise that the app can defeat Android force-stop, uninstall, physical shutdown, bootloader/recovery operations, battery removal, or manufacturer-specific controls. Alarm delivery may be affected by operating-system restrictions and user-controlled permissions.
+The flashlight is an optional visual output. It may fail when the LED is unavailable, another camera resource is using it, or Android/OEM thermal and hardware policies restrict it; the audio alarm remains independent. Flashing light may affect photosensitive users, and the owner can disable it in Settings. This privacy policy does not promise that the app can defeat Android force-stop, uninstall, physical shutdown, bootloader/recovery operations, battery removal, or manufacturer-specific controls. Alarm delivery may be affected by operating-system restrictions and user-controlled permissions.
 
 ## 9. Changes
 
