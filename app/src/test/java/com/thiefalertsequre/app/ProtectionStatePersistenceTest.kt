@@ -35,6 +35,19 @@ class ProtectionStatePersistenceTest {
         )
     }
 
+    @Test fun rebootPendingCountdownUsesDedicatedSentinelOnlyWithoutMonotonicDeadline() {
+        val pending = ProtectionState.fromPersisted(
+            "COUNTDOWN", 51_000L, 50_000L, 0L, BOOT_RECONCILIATION_PENDING
+        )
+        assertEquals(ProtectionMode.COUNTDOWN, pending.mode)
+        assertEquals(BOOT_RECONCILIATION_PENDING, pending.bootCount)
+
+        val invalid = ProtectionState.fromPersisted(
+            "COUNTDOWN", 51_000L, 50_000L, 1L, BOOT_RECONCILIATION_PENDING
+        )
+        assertEquals(ProtectionMode.ALARM_TRIGGERED, invalid.mode)
+    }
+
     @Test fun validCountdownWithoutBootIdentityRemainsPendingAndSafe() {
         val expected = ProtectionState(ProtectionMode.COUNTDOWN, 11_000L, 1_000L, 0L, -1)
         assertEquals(
