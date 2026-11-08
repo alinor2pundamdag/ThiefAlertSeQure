@@ -486,10 +486,7 @@ class SettingsActivity : FragmentActivity() {
      * It never pretends to toggle an OEM's private App launch controls.
      */
     private fun renderAppLaunchManagementSection() {
-        val prefs = getSharedPreferences("app_launch_setup_v1", MODE_PRIVATE)
-        val honorFamily = AndroidDeviceCompatibility.family(Build.MANUFACTURER, Build.BRAND) ==
-            AndroidDeviceCompatibility.Family.HONOR_HUAWEI
-        val manual = prefs.getBoolean("show_manual_controls", honorFamily)
+        val family = AndroidDeviceCompatibility.family(Build.MANUFACTURER, Build.BRAND)
         val card = MaterialCardView(this).apply {
             radius = dp(18).toFloat()
             cardElevation = 0f
@@ -501,7 +498,7 @@ class SettingsActivity : FragmentActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(16), dp(16), dp(16))
         }
-        content.addView(text("APP LAUNCH MANAGEMENT", 11f, R.color.tas_primary, true))
+        content.addView(text("DEVICE-SPECIFIC BACKGROUND SETUP", 11f, R.color.tas_primary, true))
         content.addView(space(8))
         content.addView(text(
             AndroidDeviceCompatibility.deviceSummary(
@@ -511,77 +508,98 @@ class SettingsActivity : FragmentActivity() {
         ))
         content.addView(space(8))
         content.addView(text(
-            "Choose which setup guide to show. This in-app choice does not change the phone's Manage automatically switch or grant permissions. Android/OEM settings remain user-controlled.",
+            "Detected automatically from this phone. The instructions below are selected for this device family and Android version. OEM settings are controlled by Android/the manufacturer, not by this app.",
             13f, R.color.tas_muted
         ))
         content.addView(space(10))
-        content.addView(action(if (!manual) "Manage automatically  •  SELECTED" else "Manage automatically") {
-            prefs.edit().putBoolean("show_manual_controls", false).apply()
-            render()
-        })
-        content.addView(action(if (manual) "Manage manually  •  SELECTED" else "Manage manually") {
-            prefs.edit().putBoolean("show_manual_controls", true).apply()
-            render()
-        })
-        content.addView(space(4))
-        if (manual) {
-            content.addView(text("MANUAL DEVICE CONTROLS", 11f, R.color.tas_primary, true))
-            content.addView(space(6))
-            AndroidDeviceCompatibility.LaunchControl.values().forEach { control ->
-                val item = MaterialCardView(this).apply {
-                    radius = dp(14).toFloat()
-                    cardElevation = 0f
-                    strokeWidth = dp(1)
-                    strokeColor = getColor(R.color.tas_surface_variant)
-                    setCardBackgroundColor(getColor(R.color.tas_background))
-                }
-                val itemContent = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    setPadding(dp(12), dp(12), dp(12), dp(8))
-                }
-                itemContent.addView(text(control.title, 15f, R.color.tas_text, true))
-                itemContent.addView(space(5))
-                itemContent.addView(text(
-                    AndroidDeviceCompatibility.launchControlGuide(Build.MANUFACTURER, Build.BRAND, control),
-                    12f, R.color.tas_muted
-                ))
-                itemContent.addView(space(6))
-                itemContent.addView(action("Open device settings for " + control.title) {
-                    openLaunchControlSettings()
-                })
-                item.addView(itemContent)
-                content.addView(item, matchWrap())
-                content.addView(space(8))
+        content.addView(text(
+            AndroidDeviceCompatibility.backgroundSettingsGuide(Build.MANUFACTURER, Build.BRAND),
+            13f, R.color.tas_text
+        ))
+        content.addView(space(10))
+        content.addView(text(
+            when (family) {
+                AndroidDeviceCompatibility.Family.HONOR_HUAWEI ->
+                    "HONOR/Huawei: open Settings, search for App launch, select ThiefAlertSeQure, turn Manage automatically OFF, enable Auto-launch, Secondary launch, and Run in background, then confirm."
+                AndroidDeviceCompatibility.Family.SAMSUNG ->
+                    "Samsung: there is no equivalent three-switch panel. The key control is Never sleeping apps. Do not add this app to Sleeping apps or Deep sleeping apps."
+                AndroidDeviceCompatibility.Family.XIAOMI ->
+                    "Xiaomi/Redmi/POCO: enable Background autostart and choose No restrictions for battery use when those options exist."
+                AndroidDeviceCompatibility.Family.OPPO_REALME_ONEPLUS ->
+                    "OPPO/realme/OnePlus: enable Auto launch and allow background activity where your software version exposes those controls."
+                AndroidDeviceCompatibility.Family.VIVO_IQOO ->
+                    "vivo/iQOO: allow background power use and Autostart/Background start where your software version exposes them."
+                AndroidDeviceCompatibility.Family.GOOGLE_PIXEL ->
+                    "Pixel: use Android's App battery usage controls. There is no separate HONOR-style Auto-launch/Secondary launch panel."
+                AndroidDeviceCompatibility.Family.MOTOROLA ->
+                    "Motorola: use Android App battery usage controls. A separate OEM auto-start switch may not exist."
+                AndroidDeviceCompatibility.Family.OTHER ->
+                    "Other Android devices: use only the background/autostart controls actually provided by this phone. Do not enable unrelated permissions."
+            },
+            12f, R.color.tas_text
+        ))
+        content.addView(space(10))
+        AndroidDeviceCompatibility.LaunchControl.values().forEach { control ->
+            val item = MaterialCardView(this).apply {
+                radius = dp(14).toFloat()
+                cardElevation = 0f
+                strokeWidth = dp(1)
+                strokeColor = getColor(R.color.tas_surface_variant)
+                setCardBackgroundColor(getColor(R.color.tas_background))
             }
-        } else {
-            content.addView(text(
-                "Automatic management leaves startup and background decisions to the phone. If charger monitoring is stopped or delayed, switch to Manage manually where your device supports it and review the three controls.",
+            val itemContent = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), dp(12), dp(12), dp(8))
+            }
+            itemContent.addView(text(control.title, 15f, R.color.tas_text, true))
+            itemContent.addView(space(5))
+            itemContent.addView(text(
+                AndroidDeviceCompatibility.launchControlGuide(
+                    Build.MANUFACTURER, Build.BRAND, control, Build.MODEL,
+                    Build.VERSION.RELEASE, Build.VERSION.SDK_INT
+                ),
                 12f, R.color.tas_muted
             ))
-            content.addView(space(8))
-            content.addView(action("Open device App launch / app settings") {
-                openLaunchControlSettings()
+            itemContent.addView(space(6))
+            itemContent.addView(action(
+                if (family == AndroidDeviceCompatibility.Family.HONOR_HUAWEI)
+                    "Open Settings — search App launch"
+                else
+                    "Open this phone's supported Settings"
+            ) {
+                openLaunchControlSettings(control)
             })
+            item.addView(itemContent)
+            content.addView(item, matchWrap())
+            content.addView(space(8))
         }
-        content.addView(space(4))
         content.addView(text(
-            "The app cannot verify OEM-only switch states. After changing them, return here and test charger removal with the screen off and while another app is open.",
+            "OEM switch status: Not readable by ordinary Android apps. These cards are device-specific instructions, not a false ON/OFF status. After changing settings, return and test monitoring with the screen off.",
             11f, R.color.tas_muted
         ))
         card.addView(content)
         root.addView(card, matchWrap())
     }
 
-    private fun openLaunchControlSettings() {
+    private fun openLaunchControlSettings(control: AndroidDeviceCompatibility.LaunchControl) {
+        val family = AndroidDeviceCompatibility.family(Build.MANUFACTURER, Build.BRAND)
         val primary = AndroidDeviceCompatibility.launchControlSettingsIntent(
             Build.MANUFACTURER, Build.BRAND, packageName
         )
-        AndroidDeviceCompatibility.open(
+        val opened = AndroidDeviceCompatibility.open(
             this,
             primary,
             AndroidDeviceCompatibility.appInfoIntent(packageName),
             Intent(Settings.ACTION_SETTINGS)
         )
+        if (opened) {
+            val nextStep = if (family == AndroidDeviceCompatibility.Family.HONOR_HUAWEI) {
+                "In Settings, use Search → App launch → ThiefAlertSeQure. Configure Manage automatically and all three switches."
+            } else {
+                "In Settings, follow the " + control.title + " instructions shown in ThiefAlertSeQure."
+            }
+            android.widget.Toast.makeText(this, nextStep, android.widget.Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun openAppBatterySettings() {
