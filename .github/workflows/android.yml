@@ -221,7 +221,7 @@ jobs:
           BADGING="$("$BUILD_TOOLS/aapt" dump badging "$APK_PATH")"
           PACKAGE_LINE="$(printf '%s\\n' "$BADGING" | grep -m1 "^package:")"
           echo "APK metadata: $PACKAGE_LINE"
-          EXPECTED_PACKAGE="name='com.thiefalertsequre.app'"
+          EXPECTED_PACKAGE="name='com.thiefalertsequre.app.v113test'"
           EXPECTED_CODE="versionCode='$APP_VERSION_CODE'"
           EXPECTED_NAME="versionName='$APP_VERSION_NAME'"
           for EXPECTED in "$EXPECTED_PACKAGE" "$EXPECTED_CODE" "$EXPECTED_NAME"; do
