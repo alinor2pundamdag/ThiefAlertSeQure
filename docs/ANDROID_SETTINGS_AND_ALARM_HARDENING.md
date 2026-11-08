@@ -47,7 +47,7 @@ Scrollable screens apply system-bar and display-cutout insets to handle Android 
 - Power receiver work is serialized on a single-thread executor so connect/disconnect tasks do not race on independent worker threads.
 - A CONNECTED event is accepted only when the live external-power state is positively confirmed as connected.
 - Disconnected or unknown live state does not overwrite the persisted baseline or re-arm protection.
-- Connect and disconnect confirmation use three consecutive live samples (100 ms between connect samples; 120 ms between disconnect samples), followed by a final live-state read. This reduces confirmation delay while retaining consecutive-sample validation.
+- Connect and disconnect confirmation use a five-read window with at least three consecutive matching live samples (100 ms between reads), followed by a final live-state read. The normal sampling window is about 400 ms and tolerates one or two stale snapshots without treating unknown power as unplugged.
 - A unit test covers true / false / unknown acceptance policy.
 - Existing disconnect debounce, generation checks, countdown, reboot recovery, and alarm deadline validation are preserved.
 
