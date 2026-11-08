@@ -20,7 +20,7 @@ import androidx.core.view.WindowInsetsCompat
 object AndroidDeviceCompatibility {
     enum class Family {
         SAMSUNG, HONOR_HUAWEI, XIAOMI, OPPO_REALME_ONEPLUS, VIVO_IQOO,
-        GOOGLE_PIXEL, MOTOROLA, OTHER
+        GOOGLE_PIXEL, MOTOROLA, ASUS, SONY, NOTHING, TRANSSION, ZTE, LENOVO, OTHER
     }
 
     fun family(manufacturer: String, brand: String): Family {
@@ -32,7 +32,13 @@ object AndroidDeviceCompatibility {
             "oppo" in value || "realme" in value || "oneplus" in value -> Family.OPPO_REALME_ONEPLUS
             "vivo" in value || "iqoo" in value -> Family.VIVO_IQOO
             "google" in value || "pixel" in value -> Family.GOOGLE_PIXEL
-            "motorola" in value || "lenovo" in value -> Family.MOTOROLA
+            "motorola" in value -> Family.MOTOROLA
+            "asus" in value -> Family.ASUS
+            "sony" in value || "xperia" in value -> Family.SONY
+            "nothing" in value -> Family.NOTHING
+            "tecno" in value || "infinix" in value || "itel" in value -> Family.TRANSSION
+            "zte" in value || "nubia" in value -> Family.ZTE
+            "lenovo" in value -> Family.LENOVO
             else -> Family.OTHER
         }
     }
@@ -45,6 +51,12 @@ object AndroidDeviceCompatibility {
         Family.VIVO_IQOO -> "vivo / iQOO"
         Family.GOOGLE_PIXEL -> "Google Pixel"
         Family.MOTOROLA -> "Motorola"
+        Family.ASUS -> "ASUS"
+        Family.SONY -> "Sony Xperia"
+        Family.NOTHING -> "Nothing OS"
+        Family.TRANSSION -> "TECNO / Infinix / itel"
+        Family.ZTE -> "ZTE / nubia"
+        Family.LENOVO -> "Lenovo Android"
         Family.OTHER -> if (brand.isNotBlank()) brand else "Android device"
     }
 
@@ -95,8 +107,8 @@ object AndroidDeviceCompatibility {
                 "Google Pixel: App info → App battery usage → Allow background usage; choose Unrestricted if the option is available. Pixel generally relies on Android's standard battery controls rather than a separate OEM auto-start switch."
             Family.MOTOROLA ->
                 "Motorola: App info → App battery usage / Battery; allow background usage and choose Unrestricted where available. Also review Adaptive Battery if Android offers an app-specific control. Menu names vary by model."
-            Family.OTHER ->
-                "Other Android brands: Open App info → Battery and allow background activity / unrestricted use if available. Search Settings for Auto-start, Startup manager, Background activity, or App launch. Some devices have no separate OEM auto-start control."
+            Family.ASUS, Family.SONY, Family.NOTHING, Family.TRANSSION, Family.ZTE, Family.LENOVO, Family.OTHER ->
+                "This Android manufacturer may use a model- and region-specific battery manager. Open App info → Battery and allow background activity / unrestricted use if available. Search Settings for Auto-start, Startup manager, Background activity, or App launch. If no such control exists, use Android's standard battery controls; do not follow instructions for a different brand. Some devices have no separate OEM auto-start control."
         }
         return "${familyLabel(manufacturer, brand)} guidance:\n$vendor\n\n$common\n\nIf a named menu is missing, use the Settings search box with the terms above. These are manual OEM controls; Android does not provide a public API that lets an ordinary app switch them on automatically."
     }
@@ -124,7 +136,8 @@ object AndroidDeviceCompatibility {
         Family.SAMSUNG, Family.XIAOMI, Family.OPPO_REALME_ONEPLUS, Family.VIVO_IQOO ->
             if (control == LaunchControl.RUN_IN_BACKGROUND) appInfoIntent(packageName)
             else Intent(Settings.ACTION_SETTINGS)
-        Family.GOOGLE_PIXEL, Family.MOTOROLA, Family.OTHER -> appInfoIntent(packageName)
+        Family.GOOGLE_PIXEL, Family.MOTOROLA, Family.ASUS, Family.SONY, Family.NOTHING,
+        Family.TRANSSION, Family.ZTE, Family.LENOVO, Family.OTHER -> appInfoIntent(packageName)
     }
 
     fun launchControlGuide(
@@ -170,7 +183,8 @@ object AndroidDeviceCompatibility {
                 LaunchControl.SECONDARY_LAUNCH -> "Pixel does not expose an OEM Secondary launch toggle. Android controls background activity launches; there is no equivalent switch to enable here."
                 LaunchControl.RUN_IN_BACKGROUND -> "Open App info → App battery usage → Allow background usage, and choose Unrestricted if available."
             }
-            Family.MOTOROLA, Family.OTHER -> when (control) {
+            Family.MOTOROLA, Family.ASUS, Family.SONY, Family.NOTHING, Family.TRANSSION,
+            Family.ZTE, Family.LENOVO, Family.OTHER -> when (control) {
                 LaunchControl.AUTO_LAUNCH -> "This Android build may not provide a separate Auto-launch switch. Search Settings for Auto-start, Startup manager, or App launch. If none exists, Android manages eligible startup behavior."
                 LaunchControl.SECONDARY_LAUNCH -> "A separate Secondary launch switch may not exist on this device. Search Settings for Background start or associated app-launch permissions; do not enable unrelated permissions."
                 LaunchControl.RUN_IN_BACKGROUND -> "Open App info → App battery usage / Battery and allow background usage or Unrestricted where offered. Menu names vary by model and OS version."
@@ -198,7 +212,8 @@ object AndroidDeviceCompatibility {
                 LaunchControl.RUN_IN_BACKGROUND -> "Background power consumption management"
             }
             Family.GOOGLE_PIXEL, Family.MOTOROLA -> "App battery usage"
-            Family.OTHER -> "Auto-start / Background activity"
+            Family.ASUS, Family.SONY, Family.NOTHING, Family.TRANSSION, Family.ZTE, Family.LENOVO, Family.OTHER ->
+                "App battery usage / Auto-start"
         }
 
     fun appInfoIntent(packageName: String): Intent =
