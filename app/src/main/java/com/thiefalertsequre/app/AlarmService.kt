@@ -87,7 +87,7 @@ class AlarmService : Service() {
      * Failure to access a flash unit never blocks or stops alarm audio.
      */
     private fun syncAlarmFlash() {
-        if (AlarmFlashSettings.isEnabled(this)) {
+        if (AlarmFlashSettings.isEnabled(this) && AlarmFlashSettings.shouldRun(ProtectionStore(this).read().mode)) {
             val controller = flashController ?: AlarmFlashController(this, volumeHandler) { event, detail ->
                 LocalTamperHistory.record(this, event, detail)
             }.also { flashController = it }
