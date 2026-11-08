@@ -47,7 +47,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 - Audio uses USAGE_ALARM and requests maximum available alarm-stream volume.
 - Prior alarm volume is saved and restored after successful disarm. If service is destroyed while alarm remains latched, it does not restore volume prematurely.
 - While AlarmService is active, the alarm stream maximum is reasserted every 500 ms; this is best-effort volume control, not hardware-key interception.
-- Notification is ongoing and opens a show-when-locked authentication Activity.
+- Notification is ongoing and opens the authentication Activity. The full-screen dashboard is optional, requires explicit owner opt-in, and on Android 14+ is attached only when `canUseFullScreenIntent()` confirms system access. If denied, the ordinary high-priority notification remains.
 - DND is not silently changed. Users configure alarm exceptions in Android settings.
 - Android/OEM policies can constrain sound output and background execution.
 
