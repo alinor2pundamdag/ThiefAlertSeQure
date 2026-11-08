@@ -9,9 +9,32 @@ import android.os.UserManager
 
 /**
  * Optional, explicitly enabled Android Enterprise / fully-managed-device mode.
- * This never attempts to elevate an ordinary app to Device Owner.
+ *
+ * Before changing Device Owner policies, the controller persists the exact policy
+ * values owned by this admin. Disable and failed enable operations restore those
+ * values instead of assuming that every policy was previously unset.
  */
 object ManagedProtectionController {
+    private const val PREFS = "managed_protection_rollback"
+    private const val SNAPSHOT_VERSION = 1
+    private const val KEY_VERSION = "version"
+    private const val KEY_PACKAGES = "lock_task_packages"
+    private const val KEY_FEATURES = "lock_task_features"
+
+    private val restrictions = listOf(
+        UserManager.DISALLOW_FACTORY_RESET,
+        UserManager.DISALLOW_SAFE_BOOT,
+        UserManager.DISALLOW_DEBUGGING_FEATURES,
+        UserManager.DISALLOW_ADD_USER,
+        UserManager.DISALLOW_USB_FILE_TRANSFER
+    )
+
+    private data class PolicySnapshot(
+        val lockTaskPackages: Array<String>,
+        val lockTaskFeatures: Int,
+        val restrictionValues: Map<String, Boolean>
+    )
+
     fun isDeviceOwner(context: Context): Boolean =
         context.getSystemService(DevicePolicyManager::class.java)
             .isDeviceOwnerApp(context.packageName)
@@ -29,44 +52,92 @@ object ManagedProtectionController {
         check(isDeviceOwner(activity)) {
             "Device Owner provisioning is required. Standard device-admin activation is not sufficient."
         }
+
         val dpm = activity.getSystemService(DevicePolicyManager::class.java)
         val admin = admin(activity)
+        val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-        // Allow only this app in kiosk mode. Keep Keyguard available; omit GLOBAL_ACTIONS.
-        dpm.setLockTaskPackages(admin, arrayOf(activity.packageName))
-        dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD)
-
-        dpm.addUserRestriction(admin, UserManager.DISALLOW_FACTORY_RESET)
-        dpm.addUserRestriction(admin, UserManager.DISALLOW_SAFE_BOOT)
-        dpm.addUserRestriction(admin, UserManager.DISALLOW_DEBUGGING_FEATURES)
-        dpm.addUserRestriction(admin, UserManager.DISALLOW_ADD_USER)
-        if (Build.VERSION.SDK_INT >= 28) {
-            dpm.addUserRestriction(admin, UserManager.DISALLOW_USB_FILE_TRANSFER)
+        // Do not replace the original baseline when enable is retried or the app
+        // is already configured. The first snapshot is the rollback authority.
+        if (!prefs.contains(KEY_VERSION)) {
+            val restrictionsBefore = dpm.getUserRestrictions(admin)
+            val snapshot = PolicySnapshot(
+                lockTaskPackages = dpm.getLockTaskPackages(admin),
+                lockTaskFeatures = dpm.getLockTaskFeatures(admin),
+                restrictionValues = restrictions.associateWith { key ->
+                    restrictionsBefore.getBoolean(key, false)
+                }
+            )
+            persistSnapshot(prefs, snapshot)
         }
 
-        if (dpm.isLockTaskPermitted(activity.packageName)) {
+        try {
+            // Allow only this app in kiosk mode. Keep Keyguard available; omit GLOBAL_ACTIONS.
+            dpm.setLockTaskPackages(admin, arrayOf(activity.packageName))
+            dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD)
+
+            restrictions.forEach { key -> dpm.addUserRestriction(admin, key) }
+
+            check(dpm.isLockTaskPermitted(activity.packageName)) {
+                "Android did not accept this app in the Lock Task allowlist."
+            }
             activity.startLockTask()
             return true
+        } catch (failure: Throwable) {
+            val rollbackFailure = runCatching { restorePersistedSnapshot(activity, dpm, admin) }.exceptionOrNull()
+            if (rollbackFailure != null) {
+                failure.addSuppressed(rollbackFailure)
+                throw IllegalStateException(
+                    "Managed lockdown could not be enabled and automatic rollback was incomplete. " +
+                        "Keep the app installed and use its managed-lockdown recovery action; " +
+                        "do not restart or reset the device until policies are restored.",
+                    failure
+                )
+            }
+            throw failure
         }
-        return false
     }
 
     fun disable(activity: Activity) {
-        check(isDeviceOwner(activity)) { "Only the enrolled Device Owner can remove managed policies." }
+        check(isDeviceOwner(activity)) {
+            "Only the enrolled Device Owner can remove managed policies."
+        }
+
+        // Exit kiosk first so the owner can regain navigation even if a policy
+        // restoration call below fails.
         runCatching { activity.stopLockTask() }
+
         val dpm = activity.getSystemService(DevicePolicyManager::class.java)
         val admin = admin(activity)
-        dpm.clearUserRestriction(admin, UserManager.DISALLOW_FACTORY_RESET)
-        dpm.clearUserRestriction(admin, UserManager.DISALLOW_SAFE_BOOT)
-        dpm.clearUserRestriction(admin, UserManager.DISALLOW_DEBUGGING_FEATURES)
-        dpm.clearUserRestriction(admin, UserManager.DISALLOW_ADD_USER)
-        if (Build.VERSION.SDK_INT >= 28) {
-            dpm.clearUserRestriction(admin, UserManager.DISALLOW_USB_FILE_TRANSFER)
+        val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+        if (prefs.contains(KEY_VERSION)) {
+            restorePersistedSnapshot(activity, dpm, admin)
+            return
         }
-        if (Build.VERSION.SDK_INT >= 28) {
+
+        // Compatibility recovery for installations that enabled managed mode
+        // before rollback snapshots existed. Their original policy baseline was
+        // never recorded, so restore the documented Android defaults as safely
+        // as possible and make that limitation explicit in the UI/docs.
+        val failures = mutableListOf<Throwable>()
+        restrictions.forEach { key ->
+            runCatching { dpm.clearUserRestriction(admin, key) }
+                .onFailure(failures::add)
+        }
+        runCatching {
             dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
+        }.onFailure(failures::add)
+        runCatching { dpm.setLockTaskPackages(admin, emptyArray()) }
+            .onFailure(failures::add)
+
+        if (failures.isNotEmpty()) {
+            throw IllegalStateException(
+                "Legacy managed policies were only partially cleared. Original settings cannot be " +
+                    "reconstructed because this installation predates rollback snapshots.",
+                failures.first()
+            )
         }
-        dpm.setLockTaskPackages(admin, emptyArray())
     }
 
     fun startIfConfigured(activity: Activity) {
@@ -74,6 +145,70 @@ object ManagedProtectionController {
             activity.getSystemService(DevicePolicyManager::class.java).isLockTaskPermitted(activity.packageName)
         ) {
             runCatching { activity.startLockTask() }
+        }
+    }
+
+    private fun persistSnapshot(
+        prefs: android.content.SharedPreferences,
+        snapshot: PolicySnapshot
+    ) {
+        val editor = prefs.edit()
+            .putInt(KEY_VERSION, SNAPSHOT_VERSION)
+            .putStringSet(KEY_PACKAGES, snapshot.lockTaskPackages.toSet())
+            .putInt(KEY_FEATURES, snapshot.lockTaskFeatures)
+        snapshot.restrictionValues.forEach { (key, enabled) ->
+            editor.putBoolean("restriction:$key", enabled)
+        }
+        check(editor.commit()) {
+            "Could not persist the original managed-device policies; no lockdown changes were applied."
+        }
+    }
+
+    private fun restorePersistedSnapshot(
+        context: Context,
+        dpm: DevicePolicyManager,
+        admin: ComponentName
+    ) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        check(prefs.getInt(KEY_VERSION, -1) == SNAPSHOT_VERSION) {
+            "Managed-policy rollback data is invalid. No destructive policy reset was attempted."
+        }
+
+        val packages = prefs.getStringSet(KEY_PACKAGES, null)
+            ?: throw IllegalStateException("Managed-policy rollback package list is missing.")
+        check(restrictions.all { prefs.contains("restriction:$it") }) {
+            "Managed-policy rollback restriction data is incomplete."
+        }
+
+        val failures = mutableListOf<Throwable>()
+        // Attempt every restoration independently so one OEM/API failure does
+        // not prevent the remaining restrictions and navigation policy restoring.
+        runCatching {
+            dpm.setLockTaskFeatures(admin, prefs.getInt(KEY_FEATURES, 0))
+        }.onFailure(failures::add)
+        restrictions.forEach { key ->
+            runCatching {
+                if (prefs.getBoolean("restriction:$key", false)) {
+                    dpm.addUserRestriction(admin, key)
+                } else {
+                    dpm.clearUserRestriction(admin, key)
+                }
+            }.onFailure(failures::add)
+        }
+        runCatching {
+            dpm.setLockTaskPackages(admin, packages.toTypedArray())
+        }.onFailure(failures::add)
+
+        if (failures.isNotEmpty()) {
+            throw IllegalStateException(
+                "Managed-policy rollback is incomplete. The saved original policy snapshot was retained " +
+                    "so recovery can be retried.",
+                failures.first()
+            )
+        }
+
+        check(prefs.edit().clear().commit()) {
+            "Policies were restored, but rollback metadata could not be cleared. Retry disable to verify recovery."
         }
     }
 
