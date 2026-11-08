@@ -4,6 +4,40 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ProtectionEngineTest {
+
+    @Test fun emptyPersistedStateDefaultsToDisarmed() {
+        assertEquals(
+            ProtectionState(),
+            ProtectionState.fromPersisted(null, 0L, 0L, 0L, -1)
+        )
+    }
+
+    @Test fun partialOrCorruptPersistedStateFailsClosed() {
+        assertEquals(
+            ProtectionMode.ALARM_TRIGGERED,
+            ProtectionState.fromPersisted(null, 0L, 10L, 0L, -1, hasOtherStateFields = true).mode
+        )
+        assertEquals(
+            ProtectionMode.ALARM_TRIGGERED,
+            ProtectionState.fromPersisted("UNKNOWN_MODE", 0L, 10L, 0L, -1).mode
+        )
+        assertEquals(
+            ProtectionMode.ALARM_TRIGGERED,
+            ProtectionState.fromPersisted(ProtectionMode.COUNTDOWN.name, 0L, 10L, 0L, -1).mode
+        )
+    }
+
+    @Test fun validPersistedCountdownRetainsItsDeadline() {
+        val restored = ProtectionState.fromPersisted(
+            ProtectionMode.COUNTDOWN.name, 20_000L, 10_000L, 30_000L, 4
+        )
+        assertEquals(ProtectionMode.COUNTDOWN, restored.mode)
+        assertEquals(20_000L, restored.deadlineEpochMs)
+        assertEquals(30_000L, restored.deadlineElapsedRealtimeMs)
+        assertEquals(4, restored.bootCount)
+    }
+
+
     @Test fun plugInArms() {
         assertEquals(ProtectionMode.ARMED, ProtectionEngine.chargerConnected(ProtectionState(), 100L).mode)
     }
