@@ -63,7 +63,11 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         applyAlarmWindowPolicy()
 
-        if (!getSharedPreferences("privacy_notice_v1", MODE_PRIVATE).contains("decision")) {
+        val privacyDecision = getSharedPreferences("privacy_notice_v1", MODE_PRIVATE)
+            .getString("decision", null)
+        // Migrate prior positive acknowledgements. A previous "declined" value
+        // must see the updated notice because the decline path no longer exists.
+        if (privacyDecision != "accepted" && privacyDecision != "acknowledged") {
             showPrivacyScreen()
             return
         }
