@@ -22,6 +22,8 @@ object ManagedProtectionController {
     private const val KEY_FEATURES = "lock_task_features"
     private const val KEY_RECOVERY_PENDING = "recovery_pending"
 
+    // Snapshot all policies that this controller may have applied in older builds,
+    // but keep Safe Boot and USB debugging available as owner recovery paths.
     private val restrictions = listOf(
         UserManager.DISALLOW_FACTORY_RESET,
         UserManager.DISALLOW_SAFE_BOOT,
@@ -30,13 +32,28 @@ object ManagedProtectionController {
         UserManager.DISALLOW_USB_FILE_TRANSFER
     )
 
+    private val managedRestrictions = listOf(
+        UserManager.DISALLOW_FACTORY_RESET,
+        UserManager.DISALLOW_ADD_USER,
+        UserManager.DISALLOW_USB_FILE_TRANSFER
+    )
+
     fun isDeviceOwner(context: Context): Boolean =
         context.getSystemService(DevicePolicyManager::class.java)
             .isDeviceOwnerApp(context.packageName)
 
-    fun hasPendingRollback(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_RECOVERY_PENDING, false)
+    fun hasPendingRollback(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val pending = runCatching { prefs.getBoolean(KEY_RECOVERY_PENDING, false) }
+            .getOrElse { true }
+        if (pending) return true
+        val hasRollbackData = prefs.contains(KEY_VERSION) ||
+            prefs.contains(KEY_PACKAGES) || prefs.contains(KEY_FEATURES)
+        if (!hasRollbackData) return false
+        // Damaged or legacy metadata must expose the emergency recovery action,
+        // never hide it behind the normal Enable button.
+        return runCatching { validateSnapshot(prefs) }.isFailure
+    }
 
     fun isPolicyConfigured(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < 28 || !isDeviceOwner(context)) return false
@@ -94,7 +111,7 @@ object ManagedProtectionController {
             dpm.setLockTaskPackages(admin, arrayOf(activity.packageName))
             dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD)
 
-            restrictions.forEach { key ->
+            managedRestrictions.forEach { key ->
                 if (Build.VERSION.SDK_INT >= 34) {
                     dpm.addUserRestrictionGlobally(key)
                 } else {
