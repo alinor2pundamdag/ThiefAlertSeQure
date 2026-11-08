@@ -21,7 +21,8 @@ Only when Android reports this app as Device Owner, the user can explicitly enab
 - Allowlist only com.thiefalertsequre.app for Lock Task Mode.
 - Keep Keyguard enabled in kiosk mode.
 - Omit LOCK_TASK_FEATURE_GLOBAL_ACTIONS, hiding the normal global-actions power dialog while Lock Task Mode is active on supported Android builds.
-- Apply supported restrictions to block factory reset through Settings, safe boot, USB file transfer, adding users and debugging.
+- Apply supported restrictions to block factory reset through Settings, adding users and USB file transfer.
+- Keep Safe Boot and USB debugging available as recovery paths if the app or kiosk UI malfunctions.
 - Keep an in-app, explicit exit action that removes the policies.
 
 This applies only while the app is actually in Lock Task Mode. It does not stop hardware long-press forced shutdown, battery disconnect, bootloader/recovery reset, OEM service mode, or firmware-level actions.
@@ -44,7 +45,7 @@ Official enrollment guide: https://developers.google.com/android/management/prov
 
 New installations persist the rollback snapshot synchronously before changing any Device Owner policy. If enable fails partway through, the app attempts the same restoration automatically. If restoration is incomplete, the snapshot is retained, automatic kiosk re-entry is suppressed, and the in-app Disable managed lockdown recovery action remains available for retry. A damaged snapshot triggers an explicit emergency recovery to navigable Android defaults; the previous package list and feature flags cannot be reconstructed from corrupt data. Do not uninstall the app or factory-reset the device while a rollback is pending.
 
-Installations upgraded from versions that enabled managed mode before rollback snapshots existed have no original policy baseline to restore. Their compatibility recovery path clears only the restrictions this feature manages, restores the documented Android Lock Task defaults, and removes this app from the allowlist. Any pre-existing policy values overwritten by the older implementation cannot be reconstructed.
+Installations upgraded from versions that enabled managed mode before rollback snapshots existed have no original policy baseline to restore. Their compatibility recovery path clears only the restrictions this feature manages, restores the documented Android Lock Task defaults, and removes this app from the allowlist. Safe Boot and USB debugging are not disabled by current builds. Any pre-existing policy values overwritten by the older implementation cannot be reconstructed.
 
 If provisioning has not occurred, the button only displays enrollment guidance. It does not attempt privilege escalation.
 
