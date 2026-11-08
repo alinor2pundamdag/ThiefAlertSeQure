@@ -8,7 +8,7 @@
 
 # Android device and manufacturer compatibility
 
-**Scope:** Android 8.0 (API 26) through Android 17 (API 37), including Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO MIUI and HyperOS, OPPO ColorOS, realme UI, OnePlus OxygenOS, vivo Funtouch OS / OriginOS, Google Pixel, Motorola, and other Android-derived builds.
+**Scope:** Android 8.0 (API 26) through Android 17 (API 37), including Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO MIUI and HyperOS, OPPO ColorOS, realme UI, OnePlus OxygenOS, vivo Funtouch OS / OriginOS, Google Pixel, Motorola, ASUS, Sony Xperia, Nothing OS, Lenovo, TECNO, Infinix, ZTE / nubia, and other Android-derived builds.
 
 **Important:** This is a compatibility strategy and source-level audit, not a certification of every handset. Actual behavior must be tested on physical devices and OS builds.
 
@@ -26,7 +26,7 @@
 
 | Android release | API | Relevant platform behavior | App handling |
 |---|---:|---|---|
-| Android 8.0 / 8.1 | 26–27 | Background execution limits; notification channels; runtime restrictions on implicit broadcasts | Manifest power-connected/disconnected receivers; foreground monitoring service; notification channels |
+| Android 8.0 / 8.1 | 26–27 | Background execution limits; notification channels; runtime restrictions on implicit broadcasts | Runtime-registered power-connected/disconnected receiver while the user-enabled foreground monitoring service is active; notification channels |
 | Android 9 | 28 | Additional background and standby restrictions | Keep monitoring user-visible through foreground service; show battery guidance |
 | Android 10 | 29 | Background activity-launch restrictions and evolving full-screen behavior | Use alarm notification and public Settings routes; do not rely on arbitrary background Activity launches |
 | Android 11 | 30 | Package visibility filtering | Do not use `resolveActivity()` as the sole gate for Settings routes; attempt launch and catch failure |
@@ -73,9 +73,10 @@ The app detects the device's reported manufacturer and brand and selects matchin
 - App info → App battery usage → Allow background usage.
 - Choose Unrestricted if available. Pixel devices generally use Android's standard battery controls rather than a separate OEM auto-start switch.
 
-### Motorola and other Android devices
+### Motorola, ASUS, Sony, Nothing, Lenovo, TECNO, Infinix, ZTE, and other Android devices
 - Review App battery usage and allow background activity or Unrestricted where available.
 - Search Settings for Auto-start, Startup manager, Background activity, or App launch if the device provides those features.
+- The app recognizes ASUS, Sony Xperia, Nothing OS, Lenovo, TECNO / Infinix / itel, and ZTE / nubia as separate manufacturer labels, but uses safe generic Settings guidance unless a stable public route is verified for that exact firmware.
 
 **There is no public Android API that universally opens or changes every OEM's private auto-start and background-management controls.** The app therefore opens standard App info / Settings and supplies manufacturer-specific manual instructions. Menu names change across releases, regions, and individual models.
 
