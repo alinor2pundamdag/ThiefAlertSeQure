@@ -162,6 +162,7 @@ object ManagedProtectionController {
             .putInt(KEY_VERSION, SNAPSHOT_VERSION)
             .putStringSet(KEY_PACKAGES, snapshot.lockTaskPackages.toSet())
             .putInt(KEY_FEATURES, snapshot.lockTaskFeatures)
+            .putBoolean(KEY_RECOVERY_PENDING, false)
         snapshot.restrictionValues.forEach { (key, enabled) ->
             editor.putBoolean("restriction:$key", enabled)
         }
