@@ -402,7 +402,8 @@ class MainActivity : FragmentActivity() {
             return
         }
 
-        val configured = ManagedProtectionController.isPolicyConfigured(this)
+        val configured = ManagedProtectionController.isPolicyConfigured(this) ||
+            ManagedProtectionController.hasPendingRollback(this)
         if (configured) {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Disable managed lockdown?")
