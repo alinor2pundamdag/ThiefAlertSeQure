@@ -95,6 +95,23 @@ class ProtectionEngineTest {
         assertEquals(ProtectionMode.ARMED, ProtectionEngine.restoreAfterBoot(s, true, 2_000L, 500L, 8).mode)
     }
 
+    @Test fun rebootCountdownWaitsForReliablePowerSampleBeforeStartingFreshGracePeriod() {
+        val pending = ProtectionState(
+            ProtectionMode.COUNTDOWN, 51_000L, 50_000L, 0L, BOOT_RECONCILIATION_PENDING
+        )
+        val unknown = ProtectionEngine.reconcileCountdown(pending, null, 51_000L, 1_000L, -1)
+        assertEquals(pending, unknown)
+
+        val unplugged = ProtectionEngine.reconcileCountdown(pending, false, 52_000L, 2_000L, 9)
+        assertEquals(ProtectionMode.COUNTDOWN, unplugged.mode)
+        assertEquals(62_000L, unplugged.deadlineEpochMs)
+        assertEquals(12_000L, unplugged.deadlineElapsedRealtimeMs)
+        assertEquals(9, unplugged.bootCount)
+
+        val connected = ProtectionEngine.reconcileCountdown(pending, true, 52_000L, 2_000L, 9)
+        assertEquals(ProtectionMode.ARMED, connected.mode)
+    }
+
     @Test fun countdownDeadlineFromPreviousBootIsNeverEvaluatedAgainstNewBootClock() {
         val previousBoot = ProtectionState(ProtectionMode.COUNTDOWN, 11_000L, 1_000L, 15_000L, 7)
         val unknown = ProtectionEngine.reconcileCountdown(previousBoot, null, 50_000L, 500L, 8)
