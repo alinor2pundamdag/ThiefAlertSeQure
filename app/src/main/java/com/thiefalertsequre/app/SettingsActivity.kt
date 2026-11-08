@@ -533,8 +533,14 @@ class SettingsActivity : FragmentActivity() {
                     "Pixel: use Android's App battery usage controls. There is no separate HONOR-style Auto-launch/Secondary launch panel."
                 AndroidDeviceCompatibility.Family.MOTOROLA ->
                     "Motorola: use Android App battery usage controls. A separate OEM auto-start switch may not exist."
+                AndroidDeviceCompatibility.Family.ASUS,
+                AndroidDeviceCompatibility.Family.SONY,
+                AndroidDeviceCompatibility.Family.NOTHING,
+                AndroidDeviceCompatibility.Family.TRANSSION,
+                AndroidDeviceCompatibility.Family.ZTE,
+                AndroidDeviceCompatibility.Family.LENOVO,
                 AndroidDeviceCompatibility.Family.OTHER ->
-                    "Other Android devices: use only the background/autostart controls actually provided by this phone. Do not enable unrelated permissions."
+                    "This Android device may use a model-specific battery manager. Use only the background/autostart controls actually provided by this phone. Do not enable unrelated permissions."
             },
             12f, R.color.tas_text
         ))
