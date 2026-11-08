@@ -40,7 +40,11 @@ Official enrollment guide: https://developers.google.com/android/management/prov
 2. Verify Device Owner is reported in the app's Device Hardening section.
 3. Read the in-app warning and explicitly choose Enable managed lockdown.
 4. Confirm kiosk mode starts and the in-app Disable managed lockdown control remains available.
-5. To exit, choose Disable managed lockdown. This calls stopLockTask(), clears restrictions, restores global actions and removes the app from the lock-task allowlist.
+5. To exit, choose Disable managed lockdown. The app first exits Lock Task Mode, then restores the exact lock-task package list, lock-task feature flags, and each managed restriction value captured before the first enable. The saved rollback snapshot is removed only after every restoration call succeeds.
+
+New installations persist the rollback snapshot synchronously before changing any Device Owner policy. If enable fails partway through, the app attempts the same restoration automatically. If restoration is incomplete, the snapshot is retained, automatic kiosk re-entry is suppressed, and the in-app Disable managed lockdown recovery action remains available for retry. Do not uninstall the app or factory-reset the device while a rollback is pending.
+
+Installations upgraded from versions that enabled managed mode before rollback snapshots existed have no original policy baseline to restore. Their compatibility recovery path clears only the restrictions this feature manages, restores the documented Android Lock Task defaults, and removes this app from the allowlist. Any pre-existing policy values overwritten by the older implementation cannot be reconstructed.
 
 If provisioning has not occurred, the button only displays enrollment guidance. It does not attempt privilege escalation.
 
@@ -62,7 +66,8 @@ If provisioning has not occurred, the button only displays enrollment guidance. 
 | Override DND globally on target API 35+ | No | Not through this app | User/OEM system policy |
 
 ## Recovery and rollback
-- The in-app exit action is the normal rollback path.
+- The in-app exit action is the normal rollback path and restores the pre-enable policy snapshot on new installations.
+- A failed restoration retains the snapshot and exposes a retry path; automatic kiosk re-entry is disabled while rollback is pending.
 - If the app is damaged before policies can be cleared, Device Owner policies may require an authorized management recovery path or a factory reset.
 - Do not enable kiosk mode until the exit action has been tested on the exact device build.
 - Keep owner credentials and recovery instructions available.
