@@ -27,6 +27,7 @@ class AlarmService : Service() {
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var vibrator: Vibrator? = null
+    private var flashController: AlarmFlashController? = null
     private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { }
     private val channelId = CHANNEL_ID
     private val volumeHandler = Handler(Looper.getMainLooper())
@@ -66,6 +67,7 @@ class AlarmService : Service() {
             startForeground(NOTIFICATION_ID, notification())
             val alarmStartedAt = ProtectionStore(this).read().changedAtEpochMs
             lockDeviceIfAdminEnabled(alarmStartedAt)
+            syncAlarmFlash()
             LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active; device-lock request issued")
         } catch (error: Exception) {
             LocalTamperHistory.record(this, "alarm_service_start_failed", error.javaClass.simpleName + ": " + error.message)
@@ -77,6 +79,23 @@ class AlarmService : Service() {
         volumeHandler.removeCallbacks(volumeEnforcement)
         volumeHandler.post(volumeEnforcement)
         return START_STICKY
+    }
+
+    /**
+     * The torch is an independent visual alarm output. It starts only after the
+     * persisted state has been verified as ALARM_TRIGGERED in onStartCommand.
+     * Failure to access a flash unit never blocks or stops alarm audio.
+     */
+    private fun syncAlarmFlash() {
+        if (AlarmFlashSettings.isEnabled(this)) {
+            val controller = flashController ?: AlarmFlashController(this, volumeHandler) { event, detail ->
+                LocalTamperHistory.record(this, event, detail)
+            }.also { flashController = it }
+            controller.start()
+        } else {
+            flashController?.stop()
+            flashController = null
+        }
     }
 
     private fun startAlarmAudio() {
@@ -250,6 +269,8 @@ class AlarmService : Service() {
     }
 
     private fun stopAlarm() {
+        flashController?.stop()
+        flashController = null
         runCatching { player?.stop() }
         runCatching { player?.release() }
         player = null
@@ -283,6 +304,7 @@ class AlarmService : Service() {
         const val CHANNEL_ID = "anti_theft_alarm"
         const val ACTION_START = "com.thiefalertsequre.START"
         const val ACTION_STOP_IF_AUTHENTICATED = "com.thiefalertsequre.STOP_AUTH"
+        const val ACTION_REFRESH_FLASH = "com.thiefalertsequre.REFRESH_ALARM_FLASH"
         private const val VOLUME_ENFORCEMENT_INTERVAL_MS = 500L
         private const val KEY_LOCK_REQUESTED_FOR_ALARM_AT = "lock_requested_for_alarm_started_at"
     }
