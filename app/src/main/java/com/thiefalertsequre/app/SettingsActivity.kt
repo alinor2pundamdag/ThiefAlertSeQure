@@ -123,7 +123,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(text("ALARM FLASH ALERT", 11f, R.color.tas_primary, true))
         root.addView(space(6))
         root.addView(text(
-            "When enabled, the rear camera LED pulses slowly only while the theft alarm is latched. It uses Android's torch API without camera permission and never captures photos or video. Flash hardware and availability vary by device; the sound alarm remains independent. Disable this option if flashing light is unsuitable for you.",
+            "Enabled by default, the rear camera LED pulses slowly only while the theft alarm is latched. It uses Android's torch API without camera permission and never captures photos or video. Flash hardware and availability vary by device; the sound alarm remains independent. Disable this option if flashing light is unsuitable for you.",
             13f, R.color.tas_muted
         ))
         val flashEnabled = AlarmFlashSettings.isEnabled(this)
