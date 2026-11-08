@@ -16,13 +16,13 @@
 | Original launcher icon | Original JPG copied without image edits |
 | Original alarm sound | Packaged Ogg Opus asset in res/raw, looping MediaPlayer (resource filename must use `.ogg`) |
 | Audio fallback | Repeating vibration if selected and packaged audio both fail |
-| Alarm volume | Saves prior alarm-stream volume, raises to device maximum during alarm, restores after successful disarm |
+| Alarm volume | Saves prior alarm-stream volume, raises to device maximum during alarm, restores after successful disarm; malformed saved-volume metadata is detected and removed rather than crashing recovery (the original value cannot be reconstructed if corrupted) |
 | Charger auto-arm | Runtime-registered PowerTransitionReceiver from the user-enabled foreground monitor plus persisted connected-baseline validation |
 | 10-second unplug countdown | ProtectionEngine + AlarmScheduler |
 | Reconnect before deadline | Returns to ARMED |
 | Reconnect after trigger | Cannot clear ALARM_TRIGGERED |
 | Same-boot clock integrity | elapsedRealtime + boot count |
-| Reboot recovery | Revalidate charger state; if still disconnected, restart a full 10-second grace period; if connected, return to ARMED; unknown charger state never expires a countdown; when boot identity is unavailable, new countdowns use a wall-clock fallback rather than hanging forever |
+| Reboot recovery | Revalidate charger state; if connected, return to ARMED; if disconnected, start a fresh 10-second grace period; if the first post-boot power sample is unknown, retain a short retry marker and start the full grace period only after a live disconnected sample; this also works when BOOT_COUNT is unavailable |
 | Android 15 boot recovery | After BOOT_COMPLETED/first user unlock, schedules exact alarm when granted; no Direct Boot protection before first unlock |
 | Local-only operation | No INTERNET permission, backend, analytics or advertising SDK |
 | Background protection monitor | User-enabled, stoppable foreground service with persistent notification; disabling cancels pending countdown and disarms but cannot clear a latched alarm |
