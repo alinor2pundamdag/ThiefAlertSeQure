@@ -81,11 +81,11 @@ The app detects the device's reported manufacturer and brand and selects matchin
 
 ## In-app App Launch management guide
 
-The Settings screen includes an App Launch Management card with two guide views: **Manage automatically** and **Manage manually**. The selected view is stored locally as a presentation preference only; it does not alter the OEM's similarly named switch.
+The Settings screen shows one device-detected background setup card. It displays the detected manufacturer, brand, model, Android release, and API level, then selects guidance for that device family. It no longer presents a fake **Manage automatically / Manage manually** selector because an ordinary app cannot read or change the OEM's private switch state.
 
-The manual view contains three separate cards—**Auto-launch**, **Secondary launch**, and **Run in background**—with manufacturer-specific instructions and an action to open the closest supported Android Settings destination. On HONOR/Huawei, the action opens Settings so the user can search for **App launch**, select ThiefAlertSeQure, turn **Manage automatically** off, enable all three manual controls, and confirm. The manual view is selected by default on detected HONOR/Huawei devices.
+The card contains three separate **Auto-launch**, **Secondary launch**, and **Run in background** explanations. On supported HONOR/Huawei builds, the guide instructs the user to search Settings for **App launch**, select ThiefAlertSeQure, turn **Manage automatically** off, enable all three controls, and confirm. The three cards do not pretend that Samsung, Pixel, Xiaomi, or other families have HONOR's exact controls.
 
-For Samsung, Xiaomi/Redmi/POCO, OPPO/realme/OnePlus, vivo/iQOO, Pixel, Motorola, and other Android devices, the cards describe the closest available control and explicitly identify controls that do not exist consistently. Buttons open the app's public App info page or the Settings home as appropriate.
+For Samsung, Xiaomi/Redmi/POCO, OPPO/realme/OnePlus, vivo/iQOO, Pixel, Motorola, and other Android devices, the guide describes the closest known equivalent and explicitly identifies controls that may not exist. Actions open only public Android Settings destinations; on HONOR/Huawei the App Launch page is not reliably deep-linkable by ordinary apps, so Settings search is the supported fallback. The guide includes the detected model and Android release to make firmware-specific variation visible.
 
 The app does not claim to read or change OEM-only switch states. There is no public Android API for universally reading or toggling these vendor controls, and undocumented component intents are intentionally avoided. A successful Settings launch is not proof that the user changed a setting.
 
