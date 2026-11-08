@@ -67,12 +67,14 @@ class ProtectionStore(context: Context) {
             ).any(prefs::contains)
         )
     }.getOrElse {
-        // A preference with the wrong stored type is corruption too. Do not
-        // let a ClassCastException turn the protection state into a clean boot.
-        ProtectionState(
+        // A preference with the wrong stored type is corruption too. Persist the
+        // fail-closed latch so every component observes the same alarm episode.
+        val failClosed = ProtectionState(
             mode = ProtectionMode.ALARM_TRIGGERED,
             changedAtEpochMs = System.currentTimeMillis()
         )
+        writeUnlocked(failClosed)
+        failClosed
     }
 
     private fun writeUnlocked(state: ProtectionState): Boolean = prefs.edit()
