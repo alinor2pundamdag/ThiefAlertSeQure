@@ -36,7 +36,7 @@ object AndroidDeviceCompatibility {
             "asus" in value -> Family.ASUS
             "sony" in value || "xperia" in value -> Family.SONY
             "nothing" in value -> Family.NOTHING
-            "tecno" in value || "infinix" in value || "itel" in value -> Family.TRANSSION
+            "tecno" in value || "infinix" in value || "itel" in value || "transsion" in value -> Family.TRANSSION
             "zte" in value || "nubia" in value -> Family.ZTE
             "lenovo" in value -> Family.LENOVO
             else -> Family.OTHER
