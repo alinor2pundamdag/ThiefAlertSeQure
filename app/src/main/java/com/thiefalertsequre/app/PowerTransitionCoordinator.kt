@@ -16,16 +16,16 @@ object PowerTransitionCoordinator {
 
     internal fun acceptsPowerConnectedEvent(liveConnected: Boolean?): Boolean = liveConnected == true
 
-    fun initializeBaseline(context: Context) = synchronized(lock) {
-        initializeBaselineLocked(context)
+    fun initializeBaseline(context: Context, forceBootReconciliation: Boolean = false) = synchronized(lock) {
+        initializeBaselineLocked(context, forceBootReconciliation)
     }
 
-    private fun initializeBaselineLocked(context: Context) {
+    private fun initializeBaselineLocked(context: Context, forceBootReconciliation: Boolean = false) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val baselineKnown = prefs.getBoolean(KNOWN, false)
         val currentBoot = ProtectionClock.bootCount(context)
         val priorBoot = prefs.getInt(BASELINE_BOOT_COUNT, -1)
-        val newBoot = currentBoot >= 0 && currentBoot != priorBoot
+        val newBoot = forceBootReconciliation || (currentBoot >= 0 && currentBoot != priorBoot)
 
         // Old COUNTDOWN states have no trusted unplug-event provenance. Only
         // discard them on first migration; a valid reboot countdown is recovered
