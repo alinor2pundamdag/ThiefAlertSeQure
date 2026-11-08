@@ -63,6 +63,7 @@ Existing project documentation to keep aligned with this master specification:
 - `docs/FEATURE_COMPLETION_MATRIX.md`
 - `docs/APK_INSTALL_AND_UPDATE.md`
 - `docs/PRIVACY_POLICY.md`
+- `docs/REQUIREMENT_TRACEABILITY_MATRIX.md`
 
 **Do not duplicate implementations.** Extend the existing owner of each responsibility. Add a new class only when the current file has a clearly separable responsibility and the dependency contract is documented here and tested.
 
