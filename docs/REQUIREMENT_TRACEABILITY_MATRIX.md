@@ -1,7 +1,7 @@
 # Requirement Traceability Matrix — ThiefAlertSeQure
 
-> Source audit baseline: `610811de314f2cb87a3e50c4cf8726d45017ca08` (2026-11-08). This includes the tested reboot-unknown-power recovery marker, forced boot-baseline invalidation, and alarm-volume metadata hardening. Exact-head CI is pending for this source head (development versionCode 4 / versionName 1.1.2); do not treat the earlier successful run as verification of these later source changes.
-> Previous verified APK artifact: workflow run `42478199876`, artifact ID `13616492021`, package `com.thiefalertsequre.app`, versionCode `3`, versionName `1.1.1`. That artifact predates the latest source changes and must not be installed as the final build. Current final APK will be versionCode `4`, versionName `1.1.2`, and will be identified only after exact-head CI and artifact verification succeed. Persistent release signing remains unconfigured; current pipeline produces a development/debug APK.
+> Application source baseline: `610811de314f2cb87a3e50c4cf8726d45017ca08`; workflow/verification head: `28f88f882490ee0c4820b7d07dd9c29e6a47ec94` (2026-11-08). Exact-head push CI run [42479548944](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/42479548944) passed all jobs. Application version `1.1.2` / versionCode `4`.
+> Verified APK: artifact `ThiefAlertSeQure-debug-apk`, artifact ID `13617306483`, run `42479548944`, expires 2026-11-22. Package `com.thiefalertsequre.app`; APK SHA-256 `5dc6467e90364aa7f4f730d1caeb99777ac29d69058e2981b3021a6c966dc287`; V2 signer SHA-256 `c115de2ef097e5eab7243874ad7bf212adf94f419d8fc2d963d78c8fdaebf00c`. This is a development/debug APK; permanent release-signing secrets are not configured. Earlier 1.1.1 debug artifacts used different signers, so an in-place update from an older debug install is not guaranteed.
 > Contract: [Universal Maximum Protection Specification](UNIVERSAL_MAXIMUM_PROTECTION_SPEC.md).
 > Status labels: **Implemented** means source code exists; **Unit-covered** means a named local test exists; **CI-verified** means the exact baseline commit passed GitHub Actions; **Device-unverified** means no physical-device evidence is recorded for that case. These labels are deliberately not interchangeable.
 
@@ -10,10 +10,10 @@
 | Area | Evidence at baseline | Status / limitation |
 |---|---|---|
 | Branch / PR | PR #2 remains open and draft; managed-policy safety implementation is on the current feature branch | Not merged |
-| CI | Exact-head verification is pending for source head `e713b7a5ebacfb3c69514c31fe3d1a0bf143e0fc`; prior successful runs were on older source and do not cover the reboot-reconciliation and volume-metadata fixes. | Pending exact-head CI |
+| CI | Push workflow run `42479548944` on workflow/verification head `28f88f882490ee0c4820b7d07dd9c29e6a47ec94` passed unit tests, Android lint, asset validation, version extraction, APK assembly, package/version verification, signer verification and artifact upload. | Exact application source + workflow CI-verified |
 | Unit tests | `:app:testDebugUnitTest` in workflow | Unit tests execute in CI |
 | Lint | `:app:lintDebug` in workflow | CI-verified |
-| APK | `ThiefAlertSeQure-debug-apk` artifact from run `42478199876`; package/version and V2 signer verified | Debug APK built and signed; release signing secrets absent, so no release APK was produced |
+| APK | Artifact ID `13617306483` from run `42479548944`; versionCode 4 / versionName 1.1.2; APK SHA-256 `5dc6467e90364aa7f4f730d1caeb99777ac29d69058e2981b3021a6c966dc287`; signer SHA-256 `c115de2ef097e5eab7243874ad7bf212adf94f419d8fc2d963d78c8fdaebf00c` | Debug APK built, signed, verified and uploaded; no release-signing secrets configured |
 | Instrumentation / emulator matrix | No `app/src/androidTest` suite or emulator matrix exists in the inspected tree | Not implemented |
 | Physical OEM acceptance | User-reported HONOR 200 Pro checks exist in project handoff; other OEM evidence not recorded | Partial user-reported evidence; not independently verified |
 | Universal claim | Android/OEM policies differ and ordinary apps cannot defeat privileged system controls | Never claim universal guarantee |
