@@ -759,6 +759,7 @@ class MainActivity : FragmentActivity() {
         cancelButton.isEnabled = biometricPrompt != null
         managedButton.text = when {
             !ManagedProtectionController.isDeviceOwner(this) -> "Device Owner setup guide"
+            ManagedProtectionController.hasPendingRollback(this) -> "Recover managed lockdown"
             ManagedProtectionController.isPolicyConfigured(this) -> "Disable managed lockdown"
             else -> "Enable managed lockdown"
         }
