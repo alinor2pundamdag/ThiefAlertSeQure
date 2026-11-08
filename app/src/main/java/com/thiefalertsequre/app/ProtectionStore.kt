@@ -20,7 +20,7 @@ class ProtectionStore(context: Context) {
         nowElapsedRealtimeMs: Long = 0L,
         currentBootCount: Int = -1
     ): AuthThrottleState = synchronized(LOCK) {
-        val current = readThrottleUnlocked()
+        val current = readThrottleUnlocked(nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
         val normalized = AuthenticationThrottle.normalize(current, nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
         if (normalized == current || writeThrottleUnlocked(normalized)) normalized else current
     }
@@ -30,7 +30,7 @@ class ProtectionStore(context: Context) {
         nowElapsedRealtimeMs: Long = 0L,
         currentBootCount: Int = -1
     ): AuthThrottleState = synchronized(LOCK) {
-        val current = readThrottleUnlocked()
+        val current = readThrottleUnlocked(nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
         val next = AuthenticationThrottle.onFailure(current, nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
         if (writeThrottleUnlocked(next)) next else current
     }
@@ -40,7 +40,7 @@ class ProtectionStore(context: Context) {
         nowElapsedRealtimeMs: Long = 0L,
         currentBootCount: Int = -1
     ): AuthThrottleState = synchronized(LOCK) {
-        val current = readThrottleUnlocked()
+        val current = readThrottleUnlocked(nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
         val next = AuthenticationThrottle.startCooldown(current, nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
         if (writeThrottleUnlocked(next)) next else current
     }
@@ -83,12 +83,24 @@ class ProtectionStore(context: Context) {
         .putInt("boot_count", state.bootCount)
         .commit()
 
-    private fun readThrottleUnlocked() = AuthThrottleState(
-        prefs.getInt(KEY_AUTH_FAILURES, 0).coerceIn(0, AuthenticationThrottle.MAX_FAILURES),
-        prefs.getLong(KEY_AUTH_COOLDOWN, 0L),
-        prefs.getLong(KEY_AUTH_COOLDOWN_ELAPSED, 0L),
-        prefs.getInt(KEY_AUTH_BOOT_COUNT, -1)
-    )
+    private fun readThrottleUnlocked(
+        nowEpochMs: Long,
+        nowElapsedRealtimeMs: Long,
+        currentBootCount: Int
+    ): AuthThrottleState = runCatching {
+        AuthThrottleState(
+            prefs.getInt(KEY_AUTH_FAILURES, 0).coerceIn(0, AuthenticationThrottle.MAX_FAILURES),
+            prefs.getLong(KEY_AUTH_COOLDOWN, 0L),
+            prefs.getLong(KEY_AUTH_COOLDOWN_ELAPSED, 0L),
+            prefs.getInt(KEY_AUTH_BOOT_COUNT, -1)
+        )
+    }.getOrElse {
+        // A wrong SharedPreferences value type must not crash the owner-auth flow.
+        // Apply one bounded cooldown; Android's device credential path remains available.
+        AuthenticationThrottle.recoverCorruptState(
+            nowEpochMs, nowElapsedRealtimeMs, currentBootCount
+        ).also(::writeThrottleUnlocked)
+    }
 
     private fun writeThrottleUnlocked(state: AuthThrottleState): Boolean = prefs.edit()
         .putInt(KEY_AUTH_FAILURES, state.failedAttempts)
