@@ -144,7 +144,7 @@ object ManagedProtectionController {
 
     private fun persistSnapshot(
         prefs: android.content.SharedPreferences,
-        snapshot: PolicySnapshot
+        snapshot: ManagedPolicySnapshot
     ) {
         val editor = prefs.edit()
             .putInt(KEY_VERSION, SNAPSHOT_VERSION)
