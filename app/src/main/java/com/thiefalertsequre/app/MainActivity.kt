@@ -407,7 +407,7 @@ class MainActivity : FragmentActivity() {
         if (configured) {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Disable managed lockdown?")
-                .setMessage("This restores the saved kiosk policy and managed restrictions. Safe Boot and USB debugging remain available as recovery paths; hardware recovery controls remain outside app control.")
+                .setMessage("This restores the saved pre-enable policy when a valid snapshot exists. If no valid snapshot exists, emergency recovery clears this app's managed restrictions, removes its Lock Task allowlist, and re-enables Home, Overview, notifications, system information, global actions and Keyguard; the old policy baseline cannot be reconstructed. Safe Boot and USB debugging remain available.")
                 .setNegativeButton("Keep protection", null)
                 .setPositiveButton("Disable lockdown") { _, _ ->
                     runCatching { ManagedProtectionController.disable(this) }
