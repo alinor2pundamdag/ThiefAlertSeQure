@@ -593,10 +593,13 @@ class SettingsActivity : FragmentActivity() {
             Intent(Settings.ACTION_SETTINGS)
         )
         if (opened) {
+            val searchTerm = AndroidDeviceCompatibility.settingsSearchHint(
+                Build.MANUFACTURER, Build.BRAND, control
+            )
             val nextStep = if (family == AndroidDeviceCompatibility.Family.HONOR_HUAWEI) {
-                "In Settings, use Search → App launch → ThiefAlertSeQure. Configure Manage automatically and all three switches."
+                "In Settings, search App launch → select ThiefAlertSeQure → turn Manage automatically OFF and enable all three switches."
             } else {
-                "In Settings, follow the " + control.title + " instructions shown in ThiefAlertSeQure."
+                "In Settings, search for " + searchTerm + " and follow the " + control.title + " instructions shown in ThiefAlertSeQure."
             }
             android.widget.Toast.makeText(this, nextStep, android.widget.Toast.LENGTH_LONG).show()
         }
