@@ -9,7 +9,7 @@
 | Area | Evidence at baseline | Status / limitation |
 |---|---|---|
 | Branch / PR | PR #2 is open and draft; branch head is the baseline SHA above | Not merged |
-| CI | Baseline run 42456409652 passed on `96a5346`; OEM-family expansion run 42457337094 exposed a Kotlin exhaustive-`when` error, fixed in `e260ec0`. CI on code head `60286ac` (runs 42457736590 push / 42457738958 PR) was in progress at matrix update time; this documentation-only update requires a final exact-head CI confirmation | Earlier baseline CI-verified; latest code head under CI; final exact-head CI pending |
+| CI | Baseline run 42456409652 passed on `96a5346`; OEM-family expansion run 42457337094 exposed a Kotlin exhaustive-`when` error, fixed in `e260ec0`. CI on code head `b390038` (runs 42457873498 push / 42457875251 PR) was in progress at matrix update time; this documentation-only update requires a final exact-head CI confirmation | Earlier baseline CI-verified; latest code head under CI; final exact-head CI pending |
 | Unit tests | `:app:testDebugUnitTest` in workflow | Unit tests execute in CI |
 | Lint | `:app:lintDebug` in workflow | CI-verified |
 | APK | Workflow assembles release only when persistent signing secrets exist; otherwise debug APK | Packaging verified; signing mode depends on secrets |
@@ -136,5 +136,6 @@ A requirement is **complete** only when:
 - `dba4c81` / `bf74087`: added an explicit full-screen dashboard policy and connected it to the alarm notification only when the owner opts in and Android grants access.
 - `ad80ec6`: added unit tests for API 26–37 full-screen-intent gating.
 - `58d2271`: removed the optional full-screen dashboard permission from core readiness requirements when the feature is off.
+- `75c00ae` / `b390038`: recognized the Transsion manufacturer alias and aligned the unknown-OEM test with the new generic fallback wording.
 - Documentation corrections align charger receiver registration with the runtime foreground-service registration, and align the stated target SDK with Gradle (API 36).
 - Android 17 background-audio behavior is documented against the official platform guidance: [Android 17 background audio hardening](https://developer.android.com/develop/background-work/services/fgs/changes) and [Android 17 audio hardening details](https://developer.android.com/about/versions/17/changes/bg-audio).
