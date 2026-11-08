@@ -163,15 +163,16 @@ object PowerTransitionCoordinator {
 
     fun onPowerConnected(context: Context): ProtectionState {
         val appContext = context.applicationContext
-        // Three consecutive live samples plus a final live read retain protection
-        // against stale broadcasts while reducing connect cancellation latency.
+        // Keep a five-read window so one or two stale snapshots after the OS
+        // broadcast do not reject a real reconnect. Three consecutive positives
+        // are enough; 100 ms spacing bounds normal confirmation to about 400 ms.
         var consecutiveConnected = 0
         var lastObserved: Boolean? = null
-        repeat(3) { index ->
+        repeat(5) { index ->
             val observed = ExternalPowerState.readConnected(appContext)
             lastObserved = observed
             consecutiveConnected = if (observed == true) consecutiveConnected + 1 else 0
-            if (index < 2) Thread.sleep(100L)
+            if (index < 4) Thread.sleep(100L)
         }
         if (consecutiveConnected < 3 || ExternalPowerState.readConnected(appContext) != true) {
             LocalTamperHistory.record(
@@ -181,7 +182,7 @@ object PowerTransitionCoordinator {
             return ProtectionStore(appContext).read()
         }
         return synchronized(lock) {
-            confirmConnectedAndArmLocked(appContext, "Power-connected event confirmed by three consecutive live-state samples")
+            confirmConnectedAndArmLocked(appContext, "Power-connected event confirmed by five reads including three consecutive live-state samples")
         }
     }
 
@@ -249,7 +250,7 @@ object PowerTransitionCoordinator {
             }
             // Do not reject on the first live snapshot: some devices update
             // ACTION_BATTERY_CHANGED just after ACTION_POWER_DISCONNECTED.
-            // Three consecutive samples plus a final live read are authoritative.
+            // Five reads with three consecutive negatives plus a final live read are authoritative.
             if (!prefs.getBoolean(CONNECTED, false)) {
                 LocalTamperHistory.record(
                     appContext, "charger_unplug_rejected",
@@ -267,13 +268,13 @@ object PowerTransitionCoordinator {
 
         var consecutiveDisconnected = 0
         var lastObserved: Boolean? = null
-        repeat(3) { index ->
+        repeat(5) { index ->
             val observed = ExternalPowerState.readConnected(appContext)
             lastObserved = observed
             consecutiveDisconnected = if (observed == false) consecutiveDisconnected + 1 else 0
-            if (index < 2) {
+            if (index < 4) {
                 try {
-                    Thread.sleep(120L)
+                    Thread.sleep(100L)
                 } catch (_: InterruptedException) {
                     Thread.currentThread().interrupt()
                     synchronized(lock) {
@@ -294,7 +295,7 @@ object PowerTransitionCoordinator {
             }
             LocalTamperHistory.record(
                 appContext, "charger_unplug_rejected",
-                "Three-sample debounce did not produce three consecutive disconnected readings; final=$lastObserved"
+                "Five-read debounce did not produce three consecutive disconnected readings; final=$lastObserved"
             )
             return ProtectionStore(appContext).read()
         }
@@ -333,7 +334,7 @@ object PowerTransitionCoordinator {
             }
             if (next.mode == ProtectionMode.COUNTDOWN) {
                 AlarmScheduler.schedule(appContext, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
-                LocalTamperHistory.record(appContext, "charger_countdown_started", "OS unplug event confirmed by three consecutive disconnected samples and a final live-state read")
+                LocalTamperHistory.record(appContext, "charger_countdown_started", "OS unplug event confirmed by five reads, including three consecutive disconnected samples, and a final live-state read")
                 notifyMonitorStateChanged(appContext)
             }
             next
