@@ -121,7 +121,7 @@ These vendor support pages confirm the kinds of background controls described ab
 - [realme: Troubleshooting and notification/background permissions](https://www.realme.com/global/support/troubleshooting) — foreground/background activity, auto-launch, and Startup Manager.
 - [OnePlus: OxygenOS 14 User Manual](https://service.oneplus.com/content/dam/support/user-manuals/common/OxygenOS_14.0_User_Manual.pdf) — Settings → Apps → Auto launch.
 
-vivo's support site lists a dedicated “Background app power consumption management” FAQ, but exact instructions depend on the device and Funtouch OS / OriginOS version. The app therefore directs users to Settings search rather than claiming a single universal path.
+vivo's official support material documents **Background power consumption management**, where users can allow selected apps to continue running in the background. Some Funtouch OS releases also expose Autostart under Settings → More settings → Applications → Autostart; OriginOS/Funtouch menu paths differ, so the app uses Settings search when a precise route is not verified for that build. [vivo Philippines support](https://www.vivo.com/ph/support/questionList?categoryId=54461) · [vivo device guide (PDF)](https://eu-exstatic-vivofs.vivo.com/8Xa6evfY85lu15Pb/1658104689682/c8570d4b762027b070c0f05851682905.pdf)
 
 ## Core protection architecture
 
@@ -143,6 +143,8 @@ vivo's support site lists a dedicated “Background app power consumption manage
 - [Foreground-service types](https://developer.android.com/develop/background-work/services/fgs/service-types) — media playback and special-use service declarations.
 - [Android 15 behavior changes](https://developer.android.com/about/versions/15/behavior-changes-15) — boot receiver restrictions for mediaPlayback foreground services.
 - [Android 16 foreground-service changes](https://developer.android.com/develop/background-work/services/fgs/changes) — current background-job and foreground-service policy changes.
+- [Google Pixel: app battery usage and background usage](https://support.google.com/pixelphone/answer/6090599) — Pixel app-level Allow background usage controls.
+- [vivo Philippines: Background app power consumption management](https://www.vivo.com/ph/support/questionList?categoryId=54461) — official vivo support topic for background power management.
 - [Notification permission and time-sensitive notifications](https://developer.android.com/develop/ui/views/notifications/time-sensitive) — Android 13 notification permission and alarm notification guidance.
 - [Package visibility](https://developer.android.com/training/package-visibility/declaring) — Android 11+ visibility filtering and intent queries.
 
