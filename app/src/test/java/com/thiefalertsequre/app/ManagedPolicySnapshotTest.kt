@@ -6,28 +6,36 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ManagedPolicySnapshotTest {
-    @Test fun rollbackRetainsRestrictionsThatWereAlreadyEnabled() {
+    @Test fun rollbackRetainsOriginalLocalAndGlobalRestrictionValues() {
         val snapshot = ManagedPolicySnapshot(
             lockTaskPackages = arrayOf("com.example.owner", "com.example.kiosk"),
             lockTaskFeatures = 36,
-            restrictionValues = mapOf(
+            localRestrictionValues = mapOf(
                 "no_factory_reset" to true,
                 "no_safe_boot" to false
+            ),
+            globalRestrictionValues = mapOf(
+                "no_factory_reset" to false,
+                "no_safe_boot" to true
             )
         )
 
-        assertTrue(snapshot.shouldKeepRestrictionEnabled("no_factory_reset"))
-        assertFalse(snapshot.shouldKeepRestrictionEnabled("no_safe_boot"))
+        assertTrue(snapshot.shouldKeepLocalRestrictionEnabled("no_factory_reset"))
+        assertFalse(snapshot.shouldKeepGlobalRestrictionEnabled("no_factory_reset"))
+        assertFalse(snapshot.shouldKeepLocalRestrictionEnabled("no_safe_boot"))
+        assertTrue(snapshot.shouldKeepGlobalRestrictionEnabled("no_safe_boot"))
     }
 
     @Test fun unknownRestrictionIsRestoredAsPreviouslyDisabled() {
         val snapshot = ManagedPolicySnapshot(
             lockTaskPackages = emptyArray(),
             lockTaskFeatures = 1,
-            restrictionValues = emptyMap()
+            localRestrictionValues = emptyMap(),
+            globalRestrictionValues = emptyMap()
         )
 
-        assertFalse(snapshot.shouldKeepRestrictionEnabled("no_add_user"))
+        assertFalse(snapshot.shouldKeepLocalRestrictionEnabled("no_add_user"))
+        assertFalse(snapshot.shouldKeepGlobalRestrictionEnabled("no_add_user"))
     }
 
     @Test fun snapshotRetainsOriginalLockTaskPackagesAndFeatureFlags() {
@@ -35,7 +43,8 @@ class ManagedPolicySnapshotTest {
         val snapshot = ManagedPolicySnapshot(
             lockTaskPackages = originalPackages,
             lockTaskFeatures = 37,
-            restrictionValues = emptyMap()
+            localRestrictionValues = emptyMap(),
+            globalRestrictionValues = emptyMap()
         )
 
         assertEquals(originalPackages.toList(), snapshot.lockTaskPackages.toList())
