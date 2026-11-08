@@ -5,8 +5,9 @@
 Every official build must keep this application identity unchanged:
 
 - Application ID: `com.thiefalertsequre.app`
-- Current version: `1.1.1`
-- Current version code: `3`
+- Current development version: `1.1.2`
+- Current version code: `4`
+- Current CI output: debug-only APK unless all four permanent release-signing secrets are configured
 - Minimum Android: API 26
 
 Do not change `applicationId`, add an `applicationIdSuffix`, or reuse a lower version code for an update. The display label and launcher icon can change without changing the package identity.
@@ -44,7 +45,7 @@ On a connected test device:
 
 ```bash
 adb shell dumpsys package com.thiefalertsequre.app
-adb install -r ThiefAlertSeQure-v1.1.1-release.apk
+adb install -r ThiefAlertSeQure-v1.1.2-debug.apk
 ```
 
 For an APK file, inspect its signer before installing:
@@ -71,3 +72,25 @@ No Android app can override Package Manager's signature verification, silently r
 ## CI checks
 
 The Android workflow now verifies the APK's application ID, version code, version name, and signing certificate output before uploading the artifact. Release and debug APK artifacts have distinct names to prevent accidental mixing.
+
+
+## HONOR 200 Pro acceptance test (after installing the verified 1.1.2 APK)
+
+Keep the app's protection monitor enabled. In HONOR Settings, retain the manually configured App Launch settings: Manage automatically OFF, Auto-launch ON, Secondary launch ON, and Run in background ON. The app cannot toggle these private OEM controls itself.
+
+1. Open ThiefAlertSeQure, grant notifications, and grant Alarms & reminders / exact-alarm access where Android offers it. Enable Device Administrator only if you want automatic screen locking.
+2. Connect the charger. Confirm the dashboard reports ARMED.
+3. With the screen on, unplug the charger. Confirm the 10-second countdown begins promptly.
+4. Reconnect before the deadline. Confirm the countdown cancels and the state returns to ARMED.
+5. Repeat unplugging and leave it disconnected beyond 10 seconds. Confirm ALARM_TRIGGERED, audible alarm/vibration fallback, and the ongoing notification.
+6. Reconnect after the alarm has triggered. Confirm the alarm remains active.
+7. Unlock Android normally. Confirm this alone does not stop the alarm. Open the app/notification and complete its explicit Android device-credential or BIOMETRIC_STRONG prompt. Confirm the alarm stops only after that successful prompt.
+8. Confirm the previous alarm volume is restored after successful authentication.
+9. Repeat the countdown while the app is backgrounded and the screen is off. Repeat with another app in the foreground.
+10. Reboot during a countdown. After first unlock, confirm connected power returns to ARMED; confirmed disconnected power receives a fresh 10-second grace period; unknown power waits for a reliable sample.
+11. Reboot while ALARM_TRIGGERED. After first unlock, confirm the latched alarm recovery notification/service resumes where Android permits it. Direct-Boot protection before first unlock is not supported.
+12. Review Settings status after returning from Android settings. Confirm the app reports actual notification, exact-alarm, battery-optimization, Device Admin and full-screen-intent access rather than assuming a setting was granted.
+
+Record each result as PASS / FAIL / NOT TESTED, including the exact MagicOS and Android build. Do not provision Device Owner on your everyday phone: its enrollment normally requires a prepared or factory-reset test device.
+
+**Important:** The 1.1.2 CI build is a development/debug APK unless the release keystore secrets are configured. Verify its signer SHA-256 against the previously installed development build before updating. If the signer differs, do not uninstall or clear app data; stop and inspect the signing identity first. CI success does not replace this physical-device test.
