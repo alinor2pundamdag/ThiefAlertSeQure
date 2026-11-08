@@ -244,7 +244,12 @@ class AlarmService : Service() {
             this, 42, openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        return NotificationCompat.Builder(this, channelId)
+        val dashboardEnabled = getSharedPreferences(
+            MainActivity.ALARM_DISPLAY_PREFS, MODE_PRIVATE
+        ).getBoolean(MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
+        val fullScreenAccessGranted = Build.VERSION.SDK_INT < 34 ||
+            getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
+        val builder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("ThiefAlertSeQure — Alarm active")
             .setContentText("Open to authenticate with your device lock or supported biometric.")
@@ -254,7 +259,15 @@ class AlarmService : Service() {
             .setOngoing(true)
             .setAutoCancel(false)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .build()
+        if (AlarmPresentationPolicy.shouldUseFullScreenIntent(
+                dashboardEnabled, Build.VERSION.SDK_INT, fullScreenAccessGranted
+            )
+        ) {
+            // This is the optional, owner-enabled dashboard only. If Android 14+
+            // access is denied, retain the normal alarm notification fallback.
+            builder.setFullScreenIntent(contentIntent, true)
+        }
+        return builder.build()
     }
 
     /** Force the keyguard before presenting the full-screen owner-authentication activity. */
