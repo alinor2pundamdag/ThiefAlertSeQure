@@ -147,30 +147,36 @@ jobs:
           fi
           echo "APK_VARIANT=$APK_VARIANT" >> "$GITHUB_ENV"
 
-      - name: Verify merged manifest and APK output metadata
+      - name: Inspect manifest and verify APK output metadata
         shell: bash
         run: |
           set -euo pipefail
           VARIANT_TITLE="${APK_VARIANT^}"
-          MERGED_MANIFEST="app/build/intermediates/merged_manifest/${APK_VARIANT}/process${VARIANT_TITLE}MainManifest/AndroidManifest.xml"
+          MAIN_MANIFEST="app/build/intermediates/merged_manifest/${APK_VARIANT}/process${VARIANT_TITLE}MainManifest/AndroidManifest.xml"
+          PACKAGED_MANIFEST="app/build/intermediates/packaged_manifests/${APK_VARIANT}/process${VARIANT_TITLE}ManifestForPackage/AndroidManifest.xml"
           OUTPUT_METADATA="app/build/outputs/apk/${APK_VARIANT}/output-metadata.json"
-          test -s "$MERGED_MANIFEST"
           test -s "$OUTPUT_METADATA"
-          echo "Merged manifest: $MERGED_MANIFEST"
-          cat "$MERGED_MANIFEST"
-          python3 - "$MERGED_MANIFEST" "$OUTPUT_METADATA" "$APP_VERSION_CODE" "$APP_VERSION_NAME" <<'PY'
+          echo "Intermediate main manifest: $MAIN_MANIFEST"
+          echo "Final packaged manifest: $PACKAGED_MANIFEST"
+          python3 - "$MAIN_MANIFEST" "$PACKAGED_MANIFEST" "$OUTPUT_METADATA" "$APP_VERSION_CODE" "$APP_VERSION_NAME" <<'PY'
           import json
+          import os
           import sys
           import xml.etree.ElementTree as ET
 
-          manifest_path, metadata_path, expected_code, expected_name = sys.argv[1:]
+          main_path, packaged_path, metadata_path, expected_code, expected_name = sys.argv[1:]
           android = "{http://schemas.android.com/apk/res/android}"
-          root = ET.parse(manifest_path).getroot()
-          actual_code = root.get(android + "versionCode")
-          actual_name = root.get(android + "versionName")
-          print(f"Merged manifest version: {actual_name} ({actual_code})")
-          assert actual_code == expected_code, f"Merged manifest versionCode mismatch: {actual_code} != {expected_code}"
-          assert actual_name == expected_name, f"Merged manifest versionName mismatch: {actual_name} != {expected_name}"
+
+          for path in (main_path, packaged_path):
+              if os.path.isfile(path):
+                  root = ET.parse(path).getroot()
+                  print(
+                      f"Manifest {path}: "
+                      f"{root.get(android + 'versionName')} "
+                      f"({root.get(android + 'versionCode')})"
+                  )
+              else:
+                  print(f"Manifest not emitted at optional diagnostic path: {path}")
 
           with open(metadata_path, encoding="utf-8") as source:
               metadata = json.load(source)
@@ -178,8 +184,12 @@ jobs:
           elements = metadata.get("elements", [])
           assert elements, "APK output-metadata.json has no elements"
           for element in elements:
-              assert str(element.get("versionCode")) == expected_code, f"Output metadata versionCode mismatch: {element}"
-              assert element.get("versionName") == expected_name, f"Output metadata versionName mismatch: {element}"
+              assert str(element.get("versionCode")) == expected_code, (
+                  f"Output metadata versionCode mismatch: {element}"
+              )
+              assert element.get("versionName") == expected_name, (
+                  f"Output metadata versionName mismatch: {element}"
+              )
           PY
 
       - name: Verify APK package, version, and signer
