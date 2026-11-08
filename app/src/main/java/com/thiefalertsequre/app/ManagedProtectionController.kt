@@ -59,7 +59,9 @@ object ManagedProtectionController {
 
         // Do not replace the original baseline when enable is retried or the app
         // is already configured. The first snapshot is the rollback authority.
-        if (!prefs.contains(KEY_VERSION)) {
+        if (prefs.contains(KEY_VERSION)) {
+            validateSnapshot(prefs)
+        } else {
             val restrictionsBefore = dpm.getUserRestrictions(admin)
             val snapshot = PolicySnapshot(
                 lockTaskPackages = dpm.getLockTaskPackages(admin),
@@ -84,6 +86,7 @@ object ManagedProtectionController {
             activity.startLockTask()
             return true
         } catch (failure: Throwable) {
+            runCatching { activity.stopLockTask() }
             val rollbackFailure = runCatching { restorePersistedSnapshot(activity, dpm, admin) }.exceptionOrNull()
             if (rollbackFailure != null) {
                 failure.addSuppressed(rollbackFailure)
@@ -161,6 +164,18 @@ object ManagedProtectionController {
         }
         check(editor.commit()) {
             "Could not persist the original managed-device policies; no lockdown changes were applied."
+        }
+    }
+
+    private fun validateSnapshot(prefs: android.content.SharedPreferences) {
+        check(prefs.getInt(KEY_VERSION, -1) == SNAPSHOT_VERSION) {
+            "Managed-policy rollback data is invalid. Refusing to apply lockdown over an unreadable recovery snapshot."
+        }
+        check(prefs.getStringSet(KEY_PACKAGES, null) != null) {
+            "Managed-policy rollback package list is missing. Refusing to change device policies."
+        }
+        check(prefs.contains(KEY_FEATURES) && restrictions.all { prefs.contains("restriction:$it") }) {
+            "Managed-policy rollback data is incomplete. Refusing to change device policies."
         }
     }
 
