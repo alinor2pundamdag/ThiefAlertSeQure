@@ -109,9 +109,9 @@ MainActivity / SettingsActivity
 - `ProtectionStore` owns persisted protection state and serialized updates.
 - `PowerTransitionCoordinator` owns ordering, validation, and debounce of power events.
 - `AlarmScheduler` owns deadline and recovery scheduling.
-- `BootReceiver` owns boot/package-replacement reconciliation; it does not invent a new unplug event.
+- `BootReceiver` owns boot/package-replacement reconciliation; it does not invent a new unplug event. BOOT_COMPLETED invalidates the previous charger baseline even when BOOT_COUNT is unavailable; an unknown first power sample remains pending until live power is confirmed.
 - `AlarmService` owns alarm playback, alarm notification, and active-alarm volume enforcement.
-- `OwnerAuthenticationCoordinator` is the only application path allowed to clear a latched alarm after verified Android authentication.
+- `OwnerAuthenticationCoordinator` is the only application path allowed to clear a latched alarm after the explicit successful result from app-launched Android device-credential confirmation or BIOMETRIC_STRONG authentication; keyguard dismissal alone is not proof.
 - `ManagedProtectionController` owns explicit managed-policy enable/disable and rollback.
 - `AndroidDeviceCompatibility` owns manufacturer-family identification, manual guidance, and safe Settings-intent fallback only.
 - UI Activities display state and invoke coordinators; they must not write alarm state directly or duplicate business rules.
@@ -127,7 +127,7 @@ Allowed states: `DISARMED`, `ARMED`, `COUNTDOWN`, `ALARM_TRIGGERED`.
 | ARMED | Confirmed physical disconnect | COUNTDOWN | Persist one 10-second monotonic deadline |
 | COUNTDOWN | Confirmed reconnect before latch | ARMED | Cancel matching deadline |
 | COUNTDOWN | Deadline reached and live power confirms disconnected | ALARM_TRIGGERED | Persist latch before starting alarm |
-| COUNTDOWN | Power state unknown | COUNTDOWN | Never infer unplug or expiry from unknown |
+| COUNTDOWN | Power state unknown | COUNTDOWN | Never infer unplug or expiry from unknown; after reboot, keep a pending reconciliation marker until the first reliable power sample, then start a fresh grace period only if disconnected |
 | ALARM_TRIGGERED | Charger reconnect/disconnect | ALARM_TRIGGERED | Charger events cannot clear a latched alarm |
 | ALARM_TRIGGERED | Service/process restart | ALARM_TRIGGERED | Restore same alarm episode, no duplicate |
 | ALARM_TRIGGERED | Reboot | ALARM_TRIGGERED | Recover subject to OS start rules and user-unlock state |
