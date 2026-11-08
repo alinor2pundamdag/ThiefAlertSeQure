@@ -49,6 +49,12 @@ class AuthenticationThrottleTest {
         assertEquals(30_000L, AuthenticationThrottle.remainingMs(cooling, 99_000_000L, 1_000L, 10))
     }
 
+    @Test fun corruptThrottleDataRecoversWithBoundedCooldownAndCurrentBootIdentity() {
+        val recovered = AuthenticationThrottle.recoverCorruptState(10_000L, 50_000L, 7)
+        assertEquals(30_000L, AuthenticationThrottle.remainingMs(recovered, 10_000L, 50_000L, 7))
+        assertEquals(7, recovered.bootCount)
+    }
+
     @Test fun cooldownCanBeStartedByAndroidBiometricLockout() {
         val state = AuthenticationThrottle.startCooldown(AuthThrottleState(2, 0L), 5_000L)
         assertEquals(35_000L, state.cooldownUntilEpochMs)
