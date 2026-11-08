@@ -30,7 +30,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 - State transitions are serialized through ProtectionStore.
 - Triggered state is monotonic against charger events and owner monitoring opt-out; only a successful app-launched Android device-credential confirmation or BIOMETRIC_STRONG prompt clears it. Merely unlocking the phone never clears the alarm. The separate motion alarm is opt-in and can trigger while charging. Explicitly disabling monitoring can disarm non-triggered states and cancels their pending deadline.
 - State and throttle are synchronously persisted.
-- Countdown uses elapsedRealtime plus a verified boot count. If a countdown was pending at reboot and the charger remains absent, restart a full 10-second grace period; if charging, protection returns to ARMED. If boot identity is unavailable, never use wall-clock time to expire a monotonic deadline.
+- Countdown uses elapsedRealtime plus a verified boot count. BOOT_COMPLETED explicitly invalidates the previous charger baseline even if Settings.Global.BOOT_COUNT is unavailable. If the first post-boot charger sample is unknown, a dedicated pending marker retries until power is known; the first confirmed disconnected sample starts a fresh 10-second grace period. If connected, protection returns to ARMED. An old-boot monotonic deadline is never compared to wall-clock time.
 - AlarmDeadlineReceiver rechecks the deadline and reschedules early delivery.
 - Exact alarm scheduling handles permission revocation races and falls back to inexact delivery when exact access is unavailable.
 
@@ -45,7 +45,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 ## Audio and lockscreen
 - Packaged Ogg Opus alarm asset is played in a loop through MediaPlayer. If selected and packaged audio both fail, repeating vibration is the fallback; there is no ToneGenerator implementation.
 - Audio uses USAGE_ALARM and requests maximum available alarm-stream volume.
-- Prior alarm volume is saved and restored after successful disarm. If service is destroyed while alarm remains latched, it does not restore volume prematurely.
+- Prior alarm volume is saved and restored after successful disarm. If service is destroyed while alarm remains latched, it does not restore volume prematurely. Corrupt saved-volume metadata is removed and reported; the original value cannot be reconstructed from a malformed preference.
 - While AlarmService is active, the alarm stream maximum is reasserted every 500 ms; this is best-effort volume control, not hardware-key interception.
 - Notification is ongoing and opens the authentication Activity. The full-screen dashboard is optional, requires explicit owner opt-in, and on Android 14+ is attached only when `canUseFullScreenIntent()` confirms system access. If denied, the ordinary high-priority notification remains.
 - DND is not silently changed. Users configure alarm exceptions in Android settings.
@@ -57,8 +57,8 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 - Only an already provisioned Device Owner can explicitly enable managed policies.
 - Lock Task allowlist includes only this app.
 - Lock Task features keep Keyguard available but omit GLOBAL_ACTIONS, hiding the normal power dialog while kiosk mode is active on supported Android builds.
-- Selected restrictions block Settings factory reset, safe boot, debugging, adding users and USB file transfer.
-- In-app rollback stops Lock Task and clears each restriction and allowlist.
+- New managed policies restrict Settings factory reset, adding users and USB file transfer only. Safe Boot and USB debugging deliberately remain available as recovery paths. The controller snapshots both local and global restriction values on Android 14+ and restores the exact saved values when possible.
+- In-app rollback marks recovery pending before attempting to exit Lock Task, restores each saved restriction and allowlist independently, and retains the snapshot for retry if any DevicePolicyManager operation fails. Corrupt/legacy snapshots use documented emergency navigation defaults.
 - This does not block physical long-press shutdown, hardware key combinations, bootloader/recovery reset or OEM firmware controls.
 
 ## Android boot and Direct Boot behavior
