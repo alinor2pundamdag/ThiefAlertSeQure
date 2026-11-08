@@ -190,7 +190,15 @@ object ManagedProtectionController {
         admin: ComponentName
     ) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        validateSnapshot(prefs)
+        try {
+            validateSnapshot(prefs)
+        } catch (invalidSnapshot: Exception) {
+            // The exact prior baseline is unrecoverable if local rollback data is
+            // corrupt. Because the owner explicitly requested disable, restore
+            // navigable Android defaults and clear only policies managed here.
+            restoreEmergencyDefaults(dpm, admin, prefs, invalidSnapshot)
+            return
+        }
         val packages = prefs.getStringSet(KEY_PACKAGES, null)
             ?: throw IllegalStateException("Managed-policy rollback package list is missing.")
 
@@ -223,6 +231,33 @@ object ManagedProtectionController {
 
         check(prefs.edit().clear().commit()) {
             "Policies were restored, but rollback metadata could not be cleared. Retry disable to verify recovery."
+        }
+    }
+
+    private fun restoreEmergencyDefaults(
+        dpm: DevicePolicyManager,
+        admin: ComponentName,
+        prefs: android.content.SharedPreferences,
+        invalidSnapshot: Exception
+    ) {
+        val failures = mutableListOf<Throwable>()
+        restrictions.forEach { key ->
+            runCatching { dpm.clearUserRestriction(admin, key) }.onFailure(failures::add)
+        }
+        runCatching {
+            dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
+        }.onFailure(failures::add)
+        runCatching { dpm.setLockTaskPackages(admin, emptyArray()) }.onFailure(failures::add)
+
+        if (failures.isNotEmpty()) {
+            throw IllegalStateException(
+                "Rollback data is corrupt and emergency policy recovery was incomplete. " +
+                    "The app retained recovery metadata; keep the app installed and retry disable.",
+                failures.first()
+            ).also { it.addSuppressed(invalidSnapshot) }
+        }
+        check(prefs.edit().clear().commit()) {
+            "Emergency policy defaults were restored, but damaged rollback metadata could not be cleared."
         }
     }
 
