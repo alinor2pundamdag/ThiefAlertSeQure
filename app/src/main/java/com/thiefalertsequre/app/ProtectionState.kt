@@ -2,6 +2,9 @@ package com.thiefalertsequre.app
 
 enum class ProtectionMode { DISARMED, ARMED, COUNTDOWN, ALARM_TRIGGERED }
 
+/** bootCount sentinel for a countdown awaiting the first reliable post-boot power sample. */
+const val BOOT_RECONCILIATION_PENDING = -2
+
 data class ProtectionState(
     val mode: ProtectionMode = ProtectionMode.DISARMED,
     val deadlineEpochMs: Long = 0L,
@@ -41,7 +44,7 @@ data class ProtectionState(
                     val valid = deadlineEpochMs > 0L &&
                         changedAtEpochMs > 0L &&
                         deadlineElapsedRealtimeMs >= 0L &&
-                        bootCount >= -1
+                        (bootCount >= -1 || (bootCount == BOOT_RECONCILIATION_PENDING && deadlineElapsedRealtimeMs == 0L))
                     if (valid) ProtectionState(
                         mode, deadlineEpochMs, changedAtEpochMs,
                         deadlineElapsedRealtimeMs, bootCount
