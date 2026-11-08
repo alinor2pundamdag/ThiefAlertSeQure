@@ -120,7 +120,21 @@ object AndroidDeviceCompatibility {
             else -> appInfoIntent(packageName)
         }
 
-    fun launchControlGuide(manufacturer: String, brand: String, control: LaunchControl): String {
+    fun launchControlGuide(
+        manufacturer: String,
+        brand: String,
+        control: LaunchControl,
+        model: String = "",
+        androidRelease: String = "",
+        sdk: Int = 0
+    ): String {
+        val deviceContext = listOf(
+            model.takeIf { it.isNotBlank() },
+            androidRelease.takeIf { it.isNotBlank() }?.let { "Android $it" },
+            sdk.takeIf { it > 0 }?.let { "API $it" }
+        ).joinToString(" • ")
+        val deviceSuffix = if (deviceContext.isBlank()) "" else " Device detected: $deviceContext. Menu labels can differ by model/build."
+
         return when (family(manufacturer, brand)) {
             Family.HONOR_HUAWEI ->
                 "Settings → Apps → App launch → ThiefAlertSeQure (or Settings → Battery → App launch on some MagicOS/EMUI versions). Turn Manage automatically OFF. In the Manage manually box, enable Auto-launch, Secondary launch, and Run in background, then tap OK. This is the recommended three-switch configuration on supported HONOR/Huawei builds. The app cannot read or change these OEM switches itself."
@@ -154,7 +168,7 @@ object AndroidDeviceCompatibility {
                 LaunchControl.SECONDARY_LAUNCH -> "A separate Secondary launch switch may not exist on this device. Search Settings for Background start or associated app-launch permissions; do not enable unrelated permissions."
                 LaunchControl.RUN_IN_BACKGROUND -> "Open App info → App battery usage / Battery and allow background usage or Unrestricted where offered. Menu names vary by model and OS version."
             }
-        }
+        } + deviceSuffix
     }
 
     fun appInfoIntent(packageName: String): Intent =
