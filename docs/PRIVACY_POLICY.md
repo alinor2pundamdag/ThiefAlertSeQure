@@ -41,7 +41,7 @@ Depending on Android version and the user's choices, the app may use:
 - Alarm scheduling; precise alarm access is a special Android setting on supported versions.
 - Notifications and a foreground media-playback service while an alarm is active.
 - Alarm-stream volume control to temporarily raise the alarm volume and restore the previous level after successful disarm.
-- Android CameraManager torch control to pulse a compatible device LED only while the alarm is latched. This API does not request CAMERA permission, open the camera for capture, or collect images/video. Flash hardware is optional and may be unavailable or temporarily busy.
+- Android CameraManager torch control, enabled by default, to pulse a compatible device LED only while the alarm is latched. This API does not request CAMERA permission, open the camera for capture, or collect images/video. Flash hardware is optional and may be unavailable or temporarily busy.
 - Android's Storage Access Framework document/folder picker to read audio files explicitly selected by the owner and to write an event-history CSV only when the owner chooses an export destination.
 - Device Owner / Lock Task APIs only if the device has been separately provisioned as a fully managed device and the user explicitly enables managed mode.
 
