@@ -26,27 +26,27 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
 
-      # Create the cache target before actions/cache runs; otherwise a key first
-      # generated later by Gradle is not reliably persisted between CI runs.
-      # This key is development-only and is never used for release signing.
-      - name: Prepare debug signing key cache path
+      # Restore before creating a fallback key: extracting a cache over a
+      # freshly generated file can leave the new file in place and change APK identity.
+      # Debug signing is only a development fallback, never a release identity.
+      - name: Restore cached debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
+
+      - name: Generate debug signing key only on cache miss
         shell: bash
         run: |
           mkdir -p "$HOME/.android"
-          if [[ ! -f "$HOME/.android/debug.keystore" ]]; then
+          if [[ ! -s "$HOME/.android/debug.keystore" ]]; then
             keytool -genkeypair -noprompt -storetype JKS \
               -keystore "$HOME/.android/debug.keystore" \
               -storepass android -keypass android -alias androiddebugkey \
               -dname "CN=Android Debug,O=Android,C=US" \
               -keyalg RSA -keysize 2048 -validity 10000
           fi
-
-      # Debug signing is only a development fallback. It is not a permanent release identity.
-      - name: Restore cached debug signing key
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: android-debug-keystore-v1
+          test -s "$HOME/.android/debug.keystore"
 
       - name: Prepare persistent release signing key
         shell: bash
