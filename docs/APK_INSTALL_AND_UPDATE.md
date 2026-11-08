@@ -45,7 +45,7 @@ On a connected test device:
 
 ```bash
 adb shell dumpsys package com.thiefalertsequre.app
-adb install -r ThiefAlertSeQure-v1.1.2-debug.apk
+adb install -r ThiefAlertSeQure-v1.1.3-debug.apk
 ```
 
 For an APK file, inspect its signer before installing:
@@ -74,7 +74,7 @@ No Android app can override Package Manager's signature verification, silently r
 The Android workflow now verifies the APK's application ID, version code, version name, and signing certificate output before uploading the artifact. Release and debug APK artifacts have distinct names to prevent accidental mixing.
 
 
-## Verified 1.1.2 development APK
+## Historical 1.1.2 development APK (previous build)
 
 - GitHub Actions run: [42479548944](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/42479548944)
 - Artifact: `ThiefAlertSeQure-debug-apk` (artifact ID `13617306483`, expires 2026-11-22)
@@ -84,7 +84,7 @@ The Android workflow now verifies the APK's application ID, version code, versio
 
 The earlier 1.1.1 debug artifacts from the push and pull-request workflows had different signer certificates (`bb6f5da1a5b4b795383af711ae8f4bbcbc77c203ef31f0180b514234a84a2a9d` and `148b01dd2f4b2a5912abd6d8ed43da44687caf2ef02d97a565ee10d171129555`). Therefore, do not assume this 1.1.2 APK can update an older debug installation. Compare the installed certificate first; if it differs, do not uninstall or clear data without a backup and explicit acceptance of data loss.
 
-## HONOR 200 Pro acceptance test (after installing the verified 1.1.2 APK)
+## HONOR 200 Pro acceptance test (v1.1.3 — after its CI APK is available)
 
 Keep the app's protection monitor enabled. In HONOR Settings, retain the manually configured App Launch settings: Manage automatically OFF, Auto-launch ON, Secondary launch ON, and Run in background ON. The app cannot toggle these private OEM controls itself.
 
@@ -104,4 +104,4 @@ Keep the app's protection monitor enabled. In HONOR Settings, retain the manuall
 
 Record each result as PASS / FAIL / NOT TESTED, including the exact MagicOS and Android build. Device Owner enrollment/rollback has been user-reported PASS on a separate test device; do not provision it on an everyday phone because enrollment normally requires a prepared or factory-reset test device.
 
-**Important:** The 1.1.3 CI build is a development/debug APK unless the release keystore secrets are configured. Verify its signer SHA-256 against the previously installed development build before updating. If the signer differs, do not uninstall or clear app data; stop and inspect the signing identity first. CI success does not replace this physical-device test.
+**Important:** The v1.1.3 source now includes the synchronized alarm flashlight and the acknowledgement-only first-launch notice. Its CI artifact is pending verification; do not install a guessed or previous APK as v1.1.3. When CI completes, use the artifact recorded for the exact branch head. The resulting APK is a development/debug APK unless the release keystore secrets are configured. Verify its signer SHA-256 against the previously installed development build before updating. If the signer differs, do not uninstall or clear app data; stop and inspect the signing identity first. CI success does not replace this physical-device test.
