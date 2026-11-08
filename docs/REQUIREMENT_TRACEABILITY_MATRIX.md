@@ -1,6 +1,6 @@
 # Requirement Traceability Matrix — ThiefAlertSeQure
 
-> Baseline: `feat/custom-audio-and-reliability` at `96a534664af31530bc2974069649b788a189d183` (2026-11-08).
+> Baseline: `feat/custom-audio-and-reliability` at `27ef0abf3b463fd5abca0d224e8ad225bd09b123` (2026-11-08).
 > Contract: [Universal Maximum Protection Specification](UNIVERSAL_MAXIMUM_PROTECTION_SPEC.md).
 > Status labels: **Implemented** means source code exists; **Unit-covered** means a named local test exists; **CI-verified** means the exact baseline commit passed GitHub Actions; **Device-unverified** means no physical-device evidence is recorded for that case. These labels are deliberately not interchangeable.
 
@@ -9,7 +9,7 @@
 | Area | Evidence at baseline | Status / limitation |
 |---|---|---|
 | Branch / PR | PR #2 is open and draft; branch head is the baseline SHA above | Not merged |
-| CI | Android build and tests run 42456409652 completed with conclusion `success` on the baseline SHA | CI-verified only |
+| CI | Earlier baseline run 42456409652 passed on `96a5346`; OEM-family expansion run 42457337094 failed at Kotlin compilation because `SettingsActivity` lacked the new exhaustive branches; fixed in `e260ec0`, with latest-head CI still pending | Earlier baseline CI-verified; current head not yet verified |
 | Unit tests | `:app:testDebugUnitTest` in workflow | Unit tests execute in CI |
 | Lint | `:app:lintDebug` in workflow | CI-verified |
 | APK | Workflow assembles release only when persistent signing secrets exist; otherwise debug APK | Packaging verified; signing mode depends on secrets |
@@ -72,7 +72,7 @@
 | OEM-05 | Detect vivo / iQOO | compatibility helper | family unit tests | Unit-covered detection; device menus unverified |
 | OEM-06 | Detect Google Pixel and Motorola / Lenovo | compatibility helper | family unit tests | Unit-covered detection; device menus unverified |
 | OEM-07 | Unknown manufacturers receive safe generic guidance and standard Settings fallbacks | compatibility helper | unknown-brand test | Unit-covered generic fallback |
-| OEM-08 | ASUS, Sony, Nothing, Tecno, Infinix, ZTE, and other vendors are not rejected; use generic fallback unless a stable public route is verified | compatibility helper | generic fallback only | Fallback implemented; dedicated recognition and device validation outstanding |
+| OEM-08 | ASUS, Sony Xperia, Nothing OS, Lenovo, TECNO / Infinix / itel, ZTE / nubia, and other vendors are identified where possible; use safe generic fallback unless a stable public route is verified | compatibility helper, SettingsActivity | `recognizesAdditionalAndroidManufacturersWithSafeGenericGuidance` | Family recognition and generic fallback implemented; dedicated physical-device validation outstanding |
 | OEM-09 | Never depend on undocumented OEM component names or claim the app can toggle private auto-start controls | compatibility helper, SettingsActivity | source inspection | Implemented by design |
 | OEM-10 | Manufacturer/model/Android version are shown to help tailor instructions | compatibility helper, settings UI | device-summary helper; guide test | Implemented; verify rendered UI |
 
@@ -125,3 +125,12 @@ A requirement is **complete** only when:
 7. PR remains unmerged until the owner explicitly approves integration.
 
 **No universal compatibility guarantee is implied by generic fallback guidance or a successful CI run.**
+
+
+## 8. Recent audit changes
+
+- `f8f434c`: added this traceability matrix.
+- `ba2f07a` and `7b7cbdb`: expanded OEM family recognition and added unit coverage for ASUS, Sony Xperia, Nothing OS, TECNO / Infinix / itel, ZTE / nubia, and Lenovo.
+- `e260ec0`: fixed the Kotlin exhaustive-`when` compile error in SettingsActivity found by CI.
+- Documentation corrections align charger receiver registration with the runtime foreground-service registration, and align the stated target SDK with Gradle (API 36).
+- Android 17 background-audio behavior is documented against the official platform guidance: [Android 17 background audio hardening](https://developer.android.com/develop/background-work/services/fgs/changes) and [Android 17 audio hardening details](https://developer.android.com/about/versions/17/changes/bg-audio).
