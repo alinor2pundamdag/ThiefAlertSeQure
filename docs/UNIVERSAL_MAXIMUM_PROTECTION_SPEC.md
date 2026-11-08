@@ -48,7 +48,7 @@ Existing implementation files identified on the active branch:
 | Alarm foreground service and notification | `AlarmService.kt` |
 | Alarm audio selection/storage | `AlarmSoundStore.kt` |
 | Alarm stream volume policy | `AlarmVolumeController.kt` |
-| Authentication entry coordination | `OwnerAuthenticationCoordinator.kt`, `AuthenticationThrottle.kt`, `UserPresentReceiver.kt` |
+| Authentication entry coordination | `OwnerAuthenticationCoordinator.kt`, `AuthenticationThrottle.kt` |
 | Optional managed-device policy | `ManagedProtectionController.kt`, `ThiefAlertAdminReceiver.kt`, `res/xml/device_admin.xml` |
 | Local tamper/event history | `LocalTamperHistory.kt` |
 | Existing automated tests | `app/src/test/java/com/thiefalertsequre/app/*Test.kt` |
@@ -304,7 +304,7 @@ Requirements:
 - Accept BIOMETRIC_STRONG only where available.
 - Authentication cancellation/failure never clears alarm.
 - Keep the single `OwnerAuthenticationCoordinator` disarm path.
-- Document that Android does not disclose every failed system credential attempt to ordinary apps and that system keyguard dismissal does not universally reveal the exact authentication modality.
+- Android does not disclose failed system credential attempts to ordinary apps. Do not treat `ACTION_USER_PRESENT`, `isDeviceSecure`, or an unlocked keyguard as proof of a fresh credential entry; trusted-unlock flows can dismiss the keyguard. Require a successful app-launched device-credential confirmation or BIOMETRIC_STRONG prompt.
 - Emergency/owner recovery must remain documented, usable, and tested. Do not create a hidden bypass.
 
 ## 9. UI and navigation contract
