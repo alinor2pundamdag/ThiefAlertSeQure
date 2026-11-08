@@ -57,7 +57,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 - Only an already provisioned Device Owner can explicitly enable managed policies.
 - Lock Task allowlist includes only this app.
 - Lock Task features keep Keyguard available but omit GLOBAL_ACTIONS, hiding the normal power dialog while kiosk mode is active on supported Android builds.
-- New managed policies restrict Settings factory reset, adding users and USB file transfer only. Safe Boot and USB debugging deliberately remain available as recovery paths. The controller snapshots both local and global restriction values on Android 14+ and restores the exact saved values when possible.
+- New managed policies restrict Settings factory reset, adding users and USB file transfer only. Safe Boot and USB debugging deliberately remain available as recovery paths. The controller snapshots admin-scoped local/global restriction values on Android 14+. Lock Task getters on Android 14+ expose resolved policy, not per-admin settings; rollback restores the captured DPM-visible baseline, but another management agent's separate contribution cannot be reconstructed exactly.
 - In-app rollback marks recovery pending before attempting to exit Lock Task, restores each saved restriction and allowlist independently, and retains the snapshot for retry if any DevicePolicyManager operation fails. Corrupt/legacy snapshots use documented emergency navigation defaults.
 - This does not block physical long-press shutdown, hardware key combinations, bootloader/recovery reset or OEM firmware controls.
 
