@@ -407,7 +407,7 @@ class MainActivity : FragmentActivity() {
         if (configured) {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Disable managed lockdown?")
-                .setMessage("This removes the kiosk allowlist and the app's supported restrictions for factory reset in Settings, safe boot, debugging, adding users and USB file transfer. Hardware recovery controls remain outside app control.")
+                .setMessage("This restores the saved kiosk policy and managed restrictions. Safe Boot and USB debugging remain available as recovery paths; hardware recovery controls remain outside app control.")
                 .setNegativeButton("Keep protection", null)
                 .setPositiveButton("Disable lockdown") { _, _ ->
                     runCatching { ManagedProtectionController.disable(this) }
@@ -418,7 +418,7 @@ class MainActivity : FragmentActivity() {
         } else {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Enable managed lockdown?")
-                .setMessage("This is an explicit whole-device policy. It allowlists this app for lock task mode, hides Android global actions while kiosk mode is active, and restricts selected Settings actions. Keep this app's in-app exit control available. It does not block forced hardware shutdown, bootloader recovery, or OEM-level reset.")
+                .setMessage("This is an explicit whole-device policy. It allowlists this app for lock task mode, hides Android global actions while kiosk mode is active, and restricts Settings factory reset, adding users and USB file transfer. Safe Boot and USB debugging remain available for recovery. Keep this app's in-app exit control available. It does not block forced hardware shutdown, bootloader recovery, or OEM-level reset.")
                 .setNegativeButton("Not now", null)
                 .setPositiveButton("Enable managed protection") { _, _ ->
                     runCatching { ManagedProtectionController.enable(this) }
