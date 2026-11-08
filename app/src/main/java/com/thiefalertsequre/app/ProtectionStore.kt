@@ -49,14 +49,51 @@ class ProtectionStore(context: Context) {
         writeThrottleUnlocked(AuthThrottleState())
     }
 
-    private fun readUnlocked(): ProtectionState = ProtectionState(
-        mode = runCatching { ProtectionMode.valueOf(prefs.getString("mode", "DISARMED")!!) }
-            .getOrDefault(ProtectionMode.DISARMED),
-        deadlineEpochMs = prefs.getLong("deadline", 0L),
-        changedAtEpochMs = prefs.getLong("changed", 0L),
-        deadlineElapsedRealtimeMs = prefs.getLong("deadline_elapsed", 0L),
-        bootCount = prefs.getInt("boot_count", -1)
-    )
+    /**
+     * Corrupt persisted state must never silently become DISARMED. A malformed
+     * mode, wrong preference type, or incomplete countdown fails closed into a
+     * latched alarm so only the normal owner-authentication path can clear it.
+     * A genuinely empty store remains DISARMED on first install.
+     */
+    private fun readUnlocked(): ProtectionState = runCatching {
+        val modePresent = prefs.contains("mode")
+        val hasOtherStateFields = listOf(
+            "deadline", "changed", "deadline_elapsed", "boot_count"
+        ).any(prefs::contains)
+        val mode = decodePersistedMode(
+            prefs.getString("mode", null),
+            modePresent,
+            hasOtherStateFields
+        )
+        val deadlineEpochMs = prefs.getLong("deadline", 0L)
+        val changedAtEpochMs = prefs.getLong("changed", 0L)
+        val deadlineElapsedRealtimeMs = prefs.getLong("deadline_elapsed", 0L)
+        val bootCount = prefs.getInt("boot_count", -1)
+
+        if (mode == ProtectionMode.COUNTDOWN && deadlineEpochMs <= 0L) {
+            ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, changedAtEpochMs, 0L, bootCount)
+        } else {
+            ProtectionState(
+                mode, deadlineEpochMs, changedAtEpochMs,
+                deadlineElapsedRealtimeMs, bootCount
+            )
+        }
+    }.getOrElse {
+        ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, System.currentTimeMillis(), 0L, -1)
+    }
+
+    internal fun decodePersistedMode(
+        rawMode: String?,
+        modeKeyPresent: Boolean,
+        hasOtherStateFields: Boolean = false
+    ): ProtectionMode {
+        if (!modeKeyPresent) {
+            return if (hasOtherStateFields) ProtectionMode.ALARM_TRIGGERED
+            else ProtectionMode.DISARMED
+        }
+        return runCatching { ProtectionMode.valueOf(rawMode ?: "") }
+            .getOrDefault(ProtectionMode.ALARM_TRIGGERED)
+    }
 
     private fun writeUnlocked(state: ProtectionState): Boolean = prefs.edit()
         .putString("mode", state.mode.name)
