@@ -95,6 +95,18 @@ class ProtectionEngineTest {
         assertEquals(ProtectionMode.ARMED, ProtectionEngine.restoreAfterBoot(s, true, 2_000L, 500L, 8).mode)
     }
 
+    @Test fun unknownPowerAtBootCreatesAOneSecondReconciliationMarker() {
+        val old = ProtectionState(ProtectionMode.COUNTDOWN, 11_000L, 1_000L, 15_000L, 7)
+        val pending = ProtectionEngine.awaitPostBootPowerSample(old, 50_000L)
+        assertEquals(ProtectionMode.COUNTDOWN, pending.mode)
+        assertEquals(51_000L, pending.deadlineEpochMs)
+        assertEquals(0L, pending.deadlineElapsedRealtimeMs)
+        assertEquals(BOOT_RECONCILIATION_PENDING, pending.bootCount)
+
+        val latched = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, 11_000L)
+        assertEquals(latched, ProtectionEngine.awaitPostBootPowerSample(latched, 50_000L))
+    }
+
     @Test fun rebootCountdownWaitsForReliablePowerSampleBeforeStartingFreshGracePeriod() {
         val pending = ProtectionState(
             ProtectionMode.COUNTDOWN, 51_000L, 50_000L, 0L, BOOT_RECONCILIATION_PENDING
