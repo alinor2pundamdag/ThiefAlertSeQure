@@ -25,10 +25,16 @@ object OwnerAuthenticationCoordinator {
             LocalTamperHistory.record(appContext, "deadline_cancel_after_auth_failed", it.javaClass.simpleName + ": " + it.message)
         }
         appContext.stopService(Intent(appContext, AlarmService::class.java))
-        runCatching {
+        val volumeRestored = runCatching {
             AlarmVolumeController.restore(
                 appContext,
                 appContext.getSystemService(AudioManager::class.java)
+            )
+        }.getOrDefault(false)
+        if (!volumeRestored) {
+            LocalTamperHistory.record(
+                appContext, "alarm_volume_restore_incomplete",
+                "The saved alarm-volume value was unavailable or Android rejected restoration; review alarm volume in system settings"
             )
         }
 
