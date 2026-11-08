@@ -64,3 +64,15 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
     testImplementation("junit:junit:4.13.2")
 }
+
+tasks.register("printAndroidVersionConfig") {
+    doLast {
+        val androidExtension = extensions.getByType<com.android.build.api.dsl.ApplicationExtension>()
+        println("VERSION_DIAG defaultConfig.versionCode=${androidExtension.defaultConfig.versionCode}")
+        println("VERSION_DIAG defaultConfig.versionName=${androidExtension.defaultConfig.versionName}")
+        println("VERSION_DIAG project.android.injected.version.code=${project.findProperty("android.injected.version.code")}")
+        println("VERSION_DIAG project.android.injected.version.name=${project.findProperty("android.injected.version.name")}")
+        println("VERSION_DIAG system.android.injected.version.code=${System.getProperty("android.injected.version.code")}")
+        println("VERSION_DIAG system.android.injected.version.name=${System.getProperty("android.injected.version.name")}")
+    }
+}
