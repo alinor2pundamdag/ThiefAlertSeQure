@@ -42,7 +42,7 @@
 | Managed power dialog restriction | Omits LOCK_TASK_FEATURE_GLOBAL_ACTIONS while app is in Lock Task Mode on supported builds |
 | Managed device restrictions | Settings factory reset, safe boot, USB file transfer, add user, debugging |
 | Managed rollback | In-app exit control stops Lock Task and clears applied restrictions |
-| Unit tests | Protection state machine and authentication throttle |
+| Unit tests | Protection state machine, authentication throttle, and recognized OEM-family guidance including safe generic fallbacks |
 
 ## Authentication boundary
 The five-failure / 30-second app cooldown applies to biometric failures reported through AndroidX BiometricPrompt. Device PIN/pattern/password remains available during that app cooldown; Android Keyguard independently enforces credential lockout. Android does not disclose incorrect device PIN/pattern/password attempts to ordinary apps. Android Keyguard enforces its own credential lockout. The app never collects, stores, logs or transmits device credentials.
