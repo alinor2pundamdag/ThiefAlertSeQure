@@ -58,6 +58,16 @@ class AndroidDeviceCompatibilityTest {
         }
     }
 
+    @Test fun settingsSearchHintsMatchDetectedDeviceFamily() {
+        val auto = AndroidDeviceCompatibility.LaunchControl.AUTO_LAUNCH
+        assertEquals("App launch", AndroidDeviceCompatibility.settingsSearchHint("HONOR", "HONOR", auto))
+        assertEquals("Never sleeping apps", AndroidDeviceCompatibility.settingsSearchHint("Samsung", "Samsung", auto))
+        assertEquals("Background autostart", AndroidDeviceCompatibility.settingsSearchHint("Xiaomi", "Redmi", auto))
+        assertEquals("Auto launch", AndroidDeviceCompatibility.settingsSearchHint("OPPO", "OPPO", auto))
+        assertEquals("Autostart", AndroidDeviceCompatibility.settingsSearchHint("vivo", "vivo", auto))
+        assertEquals("App battery usage", AndroidDeviceCompatibility.settingsSearchHint("Google", "Pixel", auto))
+    }
+
     @Test fun deviceSpecificGuideIncludesDetectedModelAndAndroidVersion() {
         val guide = AndroidDeviceCompatibility.launchControlGuide(
             "HONOR", "HONOR", AndroidDeviceCompatibility.LaunchControl.RUN_IN_BACKGROUND,
