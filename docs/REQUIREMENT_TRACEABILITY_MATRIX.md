@@ -53,7 +53,7 @@
 | ALARM-08 | Full-screen dashboard requires local owner opt-in and Android 14+ system access; otherwise retain normal alarm notification | `AlarmPresentationPolicy.kt`, `AlarmService.kt`, SettingsActivity | `AlarmPresentationPolicyTest` | Unit-covered policy; real notification/lock-screen behavior device-unverified |
 | AUTH-01 | Android verifies PIN/pattern/password/biometric; app never reads credential material | auth coordinator, MainActivity | source inspection | Implemented by design; integration test required |
 | AUTH-02 | Failed authentication is throttled and persisted across process restart | `AuthenticationThrottle.kt`, store | `AuthenticationThrottleTest` | Unit-covered |
-| AUTH-03 | System unlock clears alarm only when device is secure and keyguard is actually dismissed | engine, user-present receiver, alarm service | keyguard predicate tests | Unit-covered; broadcast behavior device-dependent |
+| AUTH-03 | Only explicit app-launched Android device-credential confirmation or BIOMETRIC_STRONG success clears the alarm; keyguard dismissal alone never clears it | `MainActivity.kt`, `OwnerAuthenticationCoordinator.kt` | authentication result handling; system-unlock bypass removed | Implemented by source; physical credential/biometric integration remains device-unverified |
 
 ## 4. Android platform and universal OEM compatibility
 
