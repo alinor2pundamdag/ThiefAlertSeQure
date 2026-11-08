@@ -58,6 +58,16 @@ class AndroidDeviceCompatibilityTest {
         }
     }
 
+    @Test fun deviceSpecificGuideIncludesDetectedModelAndAndroidVersion() {
+        val guide = AndroidDeviceCompatibility.launchControlGuide(
+            "HONOR", "HONOR", AndroidDeviceCompatibility.LaunchControl.RUN_IN_BACKGROUND,
+            "HONOR 200 Pro", "15", 35
+        )
+        assertTrue(guide.contains("HONOR 200 Pro"))
+        assertTrue(guide.contains("Android 15"))
+        assertTrue(guide.contains("API 35"))
+    }
+
     @Test fun allGuidesWarnThatOemControlsAreManual() {
         val brands = listOf(
             "Samsung", "HONOR", "Xiaomi", "OPPO", "vivo", "Google", "Motorola", "Unknown"
