@@ -228,9 +228,11 @@ object ManagedProtectionController {
         val failures = mutableListOf<Throwable>()
         // Attempt every restoration independently so one OEM/API failure does
         // not prevent the remaining restrictions and navigation policy restoring.
-        runCatching {
-            dpm.setLockTaskFeatures(admin, snapshot.lockTaskFeatures)
-        }.onFailure(failures::add)
+        if (Build.VERSION.SDK_INT >= 28) {
+            runCatching {
+                dpm.setLockTaskFeatures(admin, snapshot.lockTaskFeatures)
+            }.onFailure(failures::add)
+        }
         restrictions.forEach { key ->
             runCatching {
                 // clearUserRestriction clears both local and global values set
@@ -271,9 +273,11 @@ object ManagedProtectionController {
         restrictions.forEach { key ->
             runCatching { dpm.clearUserRestriction(admin, key) }.onFailure(failures::add)
         }
-        runCatching {
-            dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
-        }.onFailure(failures::add)
+        if (Build.VERSION.SDK_INT >= 28) {
+            runCatching {
+                dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
+            }.onFailure(failures::add)
+        }
         runCatching { dpm.setLockTaskPackages(admin, emptyArray()) }.onFailure(failures::add)
 
         if (failures.isNotEmpty()) {
