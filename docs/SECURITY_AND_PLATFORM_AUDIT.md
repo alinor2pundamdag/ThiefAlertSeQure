@@ -81,6 +81,7 @@ Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPl
 - Biometric availability depends on hardware, enrollment and Android strength classification.
 - Device Owner APIs and restrictions depend on Android version, provisioning state and OEM build.
 - HONOR/MagicOS, Xiaomi/HyperOS, Samsung/One UI and other OEM battery managers may require user-side background/autostart configuration. No universal public API disables all OEM power management.
+- Optional flash hardware is declared non-required; the torch is controlled without CAMERA permission, camera capture, or a camera foreground-service type.
 
 ## Remaining verification
 1. Latest GitHub Actions must pass on current branch head.
@@ -89,8 +90,8 @@ Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPl
 4. Test Opus decoding, loop, fallback and volume restoration.
 5. Test screen locked, notification permission denied, DND, silent mode, Bluetooth and headphones.
 6. Test exact alarm access granted/revoked and Android 15+ reboot recovery.
-7. Test process death, force-stop limitations, reboot and app update.
-8. Test Device Owner only on a backed-up, factory-reset test device, including successful in-app rollback.
+7. Test process death, reboot and app update. Treat force-stop as a platform boundary, not as a recoverable guarantee: Android can stop the package and suppress its scheduled work until the owner manually launches it again.
+8. Device Owner enrollment and in-app rollback are user-reported PASS on a separate test device; record its Android build and repeat after managed-policy changes.
 9. Verify the new alarm flashlight on the target device: LED pulses only after ALARM_TRIGGERED, remains synchronized with the audio alarm, and switches off after authenticated disarm. Test another app using the camera/flashlight and verify audio continues if torch access fails.
 10. Do not describe app as unstoppable or production-certified until physical-device tests pass.
 
