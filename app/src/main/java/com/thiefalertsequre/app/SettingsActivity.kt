@@ -119,13 +119,35 @@ class SettingsActivity : FragmentActivity() {
                 .apply()
             render()
         })
+        root.addView(space(10))
+        root.addView(text("ALARM FLASH ALERT", 11f, R.color.tas_primary, true))
+        root.addView(space(6))
+        root.addView(text(
+            "When enabled, the rear camera LED pulses slowly only while the theft alarm is latched. It uses Android's torch API without camera permission and never captures photos or video. Flash hardware and availability vary by device; the sound alarm remains independent. Disable this option if flashing light is unsuitable for you.",
+            13f, R.color.tas_muted
+        ))
+        val flashEnabled = AlarmFlashSettings.isEnabled(this)
+        root.addView(action("Camera flash alert: ${if (flashEnabled) "ON" else "OFF"}") {
+            val enabled = !AlarmFlashSettings.isEnabled(this)
+            getSharedPreferences(AlarmFlashSettings.PREFS_NAME, MODE_PRIVATE)
+                .edit().putBoolean(AlarmFlashSettings.KEY_ENABLED, enabled).apply()
+            if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                runCatching {
+                    ContextCompat.startForegroundService(
+                        this,
+                        Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_REFRESH_FLASH)
+                    )
+                }
+            }
+            render()
+        })
         root.addView(space(22))
 
         root.addView(text("SYSTEM ACCESS & PERMISSIONS", 11f, R.color.tas_primary, true))
         root.addView(space(10))
         addSystemSettingAction("Grant notifications permission", "Notifications", "Android 13 (API 33)+ asks for notification permission at runtime. If denied, open App info → Notifications and enable it. Android 8–12 uses per-app notification controls without this runtime prompt. Verify the Anti-theft alarm channel is enabled and allowed to appear on the lock screen.") { requestNotifications() }
         addSystemSettingAction("Alarms & reminders / exact alarm access", "Exact alarms", "Android 12 (API 31)+ exposes special Alarms & reminders access. Allow ThiefAlertSeQure if listed. Android 8–11 does not expose this special access. Without it, countdown delivery may use fallback scheduling and can be delayed.") { openExactAlarmSettings() }
-        addSystemSettingAction("All app permissions and app information", "App permissions", "Open App info → Permissions and review only permissions requested by this build. The local charger-alarm core does not need contacts, location, microphone, camera, SMS, or internet. Do not grant unrelated permissions.") { openAppInfo() }
+        addSystemSettingAction("All app permissions and app information", "App permissions", "Open App info → Permissions and review only permissions requested by this build. The local charger-alarm core does not need contacts, location, microphone, camera permission, SMS, or internet. The optional flashlight uses Android's torch API without camera permission and does not capture images or video. Do not grant unrelated permissions.") { openAppInfo() }
         addSystemSettingAction("App notification channels and settings", "App notifications", "This opens ThiefAlertSeQure's own notification settings. Enable app notifications and the Anti-theft alarm channel. Android 8+ uses channels; Android 13+ also requires app-level notification permission.") { open(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)) }
         addSystemSettingAction("Battery and background restrictions", "Background activity", "Review ThiefAlertSeQure battery usage and select Unrestricted / Allow background activity where available. Android 8+ applies background execution limits; Android 9+ adds stricter standby behavior; Android 12+ exposes additional battery controls; Android 13–15 may apply OEM restrictions. Keep the persistent protection notification enabled. No setting overrides Force stop.") { openBatterySettings() }
         addSystemSettingAction("Do Not Disturb settings", "Do Not Disturb", "Review DND mode, schedules, and permitted alarm interruptions. The alarm uses Android alarm audio usage, but DND policy, silent mode, and OEM behavior can still affect audible output. Allow alarms during DND if you require alarm audio to remain audible.") { openDndSettings() }
@@ -307,11 +329,11 @@ class SettingsActivity : FragmentActivity() {
         root.addView(text("PRIVACY & DATA", 11f, R.color.tas_primary, true))
         root.addView(space(10))
         root.addView(text(
-            "No account, server, analytics, advertising SDK, or internet permission is configured. Protection state and biometric cooldown counters are stored locally. Device credentials and biometric templates are handled by Android and are not read by this app.",
+            "No account, server, analytics, advertising SDK, or internet permission is configured. Protection state and biometric cooldown counters are stored locally. The optional alarm flashlight uses Android's torch API without camera permission and does not capture images or video. Device credentials and biometric templates are handled by Android and are not read by this app.",
             13f, R.color.tas_muted
         ))
         root.addView(space(10))
-        root.addView(action("Review privacy notice / change choice") {
+        root.addView(action("Review privacy notice") {
             getSharedPreferences("privacy_notice_v1", MODE_PRIVATE).edit().clear().apply()
             startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK))
             finish()
