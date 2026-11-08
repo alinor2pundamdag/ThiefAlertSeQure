@@ -22,7 +22,7 @@
 | Reconnect before deadline | Returns to ARMED |
 | Reconnect after trigger | Cannot clear ALARM_TRIGGERED |
 | Same-boot clock integrity | elapsedRealtime + boot count |
-| Reboot recovery | Revalidate charger state; if still disconnected, restart a full 10-second grace period; if connected, return to ARMED; unknown state/boot identity never expires the old deadline |
+| Reboot recovery | Revalidate charger state; if still disconnected, restart a full 10-second grace period; if connected, return to ARMED; unknown charger state never expires a countdown; when boot identity is unavailable, new countdowns use a wall-clock fallback rather than hanging forever |
 | Android 15 boot recovery | After BOOT_COMPLETED/first user unlock, schedules exact alarm when granted; no Direct Boot protection before first unlock |
 | Local-only operation | No INTERNET permission, backend, analytics or advertising SDK |
 | Background protection monitor | User-enabled, stoppable foreground service with persistent notification; disabling cancels pending countdown and disarms but cannot clear a latched alarm |
@@ -32,7 +32,7 @@
 | First-launch privacy notice | Accept / decline choices are recorded distinctly; both continue to the same essential local protection functions |
 | Dedicated Settings screen | Android alarm, notification, battery/background, DND, app-info and privacy-notice controls |
 | Premium adaptive UI | Material 3 dark theme, responsive scroll layout, high-contrast status states, large touch targets and explicit setup controls |
-| Device PIN / pattern / password | Android Keyguard credential confirmation; credentials are never read or stored |
+| Device PIN / pattern / password | Explicit app-launched Android device-credential confirmation; credentials are never read or stored; ordinary phone unlock alone does not stop the alarm |
 | Fingerprint / face | BIOMETRIC_STRONG only, if enrolled and supported |
 | Five failed biometric attempts | Persisted counter; fifth consecutive failure starts 30-second cooldown |
 | Repeated cooldown | Counter resets after cooldown; each subsequent five failures starts another cooldown |
@@ -40,12 +40,12 @@
 | Successful authentication | Clears triggered state and restores prior alarm volume |
 | Optional Device Owner mode | DevicePolicyManager + Lock Task Mode; requires explicit Android Enterprise enrollment and opt-in |
 | Managed power dialog restriction | Omits LOCK_TASK_FEATURE_GLOBAL_ACTIONS while app is in Lock Task Mode on supported builds |
-| Managed device restrictions | Settings factory reset, safe boot, USB file transfer, add user, debugging |
-| Managed rollback | In-app exit control stops Lock Task and clears applied restrictions |
+| Managed device restrictions | Settings factory reset, add user and USB file transfer; Safe Boot and USB debugging remain available as recovery paths |
+| Managed rollback | In-app recovery restores the saved pre-enable policy; damaged/legacy snapshots trigger emergency navigation defaults and retain a retry path if any DPM call fails |
 | Unit tests | Protection state machine, authentication throttle, and recognized OEM-family guidance including safe generic fallbacks |
 
 ## Authentication boundary
-The five-failure / 30-second app cooldown applies to biometric failures reported through AndroidX BiometricPrompt. Device PIN/pattern/password remains available during that app cooldown; Android Keyguard independently enforces credential lockout. Android does not disclose incorrect device PIN/pattern/password attempts to ordinary apps. Android Keyguard enforces its own credential lockout. The app never collects, stores, logs or transmits device credentials.
+The five-failure / 30-second app cooldown applies to biometric failures reported through AndroidX BiometricPrompt. Device PIN/pattern/password remains available during that app cooldown; Android Keyguard independently enforces credential lockout. Android does not disclose incorrect device PIN/pattern/password attempts to ordinary apps. Android Keyguard enforces its own credential lockout. The app never collects, stores, logs or transmits device credentials. `ACTION_USER_PRESENT`, `isDeviceSecure`, and keyguard dismissal are not accepted as proof of a fresh credential; the owner must complete the explicit app-launched credential or strong-biometric prompt.
 
 Strong face authentication is available only if Android reports the enrolled face modality as BIOMETRIC_STRONG. Weak face unlock is intentionally not accepted.
 
@@ -71,4 +71,4 @@ Strong face authentication is available only if Android reports the enrolled fac
 9. Verify repeated five-failure / 30-second cooldown and cancellation.
 10. Verify volume restoration, DND, silent mode, notification denial, battery settings, and full-screen dashboard with Android 14+ access both granted and denied.
 11. On a factory-reset test device only, verify Device Owner enrollment, lock-task restrictions and in-app rollback.
-12. Complete Google Play foreground-service declaration for specialUse; approval is not guaranteed. Keep the PR unmerged until CI and physical-device gates pass.
+12. Complete Google Play foreground-service declaration for specialUse; approval is not guaranteed. Keep the PR unmerged until CI and physical-device gates pass. The current CI artifact is a debug APK because persistent release-signing secrets are not configured.
