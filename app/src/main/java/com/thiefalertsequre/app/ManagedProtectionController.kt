@@ -83,7 +83,13 @@ object ManagedProtectionController {
             persistSnapshot(prefs, snapshot)
         }
 
+        check(prefs.edit().putBoolean(KEY_RECOVERY_PENDING, true).commit()) {
+            "Could not mark managed lockdown as in progress; no Device Owner policy changes were applied."
+        }
+
         try {
+            // A process death during policy application must leave a visible,
+            // retryable exit path rather than automatically re-entering kiosk.
             // Allow only this app in kiosk mode. Keep Keyguard available; omit GLOBAL_ACTIONS.
             dpm.setLockTaskPackages(admin, arrayOf(activity.packageName))
             dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD)
@@ -100,6 +106,9 @@ object ManagedProtectionController {
                 "Android did not accept this app in the Lock Task allowlist."
             }
             activity.startLockTask()
+            check(prefs.edit().putBoolean(KEY_RECOVERY_PENDING, false).commit()) {
+                "Managed policies were applied, but activation status could not be saved; rollback will be attempted."
+            }
             return true
         } catch (failure: Throwable) {
             runCatching { prefs.edit().putBoolean(KEY_RECOVERY_PENDING, true).commit() }
