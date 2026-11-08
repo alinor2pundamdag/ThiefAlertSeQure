@@ -124,6 +124,8 @@ jobs:
       - name: Assemble distributable APK
         shell: bash
         run: |
+          # Never package an APK left over from an earlier version/build.
+          ./gradlew clean --no-daemon --stacktrace
           mkdir -p dist
           if [[ "$RELEASE_SIGNING_CONFIGURED" == "true" ]]; then
             ./gradlew :app:assembleRelease --no-daemon --stacktrace
