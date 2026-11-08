@@ -53,20 +53,6 @@ android {
     testOptions { unitTests.isReturnDefaultValues = true }
 }
 
-// Re-assert the authoritative version after every plugin has configured the DSL.
-// Then pin each APK output so manifest and packaged metadata cannot diverge.
-androidComponents {
-    finalizeDsl { extension ->
-        extension.defaultConfig.versionCode = appVersionCode
-        extension.defaultConfig.versionName = appVersionName
-    }
-    onVariants(selector().all()) { variant ->
-        variant.outputs.forEach { output ->
-            output.versionCode.set(appVersionCode)
-            output.versionName.set(appVersionName)
-        }
-    }
-}
 
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
