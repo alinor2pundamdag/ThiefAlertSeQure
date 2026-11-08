@@ -1,0 +1,12 @@
+<resources>
+    <color name="tas_primary">#57C7FF</color>
+    <color name="tas_on_primary">#002B43</color>
+    <color name="tas_background">#07111F</color>
+    <color name="tas_surface">#111F31</color>
+    <color name="tas_surface_variant">#1A2B40</color>
+    <color name="tas_text">#F2F7FC</color>
+    <color name="tas_muted">#A8B8CA</color>
+    <color name="tas_success">#43D6A1</color>
+    <color name="tas_warning">#FFC66D</color>
+    <color name="tas_danger">#FF647C</color>
+</resources>
