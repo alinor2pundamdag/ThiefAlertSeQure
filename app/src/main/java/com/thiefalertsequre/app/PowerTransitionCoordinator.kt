@@ -163,15 +163,15 @@ object PowerTransitionCoordinator {
 
     fun onPowerConnected(context: Context): ProtectionState {
         val appContext = context.applicationContext
-        // The power event can arrive just before the sticky BATTERY_CHANGED
-        // snapshot is refreshed. Debounce instead of rejecting its first sample.
+        // Three consecutive live samples plus a final live read retain protection
+        // against stale broadcasts while reducing connect cancellation latency.
         var consecutiveConnected = 0
         var lastObserved: Boolean? = null
-        repeat(5) { index ->
+        repeat(3) { index ->
             val observed = ExternalPowerState.readConnected(appContext)
             lastObserved = observed
             consecutiveConnected = if (observed == true) consecutiveConnected + 1 else 0
-            if (index < 4) Thread.sleep(200L)
+            if (index < 2) Thread.sleep(100L)
         }
         if (consecutiveConnected < 3 || ExternalPowerState.readConnected(appContext) != true) {
             LocalTamperHistory.record(
@@ -249,7 +249,7 @@ object PowerTransitionCoordinator {
             }
             // Do not reject on the first live snapshot: some devices update
             // ACTION_BATTERY_CHANGED just after ACTION_POWER_DISCONNECTED.
-            // The stable five-sample debounce below is authoritative.
+            // Three consecutive samples plus a final live read are authoritative.
             if (!prefs.getBoolean(CONNECTED, false)) {
                 LocalTamperHistory.record(
                     appContext, "charger_unplug_rejected",
@@ -267,13 +267,13 @@ object PowerTransitionCoordinator {
 
         var consecutiveDisconnected = 0
         var lastObserved: Boolean? = null
-        repeat(5) { index ->
+        repeat(3) { index ->
             val observed = ExternalPowerState.readConnected(appContext)
             lastObserved = observed
             consecutiveDisconnected = if (observed == false) consecutiveDisconnected + 1 else 0
-            if (index < 4) {
+            if (index < 2) {
                 try {
-                    Thread.sleep(350L)
+                    Thread.sleep(120L)
                 } catch (_: InterruptedException) {
                     Thread.currentThread().interrupt()
                     synchronized(lock) {
@@ -294,7 +294,7 @@ object PowerTransitionCoordinator {
             }
             LocalTamperHistory.record(
                 appContext, "charger_unplug_rejected",
-                "Five-sample debounce did not produce three consecutive disconnected readings; final=$lastObserved"
+                "Three-sample debounce did not produce three consecutive connected readings; final=$lastObserved"
             )
             return ProtectionStore(appContext).read()
         }
@@ -333,7 +333,7 @@ object PowerTransitionCoordinator {
             }
             if (next.mode == ProtectionMode.COUNTDOWN) {
                 AlarmScheduler.schedule(appContext, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
-                LocalTamperHistory.record(appContext, "charger_countdown_started", "OS unplug event confirmed by five samples with three consecutive disconnected readings")
+                LocalTamperHistory.record(appContext, "charger_countdown_started", "OS unplug event confirmed by three consecutive disconnected samples and a final live-state read")
                 notifyMonitorStateChanged(appContext)
             }
             next
