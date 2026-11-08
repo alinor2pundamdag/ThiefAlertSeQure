@@ -36,7 +36,7 @@ The state machine is authoritative. Notifications, UI labels, service state and 
 | DISARMED / ARMED / COUNTDOWN | Owner disables background monitoring | DISARMED | Cancel pending deadline and stop charger/motion monitoring; never clear ALARM_TRIGGERED |
 | ALARM_TRIGGERED | Device credential succeeds | DISARMED, then ARMED if connected monitoring is enabled | Shared owner-authentication coordinator stops service, cancels deadline, restores volume and re-baselines charger state |
 | ALARM_TRIGGERED | Strong biometric succeeds | DISARMED, then ARMED if connected monitoring is enabled | Shared owner-authentication coordinator stops service, cancels deadline, restores volume and re-baselines charger state |
-| ALARM_TRIGGERED | Android reports secure keyguard dismissed (`ACTION_USER_PRESENT`) | DISARMED, then ARMED if connected monitoring is enabled | Active alarm service validates secure/unlocked Keyguard state and invokes the same coordinator |
+| ALARM_TRIGGERED | Phone is unlocked, but app authentication has not succeeded | ALARM_TRIGGERED | Keyguard dismissal alone is not proof of credential entry; keep alarm active until explicit app-launched owner verification succeeds |
 
 Motion alarm is independent and may trigger while the charger is connected, but it is disabled by default. Keep it OFF for charger-removal-only behavior.
 
@@ -117,7 +117,7 @@ A release candidate is acceptable only when:
 5. Charger state transitions and deadline are tested physically.
 6. The original Opus audio decodes, loops and restores volume.
 7. PIN, pattern, password and supported strong biometrics are tested inside the app and directly from the device lock screen.
-8. A secure lock-screen unlock stops the alarm, removes its ongoing notification, restores the previous alarm volume, and restarts monitoring with the correct charger baseline.
+8. Unlocking the phone alone does not stop the alarm. The owner must open the app/notification and complete the explicit Android device-credential confirmation or BIOMETRIC_STRONG prompt.
 9. Five-failure cooldown and repeat cycle are tested.
 10. Cancel and failed authentication never clear the alarm.
 11. Android 15+ reboot recovery is tested after first unlock with exact-alarm access granted and denied; pre-unlock Direct Boot protection is not provided.
