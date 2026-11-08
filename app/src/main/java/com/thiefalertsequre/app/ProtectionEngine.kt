@@ -17,6 +17,18 @@ object ProtectionEngine {
         s.deadlineElapsedRealtimeMs == deadlineElapsedRealtimeMs &&
         s.bootCount == deadlineBootCount
 
+    /** Create a short-lived retry state when BOOT_COMPLETED cannot read charger power. */
+    fun awaitPostBootPowerSample(s: ProtectionState, nowEpochMs: Long): ProtectionState =
+        if (s.mode == ProtectionMode.COUNTDOWN) {
+            ProtectionState(
+                ProtectionMode.COUNTDOWN,
+                nowEpochMs + 1_000L,
+                nowEpochMs,
+                0L,
+                BOOT_RECONCILIATION_PENDING
+            )
+        } else s
+
     fun chargerConnected(s: ProtectionState, now: Long): ProtectionState = when (s.mode) {
         ProtectionMode.ALARM_TRIGGERED -> s
         ProtectionMode.DISARMED, ProtectionMode.ARMED, ProtectionMode.COUNTDOWN ->
