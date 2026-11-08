@@ -33,7 +33,7 @@ object ProtectionEngine {
             ProtectionMode.COUNTDOWN,
             nowEpochMs + COUNTDOWN_MS,
             nowEpochMs,
-            if (nowElapsedRealtimeMs > 0L) nowElapsedRealtimeMs + COUNTDOWN_MS else 0L,
+            if (nowElapsedRealtimeMs > 0L && currentBootCount >= 0) nowElapsedRealtimeMs + COUNTDOWN_MS else 0L,
             currentBootCount
         )
         ProtectionMode.COUNTDOWN, ProtectionMode.ALARM_TRIGGERED, ProtectionMode.DISARMED -> s
@@ -131,7 +131,7 @@ object ProtectionEngine {
             // grant a fresh full grace period; never fire immediately from a snapshot.
             ProtectionState(
                 ProtectionMode.COUNTDOWN, nowEpochMs + COUNTDOWN_MS, nowEpochMs,
-                if (nowElapsedRealtimeMs > 0L) nowElapsedRealtimeMs + COUNTDOWN_MS else 0L,
+                if (nowElapsedRealtimeMs > 0L && currentBootCount >= 0) nowElapsedRealtimeMs + COUNTDOWN_MS else 0L,
                 currentBootCount
             )
         }
