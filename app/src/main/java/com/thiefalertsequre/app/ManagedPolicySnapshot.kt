@@ -1,8 +1,10 @@
 package com.thiefalertsequre.app
 
 /**
- * Exact pre-enable Device Owner policy values.
- * Kept Android-framework-free so rollback mapping can be unit tested.
+ * Captured pre-enable Device Owner policy values exposed by DevicePolicyManager.
+ * On Android 14+, Lock Task getters expose resolved policy rather than per-admin
+ * values; multi-admin attribution is therefore not reconstructible. Kept
+ * Android-framework-free so rollback mapping can be unit tested.
  */
 internal data class ManagedPolicySnapshot(
     val lockTaskPackages: Array<String>,
