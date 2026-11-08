@@ -17,7 +17,7 @@
 | Original alarm sound | Packaged Ogg Opus asset in res/raw, looping MediaPlayer (resource filename must use `.ogg`) |
 | Audio fallback | Repeating vibration if selected and packaged audio both fail |
 | Alarm volume | Saves prior alarm-stream volume, raises to device maximum during alarm, restores after successful disarm |
-| Charger auto-arm | Manifest-declared PowerTransitionReceiver plus persisted connected-baseline validation |
+| Charger auto-arm | Runtime-registered PowerTransitionReceiver from the user-enabled foreground monitor plus persisted connected-baseline validation |
 | 10-second unplug countdown | ProtectionEngine + AlarmScheduler |
 | Reconnect before deadline | Returns to ARMED |
 | Reconnect after trigger | Cannot clear ALARM_TRIGGERED |
@@ -62,7 +62,7 @@ Strong face authentication is available only if Android reports the enrolled fac
 ## Release gates
 1. Latest GitHub Actions unit tests pass.
 2. Latest debug APK assembles.
-3. Install on physical Android 14/15/16 devices.
+3. Install on physical Android 8–17 devices where available; prioritize API 26, 31–36, and Android 17 audio hardening.
 4. Verify selected audio URI survives reboot, decodes, previews and loops; verify vibration fallback on missing/corrupt audio.
 5. Verify foreground monitor, motion sensitivity, battery threshold crossing and stop action on physical devices.
 6. Verify icon and label before and after installation.
