@@ -199,6 +199,7 @@ A successful CI build confirms that the configured automated checks and APK asse
 | [Protection Rules](docs/PROTECTION_RULES.md) | State machine, countdown integrity, authentication, and alarm behavior. |
 | [Security & Platform Audit](docs/SECURITY_AND_PLATFORM_AUDIT.md) | Threat model, Android limits, privacy controls, and remaining verification. |
 | [Feature Completion Matrix](docs/FEATURE_COMPLETION_MATRIX.md) | Implemented features, boundaries, and release gates. |
+| [Requirement Traceability Matrix](docs/REQUIREMENT_TRACEABILITY_MATRIX.md) | Requirement IDs mapped to owner files, tests, CI evidence, device validation, and release gates. |
 | [Device Owner Mode](docs/DEVICE_OWNER_MODE.md) | Managed-device requirements, capabilities, and rollback. |
 | [Android Settings & Alarm Hardening](docs/ANDROID_SETTINGS_AND_ALARM_HARDENING.md) | System settings and reliability guidance. |
 | [Android Device Compatibility](docs/ANDROID_DEVICE_COMPATIBILITY.md) | API 26–37 behavior, OEM-specific setup, fallback navigation, and device test matrix. |
