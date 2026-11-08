@@ -117,27 +117,19 @@ object ManagedProtectionController {
         }
 
         // Compatibility recovery for installations that enabled managed mode
-        // before rollback snapshots existed. Their original policy baseline was
-        // never recorded, so restore the documented Android defaults as safely
-        // as possible and make that limitation explicit in the UI/docs.
-        val failures = mutableListOf<Throwable>()
-        restrictions.forEach { key ->
-            runCatching { dpm.clearUserRestriction(admin, key) }
-                .onFailure(failures::add)
+        // before rollback snapshots existed. Mark recovery as pending first so
+        // the UI keeps the retry/exit action available if any DPM call fails.
+        check(prefs.edit().putInt(KEY_VERSION, 0).commit()) {
+            "Could not persist the legacy managed-policy recovery marker."
         }
-        runCatching {
-            dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
-        }.onFailure(failures::add)
-        runCatching { dpm.setLockTaskPackages(admin, emptyArray()) }
-            .onFailure(failures::add)
-
-        if (failures.isNotEmpty()) {
-            throw IllegalStateException(
-                "Legacy managed policies were only partially cleared. Original settings cannot be " +
-                    "reconstructed because this installation predates rollback snapshots.",
-                failures.first()
+        restoreEmergencyDefaults(
+            dpm,
+            admin,
+            prefs,
+            IllegalStateException(
+                "This installation predates rollback snapshots; the original Device Owner policy baseline is unknown."
             )
-        }
+        )
     }
 
     fun startIfConfigured(activity: Activity) {
