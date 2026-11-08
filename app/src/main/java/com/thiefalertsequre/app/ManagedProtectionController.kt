@@ -29,12 +29,6 @@ object ManagedProtectionController {
         UserManager.DISALLOW_USB_FILE_TRANSFER
     )
 
-    private data class PolicySnapshot(
-        val lockTaskPackages: Array<String>,
-        val lockTaskFeatures: Int,
-        val restrictionValues: Map<String, Boolean>
-    )
-
     fun isDeviceOwner(context: Context): Boolean =
         context.getSystemService(DevicePolicyManager::class.java)
             .isDeviceOwnerApp(context.packageName)
@@ -66,7 +60,7 @@ object ManagedProtectionController {
             validateSnapshot(prefs)
         } else {
             val restrictionsBefore = dpm.getUserRestrictions(admin)
-            val snapshot = PolicySnapshot(
+            val snapshot = ManagedPolicySnapshot(
                 lockTaskPackages = dpm.getLockTaskPackages(admin),
                 lockTaskFeatures = dpm.getLockTaskFeatures(admin),
                 restrictionValues = restrictions.associateWith { key ->
