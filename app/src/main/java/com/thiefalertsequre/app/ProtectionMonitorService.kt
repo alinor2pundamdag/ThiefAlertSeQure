@@ -77,6 +77,18 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             return START_NOT_STICKY
         }
         val state = ProtectionStore(this).read()
+        if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
+            runCatching {
+                ContextCompat.startForegroundService(
+                    this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START)
+                )
+            }.onFailure {
+                LocalTamperHistory.record(this, "latched_alarm_restore_failed", it.javaClass.simpleName + ": " + it.message)
+                AlarmRecoveryNotice.show(this, "The latched alarm needs the app opened to resume playback")
+            }
+            stopSelf()
+            return START_NOT_STICKY
+        }
         val enabled = prefs.getBoolean(KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         if (!ProtectionMonitorPolicy.shouldRun(enabled, state.mode)) {
             stopSelf()
@@ -147,6 +159,10 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     /** Refresh sensor/deadline projections after the coordinator changes persisted state. */
     private fun refreshProtectionState() {
         val state = ProtectionStore(this).read()
+        if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
+            startTheftAlarm()
+            return
+        }
         if (state.mode == ProtectionMode.ARMED) syncMotionSensor() else unregisterMotionSensor()
         syncDeadlineAlarm(state)
     }
