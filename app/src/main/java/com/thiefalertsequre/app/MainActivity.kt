@@ -65,9 +65,9 @@ class MainActivity : FragmentActivity() {
 
         val privacyDecision = getSharedPreferences("privacy_notice_v1", MODE_PRIVATE)
             .getString("decision", null)
-        // Migrate prior positive acknowledgements. A previous "declined" value
-        // must see the updated notice because the decline path no longer exists.
-        if (privacyDecision != "accepted" && privacyDecision != "acknowledged") {
+        // Require acknowledgement of this updated notice on every existing
+        // install once; it now discloses the optional alarm flashlight and its safety toggle.
+        if (privacyDecision != "acknowledged") {
             showPrivacyScreen()
             return
         }
