@@ -45,13 +45,8 @@ class BootReceiver : BroadcastReceiver() {
             when {
                 old.mode == ProtectionMode.ALARM_TRIGGERED -> old
                 !monitorEnabled(context) -> stateBeforeRestore
-                charging == null && old.mode == ProtectionMode.COUNTDOWN -> ProtectionState(
-                    ProtectionMode.COUNTDOWN,
-                    now + 1_000L,
-                    now,
-                    0L,
-                    BOOT_RECONCILIATION_PENDING
-                )
+                charging == null && old.mode == ProtectionMode.COUNTDOWN ->
+                    ProtectionEngine.awaitPostBootPowerSample(old, now)
                 charging == null -> old
                 else -> ProtectionEngine.restoreAfterBoot(old, charging, now, elapsed, boot)
             }
