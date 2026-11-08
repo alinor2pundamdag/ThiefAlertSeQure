@@ -3,6 +3,9 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val appVersionCode = 5
+val appVersionName = "1.1.3"
+
 val releaseSigningReady = listOf(
     "ANDROID_KEYSTORE_PATH",
     "ANDROID_KEYSTORE_PASSWORD",
@@ -18,8 +21,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // Increase this for every distributable update. Never reset it between releases.
-        versionCode = 5
-        versionName = "1.1.3"
+        versionCode = appVersionCode
+        versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
@@ -49,6 +52,17 @@ android {
     androidResources { noCompress += "opus" }
     testOptions { unitTests.isReturnDefaultValues = true }
 }
+
+// Explicitly pin packaged variant metadata as well as defaultConfig.
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.forEach { output ->
+            output.versionCode.set(appVersionCode)
+            output.versionName.set(appVersionName)
+        }
+    }
+}
+
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-ktx:1.10.0")
