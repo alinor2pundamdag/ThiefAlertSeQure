@@ -18,8 +18,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // Increase this for every distributable update. Never reset it between releases.
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = 4
+        versionName = "1.1.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
