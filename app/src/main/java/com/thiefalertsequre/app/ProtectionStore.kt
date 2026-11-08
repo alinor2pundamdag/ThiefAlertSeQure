@@ -55,13 +55,25 @@ class ProtectionStore(context: Context) {
      * latched alarm so only the normal owner-authentication path can clear it.
      * A genuinely empty store remains DISARMED on first install.
      */
-    private fun readUnlocked(): ProtectionState = ProtectionState.fromPersisted(
-        modeName = prefs.getString("mode", null),
-        deadlineEpochMs = prefs.getLong("deadline", 0L),
-        changedAtEpochMs = prefs.getLong("changed", 0L),
-        deadlineElapsedRealtimeMs = prefs.getLong("deadline_elapsed", 0L),
-        bootCount = prefs.getInt("boot_count", -1)
-    )
+    private fun readUnlocked(): ProtectionState = runCatching {
+        ProtectionState.fromPersisted(
+            modeName = prefs.getString("mode", null),
+            deadlineEpochMs = prefs.getLong("deadline", 0L),
+            changedAtEpochMs = prefs.getLong("changed", 0L),
+            deadlineElapsedRealtimeMs = prefs.getLong("deadline_elapsed", 0L),
+            bootCount = prefs.getInt("boot_count", -1),
+            hasOtherStateFields = listOf(
+                "deadline", "changed", "deadline_elapsed", "boot_count"
+            ).any(prefs::contains)
+        )
+    }.getOrElse {
+        // A preference with the wrong stored type is corruption too. Do not
+        // let a ClassCastException turn the protection state into a clean boot.
+        ProtectionState(
+            mode = ProtectionMode.ALARM_TRIGGERED,
+            changedAtEpochMs = System.currentTimeMillis()
+        )
+    }
 
     private fun writeUnlocked(state: ProtectionState): Boolean = prefs.edit()
         .putString("mode", state.mode.name)
