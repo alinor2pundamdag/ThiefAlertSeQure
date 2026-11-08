@@ -64,12 +64,20 @@ object ManagedProtectionController {
             }
             validateSnapshot(prefs)
         } else {
-            val restrictionsBefore = dpm.getUserRestrictions(admin)
+            val localRestrictionsBefore = dpm.getUserRestrictions(admin)
+            val globalRestrictionsBefore = if (Build.VERSION.SDK_INT >= 34) {
+                dpm.getUserRestrictionsGlobally()
+            } else {
+                android.os.Bundle()
+            }
             val snapshot = ManagedPolicySnapshot(
                 lockTaskPackages = dpm.getLockTaskPackages(admin),
                 lockTaskFeatures = dpm.getLockTaskFeatures(admin),
-                restrictionValues = restrictions.associateWith { key ->
-                    restrictionsBefore.getBoolean(key, false)
+                localRestrictionValues = restrictions.associateWith { key ->
+                    localRestrictionsBefore.getBoolean(key, false)
+                },
+                globalRestrictionValues = restrictions.associateWith { key ->
+                    globalRestrictionsBefore.getBoolean(key, false)
                 }
             )
             persistSnapshot(prefs, snapshot)
@@ -80,7 +88,13 @@ object ManagedProtectionController {
             dpm.setLockTaskPackages(admin, arrayOf(activity.packageName))
             dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD)
 
-            restrictions.forEach { key -> dpm.addUserRestriction(admin, key) }
+            restrictions.forEach { key ->
+                if (Build.VERSION.SDK_INT >= 34) {
+                    dpm.addUserRestrictionGlobally(key)
+                } else {
+                    dpm.addUserRestriction(admin, key)
+                }
+            }
 
             check(dpm.isLockTaskPermitted(activity.packageName)) {
                 "Android did not accept this app in the Lock Task allowlist."
@@ -178,7 +192,8 @@ object ManagedProtectionController {
         check(prefs.getStringSet(KEY_PACKAGES, null) != null) {
             "Managed-policy rollback package list is missing. Refusing to change device policies."
         }
-        check(prefs.contains(KEY_FEATURES) && restrictions.all { prefs.contains("restriction:$it") }) {
+        check(prefs.contains(KEY_FEATURES) &&
+            restrictions.all { prefs.contains("local_restriction:$it") && prefs.contains("global_restriction:$it") }) {
             "Managed-policy rollback data is incomplete. Refusing to change device policies."
         }
     }
@@ -203,8 +218,11 @@ object ManagedProtectionController {
         val snapshot = ManagedPolicySnapshot(
             lockTaskPackages = packages.toTypedArray(),
             lockTaskFeatures = prefs.getInt(KEY_FEATURES, 0),
-            restrictionValues = restrictions.associateWith { key ->
-                prefs.getBoolean("restriction:$key", false)
+            localRestrictionValues = restrictions.associateWith { key ->
+                prefs.getBoolean("local_restriction:$key", false)
+            },
+            globalRestrictionValues = restrictions.associateWith { key ->
+                prefs.getBoolean("global_restriction:$key", false)
             }
         )
 
@@ -216,10 +234,17 @@ object ManagedProtectionController {
         }.onFailure(failures::add)
         restrictions.forEach { key ->
             runCatching {
-                if (snapshot.shouldKeepRestrictionEnabled(key)) {
+                // clearUserRestriction clears both local and global values set
+                // by this admin on API 34+, so rebuild the exact saved pair.
+                dpm.clearUserRestriction(admin, key)
+                if (snapshot.shouldKeepLocalRestrictionEnabled(key)) {
                     dpm.addUserRestriction(admin, key)
-                } else {
-                    dpm.clearUserRestriction(admin, key)
+                }
+                if (Build.VERSION.SDK_INT >= 34 && snapshot.shouldKeepGlobalRestrictionEnabled(key)) {
+                    dpm.addUserRestrictionGlobally(key)
+                } else if (Build.VERSION.SDK_INT < 34 && snapshot.shouldKeepLocalRestrictionEnabled(key)) {
+                    // Before API 34, addUserRestriction is the platform-supported
+                    // restriction mechanism for this device owner.
                 }
             }.onFailure(failures::add)
         }
