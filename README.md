@@ -131,7 +131,7 @@ Read the complete [Privacy Policy](docs/PRIVACY_POLICY.md).
 
 - **Minimum Android:** 8.0 (API 26).
 - **Compile / target Android:** API 36 / API 36 (Android 16 target; Android 17 runtime compatibility).
-- **Manufacturer-aware setup:** Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO, OPPO, realme, OnePlus, vivo / iQOO, Google Pixel, Motorola, and generic Android guidance.
+- **Manufacturer-aware setup:** Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO, OPPO, realme, OnePlus, vivo / iQOO, Google Pixel, Motorola, ASUS, Sony Xperia, Nothing OS, Lenovo, TECNO / Infinix / itel, ZTE / nubia, and safe generic Android guidance.
 - **Settings fallback:** Public Android Settings action → app-specific settings → general Settings.
 - **Android 15+:** Edge-to-edge safe insets are applied to the app's scrollable screens.
 - **Android 17:** Background alarm audio remains inside the qualifying foreground-service architecture; Android 17 hardening still requires physical/emulator verification.
@@ -187,7 +187,7 @@ Build a debug APK and run unit tests:
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 ```
 
-GitHub Actions runs the Android build/test workflow and uploads a **debug APK** when the configured checks pass.
+GitHub Actions runs unit tests, Android lint, asset validation, APK assembly, package/version verification, and signer verification. It uploads a release-signed APK only when the persistent release-signing secrets are configured; otherwise it uploads a clearly identified debug APK.
 
 A successful CI build confirms that the configured automated checks and APK assembly passed. It does **not** prove correct behavior on every physical phone. Charger broadcasts, alarm timing, sound output, reboot recovery, notifications, and manufacturer battery controls still require real-device testing.
 
@@ -201,7 +201,7 @@ A successful CI build confirms that the configured automated checks and APK asse
 | [Feature Completion Matrix](docs/FEATURE_COMPLETION_MATRIX.md) | Implemented features, boundaries, and release gates. |
 | [Device Owner Mode](docs/DEVICE_OWNER_MODE.md) | Managed-device requirements, capabilities, and rollback. |
 | [Android Settings & Alarm Hardening](docs/ANDROID_SETTINGS_AND_ALARM_HARDENING.md) | System settings and reliability guidance. |
-| [Android Device Compatibility](docs/ANDROID_DEVICE_COMPATIBILITY.md) | API 26–36 behavior, OEM-specific setup, fallback navigation, and device test matrix. |
+| [Android Device Compatibility](docs/ANDROID_DEVICE_COMPATIBILITY.md) | API 26–37 behavior, OEM-specific setup, fallback navigation, and device test matrix. |
 
 ## ⚠️ Honest security and reliability boundaries
 
