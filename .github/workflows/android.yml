@@ -130,15 +130,20 @@ jobs:
           # Remove prior outputs and force Gradle to execute every packaging task.
           ./gradlew clean --no-daemon --no-build-cache --no-configuration-cache --stacktrace
           mkdir -p dist
+          # Explicit AGP injected properties override any stale version injected by an IDE/init script.
+          VERSION_OVERRIDE_ARGS=(
+            "-Pandroid.injected.version.code=$APP_VERSION_CODE"
+            "-Pandroid.injected.version.name=$APP_VERSION_NAME"
+          )
           if [[ "$RELEASE_SIGNING_CONFIGURED" == "true" ]]; then
-            ./gradlew :app:assembleRelease --no-daemon --no-build-cache --no-configuration-cache --rerun-tasks --stacktrace
+            ./gradlew :app:assembleRelease "${VERSION_OVERRIDE_ARGS[@]}" --no-daemon --no-build-cache --no-configuration-cache --rerun-tasks --stacktrace
             APK_VARIANT="release"
             APK_FILE="dist/ThiefAlertSeQure-v${APP_VERSION_NAME}-release.apk"
             cp app/build/outputs/apk/release/app-release.apk "$APK_FILE"
             echo "APK_PATH=$APK_FILE" >> "$GITHUB_ENV"
             echo "APK_ARTIFACT_NAME=ThiefAlertSeQure-release-apk" >> "$GITHUB_ENV"
           else
-            ./gradlew :app:assembleDebug --no-daemon --no-build-cache --no-configuration-cache --rerun-tasks --stacktrace
+            ./gradlew :app:assembleDebug "${VERSION_OVERRIDE_ARGS[@]}" --no-daemon --no-build-cache --no-configuration-cache --rerun-tasks --stacktrace
             APK_VARIANT="debug"
             APK_FILE="dist/ThiefAlertSeQure-v${APP_VERSION_NAME}-debug.apk"
             cp app/build/outputs/apk/debug/app-debug.apk "$APK_FILE"
