@@ -51,6 +51,14 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 - DND is not silently changed. Users configure alarm exceptions in Android settings.
 - Android/OEM policies can constrain sound output and background execution.
 
+## Visual alarm flashlight
+- AlarmService starts the optional LED output only after ProtectionStore confirms ALARM_TRIGGERED; countdown and ARMED states never pulse the LED.
+- The implementation uses CameraManager.setTorchMode, which controls the torch without opening a camera capture session. No CAMERA permission, camera foreground-service type, photo, video, microphone or network access is added.
+- Flash hardware is declared optional in the manifest so Play does not require a flash unit for installation. Audio alarm remains the primary output and is not gated by flash availability.
+- The default pulse is 700 ms on / 700 ms off (about 0.71 cycles per second), not a rapid strobe. Photosensitive users can disable it in Settings.
+- Torch access is best-effort: camera contention, an unavailable camera service, thermal management, OEM policy or process termination can stop light output. stopAlarm() explicitly turns the torch off on authenticated disarm and service teardown. Android also may turn it off when the client exits.
+- Physical verification of pulse timing, screen-off behavior, torch shutdown on authentication, camera contention and thermal behavior is required on each target device. CI cannot prove LED behavior.
+
 ## Android Enterprise / Device Owner mode
 - Dedicated DeviceAdminReceiver is declared.
 - App never self-assigns Device Owner.
@@ -83,7 +91,8 @@ Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPl
 6. Test exact alarm access granted/revoked and Android 15+ reboot recovery.
 7. Test process death, force-stop limitations, reboot and app update.
 8. Test Device Owner only on a backed-up, factory-reset test device, including successful in-app rollback.
-9. Do not describe app as unstoppable or production-certified until physical-device tests pass.
+9. Verify the new alarm flashlight on the target device: LED pulses only after ALARM_TRIGGERED, remains synchronized with the audio alarm, and switches off after authenticated disarm. Test another app using the camera/flashlight and verify audio continues if torch access fails.
+10. Do not describe app as unstoppable or production-certified until physical-device tests pass.
 
 ## Lock-screen authentication regression safeguards
 
