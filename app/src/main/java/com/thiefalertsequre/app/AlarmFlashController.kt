@@ -30,13 +30,13 @@ internal class AlarmFlashController(
                 stop()
                 return
             }
-            val nextState = !torchOn
+            val nextState = AlarmFlashSettings.nextTorchState(torchOn)
             try {
                 cameraManager.setTorchMode(id, nextState)
                 torchOn = nextState
                 handler.postDelayed(
                     this,
-                    if (nextState) AlarmFlashSettings.ON_DURATION_MS else AlarmFlashSettings.OFF_DURATION_MS
+                    AlarmFlashSettings.delayAfter(nextState)
                 )
             } catch (error: Exception) {
                 report("alarm_flash_interrupted", error.javaClass.simpleName + ": " + error.message)
@@ -111,4 +111,9 @@ internal object AlarmFlashSettings {
             .getBoolean(KEY_ENABLED, true)
 
     fun shouldRun(mode: ProtectionMode): Boolean = mode == ProtectionMode.ALARM_TRIGGERED
+
+    fun nextTorchState(currentTorchOn: Boolean): Boolean = !currentTorchOn
+
+    fun delayAfter(torchOn: Boolean): Long =
+        if (torchOn) ON_DURATION_MS else OFF_DURATION_MS
 }
