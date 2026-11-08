@@ -109,16 +109,23 @@ object AndroidDeviceCompatibility {
     }
 
     /**
-     * HONOR/Huawei expose App launch as a vendor Settings page with no public
-     * Android action, so open Settings home and let the user search for App launch.
-     * Other families open this app's public App info page. No undocumented OEM
-     * component names are launched.
+     * OEM-only pages have no stable public deep link. Open the closest useful
+     * public destination: global Settings for vendor-wide autostart controls,
+     * App info for per-app battery/background controls. HONOR App launch itself
+     * is privileged on affected firmware, so Settings search is the safe route.
      */
-    fun launchControlSettingsIntent(manufacturer: String, brand: String, packageName: String): Intent =
-        when (family(manufacturer, brand)) {
-            Family.HONOR_HUAWEI -> Intent(Settings.ACTION_SETTINGS)
-            else -> appInfoIntent(packageName)
-        }
+    fun launchControlSettingsIntent(
+        manufacturer: String,
+        brand: String,
+        packageName: String,
+        control: LaunchControl
+    ): Intent = when (family(manufacturer, brand)) {
+        Family.HONOR_HUAWEI -> Intent(Settings.ACTION_SETTINGS)
+        Family.SAMSUNG, Family.XIAOMI, Family.OPPO_REALME_ONEPLUS, Family.VIVO_IQOO ->
+            if (control == LaunchControl.RUN_IN_BACKGROUND) appInfoIntent(packageName)
+            else Intent(Settings.ACTION_SETTINGS)
+        Family.GOOGLE_PIXEL, Family.MOTOROLA, Family.OTHER -> appInfoIntent(packageName)
+    }
 
     fun launchControlGuide(
         manufacturer: String,
