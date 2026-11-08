@@ -111,28 +111,22 @@ class MainActivity : FragmentActivity() {
         body.addView(label("System access and limitations", 18f, getColor(R.color.tas_text), true), matchWrap())
         body.addView(space(8))
         body.addView(label(
-            "The app may use boot and charger broadcasts, alarm scheduling, notifications, alarm audio, and a foreground service. Exact alarm access and notification permission are controlled by Android. Optional Device Owner mode requires separate device enrollment and can restrict device settings. No ordinary app can guarantee protection against force-stop, uninstall, physical shutdown, recovery controls, battery removal, or every manufacturer-specific power policy. Alarm delivery may be delayed when Android restricts background execution or exact alarms.",
+            "The app may use boot and charger broadcasts, alarm scheduling, notifications, alarm audio, the camera flashlight's Android torch control while the alarm is active, and foreground services. The flash feature does not capture photos or video and does not request camera permission. Flashing light may affect photosensitive users; you can disable the flash alert in Settings. Exact alarm access and notification permission are controlled by Android. Optional Device Owner mode requires separate device enrollment and can restrict device settings. No ordinary app can guarantee protection against force-stop, uninstall, physical shutdown, recovery controls, battery removal, or every manufacturer-specific power policy. Alarm delivery may be delayed when Android restricts background execution or exact alarms.",
             14f, getColor(R.color.tas_muted), false
         ), matchWrap())
         body.addView(space(16))
-        body.addView(label("Your choice", 18f, getColor(R.color.tas_text), true), matchWrap())
+        body.addView(label("Acknowledgement", 18f, getColor(R.color.tas_text), true), matchWrap())
         body.addView(space(6))
         body.addView(label(
-            "Accept records that you acknowledge this notice. Decline records that you do not accept it. Both choices open the dashboard and retain the same essential local protection functions; declining does not disable core protection or falsely represent consent. You can review this notice later in Settings.",
+            "Review this notice before continuing. Tapping the button below records that you have acknowledged the app's local data handling, alarm behavior, optional flashlight alert, and Android platform limitations. You can review this notice again later in Settings.",
             13f, getColor(R.color.tas_muted), false
         ), matchWrap())
         notice.addView(body)
         root.addView(notice, matchWrap())
         root.addView(space(22))
-        root.addView(button("Accept & continue") {
+        root.addView(button("I understand & continue") {
             getSharedPreferences("privacy_notice_v1", MODE_PRIVATE).edit()
-                .putString("decision", "accepted").putLong("decision_at", System.currentTimeMillis()).apply()
-            buildDashboard()
-        }, matchWrap())
-        root.addView(space(10))
-        root.addView(outlinedButton("Decline & continue") {
-            getSharedPreferences("privacy_notice_v1", MODE_PRIVATE).edit()
-                .putString("decision", "declined").putLong("decision_at", System.currentTimeMillis()).apply()
+                .putString("decision", "acknowledged").putLong("decision_at", System.currentTimeMillis()).apply()
             buildDashboard()
         }, matchWrap())
         root.addView(space(16))
