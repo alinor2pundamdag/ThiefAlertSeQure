@@ -584,7 +584,7 @@ class SettingsActivity : FragmentActivity() {
     private fun openLaunchControlSettings(control: AndroidDeviceCompatibility.LaunchControl) {
         val family = AndroidDeviceCompatibility.family(Build.MANUFACTURER, Build.BRAND)
         val primary = AndroidDeviceCompatibility.launchControlSettingsIntent(
-            Build.MANUFACTURER, Build.BRAND, packageName
+            Build.MANUFACTURER, Build.BRAND, packageName, control
         )
         val opened = AndroidDeviceCompatibility.open(
             this,
