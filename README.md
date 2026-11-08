@@ -42,7 +42,7 @@ It is a practical deterrent and awareness tool—not a guarantee against theft, 
 | Authentication to disarm | A triggered alarm is cleared only after successful Android device-credential or supported strong-biometric verification. |
 | Owner verification after unlock | Unlocking the phone does not itself silence the alarm. Open the alarm notification/dashboard and complete the app's Android biometric or device-credential verification. |
 | Persistent triggered state | Plugging the charger back in does not silence an already-triggered alarm. |
-| Synchronized visual alarm | Optional slow rear-LED flashlight pulses only while the alarm is latched; it stops after successful owner authentication. |
+| Synchronized visual alarm | Optional slow rear-LED flashlight pulses only while the alarm is latched; it stops after successful owner authentication. It uses no camera permission and captures no images/video. |
 | Local-first privacy | No account, cloud backend, analytics service, advertising SDK, or Internet permission is configured. |
 | Your own alarm sound | Choose supported audio through Android's system file picker; the packaged alarm is available as the built-in option. |
 | Loud alarm behavior | The app requests the maximum alarm-stream volume Android reports and restores the previous level after successful disarm. Actual output remains device-dependent. |
@@ -113,7 +113,7 @@ When you disarm a triggered alarm, Android handles device PIN, pattern, or passw
 
 ### Privacy notice and user choice
 
-On first launch, the app presents separate **Accept & continue** and **Decline & continue** choices. The choice is recorded locally and distinctly. Both choices continue to the same essential local protection dashboard; declining is not misrepresented as consent. You can review the notice again in Settings.
+On first launch, the app presents a local privacy and platform notice with one **I understand & continue** acknowledgement action. The acknowledgement is stored locally, and the notice can be reviewed again in Settings.
 
 Read the complete [Privacy Policy](docs/PRIVACY_POLICY.md).
 
