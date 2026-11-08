@@ -73,5 +73,5 @@ Strong face authentication is available only if Android reports the enrolled fac
 8. Verify PIN, pattern, password, fingerprint and supported strong face.
 9. Verify repeated five-failure / 30-second cooldown and cancellation.
 10. Verify volume restoration, DND, silent mode, notification denial, battery settings, and full-screen dashboard with Android 14+ access both granted and denied.
-11. On a factory-reset test device only, verify Device Owner enrollment, lock-task restrictions and in-app rollback.
+11. Device Owner enrollment, lock-task restrictions and in-app rollback are user-reported PASS on a separate test device; record its Android build and repeat after managed-policy changes.
 12. Complete Google Play foreground-service declaration for specialUse; approval is not guaranteed. Keep the PR unmerged until CI and physical-device gates pass. The current CI artifact is a debug APK because persistent release-signing secrets are not configured.
