@@ -124,10 +124,11 @@ A release candidate is acceptable only when:
 12. DND, notification denial, OEM battery controls and process death are tested.
 13. Device Owner mode is tested only on a prepared, backed-up test device, including the in-app rollback.
 
-## Single-authentication alarm recovery
+## Explicit owner-verification recovery
 
 - Request Android's secure screen lock only once per latched alarm episode. Repeated foreground-service start commands must never call `DevicePolicyManager.lockNow()` again for the same alarm.
-- Do not stack the app's `BiometricPrompt` over an already-visible Android keyguard. While the keyguard is locked, Android's own fingerprint, PIN, pattern, or password screen is the only authentication surface.
-- Register the protected `ACTION_USER_PRESENT` system broadcast as exported (Android requires this to receive broadcasts from highly privileged framework components) and independently monitor the observed locked-to-unlocked transition while the alarm service is active. The broadcast is protected and can only be sent by Android; either verified system signal completes the same owner-authentication coordinator.
-- A successful unlock stops alarm audio/vibration, restores the saved alarm volume, cancels the deadline, and re-baselines charger state. No PIN, password, pattern, or biometric template is read or stored by the app.
-- Physical acceptance must verify that one fingerprint or one PIN/password entry stops the alarm without a second lock or prompt. Android/OEM behavior still requires device testing.
+- Do not stack the app's `BiometricPrompt` over an already-visible Android keyguard. While the keyguard is locked, let the owner unlock Android first.
+- After the phone is unlocked, the owner must open the alarm notification/dashboard and complete the app-launched Android device-credential confirmation or BIOMETRIC_STRONG prompt.
+- Never clear the alarm from `ACTION_USER_PRESENT`, `isDeviceSecure`, or a keyguard locked-to-unlocked transition. Trusted-unlock flows can dismiss the keyguard without a fresh credential.
+- Only the explicit successful authentication result stops alarm audio/vibration, restores the saved alarm volume, cancels the deadline, and re-baselines charger state. No PIN, password, pattern, or biometric template is read or stored by the app.
+- Physical acceptance must verify that an ordinary phone unlock does not stop the alarm and that explicit app-launched owner verification does. Android/OEM behavior still requires device testing.
