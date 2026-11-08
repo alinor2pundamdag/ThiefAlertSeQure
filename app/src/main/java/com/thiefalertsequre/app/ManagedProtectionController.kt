@@ -39,6 +39,9 @@ object ManagedProtectionController {
         context.getSystemService(DevicePolicyManager::class.java)
             .isDeviceOwnerApp(context.packageName)
 
+    fun hasPendingRollback(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).contains(KEY_VERSION)
+
     fun isPolicyConfigured(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < 28 || !isDeviceOwner(context)) return false
         val dpm = context.getSystemService(DevicePolicyManager::class.java)
@@ -185,15 +188,9 @@ object ManagedProtectionController {
         admin: ComponentName
     ) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        check(prefs.getInt(KEY_VERSION, -1) == SNAPSHOT_VERSION) {
-            "Managed-policy rollback data is invalid. No destructive policy reset was attempted."
-        }
-
+        validateSnapshot(prefs)
         val packages = prefs.getStringSet(KEY_PACKAGES, null)
             ?: throw IllegalStateException("Managed-policy rollback package list is missing.")
-        check(restrictions.all { prefs.contains("restriction:$it") }) {
-            "Managed-policy rollback restriction data is incomplete."
-        }
 
         val failures = mutableListOf<Throwable>()
         // Attempt every restoration independently so one OEM/API failure does
