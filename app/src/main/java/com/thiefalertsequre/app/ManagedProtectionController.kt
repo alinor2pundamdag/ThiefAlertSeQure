@@ -10,9 +10,10 @@ import android.os.UserManager
 /**
  * Optional, explicitly enabled Android Enterprise / fully-managed-device mode.
  *
- * Before changing Device Owner policies, the controller persists the exact policy
- * values owned by this admin. Disable and failed enable operations restore those
- * values instead of assuming that every policy was previously unset.
+ * Before changing Device Owner policies, the controller persists the values
+ * exposed by DevicePolicyManager. Restriction getters are admin-scoped; Android 14+
+ * Lock Task getters expose resolved policy, so multi-admin attribution cannot be
+ * reconstructed exactly. Rollback restores the captured DPM-visible baseline.
  */
 object ManagedProtectionController {
     private const val PREFS = "managed_protection_rollback"
