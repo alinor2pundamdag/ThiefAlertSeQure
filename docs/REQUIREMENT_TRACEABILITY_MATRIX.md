@@ -1,6 +1,6 @@
 # Requirement Traceability Matrix — ThiefAlertSeQure
 
-> Baseline: `feat/custom-audio-and-reliability` at `27ef0abf3b463fd5abca0d224e8ad225bd09b123` (2026-11-08).
+> Audit update: `feat/custom-audio-and-reliability` at `3f729554f26cd878785edf77ef86169fcbbba011` (2026-11-08).
 > Contract: [Universal Maximum Protection Specification](UNIVERSAL_MAXIMUM_PROTECTION_SPEC.md).
 > Status labels: **Implemented** means source code exists; **Unit-covered** means a named local test exists; **CI-verified** means the exact baseline commit passed GitHub Actions; **Device-unverified** means no physical-device evidence is recorded for that case. These labels are deliberately not interchangeable.
 
@@ -8,8 +8,8 @@
 
 | Area | Evidence at baseline | Status / limitation |
 |---|---|---|
-| Branch / PR | PR #2 is open and draft; branch head is the baseline SHA above | Not merged |
-| CI | Baseline run 42456409652 passed on `96a5346`; OEM-family expansion run 42457337094 exposed a Kotlin exhaustive-`when` error, fixed in `e260ec0`. CI on code head `b390038` (runs 42457873498 push / 42457875251 PR) was in progress at matrix update time; this documentation-only update requires a final exact-head CI confirmation | Earlier baseline CI-verified; latest code head under CI; final exact-head CI pending |
+| Branch / PR | PR #2 is open and draft; latest audit commit is `3f729554f26cd878785edf77ef86169fcbbba011` | Not merged |
+| CI | Exact-head runs `42457915610` (push) and `42457920077` (PR) passed on prior verified commit `bba3aec8c8b9b6f553b72cbd569ea3b1f99043ec`. Earlier runs `42457873498` and `42457875251` on `b390038` were cancelled, not passed. The persistence-hardening commits after `bba3aec` require a fresh exact-head CI run | Prior head passed; new audit head CI pending |
 | Unit tests | `:app:testDebugUnitTest` in workflow | Unit tests execute in CI |
 | Lint | `:app:lintDebug` in workflow | CI-verified |
 | APK | Workflow assembles release only when persistent signing secrets exist; otherwise debug APK | Packaging verified; signing mode depends on secrets |
@@ -34,8 +34,8 @@
 | CORE-11 | ALARM_TRIGGERED is latched; reconnect, reboot, or service recovery cannot clear it | engine, coordinator, boot receiver | reconnect/reboot latch tests | Unit-covered |
 | CORE-12 | Only authenticated owner flow clears latched alarm | `OwnerAuthenticationCoordinator.kt`, auth coordinator, engine | auth and keyguard state tests | Unit-covered; real biometric/keyguard integration needs devices |
 | CORE-13 | Stale AlarmManager callbacks cannot affect a newer countdown | `ProtectionEngine.kt`, deadline receiver, scheduler | `staleDeadlineCallbackCannotMatchNewCountdown` | Unit-covered |
-| CORE-14 | Persistence write failures do not report an uncommitted state as saved | `ProtectionStore.kt` | Store-level failure injection not present in inspected tests | Needs dedicated tests |
-| CORE-15 | Corrupt or partially written state fails safely and is recoverable | `ProtectionStore.kt`, boot recovery | No corruption/recovery test identified | Needs dedicated tests |
+| CORE-14 | Persistence write failures do not report an uncommitted state as saved | `ProtectionStore.kt` | `writeUnlocked` uses synchronous `commit()`; `update()` returns the prior state if commit fails | Source behavior reviewed; failure-injection test still missing |
+| CORE-15 | Corrupt or partially written state fails safely and is recoverable | `ProtectionState.fromPersisted`, `ProtectionStore.kt`, boot recovery | `ProtectionStatePersistenceTest`: unknown mode, malformed countdown, negative monotonic deadline, missing state, valid countdown, latched alarm normalization | Source fix + unit regression tests added; CI pending; Android SharedPreferences corruption/device recovery remains unverified |
 | CORE-16 | Service process death / duplicate receiver / queue saturation do not create duplicate or lost transitions | receiver, coordinator, monitor service | No instrumentation/process-death suite identified | Needs integration tests |
 | CORE-17 | Monitoring opt-out stops monitoring without clearing a latched alarm | monitor service, boot receiver, policy | `ProtectionMonitorPolicyTest` | Unit-covered; lifecycle integration unverified |
 
@@ -137,5 +137,8 @@ A requirement is **complete** only when:
 - `ad80ec6`: added unit tests for API 26–37 full-screen-intent gating.
 - `58d2271`: removed the optional full-screen dashboard permission from core readiness requirements when the feature is off.
 - `75c00ae` / `b390038`: recognized the Transsion manufacturer alias and aligned the unknown-OEM test with the new generic fallback wording.
+- `bb0e884`: added conservative persisted-state decoding: absent state remains first-install `DISARMED`; unknown modes and malformed countdown records become latched `ALARM_TRIGGERED` rather than silently disarming.
+- `8d5490c`: connected `ProtectionStore.read()` to the conservative persisted-state decoder.
+- `3f72955`: added `ProtectionStatePersistenceTest` coverage for missing, malformed, valid, and latched persisted states.
 - Documentation corrections align charger receiver registration with the runtime foreground-service registration, and align the stated target SDK with Gradle (API 36).
 - Android 17 background-audio behavior is documented against the official platform guidance: [Android 17 background audio hardening](https://developer.android.com/develop/background-work/services/fgs/changes) and [Android 17 audio hardening details](https://developer.android.com/about/versions/17/changes/bg-audio).
