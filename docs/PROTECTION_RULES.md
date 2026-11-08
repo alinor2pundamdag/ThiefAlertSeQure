@@ -45,7 +45,7 @@ No other event may clear ALARM_TRIGGERED.
 ## 3. Countdown integrity
 
 - Use elapsedRealtime plus boot count on the same boot. This clock is not affected by user wall-clock changes.
-- If reboot occurs during COUNTDOWN, revalidate the live charger state. If connected, return to ARMED. If disconnected, restart a full 10-second grace period. If charger state or boot identity is unknown, do not expire the old deadline; wait for reliable state/boot identity. Never use wall-clock expiry for a persisted monotonic deadline when boot identity cannot be verified.
+- If reboot occurs during COUNTDOWN, BOOT_COMPLETED invalidates the prior charger baseline even if Android does not expose BOOT_COUNT. If connected, return to ARMED. If disconnected, restart a full 10-second grace period. If the first post-boot power sample is unknown, store a dedicated pending-reconciliation marker and retry; the first confirmed disconnected sample starts the full 10-second grace period, while a confirmed connected sample returns to ARMED. Never compare an old-boot monotonic deadline against wall-clock time.
 - Re-check the deadline inside AlarmDeadlineReceiver before changing state.
 - Prefer setExactAndAllowWhileIdle when Android permits it.
 - Android 12+ requires user-granted SCHEDULE_EXACT_ALARM access for this app's exact-alarm route.
@@ -70,8 +70,8 @@ No other event may clear ALARM_TRIGGERED.
 - After cooldown expires, reset the counter and permit a new group of five failures.
 - Android biometric lockout events also start the app's 30-second cooldown.
 - Cancellation is not a failure and never disarms the alarm.
-- While the alarm foreground service is active, register a dynamic receiver for the system-only `ACTION_USER_PRESENT` event. Require `KeyguardManager.isDeviceSecure == true` and `isKeyguardLocked == false`, then use the same owner-authentication coordinator as in-app biometric/device-credential callbacks.
-- Android reports keyguard dismissal, not the exact authentication modality. This can also follow OEM trusted-unlock flows; ordinary apps cannot obtain a universal PIN/fingerprint proof callback for authentication performed outside their own prompt. Do not collect credentials to work around this platform boundary.
+- Never treat `ACTION_USER_PRESENT`, `isDeviceSecure`, or a keyguard locked-to-unlocked transition as proof of a fresh credential. Trusted-unlock flows can dismiss the keyguard without a new PIN or biometric.
+- The owner must open the app/notification and complete the app-launched Android device-credential confirmation or BIOMETRIC_STRONG prompt. Only the explicit successful result clears the alarm.
 
 ## 5. Alarm audio policy
 
@@ -91,7 +91,7 @@ Managed lockdown is a separate, opt-in mode. It is enabled only if DevicePolicyM
 - Allowlist only this package for Lock Task Mode.
 - Keep Keyguard available.
 - Omit LOCK_TASK_FEATURE_GLOBAL_ACTIONS while kiosk mode is active.
-- Apply supported restrictions for Settings factory reset, safe boot, USB file transfer, adding users and debugging.
+- Apply supported restrictions for Settings factory reset, adding users and USB file transfer. Keep Safe Boot and USB debugging available as recovery paths.
 - Keep an in-app exit action that stops Lock Task and removes every applied restriction.
 - Do not use Accessibility to intercept global buttons, hidden overlays, root, firmware changes or deceptive persistence.
 - Device Owner is not an app permission. Provisioning usually requires Android Enterprise enrollment on a new or factory-reset device.
