@@ -116,6 +116,12 @@ class ProtectionEngineTest {
         val s = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
         assertEquals(s, ProtectionEngine.chargerConnected(s, 12_000))
     }
+    @Test fun reconnectAndCountdownReconciliationCannotResetLatchedAlarm() {
+        val latched = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, 11_000L)
+        assertEquals(latched, ProtectionEngine.reconcileCountdown(latched, true, 12_000L, 12_000L, 7))
+        assertEquals(latched, ProtectionEngine.chargerConnected(latched, 12_000L))
+        assertEquals(latched, ProtectionEngine.restoreAfterBoot(latched, true, 13_000L, 13_000L, 7))
+    }
     @Test fun rebootPreservesTriggeredAlarm() {
         val s = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0, 11_000)
         assertEquals(s, ProtectionEngine.restoreAfterBoot(s, true, 20_000))
