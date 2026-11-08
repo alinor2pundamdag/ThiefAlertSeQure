@@ -110,6 +110,21 @@ jobs:
           print(f"Validated Ogg Opus alarm ({len(data)} bytes) and {len(images)} image assets.")
           PY
 
+      - name: Check Gradle build script uniqueness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f app/build.gradle.kts
+          test -f build.gradle.kts
+          test -f settings.gradle.kts
+          for obsolete in app/build.gradle build.gradle settings.gradle; do
+            if [[ -f "$obsolete" ]]; then
+              echo "::error::Duplicate Groovy Gradle script detected: $obsolete"
+              exit 1
+            fi
+          done
+          echo "Kotlin DSL is the only Gradle build configuration."
+
       - name: Read application version
         shell: bash
         run: |
@@ -130,20 +145,15 @@ jobs:
           # Remove prior outputs and force Gradle to execute every packaging task.
           ./gradlew clean --no-daemon --no-build-cache --no-configuration-cache --stacktrace
           mkdir -p dist
-          # Explicit AGP injected properties override any stale version injected by an IDE/init script.
-          VERSION_OVERRIDE_ARGS=(
-            "-Pandroid.injected.version.code=$APP_VERSION_CODE"
-            "-Pandroid.injected.version.name=$APP_VERSION_NAME"
-          )
           if [[ "$RELEASE_SIGNING_CONFIGURED" == "true" ]]; then
-            ./gradlew :app:assembleRelease "${VERSION_OVERRIDE_ARGS[@]}" --no-daemon --no-build-cache --no-configuration-cache --rerun-tasks --stacktrace
+            ./gradlew :app:assembleRelease --no-daemon --no-build-cache --no-configuration-cache --rerun-tasks --stacktrace
             APK_VARIANT="release"
             APK_FILE="dist/ThiefAlertSeQure-v${APP_VERSION_NAME}-release.apk"
             cp app/build/outputs/apk/release/app-release.apk "$APK_FILE"
             echo "APK_PATH=$APK_FILE" >> "$GITHUB_ENV"
             echo "APK_ARTIFACT_NAME=ThiefAlertSeQure-release-apk" >> "$GITHUB_ENV"
           else
-            ./gradlew :app:assembleDebug "${VERSION_OVERRIDE_ARGS[@]}" --no-daemon --no-build-cache --no-configuration-cache --rerun-tasks --stacktrace
+            ./gradlew :app:assembleDebug --no-daemon --no-build-cache --no-configuration-cache --rerun-tasks --stacktrace
             APK_VARIANT="debug"
             APK_FILE="dist/ThiefAlertSeQure-v${APP_VERSION_NAME}-debug.apk"
             cp app/build/outputs/apk/debug/app-debug.apk "$APK_FILE"
@@ -151,18 +161,6 @@ jobs:
             echo "APK_ARTIFACT_NAME=ThiefAlertSeQure-debug-apk" >> "$GITHUB_ENV"
           fi
           echo "APK_VARIANT=$APK_VARIANT" >> "$GITHUB_ENV"
-
-      - name: Diagnose Gradle version sources and manifest provenance
-        shell: bash
-        run: |
-          set -euo pipefail
-          ./gradlew :app:printAndroidVersionConfig --no-daemon --no-build-cache --no-configuration-cache --console=plain
-          echo "Manifest report files:"
-          find app/build -type f | grep -Ei 'manifest.*(report|blame)|(report|blame).*manifest' || true
-          while IFS= read -r report; do
-            echo "===== $report ====="
-            grep -n -C 4 -E 'versionCode|versionName|1\\.1\\.1|1\\.1\\.3' "$report" || true
-          done < <(find app/build -type f | grep -Ei 'manifest.*(report|blame)|(report|blame).*manifest' || true)
 
       - name: Inspect manifest and verify APK output metadata
         shell: bash
