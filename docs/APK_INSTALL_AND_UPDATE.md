@@ -74,6 +74,16 @@ No Android app can override Package Manager's signature verification, silently r
 The Android workflow now verifies the APK's application ID, version code, version name, and signing certificate output before uploading the artifact. Release and debug APK artifacts have distinct names to prevent accidental mixing.
 
 
+## Verified 1.1.2 development APK
+
+- GitHub Actions run: [42479548944](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/42479548944)
+- Artifact: `ThiefAlertSeQure-debug-apk` (artifact ID `13617306483`, expires 2026-11-22)
+- Package / version: `com.thiefalertsequre.app`, versionCode `4`, versionName `1.1.2`
+- APK SHA-256: `5dc6467e90364aa7f4f730d1caeb99777ac29d69058e2981b3021a6c966dc287`
+- V2 signer certificate SHA-256: `c115de2ef097e5eab7243874ad7bf212adf94f419d8fc2d963d78c8fdaebf00c`
+
+The earlier 1.1.1 debug artifacts from the push and pull-request workflows had different signer certificates (`bb6f5da1a5b4b795383af711ae8f4bbcbc77c203ef31f0180b514234a84a2a9d` and `148b01dd2f4b2a5912abd6d8ed43da44687caf2ef02d97a565ee10d171129555`). Therefore, do not assume this 1.1.2 APK can update an older debug installation. Compare the installed certificate first; if it differs, do not uninstall or clear data without a backup and explicit acceptance of data loss.
+
 ## HONOR 200 Pro acceptance test (after installing the verified 1.1.2 APK)
 
 Keep the app's protection monitor enabled. In HONOR Settings, retain the manually configured App Launch settings: Manage automatically OFF, Auto-launch ON, Secondary launch ON, and Run in background ON. The app cannot toggle these private OEM controls itself.
