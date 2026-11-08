@@ -147,6 +147,8 @@ object ManagedProtectionController {
     }
 
     fun startIfConfigured(activity: Activity) {
+        // Never re-enter kiosk automatically while an explicit rollback is pending.
+        if (hasPendingRollback(activity)) return
         if (isPolicyConfigured(activity) &&
             activity.getSystemService(DevicePolicyManager::class.java).isLockTaskPermitted(activity.packageName)
         ) {
