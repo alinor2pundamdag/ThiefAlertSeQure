@@ -177,8 +177,11 @@ object ManagedProtectionController {
             .putStringSet(KEY_PACKAGES, snapshot.lockTaskPackages.toSet())
             .putInt(KEY_FEATURES, snapshot.lockTaskFeatures)
             .putBoolean(KEY_RECOVERY_PENDING, false)
-        snapshot.restrictionValues.forEach { (key, enabled) ->
-            editor.putBoolean("restriction:$key", enabled)
+        snapshot.localRestrictionValues.forEach { (key, enabled) ->
+            editor.putBoolean("local_restriction:$key", enabled)
+        }
+        snapshot.globalRestrictionValues.forEach { (key, enabled) ->
+            editor.putBoolean("global_restriction:$key", enabled)
         }
         check(editor.commit()) {
             "Could not persist the original managed-device policies; no lockdown changes were applied."
@@ -209,7 +212,8 @@ object ManagedProtectionController {
         } catch (invalidSnapshot: Exception) {
             // The exact prior baseline is unrecoverable if local rollback data is
             // corrupt. Because the owner explicitly requested disable, restore
-            // navigable Android defaults and clear only policies managed here.
+            // navigable Android defaults. The original package/feature baseline
+            // cannot be reconstructed from damaged metadata.
             restoreEmergencyDefaults(dpm, admin, prefs, invalidSnapshot)
             return
         }
@@ -242,9 +246,6 @@ object ManagedProtectionController {
                 }
                 if (Build.VERSION.SDK_INT >= 34 && snapshot.shouldKeepGlobalRestrictionEnabled(key)) {
                     dpm.addUserRestrictionGlobally(key)
-                } else if (Build.VERSION.SDK_INT < 34 && snapshot.shouldKeepLocalRestrictionEnabled(key)) {
-                    // Before API 34, addUserRestriction is the platform-supported
-                    // restriction mechanism for this device owner.
                 }
             }.onFailure(failures::add)
         }
