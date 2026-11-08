@@ -29,7 +29,8 @@
 | Independent motion alarm | Explicit opt-in, OFF by default; can trigger while charger remains connected; only monitored while ARMED |
 | Local event export | CSV export through Android's system document picker |
 | Alarm foreground notification | Ongoing high-priority alarm notification; optional full-screen dashboard only when owner-enabled and Android full-screen access is granted; otherwise normal notification fallback |
-| First-launch privacy notice | Accept / decline choices are recorded distinctly; both continue to the same essential local protection functions |
+| Synchronized camera LED alert | Optional slow rear-LED pulses only while ALARM_TRIGGERED; default ON, owner can disable it; stops on authenticated disarm; no CAMERA permission or image/video capture; unavailable hardware never blocks audio |
+| First-launch privacy notice | Notice is shown until the owner acknowledges it; one “I understand & continue” action proceeds to the dashboard; no Decline button |
 | Dedicated Settings screen | Android alarm, notification, battery/background, DND, app-info and privacy-notice controls |
 | Premium adaptive UI | Material 3 dark theme, responsive scroll layout, high-contrast status states, large touch targets and explicit setup controls |
 | Device PIN / pattern / password | Explicit app-launched Android device-credential confirmation; credentials are never read or stored; ordinary phone unlock alone does not stop the alarm |
@@ -55,6 +56,8 @@ Strong face authentication is available only if Android reports the enrolled fac
 - Android 15+ blocks a mediaPlayback foreground service launched directly from BOOT_COMPLETED. The app now schedules a user-authorized exact alarm for recovery where exact-alarm access is granted. Without that access, immediate playback after reboot is not guaranteed.
 - DND is not changed by the app. Alarm audio uses USAGE_ALARM; users configure alarm exceptions in Android sound/DND settings.
 - Maximum alarm volume means the device's reported maximum alarm-stream index, not 105% output. Prior volume is restored after successful disarm.
+- The visual alarm uses CameraManager.setTorchMode without CAMERA permission or camera capture. The flash feature is optional hardware, slow-pulsed (700 ms on / 700 ms off), user-disableable, and independent of audio. Camera contention, thermal/OEM policy or missing flash can prevent light output; no universal torch guarantee is possible.
+- Flashing light may affect photosensitive users. The owner can disable the visual alert in Settings; the feature does not strobe at high frequency.
 - Standard mode cannot block the power menu, hardware forced shutdown, global volume keys, force-stop, uninstall, or recovery reset.
 - Managed mode can hide the normal global-actions dialog while Lock Task Mode is active and restrict selected Settings actions. It cannot defeat hardware shutdown, bootloader/recovery, battery removal, or firmware controls.
 - Device Owner enrollment is a deliberate enterprise provisioning operation, not a runtime permission and not something the app can self-grant.
