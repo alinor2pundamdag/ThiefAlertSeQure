@@ -39,6 +39,40 @@ class AndroidDeviceCompatibilityTest {
     }
 
 
+
+    @Test fun recognizesAdditionalAndroidManufacturersWithSafeGenericGuidance() {
+        val cases = listOf(
+            Triple("ASUS", "ASUS", "ASUS"),
+            Triple("Sony", "Xperia", "Sony Xperia"),
+            Triple("Nothing", "Nothing", "Nothing OS"),
+            Triple("TECNO", "TECNO", "TECNO / Infinix / itel"),
+            Triple("Infinix", "Infinix", "TECNO / Infinix / itel"),
+            Triple("ZTE", "nubia", "ZTE / nubia"),
+            Triple("Lenovo", "Lenovo", "Lenovo Android")
+        )
+        cases.forEach { (manufacturer, brand, expectedLabel) ->
+            assertEquals(AndroidDeviceCompatibility.Family.valueOf(expectedLabelFamily(expectedLabel)),
+                AndroidDeviceCompatibility.family(manufacturer, brand))
+            assertTrue(AndroidDeviceCompatibility.familyLabel(manufacturer, brand).contains(expectedLabel))
+            assertTrue(AndroidDeviceCompatibility.backgroundSettingsGuide(manufacturer, brand)
+                .contains("model- and region-specific", ignoreCase = true))
+            AndroidDeviceCompatibility.LaunchControl.values().forEach { control ->
+                assertTrue(AndroidDeviceCompatibility.launchControlGuide(manufacturer, brand, control).isNotBlank())
+                assertTrue(AndroidDeviceCompatibility.settingsSearchHint(manufacturer, brand, control).isNotBlank())
+            }
+        }
+    }
+
+    private fun expectedLabelFamily(label: String): String = when (label) {
+        "ASUS" -> "ASUS"
+        "Sony Xperia" -> "SONY"
+        "Nothing OS" -> "NOTHING"
+        "TECNO / Infinix / itel" -> "TRANSSION"
+        "ZTE / nubia" -> "ZTE"
+        "Lenovo Android" -> "LENOVO"
+        else -> error("Unexpected label: $label")
+    }
+
     @Test fun honorManualGuidesNameAllThreeRequiredControls() {
         val guides = AndroidDeviceCompatibility.LaunchControl.values().map {
             AndroidDeviceCompatibility.launchControlGuide("HONOR", "HONOR", it)
