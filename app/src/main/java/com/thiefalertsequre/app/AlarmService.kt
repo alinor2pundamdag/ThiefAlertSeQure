@@ -67,7 +67,6 @@ class AlarmService : Service() {
             startForeground(NOTIFICATION_ID, notification())
             val alarmStartedAt = ProtectionStore(this).read().changedAtEpochMs
             lockDeviceIfAdminEnabled(alarmStartedAt)
-            syncAlarmFlash()
             LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active; device-lock request issued")
         } catch (error: Exception) {
             LocalTamperHistory.record(this, "alarm_service_start_failed", error.javaClass.simpleName + ": " + error.message)
@@ -76,6 +75,7 @@ class AlarmService : Service() {
             return START_NOT_STICKY
         }
         if (player == null) startAlarmAudio()
+        syncAlarmFlash()
         volumeHandler.removeCallbacks(volumeEnforcement)
         volumeHandler.post(volumeEnforcement)
         return START_STICKY
