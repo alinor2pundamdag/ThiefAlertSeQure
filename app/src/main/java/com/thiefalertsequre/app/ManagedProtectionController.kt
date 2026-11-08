@@ -20,6 +20,7 @@ object ManagedProtectionController {
     private const val KEY_VERSION = "version"
     private const val KEY_PACKAGES = "lock_task_packages"
     private const val KEY_FEATURES = "lock_task_features"
+    private const val KEY_RECOVERY_PENDING = "recovery_pending"
 
     private val restrictions = listOf(
         UserManager.DISALLOW_FACTORY_RESET,
@@ -34,7 +35,8 @@ object ManagedProtectionController {
             .isDeviceOwnerApp(context.packageName)
 
     fun hasPendingRollback(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).contains(KEY_VERSION)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_RECOVERY_PENDING, false)
 
     fun isPolicyConfigured(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < 28 || !isDeviceOwner(context)) return false
@@ -57,6 +59,9 @@ object ManagedProtectionController {
         // Do not replace the original baseline when enable is retried or the app
         // is already configured. The first snapshot is the rollback authority.
         if (prefs.contains(KEY_VERSION)) {
+            check(!prefs.getBoolean(KEY_RECOVERY_PENDING, false)) {
+                "Managed-policy rollback is pending. Disable managed lockdown before enabling it again."
+            }
             validateSnapshot(prefs)
         } else {
             val restrictionsBefore = dpm.getUserRestrictions(admin)
@@ -83,6 +88,7 @@ object ManagedProtectionController {
             activity.startLockTask()
             return true
         } catch (failure: Throwable) {
+            runCatching { prefs.edit().putBoolean(KEY_RECOVERY_PENDING, true).commit() }
             runCatching { activity.stopLockTask() }
             val rollbackFailure = runCatching { restorePersistedSnapshot(activity, dpm, admin) }.exceptionOrNull()
             if (rollbackFailure != null) {
@@ -112,6 +118,9 @@ object ManagedProtectionController {
         val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
         if (prefs.contains(KEY_VERSION)) {
+            check(prefs.edit().putBoolean(KEY_RECOVERY_PENDING, true).commit()) {
+                "Could not mark managed-policy rollback as pending; no policy restoration was attempted."
+            }
             restorePersistedSnapshot(activity, dpm, admin)
             return
         }
@@ -119,7 +128,10 @@ object ManagedProtectionController {
         // Compatibility recovery for installations that enabled managed mode
         // before rollback snapshots existed. Mark recovery as pending first so
         // the UI keeps the retry/exit action available if any DPM call fails.
-        check(prefs.edit().putInt(KEY_VERSION, 0).commit()) {
+        check(prefs.edit()
+            .putInt(KEY_VERSION, 0)
+            .putBoolean(KEY_RECOVERY_PENDING, true)
+            .commit()) {
             "Could not persist the legacy managed-policy recovery marker."
         }
         restoreEmergencyDefaults(
