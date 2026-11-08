@@ -28,7 +28,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 
 ## State integrity
 - State transitions are serialized through ProtectionStore.
-- Triggered state is monotonic against charger events and owner monitoring opt-out; only successful Keyguard or BiometricPrompt authentication clears it. The separate motion alarm is opt-in and can trigger while charging. Explicitly disabling monitoring can disarm non-triggered states and cancels their pending deadline.
+- Triggered state is monotonic against charger events and owner monitoring opt-out; only a successful app-launched Android device-credential confirmation or BIOMETRIC_STRONG prompt clears it. Merely unlocking the phone never clears the alarm. The separate motion alarm is opt-in and can trigger while charging. Explicitly disabling monitoring can disarm non-triggered states and cancels their pending deadline.
 - State and throttle are synchronously persisted.
 - Countdown uses elapsedRealtime plus a verified boot count. If a countdown was pending at reboot and the charger remains absent, restart a full 10-second grace period; if charging, protection returns to ARMED. If boot identity is unavailable, never use wall-clock time to expire a monotonic deadline.
 - AlarmDeadlineReceiver rechecks the deadline and reschedules early delivery.
@@ -40,7 +40,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 - Five consecutive biometric failure callbacks start a persisted 30-second cooldown. After it expires, another five failures can start another cooldown.
 - Cancellation is not a failed attempt and never clears the alarm.
 - Android does not disclose incorrect device-credential attempts to third-party apps; Keyguard's own lockout applies.
-- In-app Keyguard/BiometricPrompt success or a secure, unlocked Android keyguard dismissal (`ACTION_USER_PRESENT`) clears ALARM_TRIGGERED through one shared coordinator. Android does not expose the exact authentication modality for system lockscreen unlocks; OEM trusted-unlock flows may also dismiss the keyguard.
+- Only the result of the app-launched Android device-credential confirmation activity or a successful BIOMETRIC_STRONG prompt clears ALARM_TRIGGERED through one shared coordinator. `ACTION_USER_PRESENT` and keyguard locked-to-unlocked polling are not proof of credential entry: trusted-unlock flows can dismiss the keyguard without a fresh PIN or biometric.
 
 ## Audio and lockscreen
 - Packaged Ogg Opus alarm asset is played in a loop through MediaPlayer. If selected and packaged audio both fail, repeating vibration is the fallback; there is no ToneGenerator implementation.
@@ -89,6 +89,6 @@ Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPl
 
 - `DevicePolicyManager.lockNow()` is idempotent per alarm episode, keyed to the persisted alarm transition timestamp. Repeated service starts must not relock an already-unlocked phone.
 - `MainActivity` does not launch an app-owned biometric prompt while Android reports the device keyguard as locked; this avoids competing authentication surfaces.
-- `AlarmService` registers protected `ACTION_USER_PRESENT` with `RECEIVER_EXPORTED` as required for system broadcasts from highly privileged framework components, and observes the keyguard locked-to-unlocked transition as a fallback. Both invoke the same authenticated alarm-stop coordinator.
-- The system credential and biometric remain entirely Android-managed. The app receives only the successful keyguard-dismissal signal and never accesses credential material.
+- `AlarmService` does not treat `ACTION_USER_PRESENT`, `isDeviceSecure`, or an unlocked keyguard as authentication. After the phone is unlocked, the owner must open the app/notification and complete the explicit Android credential or strong-biometric prompt.
+- The system credential and biometric remain entirely Android-managed. The app receives only the successful result from its explicit authentication activity/prompt and never accesses credential material.
 - These changes require a fresh physical test on the target HONOR device; CI cannot verify OEM keyguard behavior.
