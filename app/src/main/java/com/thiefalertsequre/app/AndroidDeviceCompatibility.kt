@@ -79,7 +79,7 @@ object AndroidDeviceCompatibility {
     }
 
     fun backgroundSettingsGuide(manufacturer: String, brand: String): String {
-        val common = "First open App info for ThiefAlertSeQure and review Battery / App battery usage. Choose Unrestricted, Allow background activity, or the least restrictive option your Android build offers. Keep notifications enabled. Menu names and availability vary by model and OS update."
+        val common = "After configuring the device-specific startup control, also review App info → Battery / App battery usage. Allow background activity or choose Unrestricted only if this phone offers it and the app needs it; this can increase battery use. Keep the app's protection notification enabled. Battery Saver may still restrict background work, and no setting overrides Force stop. Menu names vary by model and OS update."
         val vendor = when (family(manufacturer, brand)) {
             Family.SAMSUNG ->
                 "Samsung One UI: Settings → Battery (or Battery and device care → Battery) → Background usage limits → Never sleeping apps → add ThiefAlertSeQure. Also check App info → Battery for an Unrestricted option if your One UI release offers it. Do not place the app in Sleeping or Deep sleeping apps. Samsung may move these controls between One UI releases."
