@@ -178,6 +178,29 @@ object AndroidDeviceCompatibility {
         } + deviceSuffix
     }
 
+    fun settingsSearchHint(manufacturer: String, brand: String, control: LaunchControl): String =
+        when (family(manufacturer, brand)) {
+            Family.HONOR_HUAWEI -> "App launch"
+            Family.SAMSUNG -> "Never sleeping apps"
+            Family.XIAOMI -> when (control) {
+                LaunchControl.AUTO_LAUNCH -> "Background autostart"
+                LaunchControl.SECONDARY_LAUNCH -> "Background autostart"
+                LaunchControl.RUN_IN_BACKGROUND -> "Battery saver / No restrictions"
+            }
+            Family.OPPO_REALME_ONEPLUS -> when (control) {
+                LaunchControl.AUTO_LAUNCH -> "Auto launch"
+                LaunchControl.SECONDARY_LAUNCH -> "Background activity"
+                LaunchControl.RUN_IN_BACKGROUND -> "App battery management"
+            }
+            Family.VIVO_IQOO -> when (control) {
+                LaunchControl.AUTO_LAUNCH -> "Autostart"
+                LaunchControl.SECONDARY_LAUNCH -> "Background start"
+                LaunchControl.RUN_IN_BACKGROUND -> "Background power consumption management"
+            }
+            Family.GOOGLE_PIXEL, Family.MOTOROLA -> "App battery usage"
+            Family.OTHER -> "Auto-start / Background activity"
+        }
+
     fun appInfoIntent(packageName: String): Intent =
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
 
