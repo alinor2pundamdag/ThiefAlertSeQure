@@ -113,8 +113,8 @@ jobs:
       - name: Read application version
         shell: bash
         run: |
-          VERSION_CODE="$(sed -n 's/^[[:space:]]*versionCode = \([0-9][0-9]*\)$/\1/p' app/build.gradle.kts | head -n 1)"
-          VERSION_NAME="$(sed -n 's/^[[:space:]]*versionName = "\([^"]*\)"$/\1/p' app/build.gradle.kts | head -n 1)"
+          VERSION_CODE="$(sed -n 's/^val appVersionCode = \([0-9][0-9]*\)$/\1/p' app/build.gradle.kts | head -n 1)"
+          VERSION_NAME="$(sed -n 's/^val appVersionName = "\([^"]*\)"$/\1/p' app/build.gradle.kts | head -n 1)"
           test -n "$VERSION_CODE"
           test -n "$VERSION_NAME"
           echo "APP_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
