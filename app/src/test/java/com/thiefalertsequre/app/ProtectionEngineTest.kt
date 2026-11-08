@@ -128,6 +128,29 @@ class ProtectionEngineTest {
         assertEquals(ProtectionMode.ARMED, result.mode)
     }
 
+    @Test fun newCountdownWithoutBootIdentityUsesWallClockFallbackInsteadOfNeverExpiring() {
+        val countdown = ProtectionEngine.chargerDisconnected(
+            ProtectionState(ProtectionMode.ARMED, 0L, 1_000L), 1_000L, 5_000L, -1
+        )
+        assertEquals(0L, countdown.deadlineElapsedRealtimeMs)
+        assertEquals(-1, countdown.bootCount)
+        assertEquals(
+            ProtectionMode.ALARM_TRIGGERED,
+            ProtectionEngine.evaluateDeadline(countdown, 11_000L, 99_000L, -1).mode
+        )
+    }
+
+    @Test fun rebootRecoveryWithoutBootIdentityUsesWallClockFallback() {
+        val prior = ProtectionState(ProtectionMode.COUNTDOWN, 11_000L, 1_000L, 15_000L, 7)
+        val restored = ProtectionEngine.restoreAfterBoot(prior, false, 50_000L, 500L, -1)
+        assertEquals(0L, restored.deadlineElapsedRealtimeMs)
+        assertEquals(-1, restored.bootCount)
+        assertEquals(
+            ProtectionMode.ALARM_TRIGGERED,
+            ProtectionEngine.evaluateDeadline(restored, 60_000L, 10_500L, -1).mode
+        )
+    }
+
     @Test fun countdownCreatedWithoutBootIdentityIsRebasedWhenIdentityBecomesAvailable() {
         val countdown = ProtectionState(ProtectionMode.COUNTDOWN, 11_000L, 1_000L, 15_000L, -1)
         val result = ProtectionEngine.reconcileCountdown(countdown, false, 50_000L, 500L, 8)
