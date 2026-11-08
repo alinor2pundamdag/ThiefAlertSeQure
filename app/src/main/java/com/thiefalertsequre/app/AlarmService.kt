@@ -8,7 +8,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
-import android.content.IntentFilter
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -31,29 +30,6 @@ class AlarmService : Service() {
     private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { }
     private val channelId = CHANNEL_ID
     private val volumeHandler = Handler(Looper.getMainLooper())
-    private val userPresentReceiver = UserPresentReceiver()
-    private var userPresentReceiverRegistered = false
-    private var keyguardLockedObserved = false
-    private var keyguardMonitorInitialized = false
-    private val keyguardUnlockMonitor = object : Runnable {
-        override fun run() {
-            if (ProtectionStore(this@AlarmService).read().mode != ProtectionMode.ALARM_TRIGGERED) return
-            val keyguard = getSystemService(android.app.KeyguardManager::class.java)
-            if (keyguard.isDeviceSecure) {
-                if (keyguard.isKeyguardLocked) {
-                    keyguardLockedObserved = true
-                    val alarmStartedAt = ProtectionStore(this@AlarmService).read().changedAtEpochMs
-                    getSharedPreferences("alarm_service_lock_v1", MODE_PRIVATE).edit()
-                        .putLong(KEY_KEYGUARD_LOCKED_FOR_ALARM_AT, alarmStartedAt).apply()
-                } else if (keyguardLockedObserved) {
-                    // Fallback to the broadcast: detect the actual locked -> unlocked
-                    // transition without asking the owner to authenticate a second time.
-                    if (OwnerAuthenticationCoordinator.complete(this@AlarmService, "keyguard_state_transition") != null) return
-                }
-            }
-            volumeHandler.postDelayed(this, KEYGUARD_POLL_INTERVAL_MS)
-        }
-    }
     private val volumeEnforcement = object : Runnable {
         override fun run() {
             if (ProtectionStore(this@AlarmService).read().mode != ProtectionMode.ALARM_TRIGGERED) return
@@ -64,25 +40,6 @@ class AlarmService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        // Keep the system keyguard-dismissal listener alive for the entire alarm
-        // foreground-service lifetime. Android 8+ restricts most manifest receivers.
-        runCatching {
-            ContextCompat.registerReceiver(
-                this,
-                userPresentReceiver,
-                IntentFilter(Intent.ACTION_USER_PRESENT),
-                // ACTION_USER_PRESENT is a protected system broadcast. Android's
-                // guidance requires EXPORTED to receive system broadcasts emitted
-                // by highly privileged framework components.
-                ContextCompat.RECEIVER_EXPORTED
-            )
-            userPresentReceiverRegistered = true
-        }.onFailure {
-            LocalTamperHistory.record(
-                this, "keyguard_unlock_receiver_register_failed",
-                it.javaClass.simpleName + ": " + it.message
-            )
-        }
         val nm = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) {
             nm.createNotificationChannel(
@@ -109,15 +66,6 @@ class AlarmService : Service() {
             startForeground(NOTIFICATION_ID, notification())
             val alarmStartedAt = ProtectionStore(this).read().changedAtEpochMs
             lockDeviceIfAdminEnabled(alarmStartedAt)
-            if (!keyguardMonitorInitialized) {
-                val keyguard = getSystemService(android.app.KeyguardManager::class.java)
-                val lockPrefs = getSharedPreferences("alarm_service_lock_v1", MODE_PRIVATE)
-                keyguardLockedObserved = keyguard.isKeyguardLocked ||
-                    lockPrefs.getLong(KEY_KEYGUARD_LOCKED_FOR_ALARM_AT, 0L) == alarmStartedAt
-                keyguardMonitorInitialized = true
-            }
-            volumeHandler.removeCallbacks(keyguardUnlockMonitor)
-            volumeHandler.postDelayed(keyguardUnlockMonitor, KEYGUARD_POLL_INTERVAL_MS)
             LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active; device-lock request issued")
         } catch (error: Exception) {
             LocalTamperHistory.record(this, "alarm_service_start_failed", error.javaClass.simpleName + ": " + error.message)
@@ -324,11 +272,6 @@ class AlarmService : Service() {
 
     override fun onDestroy() {
         volumeHandler.removeCallbacks(volumeEnforcement)
-        volumeHandler.removeCallbacks(keyguardUnlockMonitor)
-        if (userPresentReceiverRegistered) {
-            runCatching { unregisterReceiver(userPresentReceiver) }
-            userPresentReceiverRegistered = false
-        }
         stopAlarm()
         super.onDestroy()
     }
@@ -341,8 +284,6 @@ class AlarmService : Service() {
         const val ACTION_START = "com.thiefalertsequre.START"
         const val ACTION_STOP_IF_AUTHENTICATED = "com.thiefalertsequre.STOP_AUTH"
         private const val VOLUME_ENFORCEMENT_INTERVAL_MS = 500L
-        private const val KEYGUARD_POLL_INTERVAL_MS = 150L
         private const val KEY_LOCK_REQUESTED_FOR_ALARM_AT = "lock_requested_for_alarm_started_at"
-        private const val KEY_KEYGUARD_LOCKED_FOR_ALARM_AT = "keyguard_locked_for_alarm_started_at"
     }
 }
