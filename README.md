@@ -42,7 +42,7 @@ It is a practical deterrent and awareness tool—not a guarantee against theft, 
 | Authentication to disarm | A triggered alarm is cleared only after successful Android device-credential or supported strong-biometric verification. |
 | Owner verification after unlock | Unlocking the phone does not itself silence the alarm. Open the alarm notification/dashboard and complete the app's Android biometric or device-credential verification. |
 | Persistent triggered state | Plugging the charger back in does not silence an already-triggered alarm. |
-| Synchronized visual alarm | Optional slow rear-LED flashlight pulses only while the alarm is latched; it stops after successful owner authentication. It uses no camera permission and captures no images/video. |
+| Synchronized visual alarm | Slow rear-LED flashlight pulses by default only while the alarm is latched; the owner can disable it. It stops after successful owner authentication, uses no camera permission and captures no images/video. |
 | Local-first privacy | No account, cloud backend, analytics service, advertising SDK, or Internet permission is configured. |
 | Your own alarm sound | Choose supported audio through Android's system file picker; the packaged alarm is available as the built-in option. |
 | Loud alarm behavior | The app requests the maximum alarm-stream volume Android reports and restores the previous level after successful disarm. Actual output remains device-dependent. |
