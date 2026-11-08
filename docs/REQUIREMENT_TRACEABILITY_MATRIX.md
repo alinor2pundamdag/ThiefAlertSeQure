@@ -8,8 +8,8 @@
 
 | Area | Evidence at baseline | Status / limitation |
 |---|---|---|
-| Branch / PR | PR #2 is open and draft; code audit baseline is `953a9c625141fa88f99bfa69c58a8d3bcfe1c180`; traceability refresh `7b10e1d` is documentation-only | Not merged |
-| CI | Exact-head PR run `42472773722` passed all steps on `7b10e1d99252e660ed410574cb1a1030230c463b` (unit tests, lint, packaged assets, debug APK assembly, package/version/signer verification, artifact upload). Push run `42472768648` failed because the upstream Gradle distribution endpoint returned HTTP 502; the PR run on the same commit succeeded. Wrapper timeout is now 120 seconds (`953a9c6`) | Exact PR-head verified; push workflow had transient upstream failure |
+| Branch / PR | PR #2 remains open and draft; managed-policy safety implementation is on the current feature branch | Not merged |
+| CI | Earlier exact-head PR run `42472773722` passed on `7b10e1d99252e660ed410574cb1a1030230c463b`. Managed-policy controller changes and `ManagedPolicySnapshotTest` were added after that run; the current head must pass a fresh exact-head CI run before these changes are considered verified. Wrapper timeout is 120 seconds (`953a9c6`) | Earlier head passed; current implementation CI pending |
 | Unit tests | `:app:testDebugUnitTest` in workflow | Unit tests execute in CI |
 | Lint | `:app:lintDebug` in workflow | CI-verified |
 | APK | Workflow assembles release only when persistent signing secrets exist; otherwise debug APK | Packaging verified; signing mode depends on secrets |
@@ -88,7 +88,7 @@
 | PRIV-05 | Audio document URI permissions are scoped to user-selected files | audio store | source inspection | Implemented; provider revocation test needed |
 | SEC-01 | No accessibility-based power-menu interception, privilege escalation, or hidden system API | app source/dependencies | source review | Prohibited by design; audit on each change |
 | SEC-02 | Device Admin and Device Owner are clearly distinguished | managed controller, docs, UI | source/docs review | Implemented; provisioning tests needed |
-| SEC-03 | Managed restrictions require explicit owner/administrator provisioning and have a safe rollback path | managed controller, Device Owner guide | no provisioning instrumentation test identified | Needs managed-device test |
+| SEC-03 | Managed restrictions require explicit owner/administrator provisioning; preserve pre-existing policy values; roll back partial enable; keep a retryable exit path; never auto-reenter kiosk during pending rollback | `ManagedProtectionController.kt`, `ManagedPolicySnapshot.kt`, MainActivity, Device Owner guide | `ManagedPolicySnapshotTest` covers preserved lock-task package/feature values and restriction restoration decisions; CI pending; no Device Owner instrumentation test | Snapshot/rollback implementation added; exact-head CI and physical Device Owner validation pending. Legacy/corrupt snapshot emergency recovery resets to navigable defaults because original values are unavailable |
 | SEC-04 | Do not claim protection against force-stop, uninstall, physical shutdown, battery removal, recovery/bootloader, firmware, or factory reset | UI, privacy notice, docs | source/docs review | Documented limitation |
 | DOC-01 | Master spec is implementation contract | `UNIVERSAL_MAXIMUM_PROTECTION_SPEC.md` | file exists | Present |
 | DOC-02 | Every requirement maps to owner files, tests, and evidence | this matrix | file being added | In progress |
@@ -142,5 +142,6 @@ A requirement is **complete** only when:
 - `3f72955`: added `ProtectionStatePersistenceTest` coverage for missing, malformed, valid, and latched persisted states.
 - `2086fe2` / `77522e8` / `6f86965`: strengthened fail-closed handling for partial/corrupt preferences (including wrong preference value types) and added state-engine regression coverage.
 - `953a9c6`: increased Gradle wrapper distribution download timeout from 10 seconds to 120 seconds after repeated runner-side timeout/HTTP 502 failures; this changes CI resilience only, not app runtime behavior.
+- Managed Device Owner safety audit: added synchronous pre-change snapshots of this admin's lock-task package allowlist, feature flags, and five managed restrictions; disable and partial-enable failure restore those values. Added retryable recovery metadata, suppresses automatic kiosk re-entry while rollback is pending, and uses explicit emergency navigable defaults for legacy/corrupt snapshots. `ManagedPolicySnapshotTest` covers snapshot preservation semantics. Exact-head CI and physical Device Owner tests remain pending.
 - Documentation corrections align charger receiver registration with the runtime foreground-service registration, and align the stated target SDK with Gradle (API 36).
 - Android 17 background-audio behavior is documented against the official platform guidance: [Android 17 background audio hardening](https://developer.android.com/develop/background-work/services/fgs/changes) and [Android 17 audio hardening details](https://developer.android.com/about/versions/17/changes/bg-audio).
