@@ -1,6 +1,6 @@
 # Requirement Traceability Matrix — ThiefAlertSeQure
 
-> Audit update: `feat/custom-audio-and-reliability` at `953a9c625141fa88f99bfa69c58a8d3bcfe1c180` (2026-11-08).
+> Code audit baseline: `feat/custom-audio-and-reliability` at `953a9c625141fa88f99bfa69c58a8d3bcfe1c180` (2026-11-08). Exact-head CI evidence is recorded below.
 > Contract: [Universal Maximum Protection Specification](UNIVERSAL_MAXIMUM_PROTECTION_SPEC.md).
 > Status labels: **Implemented** means source code exists; **Unit-covered** means a named local test exists; **CI-verified** means the exact baseline commit passed GitHub Actions; **Device-unverified** means no physical-device evidence is recorded for that case. These labels are deliberately not interchangeable.
 
@@ -8,8 +8,8 @@
 
 | Area | Evidence at baseline | Status / limitation |
 |---|---|---|
-| Branch / PR | PR #2 is open and draft; latest audit commit is `953a9c625141fa88f99bfa69c58a8d3bcfe1c180` | Not merged |
-| CI | Prior exact-head runs `42457915610` (push) and `42457920077` (PR) passed on `bba3aec8c8b9b6f553b72cbd569ea3b1f99043ec`. Persistence-hardening CI on `953a9c625141fa88f99bfa69c58a8d3bcfe1c180`: push run `42472601131` failed before Gradle startup because GitHub returned HTTP 502 for the Gradle distribution; PR run `42472605725` is in progress. Wrapper download timeout raised from 10s to 120s in `953a9c6`; transient upstream 502 remains outside the repository's control | Prior head passed; latest exact-head PR verification pending |
+| Branch / PR | PR #2 is open and draft; code audit baseline is `953a9c625141fa88f99bfa69c58a8d3bcfe1c180`; traceability refresh `7b10e1d` is documentation-only | Not merged |
+| CI | Exact-head PR run `42472773722` passed all steps on `7b10e1d99252e660ed410574cb1a1030230c463b` (unit tests, lint, packaged assets, debug APK assembly, package/version/signer verification, artifact upload). Push run `42472768648` failed because the upstream Gradle distribution endpoint returned HTTP 502; the PR run on the same commit succeeded. Wrapper timeout is now 120 seconds (`953a9c6`) | Exact PR-head verified; push workflow had transient upstream failure |
 | Unit tests | `:app:testDebugUnitTest` in workflow | Unit tests execute in CI |
 | Lint | `:app:lintDebug` in workflow | CI-verified |
 | APK | Workflow assembles release only when persistent signing secrets exist; otherwise debug APK | Packaging verified; signing mode depends on secrets |
