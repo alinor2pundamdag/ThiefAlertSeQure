@@ -152,6 +152,18 @@ jobs:
           fi
           echo "APK_VARIANT=$APK_VARIANT" >> "$GITHUB_ENV"
 
+      - name: Diagnose Gradle version sources and manifest provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew :app:printAndroidVersionConfig --no-daemon --no-build-cache --no-configuration-cache --console=plain
+          echo "Manifest report files:"
+          find app/build -type f | grep -Ei 'manifest.*(report|blame)|(report|blame).*manifest' || true
+          while IFS= read -r report; do
+            echo "===== $report ====="
+            grep -n -C 4 -E 'versionCode|versionName|1\\.1\\.1|1\\.1\\.3' "$report" || true
+          done < <(find app/build -type f | grep -Ei 'manifest.*(report|blame)|(report|blame).*manifest' || true)
+
       - name: Inspect manifest and verify APK output metadata
         shell: bash
         run: |
