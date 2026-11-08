@@ -671,10 +671,17 @@ class MainActivity : FragmentActivity() {
         val adminComponent = ComponentName(this, ThiefAlertAdminReceiver::class.java)
         val adminActive = getSystemService(DevicePolicyManager::class.java).isAdminActive(adminComponent)
         val screenLockMessage = if (adminActive) "Automatic screen locking: ENABLED." else "Automatic screen locking: OFF; enable the device administrator in Device Hardening."
-        val fullScreenMessage = if (Build.VERSION.SDK_INT >= 34 && !notificationManager.canUseFullScreenIntent()) {
-            "Full-screen alarm access is OFF; enable it in Reliability & System Access."
-        } else {
-            "Full-screen alarm access is available on this Android version."
+        val fullScreenDashboardEnabled = getSharedPreferences(
+            ALARM_DISPLAY_PREFS, MODE_PRIVATE
+        ).getBoolean(KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
+        val fullScreenAccessGranted = Build.VERSION.SDK_INT < 34 || notificationManager.canUseFullScreenIntent()
+        val fullScreenMessage = when {
+            !fullScreenDashboardEnabled ->
+                "Optional full-screen alarm dashboard: OFF; the standard ongoing alarm notification remains active."
+            !fullScreenAccessGranted ->
+                "Optional full-screen dashboard: ON, but Android full-screen access is not granted; the standard alarm notification remains the fallback."
+            else ->
+                "Optional full-screen alarm dashboard: ON and Android full-screen access is available."
         }
         val alarmChannel = if (Build.VERSION.SDK_INT >= 26) notificationManager.getNotificationChannel(AlarmService.CHANNEL_ID) else null
         val alarmChannelReady = alarmChannel == null || alarmChannel.importance >= NotificationManager.IMPORTANCE_HIGH
@@ -708,7 +715,6 @@ class MainActivity : FragmentActivity() {
         val keyguard = getSystemService(KeyguardManager::class.java)
         val secureCredentialReady = keyguard.isDeviceSecure
         val exactAlarmReady = Build.VERSION.SDK_INT < 31 || getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
-        val fullScreenReady = Build.VERSION.SDK_INT < 34 || notificationManager.canUseFullScreenIntent()
         val monitorEnabled = monitorPrefs.getBoolean(
             ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
@@ -725,7 +731,6 @@ class MainActivity : FragmentActivity() {
         if (!adminActive) readinessIssues.add("Activate device administrator for automatic screen locking")
         if (!notificationsAllowed) readinessIssues.add("Allow notifications")
         if (!exactAlarmReady) readinessIssues.add("Allow Alarms & reminders for exact deadline recovery")
-        if (!fullScreenReady) readinessIssues.add("Allow full-screen alarm access")
         if (!alarmChannelReady) readinessIssues.add("Set Anti-theft alarm notification importance to High")
         if (!monitorEnabled) readinessIssues.add("Enable charger monitoring")
         if (monitorEnabled && state.mode != ProtectionMode.ALARM_TRIGGERED && !monitorRunning) {
