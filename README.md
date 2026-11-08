@@ -42,6 +42,7 @@ It is a practical deterrent and awareness tool—not a guarantee against theft, 
 | Authentication to disarm | A triggered alarm is cleared only after successful Android device-credential or supported strong-biometric verification. |
 | Owner verification after unlock | Unlocking the phone does not itself silence the alarm. Open the alarm notification/dashboard and complete the app's Android biometric or device-credential verification. |
 | Persistent triggered state | Plugging the charger back in does not silence an already-triggered alarm. |
+| Synchronized visual alarm | Optional slow rear-LED flashlight pulses only while the alarm is latched; it stops after successful owner authentication. |
 | Local-first privacy | No account, cloud backend, analytics service, advertising SDK, or Internet permission is configured. |
 | Your own alarm sound | Choose supported audio through Android's system file picker; the packaged alarm is available as the built-in option. |
 | Loud alarm behavior | The app requests the maximum alarm-stream volume Android reports and restores the previous level after successful disarm. Actual output remains device-dependent. |
@@ -88,7 +89,7 @@ ThiefAlertSeQure is designed to do its essential work on your Android device.
 - No configured advertising SDK or analytics tracker.
 - No sale or advertising-based sharing of app-collected data.
 - No collection of your device PIN, password, pattern, fingerprint data, or face templates.
-- No location, contacts, SMS, camera, or microphone permission is requested by the current manifest.
+- No location, contacts, SMS, microphone, or **camera permission** is requested. The optional flashlight uses Android's public torch API; it does not open the camera or capture photos/video. Flash hardware is optional, so devices without a usable LED can still install and use the audio alarm.
 
 ### What stays on your device
 
