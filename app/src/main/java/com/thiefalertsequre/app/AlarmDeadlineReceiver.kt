@@ -40,6 +40,13 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             }
             return
         }
+        // A corrupted state is conservatively persisted as ALARM_TRIGGERED. A
+        // stale deadline callback must still recover that latch, not discard it
+        // merely because its old countdown token no longer matches.
+        if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
+            startAlarm(context, "Latched alarm observed during deadline callback")
+            return
+        }
 
         val monitorEnabled = context.getSharedPreferences(
             ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
