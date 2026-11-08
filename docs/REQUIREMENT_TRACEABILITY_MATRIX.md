@@ -1,6 +1,6 @@
 # Requirement Traceability Matrix — ThiefAlertSeQure
 
-> Audit update: `feat/custom-audio-and-reliability` at `6f869659ebf1ebd3babcce95ebed49af5acc6dac` (2026-11-08).
+> Audit update: `feat/custom-audio-and-reliability` at `953a9c625141fa88f99bfa69c58a8d3bcfe1c180` (2026-11-08).
 > Contract: [Universal Maximum Protection Specification](UNIVERSAL_MAXIMUM_PROTECTION_SPEC.md).
 > Status labels: **Implemented** means source code exists; **Unit-covered** means a named local test exists; **CI-verified** means the exact baseline commit passed GitHub Actions; **Device-unverified** means no physical-device evidence is recorded for that case. These labels are deliberately not interchangeable.
 
@@ -8,8 +8,8 @@
 
 | Area | Evidence at baseline | Status / limitation |
 |---|---|---|
-| Branch / PR | PR #2 is open and draft; latest audit commit is `3f729554f26cd878785edf77ef86169fcbbba011` | Not merged |
-| CI | Prior exact-head runs 42457915610 (push) and 42457920077 (PR) passed on `bba3aec8c8b9b6f553b72cbd569ea3b1f99043ec`. New persistence-hardening changes are on `6f869659ebf1ebd3babcce95ebed49af5acc6dac`. Latest push run 42472443284 failed before Gradle startup because downloading Gradle 8.11.1 from services.gradle.org timed out; PR run 42472446467 is the current exact-head verification attempt | Previous head passed; current head awaiting a completed CI run; latest observed failure is infrastructure/network timeout, not a test assertion |
+| Branch / PR | PR #2 is open and draft; latest audit commit is `953a9c625141fa88f99bfa69c58a8d3bcfe1c180` | Not merged |
+| CI | Prior exact-head runs `42457915610` (push) and `42457920077` (PR) passed on `bba3aec8c8b9b6f553b72cbd569ea3b1f99043ec`. Persistence-hardening CI on `953a9c625141fa88f99bfa69c58a8d3bcfe1c180`: push run `42472601131` failed before Gradle startup because GitHub returned HTTP 502 for the Gradle distribution; PR run `42472605725` is in progress. Wrapper download timeout raised from 10s to 120s in `953a9c6`; transient upstream 502 remains outside the repository's control | Prior head passed; latest exact-head PR verification pending |
 | Unit tests | `:app:testDebugUnitTest` in workflow | Unit tests execute in CI |
 | Lint | `:app:lintDebug` in workflow | CI-verified |
 | APK | Workflow assembles release only when persistent signing secrets exist; otherwise debug APK | Packaging verified; signing mode depends on secrets |
@@ -140,5 +140,7 @@ A requirement is **complete** only when:
 - `bb0e884`: added conservative persisted-state decoding: absent state remains first-install `DISARMED`; unknown modes and malformed countdown records become latched `ALARM_TRIGGERED` rather than silently disarming.
 - `8d5490c`: connected `ProtectionStore.read()` to the conservative persisted-state decoder.
 - `3f72955`: added `ProtectionStatePersistenceTest` coverage for missing, malformed, valid, and latched persisted states.
+- `2086fe2` / `77522e8` / `6f86965`: strengthened fail-closed handling for partial/corrupt preferences (including wrong preference value types) and added state-engine regression coverage.
+- `953a9c6`: increased Gradle wrapper distribution download timeout from 10 seconds to 120 seconds after repeated runner-side timeout/HTTP 502 failures; this changes CI resilience only, not app runtime behavior.
 - Documentation corrections align charger receiver registration with the runtime foreground-service registration, and align the stated target SDK with Gradle (API 36).
 - Android 17 background-audio behavior is documented against the official platform guidance: [Android 17 background audio hardening](https://developer.android.com/develop/background-work/services/fgs/changes) and [Android 17 audio hardening details](https://developer.android.com/about/versions/17/changes/bg-audio).
