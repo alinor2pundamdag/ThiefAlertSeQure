@@ -245,7 +245,7 @@ class MainActivity : FragmentActivity() {
         if (Build.VERSION.SDK_INT >= 34) {
             root.addView(space(8))
             val fullScreenRow = systemSettingRow("Allow full-screen alarm and authentication", "Full-screen intent",
-                "Android 14 (API 34)+ controls full-screen intent access separately. Allow it if Android offers the option. Android may still display a heads-up notification instead of launching full-screen, and app eligibility can be restricted by system/store policy.") { requestFullScreenIntentAccess() }
+                "Android 14 (API 34)+ controls full-screen intent access separately. This access is used only when the optional full-screen dashboard is enabled in Settings. Android may deny access based on alarm/calling eligibility; the ongoing alarm notification and sound remain the fallback.") { requestFullScreenIntentAccess() }
             fullScreenAccessButton = fullScreenRow.getChildAt(0) as? MaterialButton
             root.addView(fullScreenRow, matchWrap())
         }
