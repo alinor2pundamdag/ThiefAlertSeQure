@@ -126,7 +126,7 @@ vivo's official support material documents **Background power consumption manage
 
 ## Core protection architecture
 
-- Charger events use Android's protected `ACTION_POWER_CONNECTED` and `ACTION_POWER_DISCONNECTED` broadcasts declared in the manifest. Android documents these as system broadcasts that wake interested apps.
+- Charger events use Android's protected `ACTION_POWER_CONNECTED` and `ACTION_POWER_DISCONNECTED` broadcasts registered dynamically while the user-enabled foreground monitoring service is active. The implementation does not depend on manifest-declared implicit power receivers, which are restricted by modern Android background-broadcast rules.
 - Live charging state is revalidated before a state transition; an unknown battery state is not treated as proof of unplugging.
 - A foreground service maintains user-visible monitoring while enabled. OEM battery controls may still stop or restrict it.
 - Exact alarm scheduling is checked at runtime; inexact fallback may be delayed by Android.
@@ -137,7 +137,7 @@ vivo's official support material documents **Background power consumption manage
 ## Official Android platform references
 
 - [Settings API reference](https://developer.android.com/reference/android/provider/Settings) — public Settings actions and API-level availability.
-- [Monitor battery level and charging state](https://developer.android.com/training/monitoring-device-state/battery-monitoring) — manifest receivers for power-connected and power-disconnected broadcasts.
+- [Monitor battery level and charging state](https://developer.android.com/training/monitoring-device-state/battery-monitoring) — Android's public charging-state and battery-monitoring APIs; this project registers charger events from its active foreground monitor.
 - [Intent API reference](https://developer.android.com/reference/android/content/Intent) — protected charger broadcasts and system-only battery broadcasts.
 - [Schedule alarms](https://developer.android.com/develop/background-work/services/alarms) — exact-alarm access and fallback behavior.
 - [Foreground-service launch restrictions](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start) — Android 12+ background-start limitations.
