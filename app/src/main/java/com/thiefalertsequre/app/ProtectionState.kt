@@ -20,9 +20,15 @@ data class ProtectionState(
             deadlineEpochMs: Long,
             changedAtEpochMs: Long,
             deadlineElapsedRealtimeMs: Long,
-            bootCount: Int
+            bootCount: Int,
+            hasOtherStateFields: Boolean = false
         ): ProtectionState {
-            if (modeName == null) return ProtectionState()
+            if (modeName == null) {
+                return if (hasOtherStateFields) ProtectionState(
+                    mode = ProtectionMode.ALARM_TRIGGERED,
+                    changedAtEpochMs = changedAtEpochMs.coerceAtLeast(0L)
+                ) else ProtectionState()
+            }
 
             val mode = runCatching { ProtectionMode.valueOf(modeName) }.getOrNull()
                 ?: return ProtectionState(
