@@ -55,6 +55,17 @@ object ProtectionEngine {
         if (chargerConnected == true) return chargerConnected(s, nowEpochMs)
         if (chargerConnected == null) return s
 
+        // Boot completed but Android could not provide a reliable charger sample.
+        // Keep a short retry token until live power is known. The first confirmed
+        // disconnected sample starts a fresh full grace period; never let an old
+        // boot's monotonic deadline expire or hang forever on devices without BOOT_COUNT.
+        if (s.bootCount == BOOT_RECONCILIATION_PENDING && s.deadlineElapsedRealtimeMs == 0L) {
+            return chargerDisconnected(
+                ProtectionState(ProtectionMode.ARMED, 0L, nowEpochMs),
+                nowEpochMs, nowElapsedRealtimeMs, currentBootCount
+            )
+        }
+
         val hasMonotonicDeadline = s.deadlineElapsedRealtimeMs > 0L
         // No valid boot identity means elapsedRealtime cannot safely be compared
         // with a persisted deadline. Stay pending rather than inventing expiry.
