@@ -11,6 +11,18 @@ object AuthenticationThrottle {
     const val MAX_FAILURES = 5
     const val COOLDOWN_MS = 30_000L
 
+    /** Recover malformed local throttle data without blocking Android credential fallback. */
+    fun recoverCorruptState(
+        nowEpochMs: Long,
+        nowElapsedRealtimeMs: Long = 0L,
+        currentBootCount: Int = -1
+    ): AuthThrottleState = AuthThrottleState(
+        failedAttempts = 0,
+        cooldownUntilEpochMs = nowEpochMs + COOLDOWN_MS,
+        cooldownUntilElapsedRealtimeMs = if (nowElapsedRealtimeMs > 0L) nowElapsedRealtimeMs + COOLDOWN_MS else 0L,
+        bootCount = currentBootCount
+    )
+
     fun normalize(
         state: AuthThrottleState,
         nowEpochMs: Long,
