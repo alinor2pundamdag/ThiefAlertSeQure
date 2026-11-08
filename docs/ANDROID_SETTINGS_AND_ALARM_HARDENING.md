@@ -36,10 +36,10 @@ Scrollable screens apply system-bar and display-cutout insets to handle Android 
 
 ## App Launch management UI
 
-- Settings includes a locally persisted Manage automatically / Manage manually guide selector.
-- Manual mode displays separate Auto-launch, Secondary launch, and Run in background cards with OEM-aware guidance.
-- On HONOR/Huawei, users are directed to open Settings → App launch, disable Manage automatically, enable all three manual controls, and confirm.
-- The in-app selector changes only the displayed guide; it does not change or report the OEM's private system switch state.
+- Settings displays one device-detected setup guide based on manufacturer, brand, model, Android release, and API level.
+- It displays separate Auto-launch, Secondary launch, and Run in background explanations, with family-specific equivalents and explicit notes when a switch does not exist.
+- On HONOR/Huawei, users are directed to search Settings → App launch, select ThiefAlertSeQure, disable Manage automatically, enable all three manual controls, and confirm.
+- The old local-only Manage automatically / Manage manually selector was removed because it could be mistaken for a real OEM control. The app does not claim to read or change private switch state.
 - Each action opens a supported Settings entry point. Undocumented OEM component intents are deliberately avoided because they are firmware-specific and can break across updates.
 
 ## Charger-event reliability
@@ -47,6 +47,7 @@ Scrollable screens apply system-bar and display-cutout insets to handle Android 
 - Power receiver work is serialized on a single-thread executor so connect/disconnect tasks do not race on independent worker threads.
 - A CONNECTED event is accepted only when the live external-power state is positively confirmed as connected.
 - Disconnected or unknown live state does not overwrite the persisted baseline or re-arm protection.
+- Connect and disconnect confirmation use three consecutive live samples (100 ms between connect samples; 120 ms between disconnect samples), followed by a final live-state read. This reduces confirmation delay while retaining consecutive-sample validation.
 - A unit test covers true / false / unknown acceptance policy.
 - Existing disconnect debounce, generation checks, countdown, reboot recovery, and alarm deadline validation are preserved.
 
