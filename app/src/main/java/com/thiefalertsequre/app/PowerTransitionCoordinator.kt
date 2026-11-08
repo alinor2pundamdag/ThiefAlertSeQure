@@ -181,7 +181,7 @@ object PowerTransitionCoordinator {
             return ProtectionStore(appContext).read()
         }
         return synchronized(lock) {
-            confirmConnectedAndArmLocked(appContext, "Power-connected event confirmed by five stable live-state samples")
+            confirmConnectedAndArmLocked(appContext, "Power-connected event confirmed by three consecutive live-state samples")
         }
     }
 
@@ -294,7 +294,7 @@ object PowerTransitionCoordinator {
             }
             LocalTamperHistory.record(
                 appContext, "charger_unplug_rejected",
-                "Three-sample debounce did not produce three consecutive connected readings; final=$lastObserved"
+                "Three-sample debounce did not produce three consecutive disconnected readings; final=$lastObserved"
             )
             return ProtectionStore(appContext).read()
         }
