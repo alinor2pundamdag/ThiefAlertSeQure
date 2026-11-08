@@ -5,8 +5,8 @@
 Every official build must keep this application identity unchanged:
 
 - Application ID: `com.thiefalertsequre.app`
-- Current development version: `1.1.2`
-- Current version code: `4`
+- Current development version: `1.1.3`
+- Current version code: `5`
 - Current CI output: debug-only APK unless all four permanent release-signing secrets are configured
 - Minimum Android: API 26
 
@@ -97,10 +97,11 @@ Keep the app's protection monitor enabled. In HONOR Settings, retain the manuall
 7. Unlock Android normally. Confirm this alone does not stop the alarm. Open the app/notification and complete its explicit Android device-credential or BIOMETRIC_STRONG prompt. Confirm the alarm stops only after that successful prompt.
 8. Confirm the previous alarm volume is restored after successful authentication.
 9. Repeat the countdown while the app is backgrounded and the screen is off. Repeat with another app in the foreground.
-10. Reboot during a countdown. After first unlock, confirm connected power returns to ARMED; confirmed disconnected power receives a fresh 10-second grace period; unknown power waits for a reliable sample.
-11. Reboot while ALARM_TRIGGERED. After first unlock, confirm the latched alarm recovery notification/service resumes where Android permits it. Direct-Boot protection before first unlock is not supported.
-12. Review Settings status after returning from Android settings. Confirm the app reports actual notification, exact-alarm, battery-optimization, Device Admin and full-screen-intent access rather than assuming a setting was granted.
+10. With the camera flash alert enabled, trigger the alarm and confirm the rear LED pulses slowly with the audio. Authenticate successfully and confirm both audio and LED stop. Repeat with the flash alert disabled; audio must still work. Confirm no camera permission prompt appears.
+11. Reboot during a countdown. After first unlock, confirm connected power returns to ARMED; confirmed disconnected power receives a fresh 10-second grace period; unknown power waits for a reliable sample.
+12. Reboot while ALARM_TRIGGERED. After first unlock, confirm the latched alarm recovery notification/service resumes where Android permits it. Direct-Boot protection before first unlock is not supported.
+13. Review Settings status after returning from Android settings. Confirm the app reports actual notification, exact-alarm, battery-optimization, Device Admin and full-screen-intent access rather than assuming a setting was granted.
 
-Record each result as PASS / FAIL / NOT TESTED, including the exact MagicOS and Android build. Do not provision Device Owner on your everyday phone: its enrollment normally requires a prepared or factory-reset test device.
+Record each result as PASS / FAIL / NOT TESTED, including the exact MagicOS and Android build. Device Owner enrollment/rollback has been user-reported PASS on a separate test device; do not provision it on an everyday phone because enrollment normally requires a prepared or factory-reset test device.
 
-**Important:** The 1.1.2 CI build is a development/debug APK unless the release keystore secrets are configured. Verify its signer SHA-256 against the previously installed development build before updating. If the signer differs, do not uninstall or clear app data; stop and inspect the signing identity first. CI success does not replace this physical-device test.
+**Important:** The 1.1.3 CI build is a development/debug APK unless the release keystore secrets are configured. Verify its signer SHA-256 against the previously installed development build before updating. If the signer differs, do not uninstall or clear app data; stop and inspect the signing identity first. CI success does not replace this physical-device test.
