@@ -35,7 +35,7 @@ class AndroidDeviceCompatibilityTest {
 
     @Test fun unknownBrandsReceiveGenericGuidance() {
         assertEquals(AndroidDeviceCompatibility.Family.OTHER, AndroidDeviceCompatibility.family("ExampleOEM", "Example"))
-        assertTrue(AndroidDeviceCompatibility.backgroundSettingsGuide("ExampleOEM", "Example").contains("Other Android brands"))
+        assertTrue(AndroidDeviceCompatibility.backgroundSettingsGuide("ExampleOEM", "Example").contains("model- and region-specific battery manager"))
     }
 
 
@@ -47,6 +47,7 @@ class AndroidDeviceCompatibilityTest {
             Triple("Nothing", "Nothing", "Nothing OS"),
             Triple("TECNO", "TECNO", "TECNO / Infinix / itel"),
             Triple("Infinix", "Infinix", "TECNO / Infinix / itel"),
+            Triple("Transsion", "Transsion", "TECNO / Infinix / itel"),
             Triple("ZTE", "nubia", "ZTE / nubia"),
             Triple("Lenovo", "Lenovo", "Lenovo Android")
         )
