@@ -127,3 +127,20 @@ The cache diagnostic established that the cache action reported a hit, but the r
 **Release gate remains blocked:** configure a persistent owner-controlled release keystore and four GitHub Actions secrets before production distribution. If continuity with the existing v1.1.2 installation is required, first recover the original private debug keystore from a trusted backup. If it cannot be recovered, keep v1.1.2 installed and use the separate `.v113test` package for testing; any eventual migration to a new production signing identity requires an explicit, backed-up reinstall decision. Do not describe the debug APK as a production release.
 
 The earlier paragraph above saying the v1.1.3 artifact was pending is historical and superseded by this section. The CI build is verified; physical flashlight testing and Android 17 background-audio testing are still not verified.
+
+
+## Signing recovery attempt and CI release gate — 2026-11-09
+
+A fresh pull-request build was deliberately run against the PR's `main` base cache to test whether it could restore the v1.1.2 signing identity. The cache reported a hit, but the resulting v1.1.3 APK signer was still different:
+
+- Run: https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/42554665364
+- Expected v1.1.2 certificate: `c115de2ef097e5eab7243874ad7bf212adf94f419d8fc2d963d78c8fdaebf00c`
+- Actual PR-build certificate: `dba6541743563346ff32c8daa36bfc39b75d6a46d03a1f7024ec128e256f9da2`
+- Unit tests, lint, asset validation, Gradle script uniqueness, APK assembly and APK metadata verification passed.
+- The signer gate failed as intended; artifact upload was skipped. No incompatible APK was published by this run.
+
+The workflow now checks the signing certificate against the known v1.1.2 baseline before uploading an APK. It also limits automatic push builds to `main`; feature work is verified through the PR-to-main workflow, avoiding misleading branch-push artifacts. The signer check applies to every APK variant, including release builds, because a newly generated release key would also be unable to update the installed v1.1.2 app.
+
+**Recovery conclusion:** The cached key available to the PR build is not the original private key. The v1.1.2 APK and its public certificate expose no private-key material, so the original signing key cannot be reconstructed from them. GitHub Actions cache listing/deletion and repository-secret write access are not available through the connected GitHub actions in this session. No signing secrets were configured or changed.
+
+**Only valid path to an in-place update:** locate the original `debug.keystore` backup that produced certificate `c115de2...`, then configure the workflow's four signing secrets with that exact keystore, alias and passwords. CI will then build and verify v1.1.3 with the matching identity. If no backup exists, an in-place update over v1.1.2 is cryptographically impossible; keep v1.1.2 installed and use the separate `.v113test` package for testing until an explicitly backed-up migration plan is approved. Never uninstall v1.1.2 just to bypass this check.
