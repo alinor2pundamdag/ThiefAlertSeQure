@@ -8,6 +8,9 @@
 
 # ThiefAlertSeQure — Feature Completion Matrix
 
+> **Official successor baseline: v1.1.3 (versionCode 5).** This release line preserves the completed v1.1.2 feature set; its intended functional addition is the synchronized rear-LED flashlight during a latched alarm. No v1.1.2 protection, alarm, authentication, privacy, settings, history, or managed-device feature is intentionally removed. Flashlight availability is optional and cannot block audio.
+
+
 ## Implemented in this branch
 
 | Feature | Implementation |
