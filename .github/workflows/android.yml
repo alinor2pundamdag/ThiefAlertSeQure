@@ -232,17 +232,15 @@ jobs:
           done
           SIGNER_OUTPUT="$("$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK_PATH")"
           printf '%s\\n' "$SIGNER_OUTPUT"
-          if [[ "$APK_VARIANT" == "debug" ]]; then
-            EXPECTED_DEBUG_CERT="c115de2ef097e5eab7243874ad7bf212adf94f419d8fc2d963d78c8fdaebf00c"
-            ACTUAL_DEBUG_CERT="$(printf '%s\\n' "$SIGNER_OUTPUT" | sed -n 's/.*SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
-            if [[ "$ACTUAL_DEBUG_CERT" != "$EXPECTED_DEBUG_CERT" ]]; then
-              echo "::error::Debug signing identity mismatch. Refusing to publish an APK that cannot update the known v1.1.2 installation."
-              echo "Expected certificate: $EXPECTED_DEBUG_CERT"
-              echo "Actual certificate:   $ACTUAL_DEBUG_CERT"
-              exit 1
-            fi
-            echo "Verified update-compatible v1.1.2 debug signing identity."
+          EXPECTED_BASELINE_CERT="c115de2ef097e5eab7243874ad7bf212adf94f419d8fc2d963d78c8fdaebf00c"
+          ACTUAL_SIGNER_CERT="$(printf '%s\\n' "$SIGNER_OUTPUT" | sed -n 's/.*SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          if [[ "$ACTUAL_SIGNER_CERT" != "$EXPECTED_BASELINE_CERT" ]]; then
+            echo "::error::Signing identity mismatch. Refusing to publish an APK that cannot update the known v1.1.2 installation."
+            echo "Expected certificate: $EXPECTED_BASELINE_CERT"
+            echo "Actual certificate:   $ACTUAL_SIGNER_CERT"
+            exit 1
           fi
+          echo "Verified v1.1.2 update-compatible signing identity."
 
       - uses: actions/upload-artifact@v4
         with:
