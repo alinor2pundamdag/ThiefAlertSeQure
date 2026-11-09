@@ -35,6 +35,16 @@ jobs:
           path: ~/.android/debug.keystore
           key: android-debug-keystore-v1
 
+      - name: Diagnose restored debug signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Runner HOME: $HOME"
+          java -XshowSettings:properties -version 2>&1 | grep -E 'user.home =|java.home ='
+          test -s "$HOME/.android/debug.keystore"
+          stat -c 'Keystore bytes: %s' "$HOME/.android/debug.keystore"
+          keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey 2>&1 | grep -E 'SHA256:|SHA-256:'
+
       - name: Generate debug signing key only on cache miss
         shell: bash
         run: |
