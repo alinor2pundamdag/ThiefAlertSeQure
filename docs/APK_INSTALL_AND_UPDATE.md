@@ -105,3 +105,25 @@ Keep the app's protection monitor enabled. In HONOR Settings, retain the manuall
 Record each result as PASS / FAIL / NOT TESTED, including the exact MagicOS and Android build. Device Owner enrollment/rollback has been user-reported PASS on a separate test device; do not provision it on an everyday phone because enrollment normally requires a prepared or factory-reset test device.
 
 **Important:** The v1.1.3 source now includes the synchronized alarm flashlight and the acknowledgement-only first-launch notice. Its CI artifact is pending verification; do not install a guessed or previous APK as v1.1.3. When CI completes, use the artifact recorded for the exact branch head. The resulting APK is a development/debug APK unless the release keystore secrets are configured. Verify its signer SHA-256 against the previously installed development build before updating. If the signer differs, do not uninstall or clear app data; stop and inspect the signing identity first. CI success does not replace this physical-device test.
+
+
+## v1.1.3 CI artifact and signing incident — verified 2026-11-09
+
+The exact feature-branch head `a064a410b225b556eb57d1194b779e3bd9344678` completed GitHub Actions run [42499601985](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/42499601985) successfully. Unit tests, lint, asset validation, Gradle-script uniqueness, APK assembly, package/version metadata checks, signer verification and artifact upload all passed.
+
+- Production application ID: `com.thiefalertsequre.app`
+- Version: `1.1.3` / versionCode `5`
+- Artifact ID: `13624629302` (debug APK; expires 2026-11-22)
+- APK SHA-256: `6d705b93da06c462bd767bcbf52510e4a948360cfe6d33501ce291ff8b6a4650`
+- V2 signer certificate SHA-256: `bb901aca0f9128ce1d5dd30c309bdb85fb41d5f2a4cff4a36d9f8bb4897af0bb`
+- The v1.1.2 installed baseline signer was `c115de2ef097e5eab7243874ad7bf212adf94f419d8fc2d963d78c8fdaebf00c`.
+
+**This production-package v1.1.3 debug APK is not a safe in-place update for v1.1.2.** The signing certificate differs. Do not install it over the existing app, uninstall the existing app, or clear its data to bypass the mismatch.
+
+A separate diagnostic build completed successfully in run [42499226556](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/42499226556): package `com.thiefalertsequre.app.v113test`, version 1.1.3 / code 5, signer SHA-256 `f1d21709532795482efd44b43d94251308e6e5300c61b83857ce2d9d60e88483`, APK SHA-256 `44e6127d6e9c3d6a243d801d7817bec55d35ba8d65efd96b9b8e05194f85db9a`. This package is deliberately separate and can be installed beside v1.1.2 for physical feature testing; it does not replace or migrate the production package's data.
+
+The cache diagnostic established that the cache action reported a hit, but the resulting signer did not match the v1.1.2 baseline. A cache-hit message is therefore not proof that the original private key was restored. The original private key cannot be reconstructed from the APK, public certificate, or SHA-256 fingerprint. The current production-package build is technically valid but its debug signing identity is not update-compatible with the existing installation.
+
+**Release gate remains blocked:** configure a persistent owner-controlled release keystore and four GitHub Actions secrets before production distribution. If continuity with the existing v1.1.2 installation is required, first recover the original private debug keystore from a trusted backup. If it cannot be recovered, keep v1.1.2 installed and use the separate `.v113test` package for testing; any eventual migration to a new production signing identity requires an explicit, backed-up reinstall decision. Do not describe the debug APK as a production release.
+
+The earlier paragraph above saying the v1.1.3 artifact was pending is historical and superseded by this section. The CI build is verified; physical flashlight testing and Android 17 background-audio testing are still not verified.
