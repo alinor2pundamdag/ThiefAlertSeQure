@@ -2,7 +2,7 @@
 
 > **Official development baseline: v1.1.3 (versionCode 5).** v1.1.3 carries forward the completed v1.1.2 protection, alarm, authentication, privacy, settings, event-history, and optional Device Owner functionality, with the synchronized rear-LED flashlight alert added. The flashlight is the intended functional addition; it does not replace or remove the established v1.1.2 features.
 
-> **Signing migration:** the original v1.1.2 debug private key was not found in repository branches or available CI artifacts. v1.1.3 therefore becomes the new development baseline with a newly persisted CI debug key. This key cannot update an already-installed v1.1.2 APK signed by the old certificate. Keep v1.1.2 installed until an explicitly approved, backed-up migration. Do not claim an in-place update is possible.
+> **Signing migration:** the original v1.1.2 debug private key was not found in repository branches or available CI artifacts. A new owner-controlled release keystore has now been generated and pinned as the v1.1.3 signing baseline. It cannot update an already-installed v1.1.2 APK signed by the old certificate. Keep v1.1.2 installed until the new release-signed v1.1.3 APK is ready and an explicitly approved, backed-up migration is performed.
 
 
 ## Fixed application identity
@@ -28,7 +28,7 @@ The project now has an explicit release signing configuration. Configure these G
 3. `ANDROID_KEY_ALIAS` — release key alias.
 4. `ANDROID_KEY_PASSWORD` — key password.
 
-Keep one permanent keystore and securely back it up offline. Never commit the keystore or passwords to Git. Do not regenerate the key for a later release. If the key is lost, future APKs cannot normally update installs signed by it.
+Keep one permanent keystore and securely back it up offline. Never commit the keystore or passwords to Git. Do not regenerate the key for a later release. If the key is lost, future APKs cannot normally update installs signed by it. The newly generated v1.1.3 release key has certificate SHA-256 `9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64` and alias `thiefalertsequre`. CI pins this fingerprint and rejects a different key.
 
 When all four secrets exist, CI creates a release-signed APK and verifies its signer against that exact release keystore. Without them, CI creates a **debug-only development APK** signed by the cached key at `$HOME/.config/.android/debug.keystore`. The workflow now caches the exact path Gradle resolves, under cache key `android-debug-keystore-v2`, and verifies the APK signer against the keystore file used for that build. The CI debug cache is branch-scoped and is not a production signing identity. Do not alternate between debug and release APKs on the same installed package. For official store distribution, configure one owner-controlled release keystore in the four secrets above and preserve it permanently.
 
@@ -158,3 +158,25 @@ The project direction is to make v1.1.3 the official successor and future develo
 The CI signing workflow was corrected to cache the Gradle-resolved debug keystore path (`~/.config/.android/debug.keystore`) with a new cache key (`android-debug-keystore-v2`). APK signer verification now compares the produced APK against the actual keystore selected for that build: the cached debug keystore for development builds or the configured permanent release keystore for release builds. It no longer incorrectly compares a newly migrated v1.1.3 build against the lost v1.1.2 debug certificate.
 
 This does **not** recover the v1.1.2 private key, and it does not make the new debug APK update-compatible with an installed v1.1.2 copy. A future production APK must be signed with the permanent owner-controlled release keystore. Migration of an installed v1.1.2 copy remains a separate user-approved operation after data-preservation planning.
+
+
+## Permanent v1.1.3 release keystore — generated 2026-11-09
+
+A new owner-controlled Android release keystore was generated and verified. It is the signing identity to use for v1.1.3 and every subsequent official APK update.
+
+- Keystore file: `ThiefAlertSeQure-upload-key.jks` (keep a private backup; never commit it)
+- Alias: `thiefalertsequre`
+- Certificate SHA-256: `9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64`
+- Key type: RSA 2048
+- Validity: 10,000 days
+- GitHub secret names: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`
+
+**Configuration is not yet complete:** the four secret values must be added in GitHub repository Settings → Secrets and variables → Actions. The secret values and backup keystore were delivered separately to the repository owner; none of the private key material or passwords is committed to this repository. Until all four secrets are present, CI intentionally builds only a debug development APK.
+
+The workflow now:
+1. Rejects a partial signing-secret configuration instead of silently falling back to debug.
+2. Checks the release keystore's certificate against the pinned SHA-256 above before building.
+3. Builds the release variant only when all four secrets are present.
+4. Verifies the resulting APK signer against the same configured keystore before artifact upload.
+
+**Important installation consequence:** v1.1.2 was signed with a different, unrecovered certificate. This new key cannot make the existing v1.1.2 install update in place. It establishes a stable identity for the new v1.1.3 baseline and future updates. Do not install the current debug APK; wait for the release-signed artifact after the four GitHub secrets are configured.
