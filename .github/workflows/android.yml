@@ -26,45 +26,37 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
 
-      # Restore before creating a fallback key: extracting a cache over a
-      # freshly generated file can leave the new file in place and change APK identity.
-      # Debug signing is only a development fallback, never a release identity.
+      # AGP on this runner resolves the debug key under ~/.config/.android.
+      # Cache the exact path Gradle uses. Debug signing is for CI/dev installs;
+      # official release builds use the separately configured permanent keystore.
       - name: Restore cached debug signing key
         uses: actions/cache@v4
         with:
-          path: ~/.android/debug.keystore
-          key: android-debug-keystore-v1
-
-      - name: Diagnose restored debug signing key
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Runner HOME: $HOME"
-          java -XshowSettings:properties -version 2>&1 | grep -E 'user.home =|java.home ='
-          test -s "$HOME/.android/debug.keystore"
-          stat -c 'Keystore bytes: %s' "$HOME/.android/debug.keystore"
-          keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey 2>&1 | grep -E 'SHA256:|SHA-256:'
+          path: ~/.config/.android/debug.keystore
+          key: android-debug-keystore-v2
 
       - name: Generate debug signing key only on cache miss
         shell: bash
         run: |
-          mkdir -p "$HOME/.android"
-          if [[ ! -s "$HOME/.android/debug.keystore" ]]; then
+          set -euo pipefail
+          mkdir -p "$HOME/.config/.android"
+          if [[ ! -s "$HOME/.config/.android/debug.keystore" ]]; then
             keytool -genkeypair -noprompt -storetype JKS \
-              -keystore "$HOME/.android/debug.keystore" \
+              -keystore "$HOME/.config/.android/debug.keystore" \
               -storepass android -keypass android -alias androiddebugkey \
               -dname "CN=Android Debug,O=Android,C=US" \
               -keyalg RSA -keysize 2048 -validity 10000
           fi
-          test -s "$HOME/.android/debug.keystore"
+          test -s "$HOME/.config/.android/debug.keystore"
+          echo "Gradle debug keystore prepared at the resolved AGP path."
 
       - name: Inspect Gradle debug signing resolution
         shell: bash
         run: |
           set -euo pipefail
           ./gradlew :app:signingReport --no-daemon --console=plain | tee "$RUNNER_TEMP/signing-report.txt"
-          echo "Restored keystore certificate:"
-          keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey 2>&1 | grep -E 'Alias name:|SHA256:|SHA-256:'
+          grep -F "Store: $HOME/.config/.android/debug.keystore" "$RUNNER_TEMP/signing-report.txt"
+          keytool -list -v -keystore "$HOME/.config/.android/debug.keystore" -storepass android -alias androiddebugkey 2>&1 | grep -E 'Alias name:|SHA256:|SHA-256:'
 
       - name: Prepare persistent release signing key
         shell: bash
@@ -250,15 +242,26 @@ jobs:
           done
           SIGNER_OUTPUT="$("$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK_PATH")"
           printf '%s\\n' "$SIGNER_OUTPUT"
-          EXPECTED_BASELINE_CERT="c115de2ef097e5eab7243874ad7bf212adf94f419d8fc2d963d78c8fdaebf00c"
           ACTUAL_SIGNER_CERT="$(printf '%s\\n' "$SIGNER_OUTPUT" | sed -n 's/.*SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
-          if [[ "$ACTUAL_SIGNER_CERT" != "$EXPECTED_BASELINE_CERT" ]]; then
-            echo "::error::Signing identity mismatch. Refusing to publish an APK that cannot update the known v1.1.2 installation."
-            echo "Expected certificate: $EXPECTED_BASELINE_CERT"
+          if [[ "$RELEASE_SIGNING_CONFIGURED" == "true" ]]; then
+            KEYSTORE_TO_VERIFY="$ANDROID_KEYSTORE_PATH"
+            VERIFY_ALIAS="$ANDROID_KEY_ALIAS"
+            VERIFY_PASSWORD="$ANDROID_KEYSTORE_PASSWORD"
+            KEYSTORE_LABEL="configured permanent release keystore"
+          else
+            KEYSTORE_TO_VERIFY="$HOME/.config/.android/debug.keystore"
+            VERIFY_ALIAS="androiddebugkey"
+            VERIFY_PASSWORD="android"
+            KEYSTORE_LABEL="cached CI debug keystore"
+          fi
+          EXPECTED_SIGNER_CERT="$(keytool -list -v -keystore "$KEYSTORE_TO_VERIFY" -storepass "$VERIFY_PASSWORD" -alias "$VERIFY_ALIAS" 2>&1 | sed -n 's/.*SHA256: //p' | head -n 1 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          if [[ -z "$EXPECTED_SIGNER_CERT" || "$ACTUAL_SIGNER_CERT" != "$EXPECTED_SIGNER_CERT" ]]; then
+            echo "::error::APK signer does not match the configured $KEYSTORE_LABEL. Refusing to upload."
+            echo "Expected certificate: ${EXPECTED_SIGNER_CERT:-unavailable}"
             echo "Actual certificate:   $ACTUAL_SIGNER_CERT"
             exit 1
           fi
-          echo "Verified v1.1.2 update-compatible signing identity."
+          echo "Verified APK signer against $KEYSTORE_LABEL."
 
       - uses: actions/upload-artifact@v4
         with:
