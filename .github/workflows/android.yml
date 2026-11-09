@@ -58,6 +58,14 @@ jobs:
           fi
           test -s "$HOME/.android/debug.keystore"
 
+      - name: Inspect Gradle debug signing resolution
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew :app:signingReport --no-daemon --console=plain | tee "$RUNNER_TEMP/signing-report.txt"
+          echo "Restored keystore certificate:"
+          keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey 2>&1 | grep -E 'Alias name:|SHA256:|SHA-256:'
+
       - name: Prepare persistent release signing key
         shell: bash
         env:
