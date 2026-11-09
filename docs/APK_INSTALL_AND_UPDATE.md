@@ -1,5 +1,10 @@
 # APK installation and update safety
 
+> **Official development baseline: v1.1.3 (versionCode 5).** v1.1.3 carries forward the completed v1.1.2 protection, alarm, authentication, privacy, settings, event-history, and optional Device Owner functionality, with the synchronized rear-LED flashlight alert added. The flashlight is the intended functional addition; it does not replace or remove the established v1.1.2 features.
+
+> **Signing migration:** the original v1.1.2 debug private key was not found in repository branches or available CI artifacts. v1.1.3 therefore becomes the new development baseline with a newly persisted CI debug key. This key cannot update an already-installed v1.1.2 APK signed by the old certificate. Keep v1.1.2 installed until an explicitly approved, backed-up migration. Do not claim an in-place update is possible.
+
+
 ## Fixed application identity
 
 Every official build must keep this application identity unchanged:
@@ -25,7 +30,7 @@ The project now has an explicit release signing configuration. Configure these G
 
 Keep one permanent keystore and securely back it up offline. Never commit the keystore or passwords to Git. Do not regenerate the key for a later release. If the key is lost, future APKs cannot normally update installs signed by it.
 
-When all four secrets exist, CI creates a release-signed APK. Without them, CI creates a **debug-only development APK**; its cached debug key is not a durable production signing guarantee. Do not alternate between debug and release APKs on the same installed package.
+When all four secrets exist, CI creates a release-signed APK and verifies its signer against that exact release keystore. Without them, CI creates a **debug-only development APK** signed by the cached key at `$HOME/.config/.android/debug.keystore`. The workflow now caches the exact path Gradle resolves, under cache key `android-debug-keystore-v2`, and verifies the APK signer against the keystore file used for that build. The CI debug cache is branch-scoped and is not a production signing identity. Do not alternate between debug and release APKs on the same installed package. For official store distribution, configure one owner-controlled release keystore in the four secrets above and preserve it permanently.
 
 ## Why Android may reject an update
 
@@ -144,3 +149,12 @@ The workflow now checks the signing certificate against the known v1.1.2 baselin
 **Recovery conclusion:** The cached key available to the PR build is not the original private key. The v1.1.2 APK and its public certificate expose no private-key material, so the original signing key cannot be reconstructed from them. GitHub Actions cache listing/deletion and repository-secret write access are not available through the connected GitHub actions in this session. No signing secrets were configured or changed.
 
 **Only valid path to an in-place update:** locate the original `debug.keystore` backup that produced certificate `c115de2...`, then configure the workflow's four signing secrets with that exact keystore, alias and passwords. CI will then build and verify v1.1.3 with the matching identity. If no backup exists, an in-place update over v1.1.2 is cryptographically impossible; keep v1.1.2 installed and use the separate `.v113test` package for testing until an explicitly backed-up migration plan is approved. Never uninstall v1.1.2 just to bypass this check.
+
+
+## v1.1.3 official-baseline decision — 2026-11-09
+
+The project direction is to make v1.1.3 the official successor and future development baseline. The feature branch contains the complete v1.1.2 feature set plus the synchronized alarm flashlight. The flashlight is optional, slow-pulsed, default-enabled with disclosure, owner-disableable, and never allowed to gate alarm audio. The first-launch privacy notice retains its disclosure and acknowledgement action without a Decline button.
+
+The CI signing workflow was corrected to cache the Gradle-resolved debug keystore path (`~/.config/.android/debug.keystore`) with a new cache key (`android-debug-keystore-v2`). APK signer verification now compares the produced APK against the actual keystore selected for that build: the cached debug keystore for development builds or the configured permanent release keystore for release builds. It no longer incorrectly compares a newly migrated v1.1.3 build against the lost v1.1.2 debug certificate.
+
+This does **not** recover the v1.1.2 private key, and it does not make the new debug APK update-compatible with an installed v1.1.2 copy. A future production APK must be signed with the permanent owner-controlled release keystore. Migration of an installed v1.1.2 copy remains a separate user-approved operation after data-preservation planning.
