@@ -175,26 +175,33 @@ object AppUpdateManager {
     }
 
     private fun openHttps(address: String): HttpURLConnection {
-        val url = URL(address)
-        require(url.protocol.equals("https", ignoreCase = true) && url.host in allowedHosts) {
-            "The update server is not an approved HTTPS GitHub host."
+        var currentUrl = URL(address)
+        repeat(6) {
+            require(
+                currentUrl.protocol.equals("https", ignoreCase = true) &&
+                    currentUrl.host in allowedHosts
+            ) { "The update server or redirect is not an approved HTTPS GitHub host." }
+
+            val connection = (currentUrl.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 15_000
+                readTimeout = 30_000
+                instanceFollowRedirects = false
+                setRequestProperty("User-Agent", "ThiefAlertSeQure-Android-Updater")
+                setRequestProperty("Accept", "application/vnd.github+json")
+            }
+            val status = connection.responseCode
+            if (status == HttpURLConnection.HTTP_OK) return connection
+            if (status in setOf(301, 302, 303, 307, 308)) {
+                val location = connection.getHeaderField("Location")
+                connection.disconnect()
+                require(!location.isNullOrBlank()) { "GitHub returned a redirect without a destination." }
+                currentUrl = URL(currentUrl, location)
+            } else {
+                connection.disconnect()
+                error("GitHub update request failed (HTTP $status).")
+            }
         }
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            connectTimeout = 15_000
-            readTimeout = 30_000
-            instanceFollowRedirects = true
-            setRequestProperty("User-Agent", "ThiefAlertSeQure-Android-Updater")
-            setRequestProperty("Accept", "application/vnd.github+json")
-        }
-        val status = connection.responseCode
-        require(status == HttpURLConnection.HTTP_OK) {
-            "GitHub update request failed (HTTP $status)."
-        }
-        require(
-            connection.url.protocol.equals("https", ignoreCase = true) &&
-                connection.url.host in allowedHosts
-        ) { "GitHub redirected the update to an untrusted host." }
-        return connection
+        error("GitHub returned too many update redirects.")
     }
 
     private fun verifyApk(packageManager: PackageManager, file: File, expectedVersionName: String, installedVersionCode: Long) {
