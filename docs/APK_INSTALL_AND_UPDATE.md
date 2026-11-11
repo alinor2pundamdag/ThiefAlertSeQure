@@ -121,7 +121,7 @@ Keep the app's protection monitor enabled. In HONOR Settings, retain the manuall
 
 Record each result as PASS / FAIL / NOT TESTED, including the exact MagicOS and Android build. Device Owner enrollment/rollback has been user-reported PASS on a separate test device; do not provision it on an everyday phone because enrollment normally requires a prepared or factory-reset test device.
 
-**Important:** The v1.1.3 source now includes the synchronized alarm flashlight and the acknowledgement-only first-launch notice. Its CI artifact is pending verification; do not install a guessed or previous APK as v1.1.3. When CI completes, use the artifact recorded for the exact branch head. The resulting APK is a development/debug APK unless the release keystore secrets are configured. Verify its signer SHA-256 against the previously installed development build before updating. If the signer differs, do not uninstall or clear app data; stop and inspect the signing identity first. CI success does not replace this physical-device test.
+**Current verification:** v1.1.3 branch CI run [43004454206](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43004454206) passed unit tests, lint, asset checks, APK package/version verification, and debug signer verification. Artifact `ThiefAlertSeQure-debug-apk` (ID `13846979259`) contains `ThiefAlertSeQure-v1.1.3-debug-test.apk`, package `com.thiefalertsequre.app.v113test`. It is a side-by-side functional test build, not a production update. The four permanent release-signing secrets are configured, but no signed production APK has been built or published yet. A newer docs/release-workflow commit requires its own fresh CI run.
 
 
 ## v1.1.3 CI artifact and signing incident — verified 2026-11-09
@@ -143,7 +143,7 @@ The cache diagnostic established that the cache action reported a hit, but the r
 
 **Release gate remains blocked:** configure a persistent owner-controlled release keystore and four GitHub Actions secrets before production distribution. If continuity with the existing v1.1.2 installation is required, first recover the original private debug keystore from a trusted backup. If it cannot be recovered, keep v1.1.2 installed and use the separate `.v113test` package for testing; any eventual migration to a new production signing identity requires an explicit, backed-up reinstall decision. Do not describe the debug APK as a production release.
 
-The earlier paragraph above saying the v1.1.3 artifact was pending is historical and superseded by this section. The CI build is verified; physical flashlight testing and Android 17 background-audio testing are still not verified.
+This section supersedes the older 9 November CI artifact notes above. The isolated v1.1.3 test APK is verified and the owner reported PASS for all 11 HONOR 200 Pro physical scenarios, including flashlight independence and camera conflict. Android 17 background-audio hardening, exact-alarm revocation/fallback, process-death recovery, signed update migration, and additional OEM/permission edge cases remain pending.
 
 
 ## Signing recovery attempt and CI release gate — 2026-11-09
