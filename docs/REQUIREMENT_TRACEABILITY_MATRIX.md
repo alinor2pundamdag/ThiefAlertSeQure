@@ -83,7 +83,7 @@
 
 | ID | Requirement / acceptance condition | Primary owner(s) | Existing test / evidence | Baseline status |
 |---|---|---|---|---|
-| PRIV-01 | No INTERNET permission, backend, analytics, advertising, or cloud dependency in local protection core | manifest, Gradle dependencies, app code | manifest/dependency inspection | Implemented at baseline; re-audit every dependency change |
+| PRIV-01 | Local protection core has no backend, analytics, advertising, or cloud dependency; INTERNET permission is restricted to explicit GitHub release checks | manifest, updater, Gradle dependencies, app code | manifest/dependency inspection and updater code review | Implemented; re-audit every dependency and network change |
 | PRIV-02 | No unnecessary contacts/location/microphone/CAMERA/SMS permissions; optional flash uses CameraManager torch control without camera capture permission; camera and flash hardware are optional features | manifest, `AlarmFlashController.kt` | manifest inspection; no CAMERA permission added | Implemented by source; Google Play device filtering and torch behavior require final merged-manifest/physical validation |
 | PRIV-03 | Backup disabled for sensitive local protection state | manifest | manifest inspection | Implemented at baseline |
 | PRIV-04 | Local event history bounded and contains no owner credential material | local tamper history | source inspection; capacity test not identified | Implemented; boundedness test needed |
