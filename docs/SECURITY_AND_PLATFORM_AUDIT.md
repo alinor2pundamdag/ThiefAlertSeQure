@@ -83,17 +83,37 @@ Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPl
 - HONOR/MagicOS, Xiaomi/HyperOS, Samsung/One UI and other OEM battery managers may require user-side background/autostart configuration. No universal public API disables all OEM power management.
 - Optional flash hardware is declared non-required; the torch is controlled without CAMERA permission, camera capture, or a camera foreground-service type.
 
+## Physical verification record — 11 November 2026
+
+**Device:** HONOR 200 Pro (device model from the project test record). **Android/MagicOS build:** not supplied; record it before claiming OS-version-specific compatibility. **Build under test:** v1.1.3 development/test build, versionCode 5, package `com.thiefalertsequre.app.v113test` (branch CI test identity). **Result source:** owner-reported physical test results; ChatGPT did not operate the handset or independently observe the tests.
+
+| # | Physical test | Reported result |
+|---:|---|---|
+| 1 | Automatic arming | PASS |
+| 2 | Charger-removal countdown | PASS |
+| 3 | Reconnect cancellation | PASS |
+| 4 | Alarm persistence | PASS |
+| 5 | Authentication protection | PASS |
+| 6 | Volume restoration | PASS |
+| 7 | Flashlight independence | PASS |
+| 8 | Camera conflict | PASS |
+| 9 | Background operation | PASS |
+| 10 | Reboot recovery | PASS |
+| 11 | Lock-screen presentation | PASS |
+
+No failure details were supplied. These results clear the reported HONOR 200 Pro functional test gate for the listed scenarios. They do not establish Android 17 compatibility, all Android/OEM versions, Play policy approval, Device Owner behavior on every build, or production signing/update migration.
+
 ## Remaining verification
-1. Latest GitHub Actions must pass on current branch head.
-2. Test Android 8 through Android 17 compatibility paths where devices are available.
-3. Test target HONOR device specifically, including battery optimization and autostart.
-4. Test Opus decoding, loop, fallback and volume restoration.
-5. Test screen locked, notification permission denied, DND, silent mode, Bluetooth and headphones.
-6. Test exact alarm access granted/revoked and Android 15+ reboot recovery.
-7. Test process death, reboot and app update. Treat force-stop as a platform boundary, not as a recoverable guarantee: Android can stop the package and suppress its scheduled work until the owner manually launches it again.
+1. Latest GitHub Actions CI on the current branch head: **PASS** (run 43004454206; build, unit tests, lint, APK metadata and debug signer verification all succeeded).
+2. Android 8 through Android 17 compatibility paths: still pending where devices are unavailable; Android 17 background-audio hardening remains specifically unverified.
+3. Target HONOR 200 Pro: the 11 scenarios above are owner-reported **PASS**; capture exact Android/MagicOS build and date-stamped evidence if available.
+4. Opus decoding/loop and volume restoration: volume restoration is reported **PASS**; separate decoder-failure/vibration fallback test remains pending.
+5. Screen locked/lock-screen presentation: reported **PASS**. Notification permission denied, DND, silent mode, Bluetooth and headphones remain separate cases unless explicitly included in the reported run.
+6. Exact-alarm access granted/revoked and Android 15+ reboot recovery: reboot recovery is reported **PASS**; permission-revocation and no-exact-alarm fallback tests remain pending.
+7. Process death, reboot and app update: reboot recovery is reported **PASS**; process-death and signed in-place update/migration tests remain pending. Treat force-stop as a platform boundary, not as a recoverable guarantee: Android can stop the package and suppress its scheduled work until the owner manually launches it again.
 8. Device Owner enrollment and in-app rollback are user-reported PASS on a separate test device; record its Android build and repeat after managed-policy changes.
-9. Verify the new alarm flashlight on the target device: LED pulses only after ALARM_TRIGGERED, remains synchronized with the audio alarm, and switches off after authenticated disarm. Test another app using the camera/flashlight and verify audio continues if torch access fails.
-10. Do not describe app as unstoppable or production-certified until physical-device tests pass.
+9. Flashlight independence and camera-conflict/audio continuity are reported **PASS** on the target device. Thermal behavior and extended-duration torch operation remain unverified.
+10. Do not describe the app as unstoppable or production-certified; platform boundaries and the remaining release gates still apply.
 
 ## Lock-screen authentication regression safeguards
 
@@ -101,4 +121,4 @@ Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPl
 - `MainActivity` does not launch an app-owned biometric prompt while Android reports the device keyguard as locked; this avoids competing authentication surfaces.
 - `AlarmService` does not treat `ACTION_USER_PRESENT`, `isDeviceSecure`, or an unlocked keyguard as authentication. After the phone is unlocked, the owner must open the app/notification and complete the explicit Android credential or strong-biometric prompt.
 - The system credential and biometric remain entirely Android-managed. The app receives only the successful result from its explicit authentication activity/prompt and never accesses credential material.
-- These changes require a fresh physical test on the target HONOR device; CI cannot verify OEM keyguard behavior.
+- These changes were included in the owner-reported 11 November 2026 HONOR 200 Pro physical test set; lock-screen presentation and authentication protection were reported PASS. CI still cannot independently verify OEM keyguard behavior.
