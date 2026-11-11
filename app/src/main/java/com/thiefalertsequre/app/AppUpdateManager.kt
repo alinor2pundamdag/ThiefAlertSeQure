@@ -78,7 +78,7 @@ object AppUpdateManager {
             "The latest release tag has an invalid version format."
         }
         val remoteVersionName = tag.removePrefix("v")
-        if (compareVersions(remoteVersionName, installedVersionName) <= 0) {
+        if (AppVersionComparator.compare(remoteVersionName, installedVersionName) <= 0) {
             return AppUpdateResult.UpToDate
         }
 
@@ -278,13 +278,4 @@ object AppUpdateManager {
         return digest.digest().joinToString("") { byte -> "%02x".format(byte) }
     }
 
-    private fun compareVersions(left: String, right: String): Int {
-        val a = left.split(".").map { it.toIntOrNull() ?: 0 }
-        val b = right.split(".").map { it.toIntOrNull() ?: 0 }
-        for (index in 0 until maxOf(a.size, b.size)) {
-            val comparison = (a.getOrElse(index) { 0 }).compareTo(b.getOrElse(index) { 0 })
-            if (comparison != 0) return comparison
-        }
-        return 0
-    }
 }
