@@ -17,7 +17,7 @@
     </a>
     <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" alt="Android 8.0 and newer" />
     <img src="https://img.shields.io/badge/Privacy-On--device-2D6CDF" alt="On-device privacy" />
-    <img src="https://img.shields.io/badge/Network-No%20Internet%20permission-success" alt="No Internet permission" />
+    <img src="https://img.shields.io/badge/Updates-Owner--initiated%20GitHub%20releases-2D6CDF" alt="Owner initiated GitHub updates" />
     <img src="https://img.shields.io/badge/License-See%20LICENSE-lightgrey" alt="License information" />
   </p>
 </div>
@@ -43,8 +43,8 @@ It is a practical deterrent and awareness tool—not a guarantee against theft, 
 | Owner verification after unlock | Unlocking the phone does not itself silence the alarm. Open the alarm notification/dashboard and complete the app's Android biometric or device-credential verification. |
 | Persistent triggered state | Plugging the charger back in does not silence an already-triggered alarm. |
 | Synchronized visual alarm | Slow rear-LED flashlight pulses by default only while the alarm is latched; the owner can disable it. It stops after successful owner authentication, uses no camera permission and captures no images/video. |
-| Local-first privacy | No account, cloud backend, analytics service, advertising SDK, or Internet permission is configured. |
-| Your own alarm sound | Choose supported audio through Android's system file picker; the packaged alarm is available as the built-in option. |
+| Local-first privacy | No account, cloud backend, analytics service, or advertising SDK. Internet is used only for owner-initiated GitHub release checks and APK downloads; protection data is not uploaded. |
+| Your own alarm sound | Choose supported audio through Android's system file picker; the packaged alarm is available as the built-in option. |\n| Owner-controlled updates | Check for official GitHub releases from Settings; the app verifies the APK checksum, package identity, version and pinned release certificate before opening Android's installer. |
 | Loud alarm behavior | The app requests the maximum alarm-stream volume Android reports and restores the previous level after successful disarm. Actual output remains device-dependent. |
 | Optional motion alert | Enable a separate motion-triggered alarm when wanted. It is OFF by default. |
 | Optional low-battery alert | Configure a battery threshold alert where supported by the app settings. |
@@ -83,7 +83,7 @@ ThiefAlertSeQure is designed to do its essential work on your Android device.
 
 ### What the app does not do
 
-- **No Internet permission** is declared in the app manifest.
+- Internet access is limited to the optional, owner-initiated official-update checker; the app does not upload protection state, event history, credentials, or other personal data.
 - No account registration or sign-in.
 - No cloud server, remote database, or cloud backup service.
 - No configured advertising SDK or analytics tracker.
