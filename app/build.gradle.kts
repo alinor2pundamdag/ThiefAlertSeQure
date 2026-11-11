@@ -36,6 +36,11 @@ android {
         }
     }
     buildTypes {
+        // Keep CI/device-test APKs side-by-side with the production installation.
+        // This prevents debug builds from replacing the production package.
+        getByName("debug") {
+            applicationIdSuffix = ".v113test"
+        }
         getByName("release") {
             isMinifyEnabled = false
             // A release APK is signed only with the persistent owner-controlled key.
