@@ -24,6 +24,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Restrict manual signed preflight to main
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::Manual signed preflight must run from the main branch. Current ref: $GITHUB_REF"
+            exit 1
+          fi
+          echo "Manual signed preflight is running from main."
+
       - name: Confirm tag points to main
         if: github.event_name == 'push'
         shell: bash
