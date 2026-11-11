@@ -180,3 +180,45 @@ The workflow now:
 4. Verifies the resulting APK signer against the same configured keystore before artifact upload.
 
 **Important installation consequence:** v1.1.2 was signed with a different, unrecovered certificate. This new key cannot make the existing v1.1.2 install update in place. It establishes a stable identity for the new v1.1.3 baseline and future updates. Do not install the current debug APK; wait for the release-signed artifact after the four GitHub secrets are configured.
+
+## Owner-initiated in-app updates
+
+The Settings screen now includes **Check for official updates**. This is an explicit action; no background polling or automatic download runs.
+
+1. The app requests public release metadata from the official GitHub Releases endpoint over HTTPS.
+2. It accepts only a published, non-draft, non-prerelease release with the expected versioned `-release.apk` and matching `.sha256` asset.
+3. It downloads the APK only after the owner taps the update action.
+4. Before installation, it verifies the downloaded file's SHA-256 checksum, application ID, newer version code, release tag/version name, and the pinned official signing certificate.
+5. It opens Android's Package Installer. The owner must approve the installation. Android may also require the owner to allow installs from ThiefAlertSeQure in Android settings.
+
+When the package ID and signing certificate match, Android installs the new APK **over the existing app**. A normal in-place package update retains the app's private data; uninstalling is not part of the update flow. The updater never attempts to bypass Android's package installer or install silently.
+
+The updater intentionally rejects debug APKs and any APK signed with a certificate other than the pinned official release key. The app's installed certificate is checked too, so a debug build cannot accidentally present a release APK as an eligible update.
+
+## Official release pipeline
+
+Create an annotated or lightweight version tag only after the intended commit has been merged into `main`, for example `v1.1.3`. The dedicated `.github/workflows/release.yml` workflow:
+
+- refuses tags that do not point to a commit on `main`;
+- requires all four permanent signing secrets and verifies the pinned certificate;
+- checks that the tag matches `appVersionName` and that `versionCode` is greater than the previous official release;
+- runs unit tests and release lint;
+- builds only the release variant (never falls back to debug);
+- verifies application ID, version code, version name and signing certificate;
+- publishes `ThiefAlertSeQure-v\${VERSION}-release.apk` and its `.sha256` checksum as GitHub Release assets.
+
+A missing secret, wrong key, version mismatch, failed test, or failed signature check stops publication. Do not publish a manually uploaded debug APK as an official release.
+
+## Permanent update compatibility rule
+
+For every future version, keep all of the following stable:
+
+- application ID: `com.thiefalertsequre.app`;
+- release signing certificate SHA-256: `9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64`;
+- the same owner-controlled private keystore and alias;
+- monotonically increasing `versionCode`.
+
+Only `versionName` and the increasing `versionCode` should change for an ordinary update. Never create a new release keystore for v1.1.4, v1.1.5, or later.
+
+**One-time legacy migration:** an installed v1.1.2 APK signed with the unrecovered old debug key cannot be updated in place by the new permanent release key. This is an Android cryptographic restriction, not an application bug. Do not uninstall the legacy installation until its data has been reviewed and a migration/backup decision has been made. Once the app is installed from the permanent release key, future signed releases can update in place.
+
