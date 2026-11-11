@@ -50,7 +50,7 @@ Android settings, manufacturer power-management behavior, notification controls,
 
 ## 5. Sharing and third parties
 
-The app contains no configured analytics, advertising SDK, app backend, or cloud storage. The update check sends a request to GitHub for public release metadata and, only when an update is available, downloads the APK and checksum. It does not upload protection state, event history, selected audio, credentials, device identifiers, or other personal data. No update check runs until the owner initiates it. Android itself provides the credential, biometric, notification, alarm, and device-management services.
+The app contains no configured analytics, advertising SDK, app backend, or cloud storage. The update check sends a request to GitHub for public release metadata and, only when an update is available, downloads the APK and checksum. It does not upload protection state, event history, selected audio, credentials, device identifiers, or other personal data. GitHub receives ordinary network request metadata, such as the request IP address, under GitHub's own privacy terms. No update check runs until the owner initiates it. Android itself provides the credential, biometric, notification, alarm, and device-management services.
 
 ## 6. Retention and deletion
 
