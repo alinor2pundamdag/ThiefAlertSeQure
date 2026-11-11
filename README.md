@@ -227,7 +227,7 @@ Please test the app on your own device and confirm its permissions and backgroun
 
 - In Settings, tap **Check for official updates**. The app contacts GitHub only when you request it, downloads the published stable APK and checksum, verifies the checksum, package ID, version and pinned release certificate, then opens Android's installer.
 - Android confirmation is required. If the package ID and release key match, Android updates the installed app in place and retains its private app data; uninstalling is not required.
-- Android may require you to allow installs from ThiefAlertSeQure in its app-specific unknown-apps setting. This is system-controlled and can be revoked after the update.
+- Updates are blocked while protection monitoring is enabled or a countdown/alarm is active. Disable monitoring first so package replacement cannot interrupt an active protection event.\n- Android may require you to allow installs from ThiefAlertSeQure in its app-specific unknown-apps setting. This is system-controlled and can be revoked after the update.
 - The current development baseline is `1.1.3` (version code `5`).
 - Production updates must always use the same permanent release keystore. CI supports the four GitHub Actions secrets documented in [APK installation and update safety](docs/APK_INSTALL_AND_UPDATE.md).
 - CI labels release-signed and debug-only APKs separately and verifies the package ID, version, and signing certificate before upload.
