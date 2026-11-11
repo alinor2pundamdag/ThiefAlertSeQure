@@ -58,43 +58,8 @@ jobs:
           grep -F "Store: $HOME/.config/.android/debug.keystore" "$RUNNER_TEMP/signing-report.txt"
           keytool -list -v -keystore "$HOME/.config/.android/debug.keystore" -storepass android -alias androiddebugkey 2>&1 | grep -E 'Alias name:|SHA256:|SHA-256:'
 
-      - name: Prepare persistent release signing key
-        shell: bash
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          SECRET_COUNT=0
-          for VALUE in "$ANDROID_KEYSTORE_BASE64" "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD"; do
-            if [[ -n "$VALUE" ]]; then SECRET_COUNT=$((SECRET_COUNT + 1)); fi
-          done
-          if [[ "$SECRET_COUNT" -eq 4 ]]; then
-            KEYSTORE_PATH="$RUNNER_TEMP/thiefalertsequre-release.jks"
-            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
-            test -s "$KEYSTORE_PATH"
-            EXPECTED_RELEASE_CERT="9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64"
-            ACTUAL_RELEASE_CERT="$(keytool -list -v -keystore "$KEYSTORE_PATH" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" 2>&1 | sed -n 's/^[[:space:]]*SHA256: //p' | head -n 1 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
-            if [[ "$ACTUAL_RELEASE_CERT" != "$EXPECTED_RELEASE_CERT" ]]; then
-              echo "::error::Release keystore fingerprint does not match the pinned ThiefAlertSeQure v1.1.3 signing identity."
-              echo "Expected: $EXPECTED_RELEASE_CERT"
-              echo "Actual:   ${ACTUAL_RELEASE_CERT:-unavailable}"
-              exit 1
-            fi
-            echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
-            echo "RELEASE_SIGNING_CONFIGURED=true" >> "$GITHUB_ENV"
-            echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-            echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS" >> "$GITHUB_ENV"
-            echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
-            echo "Verified the pinned permanent release signing identity."
-          elif [[ "$SECRET_COUNT" -eq 0 ]]; then
-            echo "RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
-            echo "Release signing secrets are not configured; only a development debug APK can be built."
-          else
-            echo "::error::Incomplete release signing configuration. Set all four ANDROID_KEYSTORE_* / ANDROID_KEY_* secrets or none."
-            exit 1
-          fi
+      - name: Mark branch and pull-request builds as development-only
+        run: echo "RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
 
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
