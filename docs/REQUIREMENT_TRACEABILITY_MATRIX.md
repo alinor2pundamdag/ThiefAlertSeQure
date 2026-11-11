@@ -10,7 +10,7 @@
 | Area | Evidence at baseline | Status / limitation |
 |---|---|---|
 | Branch / PR | PR #2 remains open and draft; managed-policy safety implementation is on the current feature branch | Not merged |
-| CI | v1.1.3 run `43004454206` passed unit tests, Android lint, asset validation, version extraction, APK assembly, package/version verification, debug signer verification and artifact upload on head `4dc3a7a553e7da43265cbd2feaa4c3e5ae64d294`. Latest head `807f26548cfa27059356dbe9a132c1e554739254` includes the alarm recovery-notice fallback fix and is undergoing CI run `43009188681`. | Prior v1.1.3 head CI-verified; latest head pending |
+| CI | v1.1.3 run `43004454206` passed unit tests, Android lint, asset validation, version extraction, APK assembly, package/version verification, debug signer verification and artifact upload on head `4dc3a7a553e7da43265cbd2feaa4c3e5ae64d294`. Subsequent commits, including the alarm recovery-notice fallback fix, require a successful CI run on the exact current PR head. Check PR #2 / GitHub Actions for the live run; do not merge on an earlier-head success. | Prior v1.1.3 head CI-verified; latest head pending |
 | Unit tests | `:app:testDebugUnitTest` in workflow | Unit tests execute in CI |
 | Lint | `:app:lintDebug` in workflow | CI-verified |
 | APK | v1.1.3 artifact ID `13846979259` from run `43004454206`; versionCode 5 / versionName 1.1.3; package `com.thiefalertsequre.app.v113test`; filename `ThiefAlertSeQure-v1.1.3-debug-test.apk`. | Verified side-by-side debug test APK; not production-signed; permanent signing secrets are configured; signed production artifact remains pending |
