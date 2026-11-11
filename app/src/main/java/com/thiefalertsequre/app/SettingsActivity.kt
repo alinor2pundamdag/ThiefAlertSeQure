@@ -357,7 +357,23 @@ class SettingsActivity : FragmentActivity() {
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
     }
 
+    private fun isSafeForAppUpdate(): Boolean {
+        val state = ProtectionStore(this).read()
+        val monitoringEnabled = getSharedPreferences(
+            ProtectionMonitorService.PREFS, MODE_PRIVATE
+        ).getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        return state.mode == ProtectionMode.DISARMED && !monitoringEnabled
+    }
+
     private fun checkForOfficialUpdate() {
+        if (!isSafeForAppUpdate()) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Disable protection before updating")
+                .setMessage("For safety, turn off background monitoring and make sure no countdown or alarm is active. Updating can restart the app process.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
         android.widget.Toast.makeText(this, "Checking official GitHub release…", android.widget.Toast.LENGTH_SHORT).show()
         AppUpdateManager.checkAndDownload(this, ioExecutor) { result ->
             if (isFinishing || isDestroyed) return@checkAndDownload
@@ -387,6 +403,10 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun beginUpdateInstall(apkFile: File) {
+        if (!isSafeForAppUpdate()) {
+            android.widget.Toast.makeText(this, "Update paused: disable background monitoring and clear any countdown/alarm first.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
         if (!apkFile.isFile || apkFile.length() <= 0L) {
             android.widget.Toast.makeText(this, "The verified update file is no longer available. Check again.", android.widget.Toast.LENGTH_LONG).show()
             return
