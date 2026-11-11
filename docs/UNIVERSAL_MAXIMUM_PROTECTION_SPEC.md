@@ -352,9 +352,9 @@ Use accessible text, large touch targets, scroll-safe layouts, system-bar/cutout
 
 ## 10. Cloud, privacy, and network boundary
 
-Current branch documentation and manifest describe a local-only app with no INTERNET permission, backend, analytics, or advertising SDK. Preserve this as the default architecture.
+The local protection core remains offline and has no backend, analytics, or advertising SDK. The manifest declares INTERNET only for the separate, owner-initiated GitHub release updater; alarm detection, state, countdown, authentication, and alarm output must continue to work without a network connection.
 
-Supabase, Firebase, Cloudflare, or any future server integration is **not currently part of the local alarm dependency graph**. Do not add network permission or SDKs as part of this resistance feature.
+Supabase, Firebase, Cloudflare, or any app backend is **not part of the local alarm dependency graph**. Do not add network permission or SDKs to charger detection, alarm, authentication, or resistance features. The existing INTERNET permission is reserved exclusively for the manual official-release updater.
 
 If remote event sync/notifications are approved as a separate future feature:
 - Local alarm and recovery must work offline.
@@ -508,7 +508,7 @@ Power-off tests must separately cover orderly power menu, restart menu, hardware
 - Ensure UI never becomes a second state machine.
 
 ### Phase 6 — Security/privacy and documentation
-- Verify local-only behavior and manifest has no unintended INTERNET permission.
+- Verify local protection behavior offline; INTERNET permission must be used only by the explicit GitHub release updater and must not become a dependency of alarm operation.
 - Align README, privacy policy, feature matrix, protection rules, compatibility guide, Device Owner guide, install/update guide, and this spec.
 - Remove absolute claims such as “unstoppable”, “cannot be switched off”, or universal device certification.
 
