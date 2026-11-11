@@ -13,16 +13,36 @@
 
   <p>
     <a href="https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/workflows/android.yml">
-      <img src="https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/workflows/android.yml/badge.svg?branch=feat/custom-audio-and-reliability" alt="Android CI status" />
+      <img src="https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/workflows/android.yml/badge.svg?branch=main" alt="Android CI status" />
     </a>
     <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" alt="Android 8.0 and newer" />
     <img src="https://img.shields.io/badge/Privacy-On--device-2D6CDF" alt="On-device privacy" />
+    <img src="https://img.shields.io/badge/Version-1.1.3-1677D2" alt="Version 1.1.3" />
+    <img src="https://img.shields.io/badge/Owner%20device%20tests-11%2F11%20PASS-2E8B57" alt="Owner-reported 11 of 11 physical test scenarios passed" />
     <img src="https://img.shields.io/badge/Updates-Owner--initiated%20GitHub%20releases-2D6CDF" alt="Owner initiated GitHub updates" />
     <img src="https://img.shields.io/badge/License-See%20LICENSE-lightgrey" alt="License information" />
   </p>
 </div>
 
 ---
+
+## ✅ Owner-reported physical-device verification
+
+The app owner reports that all 11 planned v1.1.3 scenarios passed on a HONOR 200 Pro:
+
+1. Automatic arming after charger connection
+2. Charger-removal countdown
+3. Reconnection cancels the pending countdown
+4. Triggered alarm remains active
+5. Owner authentication is required to disarm
+6. Alarm volume is restored after disarm
+7. Flashlight operation is independent of alarm audio
+8. Camera/torch conflict handling
+9. Background operation with the device screen off
+10. Recovery after reboot
+11. Lock-screen alarm presentation
+
+These are owner-performed physical-device tests. CI separately verifies automated build, unit-test, lint, and APK checks; it does not independently reproduce every handset scenario. Results on other Android devices and OEM builds may differ.
 
 ## 🛡️ A small layer of protection when your phone is charging
 
@@ -224,6 +244,10 @@ Please test the app on your own device and confirm its permissions and backgroun
 
 
 ## 📦 Reliable APK updates
+
+**Version:** 1.1.3 (version code 5). Official release availability is determined by the GitHub Releases page and the signed APK assets attached there—not by this README version label.
+
+> **Legacy upgrade note:** v1.1.2 was signed with a different signing certificate. Because that old private key is unavailable, v1.1.3 cannot update that installation in place. Users on v1.1.2 must review the migration instructions and data implications before uninstalling or reinstalling.
 
 - In Settings, tap **Check for official updates**. The app contacts GitHub only when you request it, downloads the published stable APK and checksum, verifies the checksum, package ID, version and pinned release certificate, then opens Android's installer.
 - Android confirmation is required. If the package ID and release key match, Android updates the installed app in place and retains its private app data; uninstalling is not required.
