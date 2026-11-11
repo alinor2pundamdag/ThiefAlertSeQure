@@ -21,7 +21,7 @@ Do not change `applicationId`, add an `applicationIdSuffix`, or reuse a lower ve
 
 Android accepts an in-place APK update only when the new APK is signed by the same signing certificate as the installed app (or by a valid, platform-supported signing-key rotation lineage).
 
-The project now has an explicit release signing configuration. The four required GitHub Actions repository secrets were verified present on 11 November 2026. Their values remain encrypted and are never printed in logs or committed to Git. Do not distribute a production APK until the tag-triggered release workflow has successfully built, signed, verified, and published it:
+The project now has an explicit release signing configuration. The four required GitHub Actions repository secrets were verified present on 11 November 2026. Their values remain encrypted and are never printed in logs or committed to Git. Do not distribute a production APK until the signed release workflow has successfully built, signed, verified, and published it:
 
 1. `ANDROID_KEYSTORE_BASE64` — base64-encoded contents of the permanent release keystore.
 2. `ANDROID_KEYSTORE_PASSWORD` — keystore password.
@@ -79,7 +79,7 @@ No Android app can override Package Manager's signature verification, silently r
 To test v1.1.3 without disturbing an installed v1.1.2 copy:
 
 1. Wait for a successful CI run on the final PR head.
-2. Download the artifact named `ThiefAlertSeQure-v113-test-apk` from that exact run.
+2. Download the artifact named `ThiefAlertSeQure-debug-apk` from the [successful PR CI run 43004454206](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43004454206). The artifact was verified present (artifact ID `13846979259`; 6,458,467 bytes; not expired when checked on 11 November 2026).
 3. Extract and install `ThiefAlertSeQure-v1.1.3-debug-test.apk`. Android should show it as a separate test installation because its package ID ends in `.v113test`.
 4. Keep the existing production v1.1.2 app installed. Do not uninstall it and do not install any debug APK over it.
 5. The test build uses the CI debug key and intentionally cannot test the official updater or production-key migration. Those checks require the production package signed with the permanent release key.
@@ -88,7 +88,7 @@ After physical acceptance, the test-only app can be removed independently. Prese
 
 ## CI checks
 
-The Android workflow now verifies the APK's application ID, version code, version name, and signing certificate output before uploading the artifact. Release and debug APK artifacts have distinct names to prevent accidental mixing.
+The Android workflow now verifies the APK's application ID, version code, version name, and signing certificate before uploading the artifact. The successful PR run 43004454206 completed unit tests, Android lint, packaged-asset validation, APK package/version verification, and debug signer verification. Its artifact is `ThiefAlertSeQure-debug-apk` (artifact ID `13846979259`), containing `ThiefAlertSeQure-v1.1.3-debug-test.apk`. Release and debug APK artifacts have distinct names to prevent accidental mixing.
 
 
 ## Historical 1.1.2 development APK (previous build)
@@ -191,7 +191,7 @@ The workflow now:
 3. Builds the release variant only when all four secrets are present.
 4. Verifies the resulting APK signer against the same configured keystore before artifact upload.
 
-**Important installation consequence:** v1.1.2 was signed with a different, unrecovered certificate. This new key cannot make the existing v1.1.2 install update in place. It establishes a stable identity for the new v1.1.3 baseline and future updates. Do not install the current debug APK; wait for the release-signed artifact after the four GitHub secrets are configured.
+**Important installation consequence:** v1.1.2 was signed with a different, unrecovered certificate. The permanent v1.1.3 key cannot update that existing install in place. The debug test APK is safe for side-by-side functional testing because it uses the `.v113test` package ID, but it is not an official update and must not replace the production package. The production v1.1.3 baseline must be installed from the verified permanent-key release artifact after migration and data-retention decisions are complete.
 
 ## Owner-initiated in-app updates
 
@@ -238,3 +238,8 @@ Only `versionName` and the increasing `versionCode` should change for an ordinar
 
 **One-time legacy migration:** an installed v1.1.2 APK signed with the unrecovered old debug key cannot be updated in place by the new permanent release key. This is an Android cryptographic restriction, not an application bug. Do not uninstall the legacy installation until its data has been reviewed and a migration/backup decision has been made. Once the app is installed from the permanent release key, future signed releases can update in place.
 
+
+
+## HONOR 200 Pro physical test record — 11 November 2026
+
+The owner reported PASS for all 11 v1.1.3 physical scenarios: automatic arming; charger-removal countdown; reconnect cancellation; alarm persistence; authentication protection; volume restoration; flashlight independence; camera conflict; background operation; reboot recovery; and lock-screen presentation. No failure details were supplied. The exact Android/MagicOS build was not provided, so this record does not claim Android-version-wide compatibility. See [Security and Android Platform Audit](SECURITY_AND_PLATFORM_AUDIT.md) for the detailed test matrix and remaining release gates.
