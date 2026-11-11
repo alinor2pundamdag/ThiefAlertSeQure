@@ -205,7 +205,7 @@ Create an annotated or lightweight version tag only after the intended commit ha
 - runs unit tests and release lint;
 - builds only the release variant (never falls back to debug);
 - verifies application ID, version code, version name and signing certificate;
-- publishes `ThiefAlertSeQure-v\${VERSION}-release.apk` and its `.sha256` checksum as GitHub Release assets.
+- publishes `ThiefAlertSeQure-v<VERSION>-release.apk` and its `.sha256` checksum as GitHub Release assets.
 
 A missing secret, wrong key, version mismatch, failed test, or failed signature check stops publication. Do not publish a manually uploaded debug APK as an official release.
 
