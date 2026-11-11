@@ -141,7 +141,19 @@ object AppUpdateManager {
     private fun readHttpsText(address: String): String {
         val connection = openHttps(address)
         return try {
-            connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            val output = java.io.ByteArrayOutputStream()
+            connection.inputStream.use { input ->
+                val buffer = ByteArray(8 * 1024)
+                var total = 0
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    total += count
+                    require(total <= 1024 * 1024) { "GitHub update metadata exceeded the 1 MB safety limit." }
+                    output.write(buffer, 0, count)
+                }
+            }
+            String(output.toByteArray(), Charsets.UTF_8)
         } finally {
             connection.disconnect()
         }
@@ -189,7 +201,12 @@ object AppUpdateManager {
                 setRequestProperty("User-Agent", "ThiefAlertSeQure-Android-Updater")
                 setRequestProperty("Accept", "application/vnd.github+json")
             }
-            val status = connection.responseCode
+            val status = try {
+                connection.responseCode
+            } catch (error: Exception) {
+                connection.disconnect()
+                throw error
+            }
             if (status == HttpURLConnection.HTTP_OK) return connection
             if (status in setOf(301, 302, 303, 307, 308)) {
                 val location = connection.getHeaderField("Location")
