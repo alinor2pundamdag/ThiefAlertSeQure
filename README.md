@@ -189,7 +189,7 @@ Build a debug APK and run unit tests:
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 ```
 
-Branch and pull-request GitHub Actions run unit tests, Android lint, asset validation, APK assembly, package/version verification, and debug-signer verification. They always upload development-only debug APKs. A separate tag-triggered workflow builds and publishes an official release APK only after the permanent signing secrets, version monotonicity, package identity, tests, and pinned certificate all pass.
+Branch and pull-request GitHub Actions run unit tests, Android lint, asset validation, APK assembly, package/version verification, and debug-signer verification. They upload a development-only side-by-side test APK using package ID `com.thiefalertsequre.app.v113test`, so it can be installed alongside v1.1.2 without replacing the production app. The test APK is not eligible for official in-app updates. After merge, a manual release preflight can build and verify a permanent-key production APK without publishing; only a `v*` tag push publishes an official release after the permanent signing secrets, version monotonicity, package identity, tests, and pinned certificate all pass.
 
 A successful CI build confirms that the configured automated checks and APK assembly passed. It does **not** prove correct behavior on every physical phone. Charger broadcasts, alarm timing, sound output, reboot recovery, notifications, and manufacturer battery controls still require real-device testing.
 
