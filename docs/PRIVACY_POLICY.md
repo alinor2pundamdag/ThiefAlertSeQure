@@ -12,7 +12,7 @@
 
 ## 1. Overview
 
-ThiefAlertSeQure is designed as an on-device charging anti-theft alarm. The application does not require an account, cloud service, or internet connection.
+ThiefAlertSeQure is designed as an on-device charging anti-theft alarm. The application does not require an account or cloud backend. Internet access is used only when the owner manually checks for an official GitHub release and downloads its APK.
 
 ## 2. Information stored on the device
 
@@ -43,13 +43,14 @@ Depending on Android version and the user's choices, the app may use:
 - Alarm-stream volume control to temporarily raise the alarm volume and restore the previous level after successful disarm.
 - Android CameraManager torch control, enabled by default, to pulse a compatible device LED only while the alarm is latched. This API does not request CAMERA permission, open the camera for capture, or collect images/video. Flash hardware is optional and may be unavailable or temporarily busy.
 - Android's Storage Access Framework document/folder picker to read audio files explicitly selected by the owner and to write an event-history CSV only when the owner chooses an export destination.
+- Internet access for an owner-initiated HTTPS request to the official ThiefAlertSeQure GitHub Releases endpoint. The app downloads the release APK and its SHA-256 checksum only after the owner taps **Check for official updates**. It verifies the checksum, package ID, version code, and pinned release signing certificate before opening Android's installer.
 - Device Owner / Lock Task APIs only if the device has been separately provisioned as a fully managed device and the user explicitly enables managed mode.
 
 Android settings, manufacturer power-management behavior, notification controls, exact-alarm access, and DND policies remain under Android/device-owner control.
 
 ## 5. Sharing and third parties
 
-The app contains no configured analytics, advertising SDK, backend, cloud storage, or network permission. It does not sell or share app-collected personal information because it is not designed to collect or transmit such information. Android itself provides the credential, biometric, notification, alarm, and device-management services.
+The app contains no configured analytics, advertising SDK, app backend, or cloud storage. The update check sends a request to GitHub for public release metadata and, only when an update is available, downloads the APK and checksum. It does not upload protection state, event history, selected audio, credentials, device identifiers, or other personal data. No update check runs until the owner initiates it. Android itself provides the credential, biometric, notification, alarm, and device-management services.
 
 ## 6. Retention and deletion
 
