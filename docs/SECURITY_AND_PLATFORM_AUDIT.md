@@ -20,7 +20,7 @@ Android 17 test command: `adb shell cmd audio set-enable-hardening throw`. Trigg
 Protect against casual charger removal and ordinary user-level interference. Standard mode is a normal Android app, not a system, privileged or device-owner app. Optional managed mode uses legitimate Android Enterprise Device Owner provisioning and Lock Task APIs. Neither mode can promise resistance to hardware forced shutdown, battery removal, bootloader/recovery, firmware changes or physical tampering.
 
 ## Local privacy and data
-- No INTERNET permission, backend, analytics, ad SDK or account.
+- No app backend, analytics, ad SDK or account. INTERNET permission is limited to owner-initiated GitHub release checks; the local protection core remains offline.
 - App state and biometric cooldown counters remain in private app storage.
 - Device PIN, pattern and password are verified only by Android Keyguard; the app never reads, stores, logs or transmits credentials.
 - Backup is disabled in the manifest.
