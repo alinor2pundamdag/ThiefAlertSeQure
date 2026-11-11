@@ -347,7 +347,7 @@ class SettingsActivity : FragmentActivity() {
         ))
         root.addView(space(10))
         root.addView(action("Review privacy notice") {
-            getSharedPreferences("privacy_notice_v1", MODE_PRIVATE).edit().clear().apply()
+            getSharedPreferences("privacy_notice_v2", MODE_PRIVATE).edit().clear().apply()
             startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK))
             finish()
         })
