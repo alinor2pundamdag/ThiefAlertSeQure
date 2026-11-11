@@ -183,7 +183,7 @@ The workflow now:
 
 ## Owner-initiated in-app updates
 
-The Settings screen now includes **Check for official updates**. This is an explicit action; no background polling or automatic download runs.
+The Settings screen now includes **Check for official updates**. This is an explicit action; no background polling or automatic download runs. For safety, both checking and installation are blocked while background protection is enabled or the protection state is ARMED, COUNTDOWN, or ALARM_TRIGGERED. Disable monitoring and ensure the state is DISARMED before updating, because Android may restart the app process during package replacement.
 
 1. The app requests public release metadata from the official GitHub Releases endpoint over HTTPS.
 2. It accepts only a published, non-draft, non-prerelease release with the expected versioned `-release.apk` and matching `.sha256` asset.
