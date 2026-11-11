@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -24,6 +25,7 @@ jobs:
           fetch-depth: 0
 
       - name: Confirm tag points to main
+        if: github.event_name == 'push'
         shell: bash
         run: |
           set -euo pipefail
@@ -77,9 +79,12 @@ jobs:
           VERSION_NAME="$(sed -n 's/^val appVersionName = "\([^"]*\)"$/\1/p' app/build.gradle.kts | head -n 1)"
           test -n "$VERSION_CODE"
           test -n "$VERSION_NAME"
-          if [[ "$GITHUB_REF_NAME" != "v$VERSION_NAME" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF_NAME" != "v$VERSION_NAME" ]]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match Gradle version v$VERSION_NAME."
             exit 1
+          fi
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "Manual release preflight only: build and verify the signed APK, but do not publish a GitHub Release."
           fi
           PREVIOUS_TAG="$(gh release list --limit 1 --json tagName --jq '.[0].tagName // ""')"
           if [[ -n "$PREVIOUS_TAG" ]]; then
@@ -141,7 +146,19 @@ jobs:
           echo "Verified official APK: $PACKAGE_LINE"
           echo "Verified release signer: $ACTUAL_CERT"
 
+      - name: Upload signed release preflight artifact (manual runs only)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ThiefAlertSeQure-v${{ env.APP_VERSION_NAME }}-release-preflight
+          path: |
+            ${{ env.APK_PATH }}
+            ${{ env.APK_PATH }}.sha256
+          if-no-files-found: error
+          retention-days: 3
+
       - name: Publish GitHub Release with APK and SHA-256 file
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
