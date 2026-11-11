@@ -16,11 +16,13 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import androidx.fragment.app.FragmentActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import java.io.File
 import java.util.concurrent.Executors
 
 class SettingsActivity : FragmentActivity() {
@@ -28,6 +30,7 @@ class SettingsActivity : FragmentActivity() {
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private var soundSlot = AlarmSoundStore.ALARM
     private var previewPlayer: MediaPlayer? = null
+    private var pendingUpdateInstall: File? = null
     private val pickSoundFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) validateAndSaveSound(uri, soundSlot, uri)
     }
@@ -79,6 +82,16 @@ class SettingsActivity : FragmentActivity() {
         statusContent.addView(text(statusSummary(), 13f, R.color.tas_text))
         statusCard.addView(statusContent)
         root.addView(statusCard, matchWrap())
+        root.addView(space(22))
+
+        root.addView(text("OFFICIAL APP UPDATES", 11f, R.color.tas_primary, true))
+        root.addView(space(8))
+        root.addView(text(
+            "Check GitHub only when you choose. ThiefAlertSeQure downloads the published release APK, verifies its SHA-256 checksum, application ID, version and pinned signing certificate, then opens Android's installer. Android confirmation is required; a matching official update installs over the existing app and keeps its private app data.",
+            13f, R.color.tas_muted
+        ))
+        root.addView(space(8))
+        root.addView(action("Check for official updates") { checkForOfficialUpdate() })
         root.addView(space(22))
 
         root.addView(text("MANUFACTURER BACKGROUND PROTECTION", 11f, R.color.tas_primary, true))
@@ -329,7 +342,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(text("PRIVACY & DATA", 11f, R.color.tas_primary, true))
         root.addView(space(10))
         root.addView(text(
-            "No account, server, analytics, advertising SDK, or internet permission is configured. Protection state and biometric cooldown counters are stored locally. The optional alarm flashlight uses Android's torch API without camera permission and does not capture images or video. Device credentials and biometric templates are handled by Android and are not read by this app.",
+            "No account, analytics, advertising SDK, or app backend is used. Internet access is used only when you manually check for an official GitHub release and download its APK; protection state and personal data are not uploaded. The optional alarm flashlight uses Android's torch API without camera permission and does not capture images or video. Device credentials and biometric templates are handled by Android and are not read by this app.",
             13f, R.color.tas_muted
         ))
         root.addView(space(10))
@@ -342,6 +355,92 @@ class SettingsActivity : FragmentActivity() {
         root.addView(action("Back to protection dashboard") { finish() })
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
+    }
+
+    private fun checkForOfficialUpdate() {
+        android.widget.Toast.makeText(this, "Checking official GitHub release…", android.widget.Toast.LENGTH_SHORT).show()
+        AppUpdateManager.checkAndDownload(this, ioExecutor) { result ->
+            if (isFinishing || isDestroyed) return@checkAndDownload
+            when (result) {
+                is AppUpdateResult.Ready -> {
+                    val notes = result.releaseNotes.ifBlank { "No release notes were provided." }
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle("Version \${result.versionName} is available")
+                        .setMessage(
+                            notes + "\n\nAndroid will ask you to confirm installation. " +
+                                "Because the package ID and official signing key match, this is an in-place update; your app data is retained."
+                        )
+                        .setNegativeButton("Later", null)
+                        .setPositiveButton("Install update") { _, _ -> beginUpdateInstall(result.apkFile) }
+                        .show()
+                }
+                AppUpdateResult.UpToDate -> android.widget.Toast.makeText(
+                    this, "ThiefAlertSeQure is already up to date.", android.widget.Toast.LENGTH_LONG
+                ).show()
+                is AppUpdateResult.Failed -> MaterialAlertDialogBuilder(this)
+                    .setTitle("Update unavailable")
+                    .setMessage(result.reason)
+                    .setPositiveButton("OK", null)
+                    .show()
+            }
+        }
+    }
+
+    private fun beginUpdateInstall(apkFile: File) {
+        if (!apkFile.isFile || apkFile.length() <= 0L) {
+            android.widget.Toast.makeText(this, "The verified update file is no longer available. Check again.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+            pendingUpdateInstall = apkFile
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Allow Android to install this update")
+                .setMessage(
+                    "Android requires your approval for installs initiated outside an app store. " +
+                        "Allow ThiefAlertSeQure to install this verified official update. You can turn this access off again afterward."
+                )
+                .setNegativeButton("Cancel") { _, _ -> pendingUpdateInstall = null }
+                .setPositiveButton("Open Android setting") { _, _ ->
+                    startActivity(
+                        Intent(
+                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                            Uri.parse("package:$packageName")
+                        )
+                    )
+                }
+                .show()
+            return
+        }
+        launchAndroidInstaller(apkFile)
+    }
+
+    private fun launchAndroidInstaller(apkFile: File) {
+        runCatching {
+            val apkUri = FileProvider.getUriForFile(this, "$packageName.updates", apkFile)
+            val installIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+                setDataAndType(apkUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                putExtra(Intent.EXTRA_RETURN_RESULT, true)
+            }
+            startActivity(installIntent)
+        }.onFailure {
+            android.widget.Toast.makeText(
+                this, "Android could not open the package installer: \${it.message}", android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val pending = pendingUpdateInstall ?: return
+        pendingUpdateInstall = null
+        if (Build.VERSION.SDK_INT < 26 || packageManager.canRequestPackageInstalls()) {
+            launchAndroidInstaller(pending)
+        } else {
+            android.widget.Toast.makeText(
+                this, "Install permission was not enabled. Tap Check for official updates to try again.", android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     private fun validateAndSaveSound(uri: Uri, slot: String, permissionUri: Uri) {
