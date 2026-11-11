@@ -12,7 +12,7 @@ Every official build must keep this application identity unchanged:
 - Application ID: `com.thiefalertsequre.app`
 - Current development version: `1.1.3`
 - Current version code: `5`
-- Branch and pull-request CI output: debug-only APK. Official release APKs are built only by the tag-triggered release workflow after all four signing secrets are verified.
+- Branch and pull-request CI output: debug-only side-by-side test APK with application ID `com.thiefalertsequre.app.v113test`. It cannot replace the production package. Official release APKs use `com.thiefalertsequre.app` and are built only by the tag-triggered workflow after all four signing secrets are verified.
 - Minimum Android: API 26
 
 Do not change `applicationId`, add an `applicationIdSuffix`, or reuse a lower version code for an update. The display label and launcher icon can change without changing the package identity.
@@ -30,7 +30,7 @@ The project now has an explicit release signing configuration. The four required
 
 Keep one permanent keystore and securely back it up offline. Never commit the keystore or passwords to Git. Do not regenerate the key for a later release. If the key is lost, future APKs cannot normally update installs signed by it. The newly generated v1.1.3 release key has certificate SHA-256 `9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64` and alias `thiefalertsequre`. CI pins this fingerprint and rejects a different key.
 
-Branch and pull-request CI always creates a **debug-only development APK** signed by the cached key at `$HOME/.config/.android/debug.keystore`. It never reads or uses the permanent release secrets. The workflow caches the exact path Gradle resolves, under cache key `android-debug-keystore-v2`, and verifies the APK signer against that debug keystore. The CI debug cache is branch-scoped and is not a production signing identity. The dedicated tag-triggered `.github/workflows/release.yml` workflow requires all four permanent secrets, builds only a release APK, and verifies its signer against the pinned certificate before publishing. Do not alternate between debug and release APKs on the same installed package.
+Branch and pull-request CI creates a **debug-only side-by-side test APK** signed by the cached key at `$HOME/.config/.android/debug.keystore`. Its application ID is `com.thiefalertsequre.app.v113test`, deliberately isolated from the production package so it can be installed alongside an existing v1.1.2 installation without replacing it. It never reads or uses the permanent release secrets. The workflow caches the exact path Gradle resolves, under cache key `android-debug-keystore-v2`, and verifies the APK signer against that debug keystore. This test APK is not eligible for official in-app updates. The dedicated tag-triggered `.github/workflows/release.yml` workflow requires all four permanent secrets, builds only the production package release APK, and verifies its signer against the pinned certificate before publishing. Never attempt to install a debug/test APK over a production installation.
 
 ## Why Android may reject an update
 
@@ -73,6 +73,18 @@ Do not uninstall the existing app just to bypass a signature error unless its lo
 ## What this fix cannot do
 
 No Android app can override Package Manager's signature verification, silently replace a different signing key, or guarantee that a device will accept an APK signed by a different developer identity. The app code cannot repair a mismatch after the APK has been signed. The permanent release keystore must be configured before the first production distribution and preserved for every future release.
+
+## Safe pre-release physical testing
+
+To test v1.1.3 without disturbing an installed v1.1.2 copy:
+
+1. Wait for a successful CI run on the final PR head.
+2. Download the artifact named `ThiefAlertSeQure-v113-test-apk` from that exact run.
+3. Extract and install `ThiefAlertSeQure-v1.1.3-debug-test.apk`. Android should show it as a separate test installation because its package ID ends in `.v113test`.
+4. Keep the existing production v1.1.2 app installed. Do not uninstall it and do not install any debug APK over it.
+5. The test build uses the CI debug key and intentionally cannot test the official updater or production-key migration. Those checks require the production package signed with the permanent release key.
+
+After physical acceptance, the test-only app can be removed independently. Preserve the existing v1.1.2 production app and its local data until a separate migration decision is approved.
 
 ## CI checks
 
