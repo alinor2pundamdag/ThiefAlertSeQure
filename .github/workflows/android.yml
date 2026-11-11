@@ -1,0 +1,259 @@
+name: Android build and tests
+
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+
+      # AGP on this runner resolves the debug key under ~/.config/.android.
+      # Cache the exact path Gradle uses. Debug signing is for CI/dev installs;
+      # official release builds use the separately configured permanent keystore.
+      - name: Restore cached debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.config/.android/debug.keystore
+          key: android-debug-keystore-v2
+
+      - name: Generate debug signing key only on cache miss
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.config/.android"
+          if [[ ! -s "$HOME/.config/.android/debug.keystore" ]]; then
+            keytool -genkeypair -noprompt -storetype JKS \
+              -keystore "$HOME/.config/.android/debug.keystore" \
+              -storepass android -keypass android -alias androiddebugkey \
+              -dname "CN=Android Debug,O=Android,C=US" \
+              -keyalg RSA -keysize 2048 -validity 10000
+          fi
+          test -s "$HOME/.config/.android/debug.keystore"
+          echo "Gradle debug keystore prepared at the resolved AGP path."
+
+      - name: Inspect Gradle debug signing resolution
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew :app:signingReport --no-daemon --console=plain | tee "$RUNNER_TEMP/signing-report.txt"
+          grep -F "Store: $HOME/.config/.android/debug.keystore" "$RUNNER_TEMP/signing-report.txt"
+          keytool -list -v -keystore "$HOME/.config/.android/debug.keystore" -storepass android -alias androiddebugkey 2>&1 | grep -E 'Alias name:|SHA256:|SHA-256:'
+
+      - name: Mark branch and pull-request builds as development-only
+        run: echo "RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Android lint
+        run: |
+          if ! ./gradlew :app:lintDebug --no-daemon --stacktrace; then
+            report=app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            if [ -f "$report" ]; then cat "$report"; fi
+            exit 1
+          fi
+
+      - name: Validate packaged assets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("app/src/main")
+          alarm = root / "res/raw/default_alarm.ogg"
+          data = alarm.read_bytes()
+          assert data.startswith(b"OggS"), "default_alarm.ogg is not an Ogg container"
+          assert b"OpusHead" in data[:512], "default_alarm.ogg does not contain an Opus identification header"
+          assert len(data) > 1024, "default alarm asset is unexpectedly small"
+          assert not (root / "res/raw/default_alarm.mp3").exists(), "Ogg Opus asset must not use an .mp3 extension"
+          images = [
+              path for path in Path(".").rglob("*")
+              if path.is_file()
+              and path.suffix.lower() in (".png", ".jpg", ".jpeg")
+              and ".git" not in path.parts
+          ]
+          assert len(images) >= 10, f"Expected launcher and app image assets; found only {len(images)}"
+          for image in images:
+              payload = image.read_bytes()
+              assert payload, f"{image} is empty"
+              if image.suffix.lower() == ".png":
+                  assert payload.startswith(b"\x89PNG\r\n\x1a\n"), f"{image} is not a PNG"
+              elif image.suffix.lower() in (".jpg", ".jpeg"):
+                  assert payload.startswith(b"\xff\xd8\xff"), f"{image} is not a JPEG"
+          print(f"Validated Ogg Opus alarm ({len(data)} bytes) and {len(images)} image assets.")
+          PY
+
+      - name: Validate official release workflow YAML
+        run: ruby -e 'require "yaml"; YAML.load_file(".github/workflows/release.yml"); puts "Official release workflow YAML is valid."'
+
+      - name: Check Gradle build script uniqueness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f app/build.gradle.kts
+          test -f build.gradle.kts
+          test -f settings.gradle.kts
+          for obsolete in app/build.gradle build.gradle settings.gradle; do
+            if [[ -f "$obsolete" ]]; then
+              echo "::error::Duplicate Groovy Gradle script detected: $obsolete"
+              exit 1
+            fi
+          done
+          echo "Kotlin DSL is the only Gradle build configuration."
+
+      - name: Read application version
+        shell: bash
+        run: |
+          VERSION_CODE="$(sed -n 's/^val appVersionCode = \([0-9][0-9]*\)$/\1/p' app/build.gradle.kts | head -n 1)"
+          VERSION_NAME="$(sed -n 's/^val appVersionName = "\([^"]*\)"$/\1/p' app/build.gradle.kts | head -n 1)"
+          test -n "$VERSION_CODE"
+          test -n "$VERSION_NAME"
+          echo "APP_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "APP_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "Building application version $VERSION_NAME ($VERSION_CODE)"
+          echo "Source commit: $(git rev-parse HEAD)"
+          echo "Gradle source SHA-256: $(sha256sum app/build.gradle.kts | cut -d' ' -f1)"
+          grep -nE 'appVersion(Code|Name)|version(Code|Name)' app/build.gradle.kts
+
+      - name: Assemble distributable APK
+        shell: bash
+        run: |
+          # Remove prior outputs and force Gradle to execute every packaging task.
+          ./gradlew clean --no-daemon --no-build-cache --no-configuration-cache --stacktrace
+          mkdir -p dist
+          if [[ "$RELEASE_SIGNING_CONFIGURED" == "true" ]]; then
+            ./gradlew :app:assembleRelease --no-daemon --no-build-cache --no-configuration-cache --rerun-tasks --stacktrace
+            APK_VARIANT="release"
+            APK_FILE="dist/ThiefAlertSeQure-v${APP_VERSION_NAME}-release.apk"
+            cp app/build/outputs/apk/release/app-release.apk "$APK_FILE"
+            echo "APK_PATH=$APK_FILE" >> "$GITHUB_ENV"
+            echo "APK_ARTIFACT_NAME=ThiefAlertSeQure-release-apk" >> "$GITHUB_ENV"
+          else
+            ./gradlew :app:assembleDebug --no-daemon --no-build-cache --no-configuration-cache --rerun-tasks --stacktrace
+            APK_VARIANT="debug"
+            APK_FILE="dist/ThiefAlertSeQure-v${APP_VERSION_NAME}-debug-test.apk"
+            cp app/build/outputs/apk/debug/app-debug.apk "$APK_FILE"
+            echo "APK_PATH=$APK_FILE" >> "$GITHUB_ENV"
+            echo "APK_ARTIFACT_NAME=ThiefAlertSeQure-debug-apk" >> "$GITHUB_ENV"
+          fi
+          echo "APK_VARIANT=$APK_VARIANT" >> "$GITHUB_ENV"
+
+      - name: Inspect manifest and verify APK output metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          VARIANT_TITLE="${APK_VARIANT^}"
+          MAIN_MANIFEST="app/build/intermediates/merged_manifest/${APK_VARIANT}/process${VARIANT_TITLE}MainManifest/AndroidManifest.xml"
+          PACKAGED_MANIFEST="app/build/intermediates/packaged_manifests/${APK_VARIANT}/process${VARIANT_TITLE}ManifestForPackage/AndroidManifest.xml"
+          OUTPUT_METADATA="app/build/outputs/apk/${APK_VARIANT}/output-metadata.json"
+          test -s "$OUTPUT_METADATA"
+          echo "Intermediate main manifest: $MAIN_MANIFEST"
+          echo "Final packaged manifest: $PACKAGED_MANIFEST"
+          python3 - "$MAIN_MANIFEST" "$PACKAGED_MANIFEST" "$OUTPUT_METADATA" "$APP_VERSION_CODE" "$APP_VERSION_NAME" <<'PY'
+          import json
+          import os
+          import sys
+          import xml.etree.ElementTree as ET
+
+          main_path, packaged_path, metadata_path, expected_code, expected_name = sys.argv[1:]
+          android = "{http://schemas.android.com/apk/res/android}"
+
+          for path in (main_path, packaged_path):
+              if os.path.isfile(path):
+                  root = ET.parse(path).getroot()
+                  print(
+                      f"Manifest {path}: "
+                      f"{root.get(android + 'versionName')} "
+                      f"({root.get(android + 'versionCode')})"
+                  )
+              else:
+                  print(f"Manifest not emitted at optional diagnostic path: {path}")
+
+          with open(metadata_path, encoding="utf-8") as source:
+              metadata = json.load(source)
+          print(f"APK output metadata: {metadata}")
+          elements = metadata.get("elements", [])
+          assert elements, "APK output-metadata.json has no elements"
+          for element in elements:
+              assert str(element.get("versionCode")) == expected_code, (
+                  f"Output metadata versionCode mismatch: {element}"
+              )
+              assert element.get("versionName") == expected_name, (
+                  f"Output metadata versionName mismatch: {element}"
+              )
+          PY
+
+      - name: Verify APK package, version, and signer
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          test -s "$APK_PATH"
+          SOURCE_APK="app/build/outputs/apk/${APK_VARIANT}/app-${APK_VARIANT}.apk"
+          test -s "$SOURCE_APK"
+          cmp --silent "$SOURCE_APK" "$APK_PATH"
+          echo "Source APK SHA-256: $(sha256sum "$SOURCE_APK" | cut -d' ' -f1)"
+          echo "Distribution APK SHA-256: $(sha256sum "$APK_PATH" | cut -d' ' -f1)"
+          BADGING="$("$BUILD_TOOLS/aapt" dump badging "$APK_PATH")"
+          PACKAGE_LINE="$(printf '%s\\n' "$BADGING" | grep -m1 "^package:")"
+          echo "APK metadata: $PACKAGE_LINE"
+          if [[ "$APK_VARIANT" == "debug" ]]; then
+            EXPECTED_PACKAGE="name='com.thiefalertsequre.app.v113test'"
+          else
+            EXPECTED_PACKAGE="name='com.thiefalertsequre.app'"
+          fi
+          EXPECTED_CODE="versionCode='$APP_VERSION_CODE'"
+          EXPECTED_NAME="versionName='$APP_VERSION_NAME'"
+          for EXPECTED in "$EXPECTED_PACKAGE" "$EXPECTED_CODE" "$EXPECTED_NAME"; do
+            if [[ "$PACKAGE_LINE" != *"$EXPECTED"* ]]; then
+              echo "::error::APK metadata mismatch. Expected $EXPECTED; actual: $PACKAGE_LINE"
+              exit 1
+            fi
+          done
+          SIGNER_OUTPUT="$("$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK_PATH")"
+          printf '%s\\n' "$SIGNER_OUTPUT"
+          ACTUAL_SIGNER_CERT="$(printf '%s\\n' "$SIGNER_OUTPUT" | sed -n 's/.*SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          if [[ "$RELEASE_SIGNING_CONFIGURED" == "true" ]]; then
+            KEYSTORE_TO_VERIFY="$ANDROID_KEYSTORE_PATH"
+            VERIFY_ALIAS="$ANDROID_KEY_ALIAS"
+            VERIFY_PASSWORD="$ANDROID_KEYSTORE_PASSWORD"
+            KEYSTORE_LABEL="configured permanent release keystore"
+          else
+            KEYSTORE_TO_VERIFY="$HOME/.config/.android/debug.keystore"
+            VERIFY_ALIAS="androiddebugkey"
+            VERIFY_PASSWORD="android"
+            KEYSTORE_LABEL="cached CI debug keystore"
+          fi
+          EXPECTED_SIGNER_CERT="$(keytool -list -v -keystore "$KEYSTORE_TO_VERIFY" -storepass "$VERIFY_PASSWORD" -alias "$VERIFY_ALIAS" 2>&1 | sed -n 's/.*SHA256: //p' | head -n 1 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          if [[ -z "$EXPECTED_SIGNER_CERT" || "$ACTUAL_SIGNER_CERT" != "$EXPECTED_SIGNER_CERT" ]]; then
+            echo "::error::APK signer does not match the configured $KEYSTORE_LABEL. Refusing to upload."
+            echo "Expected certificate: ${EXPECTED_SIGNER_CERT:-unavailable}"
+            echo "Actual certificate:   $ACTUAL_SIGNER_CERT"
+            exit 1
+          fi
+          echo "Verified APK signer against $KEYSTORE_LABEL."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK_ARTIFACT_NAME }}
+          path: ${{ env.APK_PATH }}
+          if-no-files-found: error
+          retention-days: 14
