@@ -42,7 +42,14 @@ android {
             applicationIdSuffix = ".v113test"
         }
         getByName("release") {
-            isMinifyEnabled = false
+            // R8 removes unused bytecode and obfuscates implementation names in release APKs.
+            // Keep debug builds unobfuscated for device testing and diagnostics.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             // A release APK is signed only with the persistent owner-controlled key.
             if (releaseSigningReady) {
                 signingConfig = signingConfigs.getByName("release")
