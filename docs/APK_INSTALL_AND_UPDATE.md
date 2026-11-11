@@ -12,7 +12,7 @@ Every official build must keep this application identity unchanged:
 - Application ID: `com.thiefalertsequre.app`
 - Current development version: `1.1.3`
 - Current version code: `5`
-- Current CI output: debug-only APK unless all four permanent release-signing secrets are configured
+- Branch and pull-request CI output: debug-only APK. Official release APKs are built only by the tag-triggered release workflow after all four signing secrets are verified.
 - Minimum Android: API 26
 
 Do not change `applicationId`, add an `applicationIdSuffix`, or reuse a lower version code for an update. The display label and launcher icon can change without changing the package identity.
@@ -30,7 +30,7 @@ The project now has an explicit release signing configuration. Configure these G
 
 Keep one permanent keystore and securely back it up offline. Never commit the keystore or passwords to Git. Do not regenerate the key for a later release. If the key is lost, future APKs cannot normally update installs signed by it. The newly generated v1.1.3 release key has certificate SHA-256 `9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64` and alias `thiefalertsequre`. CI pins this fingerprint and rejects a different key.
 
-When all four secrets exist, CI creates a release-signed APK and verifies its signer against that exact release keystore. Without them, CI creates a **debug-only development APK** signed by the cached key at `$HOME/.config/.android/debug.keystore`. The workflow now caches the exact path Gradle resolves, under cache key `android-debug-keystore-v2`, and verifies the APK signer against the keystore file used for that build. The CI debug cache is branch-scoped and is not a production signing identity. Do not alternate between debug and release APKs on the same installed package. For official store distribution, configure one owner-controlled release keystore in the four secrets above and preserve it permanently.
+Branch and pull-request CI always creates a **debug-only development APK** signed by the cached key at `$HOME/.config/.android/debug.keystore`. It never reads or uses the permanent release secrets. The workflow caches the exact path Gradle resolves, under cache key `android-debug-keystore-v2`, and verifies the APK signer against that debug keystore. The CI debug cache is branch-scoped and is not a production signing identity. The dedicated tag-triggered `.github/workflows/release.yml` workflow requires all four permanent secrets, builds only a release APK, and verifies its signer against the pinned certificate before publishing. Do not alternate between debug and release APKs on the same installed package.
 
 ## Why Android may reject an update
 
