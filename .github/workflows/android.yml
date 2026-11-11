@@ -101,6 +101,9 @@ jobs:
           print(f"Validated Ogg Opus alarm ({len(data)} bytes) and {len(images)} image assets.")
           PY
 
+      - name: Validate official release workflow YAML
+        run: ruby -e 'require "yaml"; YAML.load_file(".github/workflows/release.yml"); puts "Official release workflow YAML is valid."'
+
       - name: Check Gradle build script uniqueness
         shell: bash
         run: |
