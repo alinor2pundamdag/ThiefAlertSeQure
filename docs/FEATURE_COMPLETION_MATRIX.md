@@ -27,7 +27,7 @@
 | Same-boot clock integrity | elapsedRealtime + boot count |
 | Reboot recovery | Revalidate charger state; if connected, return to ARMED; if disconnected, start a fresh 10-second grace period; if the first post-boot power sample is unknown, retain a short retry marker and start the full grace period only after a live disconnected sample; this also works when BOOT_COUNT is unavailable |
 | Android 15 boot recovery | After BOOT_COMPLETED/first user unlock, schedules exact alarm when granted; no Direct Boot protection before first unlock |
-| Local-only operation | No INTERNET permission, backend, analytics or advertising SDK |
+| Local-first protection | Alarm and protection logic operate locally/offline; INTERNET is used only for owner-initiated GitHub release checks. No backend, analytics or advertising SDK |
 | Background protection monitor | User-enabled, stoppable foreground service with persistent notification; disabling cancels pending countdown and disarms but cannot clear a latched alarm |
 | Independent motion alarm | Explicit opt-in, OFF by default; can trigger while charger remains connected; only monitored while ARMED |
 | Local event export | CSV export through Android's system document picker |
