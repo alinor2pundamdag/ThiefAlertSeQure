@@ -95,6 +95,10 @@ Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPl
 - HONOR/MagicOS, Xiaomi/HyperOS, Samsung/One UI and other OEM battery managers may require user-side background/autostart configuration. No universal public API disables all OEM power management.
 - Optional flash hardware is declared non-required; the torch is controlled without CAMERA permission, camera capture, or a camera foreground-service type.
 
+## Source-review correction — 11 November 2026
+
+A final alarm recovery-path review found that `ProtectionMonitorService.startTheftAlarm()` scheduled an immediate recovery callback after a foreground-service launch failure but ignored the scheduler's `false` result. It now displays the existing `AlarmRecoveryNotice` when Android cannot provide exact-alarm recovery, so the owner is directed to reopen the app rather than relying only on potentially delayed background delivery. The change is in commit `807f26548cfa27059356dbe9a132c1e554739254` and awaits its current-head CI run.
+
 ## Physical verification record — 11 November 2026
 
 **Device:** HONOR 200 Pro (device model from the project test record). **Android/MagicOS build:** not supplied; record it before claiming OS-version-specific compatibility. **Build under test:** v1.1.3 development/test build, versionCode 5, package `com.thiefalertsequre.app.v113test` (branch CI test identity). **Result source:** owner-reported physical test results; ChatGPT did not operate the handset or independently observe the tests.
@@ -116,7 +120,7 @@ Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPl
 No failure details were supplied. These results clear the reported HONOR 200 Pro functional test gate for the listed scenarios. They do not establish Android 17 compatibility, all Android/OEM versions, Play policy approval, Device Owner behavior on every build, or production signing/update migration.
 
 ## Remaining verification
-1. Latest GitHub Actions CI on the current branch head: **PASS** (run 43004454206; build, unit tests, lint, APK metadata and debug signer verification all succeeded).
+1. Last completed successful CI run: **PASS** (run 43004454206 on head `4dc3a7a553e7da43265cbd2feaa4c3e5ae64d294`). Latest branch head `807f26548cfa27059356dbe9a132c1e554739254` is undergoing fresh CI in run 43009188681; do not treat the latest head as CI-verified until that run completes.
 2. Android 8 through Android 17 compatibility paths: still pending where devices are unavailable; Android 17 background-audio hardening remains specifically unverified.
 3. Target HONOR 200 Pro: the 11 scenarios above are owner-reported **PASS**; capture exact Android/MagicOS build and date-stamped evidence if available.
 4. Opus decoding/loop and volume restoration: volume restoration is reported **PASS**; separate decoder-failure/vibration fallback test remains pending.
