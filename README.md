@@ -44,7 +44,8 @@ It is a practical deterrent and awareness tool—not a guarantee against theft, 
 | Persistent triggered state | Plugging the charger back in does not silence an already-triggered alarm. |
 | Synchronized visual alarm | Slow rear-LED flashlight pulses by default only while the alarm is latched; the owner can disable it. It stops after successful owner authentication, uses no camera permission and captures no images/video. |
 | Local-first privacy | No account, cloud backend, analytics service, or advertising SDK. Internet is used only for owner-initiated GitHub release checks and APK downloads; protection data is not uploaded. |
-| Your own alarm sound | Choose supported audio through Android's system file picker; the packaged alarm is available as the built-in option. |\n| Owner-controlled updates | Check for official GitHub releases from Settings; the app verifies the APK checksum, package identity, version and pinned release certificate before opening Android's installer. |
+| Your own alarm sound | Choose supported audio through Android's system file picker; the packaged alarm is available as the built-in option. |
+| Owner-controlled updates | Check for official GitHub releases from Settings; the app verifies the APK checksum, package identity, version and pinned release certificate before opening Android's installer. |
 | Loud alarm behavior | The app requests the maximum alarm-stream volume Android reports and restores the previous level after successful disarm. Actual output remains device-dependent. |
 | Optional motion alert | Enable a separate motion-triggered alarm when wanted. It is OFF by default. |
 | Optional low-battery alert | Configure a battery threshold alert where supported by the app settings. |
