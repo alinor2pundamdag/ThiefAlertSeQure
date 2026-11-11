@@ -117,14 +117,14 @@ object AppUpdateManager {
         try {
             downloadHttps(apkUrl!!, temporaryFile, apkSize)
             val checksumText = readHttpsText(checksumUrl!!)
-            val expectedHash = checksumText.trim().substringBefore(Regex("\\s"))
+            val expectedHash = checksumText.trim().split(Regex("\\s+")).firstOrNull().orEmpty()
                 .lowercase()
             require(expectedHash.matches(Regex("^[a-f0-9]{64}$"))) {
                 "The release checksum file is malformed."
             }
             val actualHash = sha256(temporaryFile)
             require(actualHash == expectedHash) { "The downloaded APK failed SHA-256 verification." }
-            verifyApk(temporaryFile, remoteVersionName, installedVersionCode)
+            verifyApk(context.packageManager, temporaryFile, remoteVersionName, installedVersionCode)
             if (apkFile.exists()) apkFile.delete()
             check(temporaryFile.renameTo(apkFile)) { "Could not prepare the verified APK for installation." }
             return AppUpdateResult.Ready(
@@ -197,8 +197,7 @@ object AppUpdateManager {
         return connection
     }
 
-    private fun verifyApk(file: File, expectedVersionName: String, installedVersionCode: Long) {
-        val packageManager = appPackageManager
+    private fun verifyApk(packageManager: PackageManager, file: File, expectedVersionName: String, installedVersionCode: Long) {
         val archive = packageManager.getPackageArchiveInfo(file.absolutePath, signingFlags())
             ?: error("Android could not inspect the downloaded APK.")
         require(archive.packageName == EXPECTED_PACKAGE) {
@@ -226,11 +225,9 @@ object AppUpdateManager {
         }
     }
 
-    private lateinit var appPackageManager: PackageManager
-
     private fun installedSignerMatchesOfficialKey(context: Context): Boolean {
-        appPackageManager = context.packageManager
-        val installed = context.packageManager.getPackageInfo(context.packageName, signingFlags())
+        val packageManager = context.packageManager
+        val installed = packageManager.getPackageInfo(context.packageName, signingFlags())
         val signatures = if (Build.VERSION.SDK_INT >= 28) {
             installed.signingInfo?.apkContentsSigners
         } else {
