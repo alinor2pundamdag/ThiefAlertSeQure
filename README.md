@@ -132,7 +132,7 @@ Read the complete [Privacy Policy](docs/PRIVACY_POLICY.md).
 ## 📱 Android and manufacturer compatibility
 
 - **Minimum Android:** 8.0 (API 26).
-- **Compile / target Android:** API 36 / API 36 (Android 16 target; Android 17 runtime compatibility).
+- **Compile / target Android:** API 36 / API 36 (Android 16 target). Android 17 background-audio behavior has not yet been physically verified.
 - **Manufacturer-aware setup:** Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO, OPPO, realme, OnePlus, vivo / iQOO, Google Pixel, Motorola, ASUS, Sony Xperia, Nothing OS, Lenovo, TECNO / Infinix / itel, ZTE / nubia, and safe generic Android guidance.
 - **Settings fallback:** Public Android Settings action → app-specific settings → general Settings.
 - **Android 15+:** Edge-to-edge safe insets are applied to the app's scrollable screens.
