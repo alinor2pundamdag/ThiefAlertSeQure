@@ -16,6 +16,18 @@ For apps targeting API 37, Android adds while-in-use foreground-service capabili
 
 Android 17 test command: `adb shell cmd audio set-enable-hardening throw`. Trigger the alarm with the app backgrounded and screen off, then inspect logcat / dumpsys audio for AudioHardening failures. Disable the test override afterward with `adb shell cmd audio set-enable-hardening disable`. This test remains pending on real Android 17 hardware/emulator.
 
+## GitHub repository security automation
+
+Checked on 11 November 2026:
+- Secret scanning: enabled.
+- Secret scanning push protection: enabled.
+- Open secret-scanning alerts: none returned.
+- Dependabot vulnerability alerts: enabled; no open alerts returned.
+- Dependabot automated security updates: enabled. GitHub may open dependency update pull requests; these are not auto-merged.
+- Code scanning: no completed analysis was available at the time of this check; static code scanning remains a separate follow-up.
+
+The signed release workflow's manual preflight is restricted to `refs/heads/main`. Tag-triggered publication separately verifies that the tagged commit is already an ancestor of `main`. The preflight builds and verifies but does not publish a GitHub Release.
+
 ## Threat model
 Protect against casual charger removal and ordinary user-level interference. Standard mode is a normal Android app, not a system, privileged or device-owner app. Optional managed mode uses legitimate Android Enterprise Device Owner provisioning and Lock Task APIs. Neither mode can promise resistance to hardware forced shutdown, battery removal, bootloader/recovery, firmware changes or physical tampering.
 
