@@ -21,7 +21,7 @@ Do not change `applicationId`, add an `applicationIdSuffix`, or reuse a lower ve
 
 Android accepts an in-place APK update only when the new APK is signed by the same signing certificate as the installed app (or by a valid, platform-supported signing-key rotation lineage).
 
-The project now has an explicit release signing configuration. Configure these GitHub Actions repository secrets before distributing a production APK:
+The project now has an explicit release signing configuration. The four required GitHub Actions repository secrets were verified present on 11 November 2026. Their values remain encrypted and are never printed in logs or committed to Git. Do not distribute a production APK until the tag-triggered release workflow has successfully built, signed, verified, and published it:
 
 1. `ANDROID_KEYSTORE_BASE64` — base64-encoded contents of the permanent release keystore.
 2. `ANDROID_KEYSTORE_PASSWORD` — keystore password.
