@@ -435,7 +435,12 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             )
         }.onFailure {
             LocalTamperHistory.record(this, "monitor_alarm_service_start_failed", it.javaClass.simpleName + ": " + it.message)
-            AlarmScheduler.scheduleImmediateRecovery(this)
+            if (!AlarmScheduler.scheduleImmediateRecovery(this)) {
+                AlarmRecoveryNotice.show(
+                    this,
+                    "Android deferred background alarm playback; open the app to resume the latched alarm"
+                )
+            }
         }
         stopSelf()
     }
