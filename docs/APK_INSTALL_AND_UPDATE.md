@@ -221,6 +221,10 @@ Create an annotated or lightweight version tag only after the intended commit ha
 
 A missing secret, wrong key, version mismatch, failed test, or failed signature check stops publication. Do not publish a manually uploaded debug APK as an official release.
 
+## Signed release preflight (before creating the release tag)
+
+After PR #2 has been reviewed and merged into `main`, run the **Official signed Android release** workflow manually from the `main` branch. A manual run performs the permanent-keystore check, unit tests, release lint, release APK build, package/version/signer verification, and SHA-256 generation, then uploads a short-retention preflight artifact. A manual run does **not** create or publish a GitHub Release. The workflow publishes only when triggered by a `v*` tag push. Confirm the manual run succeeds before creating the `v1.1.3` tag.
+
 ## Permanent update compatibility rule
 
 For every future version, keep all of the following stable:
