@@ -189,7 +189,7 @@ Build a debug APK and run unit tests:
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 ```
 
-GitHub Actions runs unit tests, Android lint, asset validation, APK assembly, package/version verification, and signer verification. It uploads a release-signed APK only when the persistent release-signing secrets are configured; otherwise it uploads a clearly identified debug APK.
+Branch and pull-request GitHub Actions run unit tests, Android lint, asset validation, APK assembly, package/version verification, and debug-signer verification. They always upload development-only debug APKs. A separate tag-triggered workflow builds and publishes an official release APK only after the permanent signing secrets, version monotonicity, package identity, tests, and pinned certificate all pass.
 
 A successful CI build confirms that the configured automated checks and APK assembly passed. It does **not** prove correct behavior on every physical phone. Charger broadcasts, alarm timing, sound output, reboot recovery, notifications, and manufacturer battery controls still require real-device testing.
 
