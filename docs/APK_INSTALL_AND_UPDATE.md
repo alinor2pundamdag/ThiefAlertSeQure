@@ -171,7 +171,7 @@ A new owner-controlled Android release keystore was generated and verified. It i
 - Validity: 10,000 days
 - GitHub secret names: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`
 
-**Configuration is not yet complete:** the four secret values must be added in GitHub repository Settings → Secrets and variables → Actions. The secret values and backup keystore were delivered separately to the repository owner; none of the private key material or passwords is committed to this repository. Until all four secrets are present, CI intentionally builds only a debug development APK.
+**Configuration status (verified 11 November 2026):** all four required repository Actions secrets are now present in GitHub and stored using GitHub's encrypted secrets mechanism. Their values are not displayed in repository files or logs. The owner-controlled keystore and its secure backup remain separate; none of the private key material or passwords is committed to this repository. Branch and pull-request CI remains debug-only. The dedicated tag-triggered release workflow will use the secrets and fail closed if any value or certificate check is invalid.
 
 The workflow now:
 1. Rejects a partial signing-secret configuration instead of silently falling back to debug.
