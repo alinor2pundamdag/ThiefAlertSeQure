@@ -474,6 +474,7 @@ class SettingsActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (::root.isInitialized) ThemeRuntime.apply(this, window.decorView)
         val pending = pendingUpdateInstall ?: return
         pendingUpdateInstall = null
         if (Build.VERSION.SDK_INT < 26 || packageManager.canRequestPackageInstalls()) {
