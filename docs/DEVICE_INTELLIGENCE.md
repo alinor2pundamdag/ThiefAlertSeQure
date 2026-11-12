@@ -16,9 +16,10 @@ The Device Intelligence page reads Android public APIs and package-manager featu
 - Logical processor count.
 - Battery level/charging state, BatteryManager capacity when exposed, Battery Saver, thermal status, and whether Android reports the app exempt from battery optimization.
 - Display pixel dimensions, density, refresh rate, and active display mode.
-- Presence of accelerometer, gyroscope, magnetometer, proximity, light, barometer, step counter, step detector, rotation vector, and significant-motion sensors.
+- Presence and Android-reported name, vendor, maximum range, resolution, and power figures for accelerometer, gyroscope, magnetometer, proximity, light, barometer, step counter, step detector, rotation vector, and significant-motion sensors.
 - Package-manager feature flags for Bluetooth Classic/LE, Wi-Fi, NFC, GPS/network location hardware capability, telephony, camera/flash, fingerprint, USB host/accessory, and selected sensor categories.
-- ThiefAlertSeQure readiness signals: notification enablement, exact-alarm access where applicable, secure lock-screen configuration, Bluetooth Connect permission, and Android Ranging permission where applicable.
+- ThiefAlertSeQure readiness signals: notification enablement, full-screen alarm-intent access where applicable, exact-alarm access, secure lock-screen configuration, Bluetooth Connect permission, Android Ranging permission where applicable, monitor preference/runtime-last-recorded state, and current protection state.
+- Device idle/doze mode and app data filesystem volume metrics.
 - Manufacturer-family background execution guidance and passive root indicators.
 
 ## Privacy and safety boundaries
