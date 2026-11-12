@@ -888,6 +888,14 @@ class SettingsActivity : FragmentActivity() {
     private fun addSystemSettingAction(label: String, tutorialTitle: String, tutorial: String, click: () -> Unit) {
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
         val launch = action(label, click).apply {
+            val statusId = when (tutorialTitle) { "Notifications", "App notifications" -> "notifications"; "Exact alarms" -> "exact"; "Full-screen intent permission" -> "fullscreen"; "Secure device lock" -> "lock"; "Battery optimization", "Background activity" -> "battery"; "Bluetooth permission" -> "bt_permission"; else -> null }
+            statusId?.let { id ->
+                val p = ThemeStore.get(this@SettingsActivity)
+                val state = SetupStatusSnapshot.read(this@SettingsActivity).items.firstOrNull { it.id == id }?.state
+                val accent = when (state) { SetupState.VERIFIED -> p.success; SetupState.ACTION_REQUIRED -> p.warning; SetupState.NEUTRAL, SetupState.UNSUPPORTED -> p.muted; SetupState.UNKNOWN -> p.danger; null -> p.primary }
+                strokeColor = android.content.res.ColorStateList.valueOf(accent)
+                setTextColor(accent)
+            }
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(8) }
         }
         val info = MaterialButton(this).apply {
