@@ -163,14 +163,39 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         val monitorRunning = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_RUNNING, false)
         val protectionMode = ProtectionStore(this).read().mode
         val btConnect = Build.VERSION.SDK_INT < 31 || checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        val a2Enabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+        val dashboardEnabled = getSharedPreferences(MainActivity.ALARM_DISPLAY_PREFS, MODE_PRIVATE)
+            .getBoolean(MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
+        val fullScreenSummary = when {
+            !dashboardEnabled -> "Not needed — optional dashboard is OFF"
+            Build.VERSION.SDK_INT < 34 -> "Available — no separate access gate on this Android version"
+            fullScreenIntent -> "Allowed by Android"
+            else -> "Not allowed — normal alarm notification and sound remain available"
+        }
+        val exactAlarmSummary = when {
+            !monitorEnabled -> "Not needed while the protection monitor is disabled"
+            Build.VERSION.SDK_INT < 31 -> "Available — no separate access gate on this Android version"
+            exactAlarm -> "Available / permitted"
+            else -> "Access not granted — precise protection scheduling may be delayed"
+        }
+        val btConnectSummary = when {
+            !a2Enabled -> "Not needed — optional A2 is OFF"
+            btConnect -> "Granted / not runtime-gated on this Android version"
+            else -> "Not granted — A2 cannot monitor trusted-device separation until granted"
+        }
         val ranging = Build.VERSION.SDK_INT >= 36 && checkSelfPermission("android.permission.RANGING") == PackageManager.PERMISSION_GRANTED
+        val rangingSummary = when {
+            Build.VERSION.SDK_INT < 36 -> "Not applicable on this OS"
+            ranging -> "Granted for optional owner-initiated capability query"
+            else -> "Not granted — only needed for the optional owner-initiated API 36 capability query"
+        }
         val appReadiness = listOf(
-            "Android notifications: ${if (notifications) "Enabled" else "Disabled"}",
-            "Full-screen alarm intent access: ${if (Build.VERSION.SDK_INT < 34) "No separate access gate on this Android version" else if (fullScreenIntent) "Allowed" else "Not allowed by current Android settings"}",
-            "Exact alarm scheduling: ${if (exactAlarm) "Available / permitted" else "Access not granted"}",
+            "Android notifications: ${if (notifications) "Enabled" else "Disabled — protection notifications may be hidden"}",
+            "Full-screen alarm intent access: $fullScreenSummary",
+            "Exact alarm scheduling: $exactAlarmSummary",
             "Secure screen lock: ${if (secureLock) "Configured" else "Not configured"}",
-            "Bluetooth Connect permission: ${if (btConnect) "Granted / not runtime-gated on this Android version" else "Not granted"}",
-            "Android Ranging permission: ${if (Build.VERSION.SDK_INT < 36) "Not applicable on this OS" else if (ranging) "Granted" else "Not granted"}",
+            "Bluetooth Connect permission: $btConnectSummary",
+            "Android Ranging permission: $rangingSummary",
             "Protection monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled"} • Runtime status: ${if (monitorRunning) "Running (last recorded state)" else "Not running (last recorded state)"}",
             "Protection state: $protectionMode",
             "Background guidance family: $family"

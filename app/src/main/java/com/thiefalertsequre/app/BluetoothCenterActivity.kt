@@ -1,6 +1,7 @@
 package com.thiefalertsequre.app
 
 import android.Manifest
+import android.app.ActivityManager
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
@@ -131,14 +132,19 @@ class BluetoothCenterActivity : FragmentActivity() {
         val enabled = prefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
         val baselineCount = devices.count { TrustedBluetoothRegistry.isBaselineConnected(prefs, it.address) }
         val monitorEnabled = prefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        val monitorRunning = runCatching {
+            getSystemService(ActivityManager::class.java).getRunningServices(100)
+                .any { it.service.className == ProtectionMonitorService::class.java.name }
+        }.getOrDefault(false)
         val protectionMode = ProtectionStore(this).read().mode
         addCard("TRUSTED ACCESSORY SEPARATION ALERT (A2)", listOf(
             "Feature: ${if (enabled) "ON" else "OFF"}",
             "Registered trusted accessories: ${devices.size}",
             "Connection baselines confirmed: $baselineCount / ${devices.size}",
-            "Protection monitor: ${if (monitorEnabled) "Enabled" else "Disabled by owner"}",
+            "Monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled by owner"}",
+            "Monitor runtime: ${if (monitorRunning) "Running" else "Not confirmed running"}",
             "Protection state: $protectionMode",
-            "Each registered accessory is monitored independently. A confirmed disconnect starts an 8-second grace period; reconnecting that accessory cancels its pending alert.",
+            "Monitoring runs only while A2 is ON and the protection monitor service is running. Each registered accessory needs a fresh connection baseline; disconnect starts an 8-second grace period, and reconnecting that accessory cancels its pending alert.",
             "Unregistering removes only this app's trust. Android pairing remains unchanged."
         ))
         root.addView(button("Add trusted paired device") { requestTrustedDevicePicker() }, matchWrap())

@@ -26,6 +26,8 @@ Status: active development audit; not a release certification.
 - Multi-device A2 readiness is not marked verified until every registered accessory has a fresh connection baseline.
 - Full-screen intent permission is optional while the owner-disabled full-screen dashboard is OFF; setup status requests it only after explicit opt-in. If the owner enables the dashboard without Android 14+ access, the Settings toggle explicitly labels the missing system access and offers the correct settings route.
 - Bluetooth Connect permission and adapter availability are neutral while optional A2 is OFF; they become actionable prerequisites only after the owner enables A2.
+- Device Intelligence labels optional A2, full-screen dashboard, exact-alarm scheduling, and API 36 ranging requirements according to whether their dependent feature is enabled.
+- Bluetooth Center separates the monitor preference from a confirmed running service state and does not claim accessory monitoring when the service is not confirmed running.
 - Setup status displays action buttons only for action-required or unconfirmed states; neutral, unsupported, and verified items do not show misleading action controls.
 - Material dialogs in audited screens use the shared themed-dialog helper.
 - CI statically checks manifest Activity declarations, internal Activity targets, themed Material dialogs, obvious empty click listeners, theme-preview/inset contracts, safe setup-action fallbacks, Bluetooth/Device Intelligence Settings fallbacks, and A2 readiness/timer invalidation contracts.

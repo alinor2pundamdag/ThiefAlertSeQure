@@ -65,6 +65,13 @@ if "AndroidDeviceCompatibility.open(this, Intent(Settings.ACTION_BLUETOOTH_SETTI
     errors.append("BluetoothCenterActivity must provide a fallback for Bluetooth Settings navigation")
 
 device_activity = (APP / "DeviceIntelligenceActivity.kt").read_text(encoding="utf-8")
+for required in ("Not needed — optional A2 is OFF", "Not needed — optional dashboard is OFF", "optional owner-initiated API 36 capability query"):
+    if required not in device_activity:
+        errors.append("DeviceIntelligenceActivity missing optional-feature context: " + required)
+
+bluetooth_activity = (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
+if "Monitor runtime:" not in bluetooth_activity or "Monitoring runs only while A2 is ON" not in bluetooth_activity:
+    errors.append("Bluetooth center must distinguish enabled preference from confirmed runtime")
 if "AndroidDeviceCompatibility.appInfoIntent(packageName)" not in device_activity:
     errors.append("DeviceIntelligenceActivity must provide a fallback for app Settings navigation")
 
