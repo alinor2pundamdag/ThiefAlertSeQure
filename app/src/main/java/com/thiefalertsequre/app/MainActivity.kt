@@ -672,12 +672,13 @@ class MainActivity : FragmentActivity() {
             ProtectionMode.COUNTDOWN -> "Charger removed"
             ProtectionMode.ALARM_TRIGGERED -> "ALARM TRIGGERED"
         }
-        status.setTextColor(getColor(when (state.mode) {
-            ProtectionMode.DISARMED -> R.color.tas_text
-            ProtectionMode.ARMED -> R.color.tas_success
-            ProtectionMode.COUNTDOWN -> R.color.tas_warning
-            ProtectionMode.ALARM_TRIGGERED -> R.color.tas_danger
-        }))
+        val palette = ThemeStore.get(this)
+        status.setTextColor(when (state.mode) {
+            ProtectionMode.DISARMED -> palette.text
+            ProtectionMode.ARMED -> palette.success
+            ProtectionMode.COUNTDOWN -> palette.warning
+            ProtectionMode.ALARM_TRIGGERED -> palette.danger
+        })
 
         val stateMessage = when (state.mode) {
             ProtectionMode.DISARMED -> "Connect the charger to arm protection automatically. The built-in alarm is ready; a custom sound is optional."
