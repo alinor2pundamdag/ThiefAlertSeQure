@@ -276,6 +276,20 @@ class SettingsActivity : FragmentActivity() {
             "Optional anti-theft layer. Choose an already-paired trusted Bluetooth device. While phone protection is ARMED, a detected disconnect starts a short grace period; reconnecting cancels it. Android may not deliver connection events if the app/service is stopped. After selecting a device, reconnect it once to establish the monitoring baseline.",
             13f, R.color.tas_muted
         ))
+        val bluetoothReport = BluetoothCompatibility.inspect(this)
+        root.addView(text("BLUETOOTH DEVICE COMPATIBILITY", 11f, R.color.tas_primary, true))
+        root.addView(space(6))
+        root.addView(text(BluetoothCompatibility.reportText(bluetoothReport), 13f, R.color.tas_text))
+        root.addView(space(6))
+        root.addView(text(
+            BluetoothCompatibility.versionGuide(bluetoothReport.apiLevel) + "\\n\\n" +
+                BluetoothCompatibility.permissionGuide(bluetoothReport.apiLevel),
+            12f, R.color.tas_muted
+        ))
+        root.addView(action("Open Android Bluetooth settings") {
+            open(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+        })
+        root.addView(space(8))
         val trustedAddress = monitorPrefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null)
         val trustedName = monitorPrefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, null)
         root.addView(text("Trusted device: " + (trustedName ?: "Not selected"), 13f, R.color.tas_text))
