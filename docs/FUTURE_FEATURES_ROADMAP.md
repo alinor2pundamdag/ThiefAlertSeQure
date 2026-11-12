@@ -16,7 +16,7 @@ Keep future work small and independently testable. Add only features that solve 
 - Do not run sensors continuously while disarmed. Do not claim it can distinguish an owner from a thief.
 
 ### A2 — Trusted Bluetooth Device Separation Alert
-Implementation status: in progress on the development branch; release version unassigned.
+Implementation status: being developed on the separate feature/trusted-bluetooth-separation branch; release version unassigned.
 - Optionally pair a trusted watch, earbuds, or other Bluetooth device.
 - Warn when the trusted device disconnects while anti-theft protection is armed.
 - Treat Bluetooth range and disconnect events as approximate; avoid claiming precise distance or guaranteed background detection.
