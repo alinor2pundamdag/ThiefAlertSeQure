@@ -9,7 +9,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 class ThemeActivity:FragmentActivity(){
  private var preview=ThemeStore.DEFAULT_ID;private var mode="Dark"
- override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);preview=ThemeStore.selected(this);render()}
+ override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);preview=ThemeStore.selected(this);mode=ThemeStore.get(this,preview).mode;render()}
  override fun onResume(){super.onResume();ThemeRuntime.apply(this,window.decorView,preview)}
  private fun dp(v:Int)=(v*resources.displayMetrics.density).toInt()
  private fun render(){
@@ -19,7 +19,7 @@ class ThemeActivity:FragmentActivity(){
   root.addView(TextView(this).apply{text="Choose your theme";textSize=28f;setTextColor(ThemeStore.get(this@ThemeActivity,preview).text)})
   root.addView(TextView(this).apply{text="Tap a theme to preview it. Apply saves it locally; Cancel leaves your current theme unchanged.";textSize=13f;setTextColor(ThemeStore.get(this@ThemeActivity,preview).muted)})
   val filters=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
-  listOf("Dark","Light").forEach{v->filters.addView(MaterialButton(this).apply{text=v;setOnClickListener{mode=v;render()}},LinearLayout.LayoutParams(0,dp(48),1f))}
+  listOf("Dark","Light").forEach{v->filters.addView(MaterialButton(this).apply{text=v;isAllCaps=false;isEnabled=mode!=v;setOnClickListener{mode=v;if(ThemeStore.get(this@ThemeActivity,preview).mode!=mode)preview=ThemeStore.all.first{it.mode==mode}.id;render()}},LinearLayout.LayoutParams(0,dp(48),1f))}
   root.addView(filters)
   val p=ThemeStore.get(this,preview);val card=MaterialCardView(this).apply{radius=dp(16).toFloat();setCardBackgroundColor(p.surface);strokeColor=p.variant;strokeWidth=dp(1)}
   val sample=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(15),dp(15),dp(15),dp(15))}
