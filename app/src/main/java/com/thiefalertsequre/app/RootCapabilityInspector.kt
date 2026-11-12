@@ -28,7 +28,7 @@ object RootCapabilityInspector {
     ) {
         val isRootAuthorized: Boolean get() = status == RootStatus.ROOT_AUTHORIZED
         val mayBeRooted: Boolean get() =
-            status == RootStatus.ROOT_INDICATORS_FOUND || status == RootStatus.ROOT_AUTHORIZED
+            indicators.isNotEmpty() || status == RootStatus.ROOT_INDICATORS_FOUND || status == RootStatus.ROOT_AUTHORIZED
     }
 
     private val suPaths = listOf(
