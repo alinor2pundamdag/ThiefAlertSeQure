@@ -25,6 +25,7 @@ Status: development audit; not a release certification.
 - Add CI static checks for internal Activity declarations/targets and themed Material dialog usage.
 - Clear per-device connection baselines when A2 is disabled or re-enabled.
 - Add per-device connection baselines and per-device 8-second disconnect timers.
+- Extract A2 grace-period and alarm gates into pure policy functions with regression tests for disabled, untrusted, baseline-missing, reconnect, registry-change, and non-armed cases.
 - Add explicit confirmation before unregistering an accessory.
 - Unregister affects only the app trust registry; it never unpairs Android Bluetooth devices.
 - Removing the final trusted accessory automatically disables A2.

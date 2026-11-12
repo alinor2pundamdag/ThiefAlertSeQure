@@ -65,7 +65,13 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                 }
                 BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
                     val hadConnectionBaseline = TrustedBluetoothRegistry.markConnected(prefs, address, false)
-                    if (hadConnectionBaseline && ProtectionStore(context).read().mode == ProtectionMode.ARMED) {
+                    if (A2DisconnectPolicy.shouldStartGracePeriod(
+                            alertEnabled = prefs.getBoolean(KEY_BT_ALERT_ENABLED, false),
+                            trusted = TrustedBluetoothRegistry.isTrusted(prefs, address),
+                            hadConnectionBaseline = hadConnectionBaseline,
+                            protectionMode = ProtectionStore(context).read().mode
+                        )
+                    ) {
                         pendingBluetoothRunnables.remove(address)?.let(handler::removeCallbacks)
                         val registryRevision = TrustedBluetoothRegistry.revision(prefs)
                         val runnable = Runnable {
@@ -73,9 +79,13 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                             val stillTrusted = TrustedBluetoothRegistry.isTrusted(prefs, address)
                             val unchangedRegistry = TrustedBluetoothRegistry.revision(prefs) == registryRevision
                             val stillDisconnected = !TrustedBluetoothRegistry.isBaselineConnected(prefs, address)
-                            if (prefs.getBoolean(KEY_BT_ALERT_ENABLED, false) && stillTrusted &&
-                                unchangedRegistry && stillDisconnected &&
-                                ProtectionStore(this@ProtectionMonitorService).read().mode == ProtectionMode.ARMED
+                            if (A2DisconnectPolicy.shouldTriggerAlarm(
+                                    alertEnabled = prefs.getBoolean(KEY_BT_ALERT_ENABLED, false),
+                                    trusted = stillTrusted,
+                                    registryUnchanged = unchangedRegistry,
+                                    stillDisconnected = stillDisconnected,
+                                    protectionMode = ProtectionStore(this@ProtectionMonitorService).read().mode
+                                )
                             ) {
                                 val now = System.currentTimeMillis()
                                 var transitioned = false

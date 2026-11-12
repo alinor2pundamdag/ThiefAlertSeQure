@@ -31,6 +31,8 @@ for path in sources:
     targets.update(target_pattern.findall(text))
     builders = len(builder_pattern.findall(text))
     themed = len(themed_pattern.findall(text))
+    if "fun MaterialAlertDialogBuilder.showThemed" in text:
+        themed -= 1  # Exclude the shared extension declaration itself.
     if builders != themed:
         dialog_errors.append(
             f"{path.relative_to(ROOT)}: {builders} MaterialAlertDialogBuilder calls, "
