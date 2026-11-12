@@ -181,3 +181,12 @@ The main dashboard displays a compact per-device summary. Settings exposes the f
 ## Owner-request persistence
 
 The owner requested that future Bluetooth feature requests be implemented where technically possible and recorded for continuity. The project-level instruction and implementation log are maintained in docs/OWNER_BLUETOOTH_IMPLEMENTATION_POLICY.md. ChatGPT project Memory is disabled in this project, so repository documentation is the durable record rather than a claim of persistent assistant memory.
+
+
+## Dedicated Bluetooth capability center UI (2026-11-12)
+
+Bluetooth inventory is presented on its own BluetoothCenterActivity page, reachable from the dashboard and Settings. The page groups results into radio/connection, controller capabilities, profiles/transports, ranging/proximity, and root/restricted operations. Each item displays a distinct state and explanatory detail rather than placing the entire inventory in a long Settings screen or a single oversized dialog.
+
+The page provides explicit refresh, Android Bluetooth Settings navigation, an owner-triggered Bluetooth Connect permission request when needed, an Android 16+ Ranging capability query, and optional read-only root diagnostics. Opening the page does not scan, advertise, pair, stream, or modify Bluetooth configuration. It does not show paired-device addresses.
+
+The inventory is comprehensive for Android APIs and controller capability signals exposed to an ordinary app, but it is not a promise that every Bluetooth SIG profile, vendor extension, firmware command, or accessory feature is implemented. Profiles requiring peer negotiation remain peer-required; APIs without a reliable local hardware probe remain API-present/unknown; dangerous firmware writes remain intentionally unimplemented.
