@@ -247,7 +247,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
 
     private fun rootButtonRow() {
         root.addView(button("Open Android app settings") {
-            runCatching { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName"))) }
+            AndroidDeviceCompatibility.open(this, AndroidDeviceCompatibility.appInfoIntent(packageName), Intent(android.provider.Settings.ACTION_SETTINGS))
         }, matchWrap())
         root.addView(space(8))
     }

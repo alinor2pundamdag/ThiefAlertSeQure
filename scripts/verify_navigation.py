@@ -59,6 +59,14 @@ for required in (
     if required not in theme_activity:
         errors.append("ThemeActivity missing required preview/inset contract: " + required)
 
+bluetooth_activity = (JAVA / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
+if "AndroidDeviceCompatibility.open(this, Intent(Settings.ACTION_BLUETOOTH_SETTINGS)" not in bluetooth_activity:
+    errors.append("BluetoothCenterActivity must provide a fallback for Bluetooth Settings navigation")
+
+device_activity = (JAVA / "DeviceIntelligenceActivity.kt").read_text(encoding="utf-8")
+if "AndroidDeviceCompatibility.appInfoIntent(packageName)" not in device_activity:
+    errors.append("DeviceIntelligenceActivity must provide a fallback for app Settings navigation")
+
 setup_activity = (JAVA / "SetupStatusActivity.kt").read_text(encoding="utf-8")
 for required in (
     "AndroidDeviceCompatibility.open", "AndroidDeviceCompatibility.applySystemBarInsets",

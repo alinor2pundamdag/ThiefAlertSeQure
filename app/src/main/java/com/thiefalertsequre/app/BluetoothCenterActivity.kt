@@ -75,7 +75,7 @@ class BluetoothCenterActivity : FragmentActivity() {
             root.addView(button("Grant Bluetooth Connect permission") { connectPermission.launch(Manifest.permission.BLUETOOTH_CONNECT) }, matchWrap())
             root.addView(space(8))
         }
-        root.addView(button("Open Android Bluetooth settings") { runCatching { startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) } }, matchWrap())
+        root.addView(button("Open Android Bluetooth settings") { AndroidDeviceCompatibility.open(this, Intent(Settings.ACTION_BLUETOOTH_SETTINGS), Intent(Settings.ACTION_SETTINGS)) }, matchWrap())
         root.addView(space(8))
         root.addView(button("Refresh device capabilities") { render() }, matchWrap())
         root.addView(space(18))
@@ -181,13 +181,13 @@ class BluetoothCenterActivity : FragmentActivity() {
         val enabled = runCatching { adapter.isEnabled }.getOrDefault(false)
         if (!enabled) {
             showResult("Turn on Bluetooth", "Turn on Bluetooth and pair your trusted accessory in Android Settings, then return here.")
-            runCatching { startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
+            AndroidDeviceCompatibility.open(this, Intent(Settings.ACTION_BLUETOOTH_SETTINGS), Intent(Settings.ACTION_SETTINGS))
             return
         }
         val devices = runCatching { adapter.bondedDevices.toList().sortedBy { it.name ?: it.address } }.getOrDefault(emptyList())
         if (devices.isEmpty()) {
             showResult("No paired accessories", "Pair a watch, earbuds, or another trusted Bluetooth accessory in Android Settings first.")
-            runCatching { startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
+            AndroidDeviceCompatibility.open(this, Intent(Settings.ACTION_BLUETOOTH_SETTINGS), Intent(Settings.ACTION_SETTINGS))
             return
         }
         val labels = devices.map { it.name?.takeIf { name -> name.isNotBlank() } ?: "Bluetooth accessory" }.toTypedArray()
