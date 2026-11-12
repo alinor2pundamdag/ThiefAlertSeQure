@@ -618,9 +618,15 @@ class MainActivity : FragmentActivity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         val launch = outlinedButton(title, click).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginEnd = dp(8)
+            val statusId = when (tutorialTitle) { "Exact alarms" -> "exact"; "Full-screen intent" -> "fullscreen"; "Alarm notifications" -> "notifications"; "Secure screen lock" -> "lock"; "Battery optimization" -> "battery"; else -> null }
+            statusId?.let { id ->
+                val p = ThemeStore.get(this@MainActivity)
+                val state = SetupStatusSnapshot.read(this@MainActivity).items.firstOrNull { it.id == id }?.state
+                val accent = when (state) { SetupState.VERIFIED -> p.success; SetupState.ACTION_REQUIRED -> p.warning; SetupState.NEUTRAL, SetupState.UNSUPPORTED -> p.muted; SetupState.UNKNOWN -> p.danger; null -> p.primary }
+                strokeColor = android.content.res.ColorStateList.valueOf(accent)
+                setTextColor(accent)
             }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(8) }
         }
         val info = MaterialButton(this).apply {
             text = "i"
