@@ -23,11 +23,15 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.FragmentActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.util.Locale
+import java.util.concurrent.Executors
 
 /** Read-only, on-device capability and readiness report. No hardware identifiers are collected. */
 class DeviceIntelligenceActivity : FragmentActivity() {
     private lateinit var root: LinearLayout
+    private lateinit var rootStatusView: TextView
+    private val rootCheckExecutor = Executors.newSingleThreadExecutor()
 
     override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); render() }
 
@@ -171,14 +175,21 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         )
         addCard("THIEFALERTSEQuRE READINESS", appReadiness)
         val rootReport = RootCapabilityInspector.inspectPassive()
-        addCard("ROOT INDICATORS (PASSIVE)", listOf(
+        addCard("ROOT / SUPERUSER STATUS", listOf(
             when (rootReport.status) {
-                RootCapabilityInspector.RootStatus.NOT_INDICATED -> "No common indicators found; this does not prove the device is unrooted."
-                RootCapabilityInspector.RootStatus.ROOT_INDICATORS_FOUND -> "Possible root indicators found; authorization has not been verified."
+                RootCapabilityInspector.RootStatus.NOT_INDICATED -> "PASSIVE CHECK: no common root indicators found. This does not prove the device is unrooted."
+                RootCapabilityInspector.RootStatus.ROOT_INDICATORS_FOUND -> "PASSIVE CHECK: possible root indicators found. Active su authorization has not been checked."
                 else -> rootReport.status.name
             },
-            "No root command or authorization prompt is started by this page."
+            "Build tags: ${rootReport.buildTags ?: "unknown"}",
+            if (rootReport.indicators.isEmpty()) "Indicators: none detected in common locations" else "Indicators:\\n${rootReport.indicators.joinToString("\\n")}",
+            "Active root access: NOT CHECKED — tap the button below to execute the read-only su -c id test."
         ))
+        rootStatusView = label("ROOT ACCESS: NOT CHECKED", 15f, R.color.tas_warning, true)
+        root.addView(rootStatusView, matchWrap())
+        root.addView(space(8))
+        root.addView(button("Check Root Status (run su -c id)") { confirmRootCheck() }, matchWrap())
+        root.addView(space(8))
         addCard("MANUFACTURER BACKGROUND GUIDANCE", listOf(
             AndroidDeviceCompatibility.backgroundSettingsGuide(manufacturer, brand),
             "Manufacturer menus and battery policies vary by model and firmware. Guidance does not silently change system settings."
@@ -190,6 +201,45 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         root.addView(label("Privacy boundary: this report reads public local Android APIs and hardware feature flags. It does not read IMEI, serial number, MAC address, Wi-Fi identifiers, contacts, messages, files, microphone, camera content, or precise location. Results stay on this device.", 12f, R.color.tas_muted, false), matchWrap())
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
+    }
+
+    private fun confirmRootCheck() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Check root access?")
+            .setMessage("This runs the read-only command su -c id. Your Magisk or other superuser manager may display an authorization prompt. The check does not modify files, settings, firmware, or protection behavior. Continue?")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Run check") { _, _ ->
+                rootStatusView.text = "ROOT ACCESS: CHECKING…"
+                rootCheckExecutor.execute {
+                    val report = RootCapabilityInspector.verifyRootAuthorization()
+                    runOnUiThread {
+                        if (isFinishing || isDestroyed) return@runOnUiThread
+                        val status = when (report.status) {
+                            RootCapabilityInspector.RootStatus.ROOT_AUTHORIZED -> "ROOT ACCESS GRANTED — UID 0 VERIFIED"
+                            RootCapabilityInspector.RootStatus.ROOT_NOT_AUTHORIZED -> "ROOT ACCESS DENIED / NOT GRANTED"
+                            RootCapabilityInspector.RootStatus.SU_NOT_AVAILABLE -> "SU NOT AVAILABLE — ROOT ACCESS NOT VERIFIED"
+                            RootCapabilityInspector.RootStatus.ROOT_INDICATORS_FOUND -> "POSSIBLE ROOT — AUTHORIZATION NOT VERIFIED"
+                            RootCapabilityInspector.RootStatus.NOT_INDICATED -> "NO ROOT INDICATORS — NOT PROOF OF NON-ROOT"
+                            RootCapabilityInspector.RootStatus.ROOT_CHECK_TIMED_OUT -> "ROOT CHECK TIMED OUT"
+                            RootCapabilityInspector.RootStatus.ROOT_CHECK_ERROR -> "ROOT CHECK ERROR"
+                        }
+                        rootStatusView.text = status
+                        val color = if (report.isRootAuthorized) R.color.tas_primary else R.color.tas_warning
+                        rootStatusView.setTextColor(getColor(color))
+                        val details = buildString {
+                            append(report.detail)
+                            if (report.indicators.isNotEmpty()) append("\\n\\nPassive indicators:\\n${report.indicators.joinToString("\\n")}")
+                            append("\\n\\nBuild tags: ${report.buildTags}")
+                            append("\\n\\nThis result describes root authorization available to this app at check time. Root-hiding tools can conceal indicators.")
+                        }
+                        MaterialAlertDialogBuilder(this)
+                            .setTitle("Root status: ${report.status.name}")
+                            .setMessage(details)
+                            .setPositiveButton("Close", null)
+                            .show()
+                    }
+                }
+            }.show()
     }
 
     private fun rootButtonRow() {
@@ -243,4 +293,8 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     private fun space(height: Int) = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dp(height)) }
     private fun matchWrap() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+    override fun onDestroy() {
+        rootCheckExecutor.shutdownNow()
+        super.onDestroy()
+    }
 }
