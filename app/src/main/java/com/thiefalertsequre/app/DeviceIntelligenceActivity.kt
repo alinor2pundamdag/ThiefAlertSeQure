@@ -160,7 +160,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         val ranging = Build.VERSION.SDK_INT >= 36 && checkSelfPermission("android.permission.RANGING") == PackageManager.PERMISSION_GRANTED
         val appReadiness = listOf(
             "Android notifications: ${if (notifications) "Enabled" else "Disabled"}",
-            "Full-screen alarm intent access: ${if (fullScreenIntent) "Available / not restricted" else "Not allowed by current Android settings"}",
+            "Full-screen alarm intent access: ${if (Build.VERSION.SDK_INT < 34) "No separate access gate on this Android version" else if (fullScreenIntent) "Allowed" else "Not allowed by current Android settings"}",
             "Exact alarm scheduling: ${if (exactAlarm) "Available / permitted" else "Access not granted"}",
             "Secure screen lock: ${if (secureLock) "Configured" else "Not configured"}",
             "Bluetooth Connect permission: ${if (btConnect) "Granted / not runtime-gated on this Android version" else "Not granted"}",
