@@ -168,7 +168,7 @@ class BluetoothCenterActivity : FragmentActivity() {
             runCatching { startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
             return
         }
-        val labels = devices.map { it.name?.takeIf(String::isNotBlank) ?: "Bluetooth accessory" }.toTypedArray()
+        val labels = devices.map { it.name?.takeIf { name -> name.isNotBlank() } ?: "Bluetooth accessory" }.toTypedArray()
         MaterialAlertDialogBuilder(this)
             .setTitle("Select trusted paired accessory")
             .setItems(labels) { _, which ->
