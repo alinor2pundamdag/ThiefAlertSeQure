@@ -8,8 +8,8 @@ import androidx.fragment.app.FragmentActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 class ThemeActivity:FragmentActivity(){
- private var preview=ThemeStore.selected(this);private var mode="Dark"
- override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);render()}
+ private var preview=ThemeStore.DEFAULT_ID;private var mode="Dark"
+ override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);preview=ThemeStore.selected(this);render()}
  override fun onResume(){super.onResume();ThemeRuntime.apply(this,window.decorView,preview)}
  private fun dp(v:Int)=(v*resources.displayMetrics.density).toInt()
  private fun render(){
