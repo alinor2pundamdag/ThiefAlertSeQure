@@ -1,4 +1,4 @@
-package com.thiefalertsequre
+package com.thiefalertsequre.app
 import android.Manifest
 import android.app.ActivityManager
 import android.app.AlarmManager
