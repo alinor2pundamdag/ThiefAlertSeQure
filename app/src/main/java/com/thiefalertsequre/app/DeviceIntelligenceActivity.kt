@@ -143,7 +143,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             PackageManager.FEATURE_SENSOR_PROXIMITY to "Proximity sensor feature flag"
         )
         addCard("ANDROID HARDWARE FEATURES", features.map { (feature, name) ->
-            "$name: ${if (pm.hasSystemFeature(feature)) "Detected" else "Not declared by device"}
+            "$name: ${if (pm.hasSystemFeature(feature)) "Detected" else "Not declared by device"}"
         })
 
         val alarmManager = getSystemService(AlarmManager::class.java)
