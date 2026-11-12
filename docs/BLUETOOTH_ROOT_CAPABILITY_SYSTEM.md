@@ -158,3 +158,26 @@ Distinguish not checked from not supported, permission required, temporarily una
 8. Test explicit root authorization granted, denied, cancelled, and timed out.
 9. Confirm root diagnostics never modify Bluetooth state or system configuration.
 10. Confirm charger alarm and A2 remain functional when root is absent, denied, or unavailable.
+
+## Per-install controller capability probes (2026-11-12)
+
+The capability inventory now runs locally on each installation and queries the current device rather than relying only on the Android version label.
+
+Direct controller probes include:
+- LE 2M PHY and LE Coded PHY.
+- LE Extended Advertising and LE Periodic Advertising.
+- Multiple BLE advertising support.
+- Controller offloaded filtering and scan batching.
+- Android 13+ LE Audio, Broadcast Source, and Broadcast Assistant support status.
+
+The inventory also reports adapter presence/power, Bluetooth Connect permission state, Classic/BLE hardware feature flags, and the number of paired devices when the adapter is on and permission allows access. It does not copy paired-device names or addresses into the report.
+
+The UI distinguishes supported by the local controller, API present but requiring further capability/session verification, compatible peer required, permission required, adapter off, unsupported/not detected, unknown, not implemented by this app, and root-only read-only diagnostics.
+
+A controller probe returning supported does not mean the app has implemented an end-user workflow using that capability. Advertising hardware support does not mean the app starts advertising; LE Audio support does not mean the app is an audio player; profile inventory does not mean the app reads contacts/messages or transfers files. Android API errors and permission restrictions are surfaced as unknown/permission-required rather than being treated as unsupported or silently enabled.
+
+The main dashboard displays a compact per-device summary. Settings exposes the full inventory. The inventory is refreshed when the relevant screen is opened; it is not a background scanner and does not continuously discover nearby devices.
+
+## Owner-request persistence
+
+The owner requested that future Bluetooth feature requests be implemented where technically possible and recorded for continuity. The project-level instruction and implementation log are maintained in docs/OWNER_BLUETOOTH_IMPLEMENTATION_POLICY.md. ChatGPT project Memory is disabled in this project, so repository documentation is the durable record rather than a claim of persistent assistant memory.
