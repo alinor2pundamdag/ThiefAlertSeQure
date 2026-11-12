@@ -40,7 +40,10 @@ object ThemeRuntime {
  fun apply(a:Activity,root:View,id:String=ThemeStore.selected(a)){
   val p=ThemeStore.get(a,id); a.window.statusBarColor=p.background; a.window.navigationBarColor=p.background
   @Suppress("DEPRECATION") run { a.window.decorView.systemUiVisibility=if(p.mode=="Light") View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0 }
-  val old=mapOf(a.getColor(R.color.tas_primary) to p.primary,a.getColor(R.color.tas_on_primary) to p.onPrimary,a.getColor(R.color.tas_background) to p.background,a.getColor(R.color.tas_surface) to p.surface,a.getColor(R.color.tas_surface_variant) to p.variant,a.getColor(R.color.tas_text) to p.text,a.getColor(R.color.tas_muted) to p.muted,a.getColor(R.color.tas_success) to p.success,a.getColor(R.color.tas_warning) to p.warning,a.getColor(R.color.tas_danger) to p.danger)
+  val decor=a.window.decorView
+  val previousId=decor.tag as? String ?: ThemeStore.DEFAULT_ID
+  val previous=ThemeStore.get(a,previousId)
+  val old=mapOf(previous.primary to p.primary,previous.onPrimary to p.onPrimary,previous.background to p.background,previous.surface to p.surface,previous.variant to p.variant,previous.text to p.text,previous.muted to p.muted,previous.success to p.success,previous.warning to p.warning,previous.danger to p.danger)
   fun walk(v:View){
    if(v is TextView) old[v.currentTextColor]?.let(v::setTextColor)
    if(v is MaterialCardView){old[v.cardBackgroundColor.defaultColor]?.let(v::setCardBackgroundColor);v.strokeColor=p.variant}
@@ -48,6 +51,6 @@ object ThemeRuntime {
    if(v is MaterialButton){ val tint=v.backgroundTintList?.defaultColor; when(tint){a.getColor(R.color.tas_primary)->v.backgroundTintList=ColorStateList.valueOf(p.primary);a.getColor(R.color.tas_surface)->v.backgroundTintList=ColorStateList.valueOf(p.surface);a.getColor(R.color.tas_surface_variant)->v.backgroundTintList=ColorStateList.valueOf(p.variant)}; if(v.currentTextColor==a.getColor(R.color.tas_on_primary))v.setTextColor(p.onPrimary)}
    if(v is ViewGroup) for(i in 0 until v.childCount) walk(v.getChildAt(i))
   }
-  walk(root); root.setBackgroundColor(p.background)
+  walk(root); root.setBackgroundColor(p.background); decor.tag=id
  }
 }
