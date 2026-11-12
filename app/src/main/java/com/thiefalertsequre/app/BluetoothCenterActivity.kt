@@ -42,7 +42,7 @@ class BluetoothCenterActivity : FragmentActivity() {
         val scroll = ScrollView(this).apply { isFillViewport = true; setBackgroundColor(getColor(R.color.tas_background)) }
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(22), dp(20), dp(30)) }
         scroll.addView(root)
-        root.addView(button("‹  Back to Settings") { finish() }, matchWrap())
+        root.addView(button("‹  Back") { finish() }, matchWrap())
         root.addView(space(18))
         root.addView(label("DEVICE CAPABILITY CENTER", 11f, R.color.tas_primary, true), matchWrap())
         root.addView(space(6))
