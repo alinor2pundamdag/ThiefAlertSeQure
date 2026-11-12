@@ -211,10 +211,12 @@ object BluetoothCapabilityCatalog {
         )
         add("Bluetooth Direction Finding (AoA/AoD)", State.HARDWARE_REQUIRED,
             "Requires controller support, antenna arrays, peer support, and platform APIs. Not inferred from a phone compass.")
-        add("UWB ranging", if (api >= 31) State.API_PRESENT_CHECK_REQUIRED else State.NOT_SUPPORTED,
-            "UWB is not Bluetooth. Android Ranging can expose it on supported OS/device combinations; this app does not start UWB sessions.")
-        add("Wi-Fi NAN RTT / Wi-Fi Proximity", if (api >= 36) State.API_PRESENT_CHECK_REQUIRED else State.NOT_SUPPORTED,
-            "These are Wi-Fi technologies, not Bluetooth. They are listed separately to prevent category confusion.")
+        add("UWB platform capability", if (api >= 31) State.API_PRESENT_CHECK_REQUIRED else State.NOT_SUPPORTED,
+            "UWB is not Bluetooth. Android exposes UWB APIs on supported Android 12+ devices; Android Ranging integration is queried separately where available. This app does not start UWB sessions.")
+        add("Wi-Fi NAN RTT ranging", if (api >= 36) State.API_PRESENT_CHECK_REQUIRED else State.NOT_SUPPORTED,
+            "Wi-Fi NAN RTT is not Bluetooth. Android Ranging API capability must be queried; this app does not start Wi-Fi ranging sessions.")
+        add("Wi-Fi Proximity Detection", if (api >= 37) State.API_PRESENT_CHECK_REQUIRED else State.NOT_SUPPORTED,
+            "Android 17+ platform capability; this is Wi-Fi, not Bluetooth, and requires supported hardware, system capability, and peer context.")
         add("Root Bluetooth stack diagnostics", State.ROOT_ONLY,
             if (root.isRootAuthorized) "Root authorization was verified in an explicit owner action; read-only diagnostics can be requested."
             else "Requires an explicit owner-authorized root check. Passive root indicators are not proof.")
