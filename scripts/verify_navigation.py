@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 JAVA = ROOT / "app" / "src" / "main" / "java"
+APP = JAVA / "com" / "thiefalertsequre" / "app"
 MANIFEST = ROOT / "app" / "src" / "main" / "AndroidManifest.xml"
 ANDROID = "{http://schemas.android.com/apk/res/android}"
 
@@ -50,7 +51,7 @@ if missing_declarations:
 if missing_sources:
     errors.append("Manifest Activities missing Kotlin classes: " + ", ".join(missing_sources))
 
-theme_activity = (JAVA / "ThemeActivity.kt").read_text(encoding="utf-8")
+theme_activity = (APP / "ThemeActivity.kt").read_text(encoding="utf-8")
 for required in (
     "LIVE APP PREVIEW", "SETTINGS", "PROTECTION READINESS",
     "SAMPLE CONFIRMATION DIALOG", "ThemeStore.save",
@@ -59,15 +60,15 @@ for required in (
     if required not in theme_activity:
         errors.append("ThemeActivity missing required preview/inset contract: " + required)
 
-bluetooth_activity = (JAVA / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
+bluetooth_activity = (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
 if "AndroidDeviceCompatibility.open(this, Intent(Settings.ACTION_BLUETOOTH_SETTINGS)" not in bluetooth_activity:
     errors.append("BluetoothCenterActivity must provide a fallback for Bluetooth Settings navigation")
 
-device_activity = (JAVA / "DeviceIntelligenceActivity.kt").read_text(encoding="utf-8")
+device_activity = (APP / "DeviceIntelligenceActivity.kt").read_text(encoding="utf-8")
 if "AndroidDeviceCompatibility.appInfoIntent(packageName)" not in device_activity:
     errors.append("DeviceIntelligenceActivity must provide a fallback for app Settings navigation")
 
-setup_activity = (JAVA / "SetupStatusActivity.kt").read_text(encoding="utf-8")
+setup_activity = (APP / "SetupStatusActivity.kt").read_text(encoding="utf-8")
 for required in (
     "AndroidDeviceCompatibility.open", "AndroidDeviceCompatibility.applySystemBarInsets",
     "openStatusAction", "Toast.LENGTH_LONG"
@@ -75,12 +76,12 @@ for required in (
     if required not in setup_activity:
         errors.append("SetupStatusActivity missing safe action/inset contract: " + required)
 
-a2_policy = (JAVA / "A2SetupStatusPolicy.kt").read_text(encoding="utf-8")
+a2_policy = (APP / "A2SetupStatusPolicy.kt").read_text(encoding="utf-8")
 if "connectedBaselineCount < trustedDeviceCount" not in a2_policy:
     errors.append("A2 setup readiness must require a fresh baseline for every registered device")
 
-registry = (JAVA / "TrustedBluetoothRegistry.kt").read_text(encoding="utf-8")
-service = (JAVA / "ProtectionMonitorService.kt").read_text(encoding="utf-8")
+registry = (APP / "TrustedBluetoothRegistry.kt").read_text(encoding="utf-8")
+service = (APP / "ProtectionMonitorService.kt").read_text(encoding="utf-8")
 if "fun deviceRevision(" not in registry or "TrustedBluetoothRegistry.deviceRevision(prefs, address)" not in service:
     errors.append("A2 disconnect timers must use per-device registry revisions")
 if "TrustedBluetoothRegistry.revision(prefs)" not in service:
