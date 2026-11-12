@@ -48,7 +48,7 @@ object ThemeRuntime {
    if(v is TextView) old[v.currentTextColor]?.let(v::setTextColor)
    if(v is MaterialCardView){old[v.cardBackgroundColor.defaultColor]?.let(v::setCardBackgroundColor);v.strokeColor=p.variant}
    else if(v.background is ColorDrawable) old[(v.background as ColorDrawable).color]?.let(v::setBackgroundColor)
-   if(v is MaterialButton){ val tint=v.backgroundTintList?.defaultColor; when(tint){a.getColor(R.color.tas_primary)->v.backgroundTintList=ColorStateList.valueOf(p.primary);a.getColor(R.color.tas_surface)->v.backgroundTintList=ColorStateList.valueOf(p.surface);a.getColor(R.color.tas_surface_variant)->v.backgroundTintList=ColorStateList.valueOf(p.variant)}; if(v.currentTextColor==a.getColor(R.color.tas_on_primary))v.setTextColor(p.onPrimary)}
+   if(v is MaterialButton){ val tint=v.backgroundTintList?.defaultColor; old[tint]?.let{v.backgroundTintList=ColorStateList.valueOf(it)}; val stroke=v.strokeColor?.defaultColor; old[stroke]?.let{v.strokeColor=ColorStateList.valueOf(it)} }
    if(v is ViewGroup) for(i in 0 until v.childCount) walk(v.getChildAt(i))
   }
   walk(root); root.setBackgroundColor(p.background); decor.tag=id
