@@ -1,4 +1,4 @@
-package com.thiefalertsequre
+package com.thiefalertsequre.app
 import android.app.Activity
 import android.content.Context
 import android.content.res.ColorStateList
