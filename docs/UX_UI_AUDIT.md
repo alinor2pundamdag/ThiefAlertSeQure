@@ -28,6 +28,8 @@ Status: development audit; not a release certification.
 - Removing the final trusted accessory automatically disables A2.
 - Pending disconnect callbacks are invalidated when the registry changes, including A2 disable/re-enable and service restart.
 - Setup status now checks registered-device baselines rather than the legacy single-device baseline flag.
+- A2 setup readiness distinguishes disabled monitor, unconfirmed service, missing baseline, permission failure, adapter failure, and verified readiness.
+- Setup action labels describe their actual destinations; the monitor action opens monitor settings instead of generic Android app details.
 - Add JVM tests for registry encoding, duplicate handling, malformed records, and empty state.
 
 ## Security invariants

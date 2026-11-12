@@ -20,13 +20,22 @@ class SetupStatusActivity:FragmentActivity(){
   root.addView(TextView(this).apply{text="Protection readiness";textSize=27f;setTextColor(p.text)})
   root.addView(TextView(this).apply{text="Fresh Android checks. Stored preferences alone never prove that a service is running.";textSize=13f;setTextColor(p.muted)})
   SetupStatusSnapshot.read(this).items.forEach{item->
-   val color=when(item.state){SetupState.VERIFIED->p.success;SetupState.ACTION_REQUIRED->p.warning;SetupState.NEUTRAL,SetupState.UNSUPPORTED->p.muted;SetupState.UNKNOWN->p.danger}
+   val color=when(item.state){SetupState.VERIFIED->p.success;SetupState.ACTION_REQUIRED->p.warning;SetupState.NEUTRAL,SetupState.UNSUPPORTED->p.muted;SetupState.UNKNOWN->p.muted}
    val card=MaterialCardView(this).apply{radius=dp(14).toFloat();setCardBackgroundColor(p.surface);strokeColor=p.variant;strokeWidth=dp(1)}
    val body=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(13),dp(12),dp(13),dp(12))}
    body.addView(TextView(this).apply{text=item.title;textSize=16f;setTextColor(p.text)})
    body.addView(TextView(this).apply{text=item.state.name.replace('_',' ');textSize=11f;setTextColor(color)})
    body.addView(TextView(this).apply{text=item.detail;textSize=13f;setTextColor(p.muted)})
-   SetupStatusSnapshot.action(this,item.id)?.let{intent->body.addView(MaterialButton(this).apply{text="Open Android settings";setOnClickListener{runCatching{startActivity(intent)}}})}
+   SetupStatusSnapshot.action(this,item.id)?.let{intent->
+    val actionLabel=when(item.id){
+     "monitor"->"Review monitor settings"
+     "a2"->"Manage trusted accessories"
+     "bt"->"Open Bluetooth settings"
+     "bt_permission"->"Open app permissions"
+     else->"Open Android settings"
+    }
+    body.addView(MaterialButton(this).apply{text=actionLabel;minHeight=dp(48);setOnClickListener{runCatching{startActivity(intent)}}})
+   }
    card.addView(body);root.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(8)})
   }
   setContentView(scroll);ThemeRuntime.apply(this,scroll);rendered=true

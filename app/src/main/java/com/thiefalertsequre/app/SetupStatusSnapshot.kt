@@ -36,8 +36,10 @@ object SetupStatusSnapshot {
   val prefs=c.getSharedPreferences(ProtectionMonitorService.PREFS,0);val enabled=prefs.getBoolean(ProtectionMonitorService.KEY_ENABLED,ProtectionMonitorPolicy.DEFAULT_ENABLED)
   val running=runCatching{c.getSystemService(ActivityManager::class.java).getRunningServices(100).any{it.service.className==ProtectionMonitorService::class.java.name}}.getOrDefault(false)
   x+=when{!enabled->SetupItem("monitor","Protection monitor",SetupState.NEUTRAL,"Monitor is disabled by owner.");running->SetupItem("monitor","Protection monitor",SetupState.VERIFIED,"Android process list confirms the service is running.");else->SetupItem("monitor","Protection monitor",SetupState.UNKNOWN,"Enabled preference exists, but running service is not confirmed.")}
-  val a2=prefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED,false);val trustedDevices=TrustedBluetoothRegistry.read(prefs);val trusted=trustedDevices.isNotEmpty();val baseline=trustedDevices.any{TrustedBluetoothRegistry.isBaselineConnected(prefs,it.address)}
-  x+=when{!a2->SetupItem("a2","Bluetooth separation alert",SetupState.NEUTRAL,"Optional A2 is disabled.");!trusted->SetupItem("a2","Bluetooth separation alert",SetupState.ACTION_REQUIRED,"A2 is enabled but no trusted accessory is registered.");!perm->SetupItem("a2","Bluetooth separation alert",SetupState.ACTION_REQUIRED,"Bluetooth Connect permission is required.");adapter!=true->SetupItem("a2","Bluetooth separation alert",if(adapter==false)SetupState.ACTION_REQUIRED else SetupState.UNKNOWN,"Bluetooth must be enabled and verified before A2 can monitor.");!baseline->SetupItem("a2","Bluetooth separation alert",SetupState.ACTION_REQUIRED,"Reconnect at least one registered accessory to establish a fresh connection baseline.");running->SetupItem("a2","Bluetooth separation alert",SetupState.VERIFIED,"Permission, adapter, a registered-device baseline, and monitor process are confirmed.");else->SetupItem("a2","Bluetooth separation alert",SetupState.UNKNOWN,"Monitor service is not confirmed running.")}
+  val a2=prefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED,false)
+  val trustedDevices=TrustedBluetoothRegistry.read(prefs)
+  val baselineCount=trustedDevices.count{TrustedBluetoothRegistry.isBaselineConnected(prefs,it.address)}
+  x+=A2SetupStatusPolicy.evaluate(a2,trustedDevices.size,perm,adapter,enabled,running,baselineCount)
   return SetupSnapshot(x)
  }
  fun action(c:Context,id:String):Intent?=when(id){
@@ -47,7 +49,8 @@ object SetupStatusSnapshot {
  "battery"->if(Build.VERSION.SDK_INT>=23)Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:${c.packageName}"))else null
  "lock"->Intent(Settings.ACTION_SECURITY_SETTINGS)
  "bt"->Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
- "bt_permission","monitor"->Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:${c.packageName}"))
+ "bt_permission"->Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:${c.packageName}"))
+ "monitor"->Intent(c,SettingsActivity::class.java)
  "a2"->Intent(c,BluetoothCenterActivity::class.java)
  else->null}
 }
