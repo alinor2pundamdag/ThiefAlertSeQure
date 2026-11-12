@@ -84,6 +84,12 @@ for screen in (
         errors.append(screen + " must apply system-bar/cutout insets")
 
 settings_activity = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
+if "startActivity(installIntent)" in settings_activity:
+    errors.append("Package installer launch must use guarded Android Settings/activity fallback")
+if "startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" in settings_activity:
+    errors.append("Battery optimization request must use guarded Android Settings/activity fallback")
+if "AndroidDeviceCompatibility.open(" not in settings_activity:
+    errors.append("Settings external destinations must use the centralized guarded launcher")
 if "Android access not granted" not in settings_activity or "Open access settings" not in settings_activity:
     errors.append("Optional full-screen dashboard toggle must disclose missing Android access and provide a settings route")
 

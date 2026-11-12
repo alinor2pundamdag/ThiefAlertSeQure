@@ -458,11 +458,11 @@ class SettingsActivity : FragmentActivity() {
                 )
                 .setNegativeButton("Cancel") { _, _ -> pendingUpdateInstall = null }
                 .setPositiveButton("Open Android setting") { _, _ ->
-                    startActivity(
-                        Intent(
-                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                            Uri.parse("package:$packageName")
-                        )
+                    AndroidDeviceCompatibility.open(
+                        this,
+                        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")),
+                        AndroidDeviceCompatibility.appInfoIntent(packageName),
+                        Intent(Settings.ACTION_SETTINGS)
                     )
                 }
                 .showThemed(this)
@@ -479,7 +479,13 @@ class SettingsActivity : FragmentActivity() {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 putExtra(Intent.EXTRA_RETURN_RESULT, true)
             }
-            startActivity(installIntent)
+            val installerFallback = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(apkUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            if (!AndroidDeviceCompatibility.open(this, installIntent, installerFallback)) {
+                android.widget.Toast.makeText(this, "No Android package installer is available.", android.widget.Toast.LENGTH_LONG).show()
+            }
         }.onFailure {
             android.widget.Toast.makeText(
                 this, "Android could not open the package installer: \${it.message}", android.widget.Toast.LENGTH_LONG
@@ -805,11 +811,12 @@ class SettingsActivity : FragmentActivity() {
                 android.widget.Toast.makeText(this, "Battery optimization is already unrestricted for ThiefAlertSeQure.", android.widget.Toast.LENGTH_LONG).show()
                 return
             }
-            try {
-                startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).setData(Uri.parse("package:$packageName")))
-            } catch (_: Exception) {
-                open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
-            }
+            AndroidDeviceCompatibility.open(
+                this,
+                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).setData(Uri.parse("package:$packageName")),
+                Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+                AndroidDeviceCompatibility.appInfoIntent(packageName)
+            )
         } else {
             openBatterySettings()
         }
