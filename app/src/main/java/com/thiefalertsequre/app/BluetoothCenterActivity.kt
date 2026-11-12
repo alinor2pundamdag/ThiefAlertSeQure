@@ -1,6 +1,9 @@
 package com.thiefalertsequre.app
 
 import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -13,6 +16,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.FragmentActivity
+import androidx.core.content.ContextCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -22,7 +26,12 @@ import java.util.concurrent.Executors
 class BluetoothCenterActivity : FragmentActivity() {
     private lateinit var root: LinearLayout
     private val ioExecutor = Executors.newSingleThreadExecutor()
-    private val connectPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { render() }
+    private var enableAfterPermission = false
+    private val connectPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            if (enableAfterPermission) enableA2() else showTrustedDevicePicker()
+        } else render()
+    }
     private val rangingPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted && Build.VERSION.SDK_INT >= 36) queryRangingCapabilities() else render()
     }
@@ -58,6 +67,7 @@ class BluetoothCenterActivity : FragmentActivity() {
             "Paired devices: ${snapshot.bondedDeviceCount?.toString() ?: "Not checked"}",
             "Controller probes supported: ${snapshot.supportedCount} • Unknown: ${snapshot.unknownCount}"
         ))
+        addTrustedDeviceSection()
         if (!snapshot.connectPermissionGranted && Build.VERSION.SDK_INT >= 31) {
             root.addView(button("Grant Bluetooth Connect permission") { connectPermission.launch(Manifest.permission.BLUETOOTH_CONNECT) }, matchWrap())
             root.addView(space(8))
@@ -109,6 +119,119 @@ class BluetoothCenterActivity : FragmentActivity() {
         root.addView(label("Capability labels are conservative. SUPPORTED means the local device/controller reported support; it does not mean ThiefAlertSeQure has implemented a complete user workflow. Peer-dependent profiles require compatible accessories. Unsupported hardware cannot be enabled by software or root.", 12f, R.color.tas_muted, false), matchWrap())
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
+    }
+
+    private fun addTrustedDeviceSection() {
+        val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+        val name = prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, null)
+        val enabled = prefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+        val baseline = prefs.getBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
+        val monitorEnabled = prefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        val protectionMode = ProtectionStore(this).read().mode
+        addCard("TRUSTED ACCESSORY SEPARATION ALERT (A2)", listOf(
+            "Feature: ${if (enabled) "ON" else "OFF"}",
+            "Trusted accessory: ${name ?: "Not selected"}",
+            "Connection baseline: ${if (baseline) "Established" else "Not established — connect/reconnect the accessory after enabling"}",
+            "Protection monitor: ${if (monitorEnabled) "Enabled" else "Disabled by owner"}",
+            "Protection state: $protectionMode",
+            "When armed, a matching disconnect starts an 8-second grace period. Reconnection cancels the pending alert."
+        ))
+        root.addView(button("Choose or change trusted paired device") { requestTrustedDevicePicker() }, matchWrap())
+        root.addView(space(7))
+        root.addView(button(if (enabled) "Disable trusted-device separation alert" else "Enable trusted-device separation alert") { toggleA2() }, matchWrap())
+        root.addView(space(14))
+    }
+
+    private fun requestTrustedDevicePicker() {
+        if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            enableAfterPermission = false
+            connectPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+        } else showTrustedDevicePicker()
+    }
+
+    @Suppress("MissingPermission", "DEPRECATION")
+    private fun showTrustedDevicePicker() {
+        val adapter = getSystemService(BluetoothManager::class.java)?.adapter
+        if (adapter == null) {
+            showResult("Bluetooth unavailable", "This device does not expose a Bluetooth adapter.")
+            return
+        }
+        val enabled = runCatching { adapter.isEnabled }.getOrDefault(false)
+        if (!enabled) {
+            showResult("Turn on Bluetooth", "Turn on Bluetooth and pair your trusted accessory in Android Settings, then return here.")
+            runCatching { startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
+            return
+        }
+        val devices = runCatching { adapter.bondedDevices.toList().sortedBy { it.name ?: it.address } }.getOrDefault(emptyList())
+        if (devices.isEmpty()) {
+            showResult("No paired accessories", "Pair a watch, earbuds, or another trusted Bluetooth accessory in Android Settings first.")
+            runCatching { startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
+            return
+        }
+        val labels = devices.map { it.name?.takeIf(String::isNotBlank) ?: "Bluetooth accessory" }.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Select trusted paired accessory")
+            .setItems(labels) { _, which ->
+                val selected = devices[which]
+                getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE).edit()
+                    .putString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, selected.address)
+                    .putString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, selected.name ?: "Bluetooth accessory")
+                    .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
+                    .apply()
+                render()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun toggleA2() {
+        val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+        if (prefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)) {
+            prefs.edit()
+                .putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+                .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
+                .apply()
+            render()
+            return
+        }
+        if (prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null).isNullOrBlank()) {
+            requestTrustedDevicePicker()
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            enableAfterPermission = true
+            connectPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+            return
+        }
+        enableA2()
+    }
+
+    private fun enableA2() {
+        enableAfterPermission = false
+        val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+        if (prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null).isNullOrBlank()) {
+            showTrustedDevicePicker()
+            return
+        }
+        if (!prefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
+            showResult("Protection monitor is disabled", "Enable the protection monitor from the main dashboard first. This Bluetooth alert uses the existing user-visible monitor and will not silently turn it back on.")
+            return
+        }
+        if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+            showResult("Alarm is active", "Do not change Bluetooth alert configuration while the theft alarm is active.")
+            return
+        }
+        prefs.edit()
+            .putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, true)
+            .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
+            .apply()
+        runCatching {
+            ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
+        }.onFailure {
+            prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).apply()
+            showResult("Could not start monitoring", "${it.javaClass.simpleName}: ${it.message ?: "Android blocked the foreground service."}")
+        }
+        render()
     }
 
     private fun addCapabilityItem(item: BluetoothCapabilityCatalog.Item) {
