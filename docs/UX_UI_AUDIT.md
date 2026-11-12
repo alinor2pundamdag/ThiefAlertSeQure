@@ -1,20 +1,21 @@
 # v1.1.4 UX/UI and interaction audit
 
-Status: active development audit; not a release certification.
+Status: source-level UX/UI implementation and CI audit passed on the recorded development HEAD; physical-device acceptance remains pending. This is not a release certification.
 
 ## Verified baseline
 - Branch: `feature/persistent-themes-and-setup-status`
-- Baseline commit: `1cfa2696be72b7fe40fe078f4be05d1304e2c227`
-- GitHub Actions run #1072 completed successfully on that exact commit.
+- Verified HEAD: `a0c739471ad08740b2c33921ecc6f03a5096dc8e`
+- GitHub Actions run [#1090](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43192440662) completed successfully on that exact commit.
 - Unit tests, internal navigation/dialog checks, Android lint, asset validation, workflow YAML validation, APK assembly, package/version/signer checks, and artifact upload passed.
+- The successful run produced the `ThiefAlertSeQure-debug-apk` artifact (ID `13931621964`; development-only test package).
 - No physical-device test has been performed by this audit.
 
 ## Implemented interaction contracts
 - Theme selection remains a local preview until Apply; Cancel does not persist the selection.
 - Theme preview represents dashboard, settings, setup readiness, and confirmation-dialog surfaces.
 - Preview sample controls are visual-only and explicitly identified as non-interactive.
-- Main, Bluetooth capability, Device Intelligence, and setup-status action buttons enforce at least 48dp minimum touch height.
-- All six app screens apply system-bar and display-cutout insets for edge-to-edge devices.
+- Main, Settings, Bluetooth capability, Device Intelligence, Theme, and setup-status action buttons enforce at least 48dp minimum touch height.
+- All six app screens apply system-bar and display-cutout insets for edge-to-edge devices and reapply the saved/preview theme when returning to the screen.
 - Dark/light filters remain tappable, visibly indicate selection, and use 48dp minimum height.
 - All 16 palettes have JVM WCAG AA checks for primary/muted text on background and surface, button text on primary, primary accent on surface, and success/warning/danger status labels on surfaces.
 - Trusted Bluetooth registry supports multiple locally registered accessories, per-device connection baselines, and independent 8-second disconnect grace timers.
@@ -30,7 +31,10 @@ Status: active development audit; not a release certification.
 - Bluetooth Center separates the monitor preference from a confirmed running service state and does not claim accessory monitoring when the service is not confirmed running.
 - Setup status displays action buttons only for action-required or unconfirmed states; neutral, unsupported, and verified items do not show misleading action controls.
 - Material dialogs in audited screens use the shared themed-dialog helper.
-- CI statically checks manifest Activity declarations, internal Activity targets, themed Material dialogs, obvious empty click listeners, theme-preview/inset contracts, safe setup-action fallbacks, Bluetooth/Device Intelligence Settings fallbacks, and A2 readiness/timer invalidation contracts.
+- External Android Settings, battery-optimization, unknown-source install-access, and package-installer launches use a centralized guarded launcher with ordered fallbacks and visible failure feedback.
+- Explicit device-credential launch failure is handled without clearing or stopping the latched alarm; the failure is recorded locally and owner authentication can be retried.
+- CI statically checks manifest Activity declarations, internal Activity targets, themed Material dialogs, obvious empty click listeners, theme-preview/inset/reapply contracts, safe setup-action fallbacks, external Settings/installer launch guards, credential-launch failure handling, Bluetooth/Device Intelligence Settings fallbacks, and A2 readiness/timer invalidation contracts.
+- Charger countdown, reconnect cancellation, latched alarm state, reboot recovery, authentication throttle/cooldown, and authenticated alarm clearing have JVM regression coverage. A2 timer invalidation, unregister, reconnect, armed-state gating, and multiple-device registry encoding have JVM policy/registry coverage.
 
 ## Security invariants
 - Owner authentication remains Android Keyguard / supported strong biometric verification; app code does not collect or store the device credential.
@@ -41,16 +45,15 @@ Status: active development audit; not a release certification.
 - No new permissions or background services are introduced by the theme preview.
 - Production package ID, signing configuration, minSdk, and release version remain unchanged.
 
-## Remaining audit and verification gates
-- Review every click listener and settings route in every Activity, including fallback behavior when an Android Settings intent is unavailable.
-- Verify Activity recreation, theme persistence, and preview cancellation paths.
-- Verify Bluetooth unregister, reconnect, duplicate registration, two-device concurrency, and stale callback invalidation.
-- Verify charger alarm, alarm state transitions, and authentication behavior with dedicated regression tests.
-- Verify TalkBack semantics, focus order, large-font scaling, and touch targets on a real device.
+## Remaining device-acceptance gates
+- Verify Activity recreation, theme persistence after process death, and preview cancellation on device.
+- Verify Bluetooth unregister, reconnect, duplicate registration, two-device concurrency, and stale callback invalidation on device.
+- Verify TalkBack semantics, focus order, large-font scaling, contrast perception, and touch targets on the actual display.
 - Verify notification, exact-alarm, full-screen-intent, foreground-service and battery-management behavior on HONOR 200 Pro.
 - Verify OEM background restrictions do not suppress the monitor or delay alarm delivery on the target device.
+- Repeat charger countdown, reconnect, alarm latch, audio/flashlight, and owner-authentication recovery tests on the target device; JVM tests do not substitute for Android hardware/system behavior.
 
-## Physical-device checklist — pending
+## Physical-device checklist — pending (owner has not tested this v1.1.4 development build)
 - HONOR 200 Pro: Android version, permission flows, Bluetooth adapter off/on, paired accessory connect/disconnect.
 - Confirm A2 8-second behavior, reconnect cancellation, and independent monitoring of two trusted accessories.
 - Confirm unregister does not remove Android pairing.

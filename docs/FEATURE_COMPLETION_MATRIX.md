@@ -11,6 +11,23 @@
 > **Official successor baseline: v1.1.3 (versionCode 5).** This release line preserves the completed v1.1.2 feature set; its intended functional addition is the synchronized rear-LED flashlight during a latched alarm. No v1.1.2 protection, alarm, authentication, privacy, settings, history, or managed-device feature is intentionally removed. Flashlight availability is optional and cannot block audio.
 
 
+## v1.1.4 development-only UX/UI and interaction work
+
+The production baseline remains v1.1.3. The current feature branch contains the following v1.1.4 development work; it is not merged or released.
+
+| Feature | Implementation / verification |
+|---|---|
+| Persistent appearance system | 16 locally persisted palettes (8 dark, 8 light); live preview is isolated until Apply; Cancel preserves the selected palette |
+| Cross-screen theme consistency | Main, Settings, Bluetooth Center, Device Intelligence, Theme, and Setup Status screens reapply the selected palette; app-owned Material dialogs use shared theme styling |
+| Theme accessibility | JVM WCAG AA contrast assertions cover primary/muted text, button text, primary accents, and success/warning/danger status labels across all palettes |
+| Theme preview | Representative dashboard, settings, setup-readiness, and confirmation-dialog surfaces; sample actions are explicitly preview-only |
+| Setup readiness | Live checks distinguish verified, action-required, neutral, unsupported, and unknown; optional Bluetooth and full-screen features do not demand permissions while disabled |
+| Setup navigation | Action buttons appear only for actionable/unconfirmed states and use destination-specific labels with guarded Android Settings fallbacks |
+| Multi-accessory A2 | Local multi-device trust registry, per-device baselines/revisions, independent 8-second disconnect grace periods, reconnect cancellation, and unregister-without-unpairing semantics |
+| Navigation and interaction audit | CI static checks cover declared Activity destinations, obvious empty click listeners, themed dialogs, edge-to-edge insets, theme reapplication, and external launch fallbacks |
+| Alarm/authentication regression protection | JVM tests cover the existing 10-second charger countdown, reconnect cancellation, latched alarm behavior, reboot recovery, authentication cooldown, and A2 disconnect gates |
+| Development build | Exact-head CI builds and verifies a side-by-side development APK; it is not a production update or release |
+
 ## Implemented in this branch
 
 | Feature | Implementation |
