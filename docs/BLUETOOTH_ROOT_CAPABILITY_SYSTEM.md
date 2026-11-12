@@ -15,7 +15,7 @@ The system is local-first. It does not upload device fingerprints, Bluetooth ide
 ### Root-enhanced diagnostics mode
 Root detection has two stages:
 1. **Passive startup detection:** checks common su/Magisk paths and build tags. It never launches a root manager prompt. Results are "no common indicators" or "possible root indicators"; neither proves the device's true root state.
-2. **Owner-authorized verification:** only after the owner taps the diagnostics action, the app runs the read-only command 'su -c id'. A root manager may display an authorization prompt. A successful uid=0 response verifies that this app received root authorization for that diagnostic request.
+2. **Owner-authorized verification:** both the Device Intelligence page and Bluetooth diagnostics page expose an explicit root-check action. After confirmation, the app runs the read-only command `su -c id` off the UI thread. A root manager may display an authorization prompt. A successful `uid=0` response verifies that this app received root authorization for that diagnostic request. The result distinguishes ROOT ACCESS GRANTED, ROOT ACCESS NOT GRANTED, SU NOT AVAILABLE, POSSIBLE ROOT, TIMEOUT, and ERROR. No common indicators plus no usable `su` is reported as no root access detected, never as proof that concealed root is impossible.
 
 After authorization, the implementation reads:
 - dumpsys bluetooth_manager
