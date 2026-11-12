@@ -64,6 +64,9 @@ jobs:
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
 
+      - name: Verify internal navigation and themed dialogs
+        run: python3 scripts/verify_navigation.py
+
       - name: Android lint
         run: |
           if ! ./gradlew :app:lintDebug --no-daemon --stacktrace; then

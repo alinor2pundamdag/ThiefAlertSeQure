@@ -906,7 +906,7 @@ class SettingsActivity : FragmentActivity() {
                 MaterialAlertDialogBuilder(this@SettingsActivity)
                     .setTitle(tutorialTitle + " • Android " + Build.VERSION.SDK_INT)
                     .setMessage(androidVersionContext() + "\n\n" + tutorial)
-                    .setPositiveButton("Got it", null).showThemed(this)
+                    .setPositiveButton("Got it", null).showThemed(this@SettingsActivity)
             }
         }
         row.addView(launch); row.addView(info, LinearLayout.LayoutParams(dp(48), dp(52)))

@@ -21,6 +21,8 @@ Status: development audit; not a release certification.
 ## Changes in this commit
 - Add a local multi-device trusted Bluetooth registry with legacy single-device migration.
 - Add WCAG AA contrast regression tests for primary text, muted text, and button labels across all 16 palettes.
+- Apply the selected palette to Material dialogs and dialog action buttons.
+- Add CI static checks for internal Activity declarations/targets and themed Material dialog usage.
 - Clear per-device connection baselines when A2 is disabled or re-enabled.
 - Add per-device connection baselines and per-device 8-second disconnect timers.
 - Add explicit confirmation before unregistering an accessory.

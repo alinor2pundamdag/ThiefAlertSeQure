@@ -641,7 +641,7 @@ class MainActivity : FragmentActivity() {
                     .setTitle(tutorialTitle + " • Android " + Build.VERSION.SDK_INT)
                     .setMessage(androidVersionGuide() + "\n\n" + tutorial)
                     .setPositiveButton("Got it", null)
-                    .showThemed(this)
+                    .showThemed(this@MainActivity)
             }
         }
         row.addView(launch)
