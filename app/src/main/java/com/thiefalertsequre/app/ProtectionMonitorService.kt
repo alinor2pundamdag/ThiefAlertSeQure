@@ -520,7 +520,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         if (Build.VERSION.SDK_INT >= 26) {
             getSystemService(NotificationManager::class.java).createNotificationChannel(
                 NotificationChannel(CHANNEL_ID, "Protection monitoring", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "Visible notification while motion and battery protection monitoring is enabled"
+                    description = "Visible notification while charger, motion, trusted Bluetooth, and optional battery protection monitoring is enabled"
                     setSound(null, null)
                 }
             )
@@ -539,7 +539,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("ThiefAlertSeQure protection monitor")
-            .setContentText("Charger monitoring is active; motion alarm is opt-in; battery alert is optional.")
+            .setContentText("Charger monitoring is active; motion and trusted Bluetooth alerts are optional.")
             .setContentIntent(open)
             .addAction(android.R.drawable.ic_media_pause, "Stop monitoring", stop)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
