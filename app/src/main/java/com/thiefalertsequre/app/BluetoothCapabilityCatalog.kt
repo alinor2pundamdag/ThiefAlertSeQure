@@ -80,16 +80,10 @@ object BluetoothCapabilityCatalog {
             items += Item(name, state, detail)
         }
         fun adapterProbe(name: String, probe: (BluetoothAdapter) -> Boolean, detail: String) {
-            val state = when {
-                adapter == null -> State.NOT_SUPPORTED
-                !connectGranted -> State.PERMISSION_REQUIRED
-                adapterEnabled != true -> if (adapterEnabled == false) State.ADAPTER_OFF else State.UNKNOWN
-                else -> runCatching { probe(adapter) }.fold(
-                    onSuccess = { if (it) State.SUPPORTED_ON_DEVICE else State.NOT_SUPPORTED },
-                    onFailure = { State.UNKNOWN }
-                )
-            }
-            add(name, state, detail)
+            val supported = if (adapter != null && connectGranted && adapterEnabled == true) {
+                runCatching { probe(adapter) }.getOrNull()
+            } else null
+            add(name, classifyControllerProbe(adapter != null, connectGranted, adapterEnabled, supported), detail)
         }
         fun apiPeer(name: String, available: Boolean, detail: String) {
             add(name, when {
@@ -230,6 +224,21 @@ object BluetoothCapabilityCatalog {
             "Intentionally not implemented. No contacts, messages, file transfer, or network payload access is part of the anti-theft capability system.")
 
         return Snapshot(api, adapter != null, adapterEnabled, connectGranted, classic, ble, bondedCount, items)
+    }
+
+    internal fun classifyControllerProbe(
+        adapterAvailable: Boolean,
+        connectPermissionGranted: Boolean,
+        adapterEnabled: Boolean?,
+        supported: Boolean?
+    ): State = when {
+        !adapterAvailable -> State.NOT_SUPPORTED
+        !connectPermissionGranted -> State.PERMISSION_REQUIRED
+        adapterEnabled == false -> State.ADAPTER_OFF
+        adapterEnabled == null -> State.UNKNOWN
+        supported == true -> State.SUPPORTED_ON_DEVICE
+        supported == false -> State.NOT_SUPPORTED
+        else -> State.UNKNOWN
     }
 
     fun summary(context: Context): String {
