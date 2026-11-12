@@ -24,11 +24,6 @@ class SetupStatusActivity : FragmentActivity() {
         if (rendered) render()
     }
 
-    override fun onResume() {
-        super.onResume()
-        ThemeRuntime.apply(this, window.decorView)
-    }
-
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     private fun render() {
