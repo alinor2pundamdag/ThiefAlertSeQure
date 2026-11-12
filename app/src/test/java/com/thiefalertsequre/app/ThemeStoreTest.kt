@@ -1,6 +1,5 @@
 package com.thiefalertsequre.app
 
-import android.graphics.Color
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -43,8 +42,11 @@ class ThemeStoreTest {
             return if (normalized <= 0.04045) normalized / 12.92
             else Math.pow((normalized + 0.055) / 1.055, 2.4)
         }
-        return 0.2126 * channel(Color.red(color)) +
-            0.7152 * channel(Color.green(color)) +
-            0.0722 * channel(Color.blue(color))
+        val red = (color shr 16) and 0xff
+        val green = (color shr 8) and 0xff
+        val blue = color and 0xff
+        return 0.2126 * channel(red) +
+            0.7152 * channel(green) +
+            0.0722 * channel(blue)
     }
 }

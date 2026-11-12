@@ -83,7 +83,12 @@ object TrustedBluetoothRegistry {
     }
 
     fun clearBaselines(prefs: SharedPreferences) {
-        prefs.edit().putString(KEY_BASELINES, "").putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false).apply()
+        // Invalidate queued 8-second callbacks when A2 is disabled, re-enabled, or restarted.
+        prefs.edit()
+            .putString(KEY_BASELINES, "")
+            .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
+            .putLong(KEY_REVISION, revision(prefs) + 1L)
+            .apply()
     }
 
     internal fun encode(devices: List<TrustedBluetoothDevice>): String = devices

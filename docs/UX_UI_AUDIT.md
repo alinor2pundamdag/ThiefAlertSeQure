@@ -26,7 +26,7 @@ Status: development audit; not a release certification.
 - Add explicit confirmation before unregistering an accessory.
 - Unregister affects only the app trust registry; it never unpairs Android Bluetooth devices.
 - Removing the final trusted accessory automatically disables A2.
-- Pending disconnect callbacks are invalidated when the registry changes.
+- Pending disconnect callbacks are invalidated when the registry changes, including A2 disable/re-enable and service restart.
 - Setup status now checks registered-device baselines rather than the legacy single-device baseline flag.
 - Add JVM tests for registry encoding, duplicate handling, malformed records, and empty state.
 
@@ -40,6 +40,7 @@ Status: development audit; not a release certification.
 
 ## Required verification before phone testing
 - Run unit tests and Android lint on the new commit.
+- Contrast tests use JVM-safe RGB bit extraction rather than Android SDK color helpers.
 - Inspect merged manifest and debug APK package/version/signer metadata.
 - Verify no A2 receiver path can alarm for an unregistered address.
 - Verify reconnect cancels only the matching device's pending timer.
