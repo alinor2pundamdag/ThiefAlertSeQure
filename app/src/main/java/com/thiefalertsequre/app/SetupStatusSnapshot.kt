@@ -37,7 +37,7 @@ object SetupStatusSnapshot {
   val running=runCatching{c.getSystemService(ActivityManager::class.java).getRunningServices(100).any{it.service.className==ProtectionMonitorService::class.java.name}}.getOrDefault(false)
   x+=when{!enabled->SetupItem("monitor","Protection monitor",SetupState.NEUTRAL,"Monitor is disabled by owner.");running->SetupItem("monitor","Protection monitor",SetupState.VERIFIED,"Android process list confirms the service is running.");else->SetupItem("monitor","Protection monitor",SetupState.UNKNOWN,"Enabled preference exists, but running service is not confirmed.")}
   val a2=prefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED,false);val trusted=prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME,null)
-  x+=when{!a2->SetupItem("a2","Bluetooth separation alert",SetupState.NEUTRAL,"Optional A2 is disabled.");trusted.isNullOrBlank()->SetupItem("a2","Bluetooth separation alert",SetupState.ACTION_REQUIRED,"A2 enabled but no accessory selected.");running->SetupItem("a2","Bluetooth separation alert",SetupState.VERIFIED,"Accessory selected and monitor confirmed running.");else->SetupItem("a2","Bluetooth separation alert",SetupState.UNKNOWN,"Monitor service is not confirmed running.")}
+  x+=when{!a2->SetupItem("a2","Bluetooth separation alert",SetupState.NEUTRAL,"Optional A2 is disabled.");trusted.isNullOrBlank()->SetupItem("a2","Bluetooth separation alert",SetupState.ACTION_REQUIRED,"A2 is enabled but no trusted accessory is selected.");!perm->SetupItem("a2","Bluetooth separation alert",SetupState.ACTION_REQUIRED,"Bluetooth Connect permission is required.");adapter!=true->SetupItem("a2","Bluetooth separation alert",if(adapter==false)SetupState.ACTION_REQUIRED else SetupState.UNKNOWN,"Bluetooth must be enabled and verified before A2 can monitor.");!prefs.getBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED,false)->SetupItem("a2","Bluetooth separation alert",SetupState.ACTION_REQUIRED,"Reconnect the selected accessory to establish a fresh connection baseline.");running->SetupItem("a2","Bluetooth separation alert",SetupState.VERIFIED,"Permission, adapter, baseline, and monitor process are confirmed.");else->SetupItem("a2","Bluetooth separation alert",SetupState.UNKNOWN,"Monitor service is not confirmed running.")}
   return SetupSnapshot(x)
  }
  fun action(c:Context,id:String):Intent?=when(id){
@@ -46,7 +46,8 @@ object SetupStatusSnapshot {
  "fullscreen"->if(Build.VERSION.SDK_INT>=34)Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,Uri.parse("package:${c.packageName}"))else null
  "battery"->if(Build.VERSION.SDK_INT>=23)Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:${c.packageName}"))else null
  "lock"->Intent(Settings.ACTION_SECURITY_SETTINGS)
- "bt","bt_permission"->Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
- "monitor","a2"->Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:${c.packageName}"))
+ "bt"->Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
+ "bt_permission","monitor"->Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:${c.packageName}"))
+ "a2"->Intent(c,BluetoothCenterActivity::class.java)
  else->null}
 }
