@@ -99,7 +99,12 @@ class SetupStatusActivity : FragmentActivity() {
                     "a2" -> "Manage trusted accessories"
                     "bt" -> "Open Bluetooth settings"
                     "bt_permission" -> "Open app permissions"
-                    else -> "Open Android settings"
+                    "exact" -> "Open exact-alarm access"
+                    "fullscreen" -> "Open full-screen access"
+                    "battery" -> "Review battery restrictions"
+                    "notifications" -> "Open notification settings"
+                    "lock" -> "Open Android screen-lock settings"
+                    else -> "Open relevant Android settings"
                 }
                 body.addView(MaterialButton(this).apply {
                     text = actionLabel

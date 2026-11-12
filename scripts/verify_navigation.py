@@ -103,6 +103,13 @@ for screen in ("BluetoothCenterActivity.kt", "DeviceIntelligenceActivity.kt"):
         errors.append(screen + " button helper must enforce a 48dp minimum touch target")
 
 setup_activity = (APP / "SetupStatusActivity.kt").read_text(encoding="utf-8")
+for action_label in (
+    "Open exact-alarm access", "Open full-screen access",
+    "Review battery restrictions", "Open notification settings",
+    "Open Android screen-lock settings"
+):
+    if action_label not in setup_activity:
+        errors.append("Setup status action label missing or ambiguous: " + action_label)
 for required in (
     "AndroidDeviceCompatibility.open", "AndroidDeviceCompatibility.applySystemBarInsets",
     "openStatusAction", "Toast.LENGTH_LONG"
