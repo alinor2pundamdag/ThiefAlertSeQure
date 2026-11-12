@@ -131,7 +131,7 @@ object RootCapabilityInspector {
                 process.inputStream.bufferedReader().useLines { lines ->
                     lines.forEach { line ->
                         synchronized(output) {
-                            if (output.length < 24000) output.append(line).append('\\n')
+                            if (output.length < 24000) output.append(line).append('\n')
                         }
                     }
                 }
