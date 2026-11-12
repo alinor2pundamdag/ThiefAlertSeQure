@@ -189,6 +189,43 @@ class MainActivity : FragmentActivity() {
         root.addView(statusCard, matchWrap())
         root.addView(space(20))
 
+        root.addView(sectionTitle("BLUETOOTH & ROOT CAPABILITY INTELLIGENCE"), matchWrap())
+        root.addView(space(10))
+        val capabilityCard = card()
+        val capabilityContent = column()
+        capabilityContent.setPadding(dp(16), dp(16), dp(16), dp(16))
+        capabilityContent.addView(label("AUTOMATIC DEVICE PROFILE", 11f, getColor(R.color.tas_primary), true), matchWrap())
+        capabilityContent.addView(space(8))
+        val bluetoothReport = BluetoothCompatibility.inspect(this)
+        capabilityContent.addView(label(
+            AndroidDeviceCompatibility.deviceSummary(
+                Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.VERSION.RELEASE, Build.VERSION.SDK_INT
+            ) + "\\n" + BluetoothCompatibility.reportText(bluetoothReport),
+            13f, getColor(R.color.tas_text), false
+        ), matchWrap())
+        capabilityContent.addView(space(10))
+        val rootReport = RootCapabilityInspector.inspectPassive()
+        capabilityContent.addView(label(
+            "ROOT STATUS: " + when (rootReport.status) {
+                RootCapabilityInspector.RootStatus.NOT_INDICATED -> "No common root indicators found (not proof of unrooted)"
+                RootCapabilityInspector.RootStatus.ROOT_INDICATORS_FOUND -> "Possible root indicators found (authorization not verified)"
+                else -> rootReport.status.name
+            } + "\\n" + rootReport.detail,
+            12f, getColor(R.color.tas_muted), false
+        ), matchWrap())
+        capabilityContent.addView(space(8))
+        capabilityContent.addView(label(
+            "Standard Bluetooth features use Android's supported APIs. Root mode is optional and limited to owner-authorized, read-only diagnostics. Hardware-specific features are reported separately and are never assumed from root status.",
+            12f, getColor(R.color.tas_muted), false
+        ), matchWrap())
+        capabilityContent.addView(space(10))
+        capabilityContent.addView(outlinedButton("Open Bluetooth & root diagnostics") {
+            startActivity(Intent(this, SettingsActivity::class.java).putExtra("open_bluetooth_diagnostics", true))
+        }, matchWrap())
+        capabilityCard.addView(capabilityContent)
+        root.addView(capabilityCard, matchWrap())
+        root.addView(space(20))
+
         root.addView(sectionTitle("OWNER AUTHENTICATION"), matchWrap())
         root.addView(space(10))
         biometricButton = button("Use fingerprint or supported strong face") { authenticateBiometric() }
