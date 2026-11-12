@@ -125,13 +125,27 @@ object RootCapabilityInspector {
             "su", "-c",
             "dumpsys bluetooth_manager; echo '\\n--- Bluetooth system properties ---'; getprop | grep -i bluetooth; echo '\\n--- Bluetooth sysfs devices ---'; ls -la /sys/class/bluetooth 2>/dev/null"
         ).redirectErrorStream(true).start()
+        val output = StringBuilder()
+        val reader = Thread {
+            runCatching {
+                process.inputStream.bufferedReader().useLines { lines ->
+                    lines.forEach { line ->
+                        synchronized(output) {
+                            if (output.length < 24000) output.append(line).append('\\n')
+                        }
+                    }
+                }
+            }
+        }.apply { isDaemon = true; start() }
         return try {
             if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
                 process.destroyForcibly()
+                reader.join(500L)
                 "Root Bluetooth diagnostics timed out. No system changes were made."
             } else {
-                val output = process.inputStream.bufferedReader().use { it.readText() }.take(24000)
-                if (process.exitValue() == 0 || output.isNotBlank()) output
+                reader.join(1000L)
+                val text = synchronized(output) { output.toString().take(24000) }
+                if (process.exitValue() == 0 || text.isNotBlank()) text
                 else "Diagnostics returned no readable Bluetooth system information."
             }
         } catch (e: Exception) {
