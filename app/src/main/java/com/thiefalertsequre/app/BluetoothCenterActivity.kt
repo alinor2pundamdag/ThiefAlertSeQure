@@ -27,6 +27,7 @@ class BluetoothCenterActivity : FragmentActivity() {
     private lateinit var root: LinearLayout
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private var enableAfterPermission = false
+    private var unregisterRangingCallback: (() -> Unit)? = null
     private val connectPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             if (enableAfterPermission) enableA2() else showTrustedDevicePicker()
@@ -280,6 +281,7 @@ class BluetoothCenterActivity : FragmentActivity() {
         val callback = object : android.ranging.RangingManager.RangingCapabilitiesCallback {
             override fun onRangingCapabilities(capabilities: android.ranging.RangingCapabilities) {
                 runCatching { manager.unregisterCapabilitiesCallback(this) }
+                unregisterRangingCallback = null
                 val availability = capabilities.technologyAvailability
                 fun status(id: Int): String = when (availability[id]) {
                     android.ranging.RangingCapabilities.ENABLED -> "SUPPORTED AND ENABLED"
@@ -301,8 +303,12 @@ class BluetoothCenterActivity : FragmentActivity() {
                 runOnUiThread { if (!isFinishing && !isDestroyed) showResult("Ranging capability results", result) }
             }
         }
+        unregisterRangingCallback = { runCatching { manager.unregisterCapabilitiesCallback(callback) }; Unit }
         runCatching { manager.registerCapabilitiesCallback(mainExecutor, callback) }
-            .onFailure { showResult("Ranging check unavailable", "${it.javaClass.simpleName}: ${it.message ?: "No platform capability data."}") }
+            .onFailure {
+                unregisterRangingCallback = null
+                showResult("Ranging check unavailable", "${it.javaClass.simpleName}: ${it.message ?: "No platform capability data."}")
+            }
     }
 
     private fun confirmRootDiagnostics() {
@@ -349,5 +355,10 @@ class BluetoothCenterActivity : FragmentActivity() {
     private fun space(height: Int) = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dp(height)) }
     private fun matchWrap() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
-    override fun onDestroy() { ioExecutor.shutdownNow(); super.onDestroy() }
+    override fun onDestroy() {
+        unregisterRangingCallback?.invoke()
+        unregisterRangingCallback = null
+        ioExecutor.shutdownNow()
+        super.onDestroy()
+    }
 }
