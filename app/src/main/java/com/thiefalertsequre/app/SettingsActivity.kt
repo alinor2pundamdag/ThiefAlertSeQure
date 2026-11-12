@@ -280,6 +280,18 @@ class SettingsActivity : FragmentActivity() {
         root.addView(text("BLUETOOTH DEVICE COMPATIBILITY", 11f, R.color.tas_primary, true))
         root.addView(space(6))
         root.addView(text(BluetoothCompatibility.reportText(bluetoothReport), 13f, R.color.tas_text))
+        val btAlertEnabledNow = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+        val btBaselineReady = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
+        val protectionMonitorEnabledNow = monitorPrefs.getBoolean(
+            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
+        root.addView(space(6))
+        root.addView(text(
+            "Protection monitor: ${if (protectionMonitorEnabledNow) "enabled" else "disabled"}\\n" +
+                "Trusted separation alert: ${if (btAlertEnabledNow) "enabled" else "disabled"}\\n" +
+                "Trusted-device connection baseline: ${if (btBaselineReady) "established" else "not established — reconnect the selected accessory"}",
+            12f, R.color.tas_text
+        ))
         root.addView(space(6))
         root.addView(text(
             BluetoothCompatibility.versionGuide(bluetoothReport.apiLevel) + "\\n\\n" +
