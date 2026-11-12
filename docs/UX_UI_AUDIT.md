@@ -24,6 +24,7 @@ Status: active development audit; not a release certification.
 - Setup status distinguishes verified, action-required, unsupported/neutral, and unknown states; action labels identify their destination and external Settings routes use ordered fallbacks with visible failure feedback.
 - Multi-device A2 readiness is not marked verified until every registered accessory has a fresh connection baseline.
 - Full-screen intent permission is optional while the owner-disabled full-screen dashboard is OFF; setup status requests it only after explicit opt-in.
+- Bluetooth Connect permission and adapter availability are neutral while optional A2 is OFF; they become actionable prerequisites only after the owner enables A2.
 - Setup status displays action buttons only for action-required or unconfirmed states; neutral, unsupported, and verified items do not show misleading action controls.
 - Material dialogs in audited screens use the shared themed-dialog helper.
 - CI statically checks manifest Activity declarations, internal Activity targets, themed Material dialogs, obvious empty click listeners, theme-preview/inset contracts, safe setup-action fallbacks, Bluetooth/Device Intelligence Settings fallbacks, and A2 readiness/timer invalidation contracts.

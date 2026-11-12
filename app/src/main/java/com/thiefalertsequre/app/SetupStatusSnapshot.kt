@@ -33,12 +33,15 @@ object SetupStatusSnapshot {
   x+=FullScreenSetupStatusPolicy.evaluate(dashboardEnabled,Build.VERSION.SDK_INT,fullScreenAccess)
   if(Build.VERSION.SDK_INT>=23){val ok=runCatching{c.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(c.packageName)}.getOrDefault(false);x+=SetupItem("battery","Battery optimization exemption",if(ok)SetupState.VERIFIED else SetupState.ACTION_REQUIRED,if(ok)"Android confirms exemption." else "App remains subject to battery optimization.")}
   val lock=runCatching{c.getSystemService(KeyguardManager::class.java).isDeviceSecure}.getOrDefault(false);x+=SetupItem("lock","Secure device lock",if(lock)SetupState.VERIFIED else SetupState.ACTION_REQUIRED,if(lock)"Android confirms a secure lock." else "No secure PIN, pattern, or password is configured.")
-  val perm=Build.VERSION.SDK_INT<31||c.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)==PackageManager.PERMISSION_GRANTED;x+=SetupItem("bt_permission","Bluetooth Connect permission",if(perm)SetupState.VERIFIED else SetupState.ACTION_REQUIRED,if(perm)"Permission granted or not runtime-gated." else "Permission is not granted.")
-  val adapter=runCatching{if(perm)c.getSystemService(BluetoothManager::class.java)?.adapter?.isEnabled else null}.getOrNull();x+=when(adapter){true->SetupItem("bt","Bluetooth adapter",SetupState.VERIFIED,"Android reports Bluetooth enabled.");false->SetupItem("bt","Bluetooth adapter",SetupState.NEUTRAL,"Bluetooth is off; enable only when using A2.");null->SetupItem("bt","Bluetooth adapter",SetupState.UNKNOWN,"Adapter state could not be verified.")}
+  val a2Enabled=prefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED,false)
+  val perm=Build.VERSION.SDK_INT<31||c.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)==PackageManager.PERMISSION_GRANTED
+  x+=BluetoothSetupStatusPolicy.permission(a2Enabled,perm)
+  val adapter=runCatching{if(perm)c.getSystemService(BluetoothManager::class.java)?.adapter?.isEnabled else null}.getOrNull()
+  x+=BluetoothSetupStatusPolicy.adapter(a2Enabled,adapter)
   val prefs=c.getSharedPreferences(ProtectionMonitorService.PREFS,0);val enabled=prefs.getBoolean(ProtectionMonitorService.KEY_ENABLED,ProtectionMonitorPolicy.DEFAULT_ENABLED)
   val running=runCatching{c.getSystemService(ActivityManager::class.java).getRunningServices(100).any{it.service.className==ProtectionMonitorService::class.java.name}}.getOrDefault(false)
   x+=when{!enabled->SetupItem("monitor","Protection monitor",SetupState.NEUTRAL,"Monitor is disabled by owner.");running->SetupItem("monitor","Protection monitor",SetupState.VERIFIED,"Android process list confirms the service is running.");else->SetupItem("monitor","Protection monitor",SetupState.UNKNOWN,"Enabled preference exists, but running service is not confirmed.")}
-  val a2=prefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED,false)
+  val a2=a2Enabled
   val trustedDevices=TrustedBluetoothRegistry.read(prefs)
   val baselineCount=trustedDevices.count{TrustedBluetoothRegistry.isBaselineConnected(prefs,it.address)}
   x+=A2SetupStatusPolicy.evaluate(a2,trustedDevices.size,perm,adapter,enabled,running,baselineCount)

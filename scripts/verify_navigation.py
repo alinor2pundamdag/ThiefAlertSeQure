@@ -97,6 +97,14 @@ setup_activity = (APP / "SetupStatusActivity.kt").read_text(encoding="utf-8")
 if "item.state == SetupState.ACTION_REQUIRED || item.state == SetupState.UNKNOWN" not in setup_activity:
     errors.append("Setup status must not show action buttons for neutral/unsupported/verified items")
 
+bluetooth_policy = (APP / "BluetoothSetupStatusPolicy.kt").read_text(encoding="utf-8")
+if "!a2Enabled" not in bluetooth_policy:
+    errors.append("Bluetooth permission and adapter must be optional while A2 is disabled")
+
+setup_snapshot = (APP / "SetupStatusSnapshot.kt").read_text(encoding="utf-8")
+if "BluetoothSetupStatusPolicy.permission" not in setup_snapshot or "BluetoothSetupStatusPolicy.adapter" not in setup_snapshot:
+    errors.append("Setup status must use owner-aware Bluetooth readiness policy")
+
 a2_policy = (APP / "A2SetupStatusPolicy.kt").read_text(encoding="utf-8")
 if "connectedBaselineCount < trustedDeviceCount" not in a2_policy:
     errors.append("A2 setup readiness must require a fresh baseline for every registered device")
