@@ -126,6 +126,10 @@ jobs:
           VERSION_NAME="$(sed -n 's/^val appVersionName = "\([^"]*\)"$/\1/p' app/build.gradle.kts | head -n 1)"
           test -n "$VERSION_CODE"
           test -n "$VERSION_NAME"
+          if [[ "$RELEASE_SIGNING_CONFIGURED" != "true" ]]; then
+            VERSION_CODE=6
+            VERSION_NAME="1.1.4-test"
+          fi
           echo "APP_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "APP_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           echo "Building application version $VERSION_NAME ($VERSION_CODE)"
@@ -216,7 +220,7 @@ jobs:
           PACKAGE_LINE="$(printf '%s\\n' "$BADGING" | grep -m1 "^package:")"
           echo "APK metadata: $PACKAGE_LINE"
           if [[ "$APK_VARIANT" == "debug" ]]; then
-            EXPECTED_PACKAGE="name='com.thiefalertsequre.app.v113test'"
+            EXPECTED_PACKAGE="name='com.thiefalertsequre.app.v114test'"
           else
             EXPECTED_PACKAGE="name='com.thiefalertsequre.app'"
           fi
