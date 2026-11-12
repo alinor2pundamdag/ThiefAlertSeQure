@@ -161,12 +161,12 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             "Background guidance family: $family"
         )
         addCard("THIEFALERTSEQuRE READINESS", appReadiness)
-        val root = RootCapabilityInspector.inspectPassive()
+        val rootReport = RootCapabilityInspector.inspectPassive()
         addCard("ROOT INDICATORS (PASSIVE)", listOf(
-            when (root.status) {
+            when (rootReport.status) {
                 RootCapabilityInspector.RootStatus.NOT_INDICATED -> "No common indicators found; this does not prove the device is unrooted."
                 RootCapabilityInspector.RootStatus.ROOT_INDICATORS_FOUND -> "Possible root indicators found; authorization has not been verified."
-                else -> root.status.name
+                else -> rootReport.status.name
             },
             "No root command or authorization prompt is started by this page."
         ))
@@ -192,7 +192,8 @@ class DeviceIntelligenceActivity : FragmentActivity() {
 
     private fun appVersion(): String = runCatching {
         val info = packageManager.getPackageInfo(packageName, 0)
-        "${info.versionName ?: "unknown"} (${if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()})"
+        val code = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+        "${info.versionName ?: "unknown"} ($code)"
     }.getOrDefault("unknown")
 
     private fun thermalLabel(status: Int): String = when (status) {
