@@ -29,6 +29,30 @@ class BluetoothCompatibilityTest {
         assertTrue(BluetoothCompatibility.versionGuide(37).contains("RFCOMM"))
     }
 
+    @Test fun controllerProbeDistinguishesPermissionAdapterAndHardwareStates() {
+        val classify = BluetoothCapabilityCatalog::classifyControllerProbe
+        assertEquals(
+            BluetoothCapabilityCatalog.State.PERMISSION_REQUIRED,
+            classify(true, false, true, null)
+        )
+        assertEquals(
+            BluetoothCapabilityCatalog.State.ADAPTER_OFF,
+            classify(true, true, false, null)
+        )
+        assertEquals(
+            BluetoothCapabilityCatalog.State.SUPPORTED_ON_DEVICE,
+            classify(true, true, true, true)
+        )
+        assertEquals(
+            BluetoothCapabilityCatalog.State.NOT_SUPPORTED,
+            classify(true, true, true, false)
+        )
+        assertEquals(
+            BluetoothCapabilityCatalog.State.UNKNOWN,
+            classify(true, true, null, null)
+        )
+    }
+
     @Test fun catalogStatesDoNotConflateApiPresenceWithImplementation() {
         assertEquals(
             BluetoothCapabilityCatalog.State.NOT_IMPLEMENTED,
