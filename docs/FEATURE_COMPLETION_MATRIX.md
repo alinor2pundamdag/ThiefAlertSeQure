@@ -26,7 +26,7 @@ The production baseline remains v1.1.3. The current feature branch contains the 
 | Multi-accessory A2 | Local multi-device trust registry, per-device baselines/revisions, independent 8-second disconnect grace periods, reconnect cancellation, and unregister-without-unpairing semantics |
 | Navigation and interaction audit | CI static checks cover declared Activity destinations, obvious empty click listeners, themed dialogs, edge-to-edge insets, theme reapplication, and external launch fallbacks |
 | Alarm/authentication regression protection | JVM tests cover the existing 10-second charger countdown, reconnect cancellation, latched alarm behavior, reboot recovery, authentication cooldown, and A2 disconnect gates |
-| Development build | Exact-head CI builds and verifies a side-by-side development APK; it is not a production update or release |
+| Development build | CI run #1091 verified artifact `ThiefAlertSeQure-debug-apk` (ID `13931562732`): package `com.thiefalertsequre.app.v114test`, versionCode `6`, versionName `1.1.4-test`, minSdk `26`; debug certificate SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`. Not a production update or release |
 
 ## Implemented in this branch
 

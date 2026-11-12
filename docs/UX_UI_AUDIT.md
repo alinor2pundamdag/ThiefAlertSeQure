@@ -4,10 +4,10 @@ Status: source-level UX/UI implementation and CI audit passed on the recorded de
 
 ## Verified baseline
 - Branch: `feature/persistent-themes-and-setup-status`
-- Verified HEAD: `a0c739471ad08740b2c33921ecc6f03a5096dc8e`
-- GitHub Actions run [#1090](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43192440662) completed successfully on that exact commit.
+- Verified HEAD: `0acd294d99856228dfc04e858ef8e3c8d0218c66`
+- GitHub Actions run [#1091](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43193065409) completed successfully on that exact commit.
 - Unit tests, internal navigation/dialog checks, Android lint, asset validation, workflow YAML validation, APK assembly, package/version/signer checks, and artifact upload passed.
-- The successful run produced the `ThiefAlertSeQure-debug-apk` artifact (ID `13931621964`; development-only test package).
+- The successful run produced the `ThiefAlertSeQure-debug-apk` artifact (ID `13931562732`). Verified APK: `com.thiefalertsequre.app.v114test`, versionCode `6`, versionName `1.1.4-test`, minSdk `26`; debug certificate SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`. APK SHA-256: `1523e03947550a5d06768a991222750a2fd16e824931dd17d39ae29469dd2a4c`. This debug signer is not the production signer.
 - No physical-device test has been performed by this audit.
 
 ## Implemented interaction contracts
