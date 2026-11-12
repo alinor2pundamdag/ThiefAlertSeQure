@@ -1,6 +1,8 @@
 package com.thiefalertsequre.app
 
 import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.app.AlarmManager
 import android.content.Intent
 import android.media.MediaPlayer
@@ -43,6 +45,9 @@ class SettingsActivity : FragmentActivity() {
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { renderStatus() }
+    private val bluetoothPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) showTrustedBluetoothDevicePicker() else android.widget.Toast.makeText(this, "Bluetooth permission is required only for the optional trusted-device separation alert.", android.widget.Toast.LENGTH_LONG).show() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -264,6 +269,38 @@ class SettingsActivity : FragmentActivity() {
             "Motion is a separate alarm source and can trigger while the charger is still connected. Leave it OFF for charger-removal-only protection.",
             12f, R.color.tas_muted
         ))
+        root.addView(space(18))
+        root.addView(text("TRUSTED BLUETOOTH SEPARATION ALERT", 11f, R.color.tas_primary, true))
+        root.addView(space(8))
+        root.addView(text(
+            "Optional anti-theft layer. Choose an already-paired trusted Bluetooth device. While phone protection is ARMED, a detected disconnect starts a short grace period; reconnecting cancels it. Android may not deliver connection events if the app/service is stopped. After selecting a device, reconnect it once to establish the monitoring baseline.",
+            13f, R.color.tas_muted
+        ))
+        val trustedAddress = monitorPrefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null)
+        val trustedName = monitorPrefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, null)
+        root.addView(text("Trusted device: " + (trustedName ?: "Not selected"), 13f, R.color.tas_text))
+        root.addView(action("Choose paired Bluetooth device") { requestTrustedBluetoothDevicePicker() })
+        val bluetoothEnabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+        root.addView(action("Bluetooth separation alert: ${if (bluetoothEnabled) "ON" else "OFF"}") {
+            val selected = monitorPrefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null)
+            if (!bluetoothEnabled && selected.isNullOrBlank()) {
+                android.widget.Toast.makeText(this, "Choose a trusted paired device first.", android.widget.Toast.LENGTH_LONG).show()
+            } else {
+                val enabled = !monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+                monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, enabled)
+                    .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false).apply()
+                if (enabled) {
+                    monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).apply()
+                    runCatching { ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java)) }
+                        .onFailure { android.widget.Toast.makeText(this, "Protection monitor could not start: ${it.message}", android.widget.Toast.LENGTH_LONG).show() }
+                    android.widget.Toast.makeText(this, "Reconnect your trusted Bluetooth device once to establish its connection baseline.", android.widget.Toast.LENGTH_LONG).show()
+                } else {
+                    sendBroadcast(Intent(ProtectionMonitorService.ACTION_REFRESH).setPackage(packageName))
+                }
+                render()
+            }
+        })
+        root.addView(space(8))
         val sensitivity = MotionSensitivity.fromStored(
             monitorPrefs.getString(ProtectionMonitorService.KEY_SENSITIVITY, MotionSensitivity.MEDIUM.name)
         )
@@ -355,6 +392,51 @@ class SettingsActivity : FragmentActivity() {
         root.addView(action("Back to protection dashboard") { finish() })
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
+    }
+
+    private fun requestTrustedBluetoothDevicePicker() {
+        if (Build.VERSION.SDK_INT >= 31 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            bluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+            return
+        }
+        showTrustedBluetoothDevicePicker()
+    }
+
+    @Suppress("MissingPermission")
+    private fun showTrustedBluetoothDevicePicker() {
+        val adapter = BluetoothAdapter.getDefaultAdapter()
+        if (adapter == null) {
+            android.widget.Toast.makeText(this, "This device does not support Bluetooth.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        if (!adapter.isEnabled) {
+            android.widget.Toast.makeText(this, "Turn on Bluetooth and pair your trusted device in Android settings first.", android.widget.Toast.LENGTH_LONG).show()
+            open(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+            return
+        }
+        val devices = runCatching { adapter.bondedDevices.toList().sortedBy { it.name ?: it.address } }.getOrDefault(emptyList())
+        if (devices.isEmpty()) {
+            android.widget.Toast.makeText(this, "No paired Bluetooth devices found. Pair a trusted device in Android settings first.", android.widget.Toast.LENGTH_LONG).show()
+            open(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+            return
+        }
+        val labels = devices.map { "${it.name ?: "Bluetooth device"} — ${it.address}" }.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Select trusted Bluetooth device")
+            .setItems(labels) { _, which ->
+                val selected = devices[which]
+                getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE).edit()
+                    .putString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, selected.address)
+                    .putString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, selected.name ?: "Bluetooth device")
+                    .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
+                    .apply()
+                render()
+                android.widget.Toast.makeText(this, "Trusted device saved. Enable the alert, then reconnect this device once.", android.widget.Toast.LENGTH_LONG).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun isSafeForAppUpdate(): Boolean {
