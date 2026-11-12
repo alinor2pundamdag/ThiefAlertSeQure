@@ -934,7 +934,17 @@ class MainActivity : FragmentActivity() {
             details.text = "Android could not open device credential verification."
             return
         }
-        startActivityForResult(credentialIntent, REQUEST_DEVICE_CREDENTIAL)
+        try {
+            startActivityForResult(credentialIntent, REQUEST_DEVICE_CREDENTIAL)
+        } catch (error: Exception) {
+            autoAuthenticationRequested = false
+            details.text = "Android could not launch device credential verification. The alarm remains active. Open Android screen-lock settings and try owner verification again."
+            LocalTamperHistory.record(
+                this, "device_credential_launch_failed",
+                error.javaClass.simpleName + ": " + error.message
+            )
+            render()
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

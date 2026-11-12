@@ -82,6 +82,8 @@ for screen in (
     source = (APP / screen).read_text(encoding="utf-8")
     if "applySystemBarInsets" not in source:
         errors.append(screen + " must apply system-bar/cutout insets")
+    if "override fun onResume" not in source or "ThemeRuntime.apply" not in source:
+        errors.append(screen + " must reapply the persisted/preview theme when returning to the screen")
 
 settings_activity = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
 if "startActivity(installIntent)" in settings_activity:
@@ -90,6 +92,9 @@ if "startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" i
     errors.append("Battery optimization request must use guarded Android Settings/activity fallback")
 if "AndroidDeviceCompatibility.open(" not in settings_activity:
     errors.append("Settings external destinations must use the centralized guarded launcher")
+main_activity = (APP / "MainActivity.kt").read_text(encoding="utf-8")
+if "device_credential_launch_failed" not in main_activity:
+    errors.append("Device credential launch failures must be handled without terminating the active alarm")
 if "Android access not granted" not in settings_activity or "Open access settings" not in settings_activity:
     errors.append("Optional full-screen dashboard toggle must disclose missing Android access and provide a settings route")
 
