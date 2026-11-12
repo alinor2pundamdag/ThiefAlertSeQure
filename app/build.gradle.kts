@@ -40,7 +40,7 @@ android {
         // This prevents debug builds from replacing the production package.
         getByName("debug") {
             applicationIdSuffix = ".v114test"
-            versionNameSuffix = "-v1.1.4-test"
+
         }
         getByName("release") {
             isMinifyEnabled = false
@@ -59,6 +59,15 @@ android {
     testOptions { unitTests.isReturnDefaultValues = true }
 }
 
+
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        variant.outputs.forEach { output ->
+            output.versionCode.set(6)
+            output.versionName.set("1.1.4-test")
+        }
+    }
+}
 
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
