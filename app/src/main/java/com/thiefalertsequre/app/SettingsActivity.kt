@@ -89,6 +89,39 @@ class SettingsActivity : FragmentActivity() {
         root.addView(statusCard, matchWrap())
         root.addView(space(22))
 
+        root.addView(text("BLUETOOTH & ROOT CAPABILITY INTELLIGENCE", 11f, R.color.tas_primary, true))
+        root.addView(space(8))
+        val btReport = BluetoothCompatibility.inspect(this)
+        val passiveRoot = RootCapabilityInspector.inspectPassive()
+        root.addView(text(
+            AndroidDeviceCompatibility.deviceSummary(
+                Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.VERSION.RELEASE, Build.VERSION.SDK_INT
+            ) + "\\n" + BluetoothCompatibility.reportText(btReport) +
+                "\\nRoot status: " + when (passiveRoot.status) {
+                    RootCapabilityInspector.RootStatus.NOT_INDICATED -> "No common indicators found (not proof of unrooted)"
+                    RootCapabilityInspector.RootStatus.ROOT_INDICATORS_FOUND -> "Possible root indicators found; authorization not verified"
+                    else -> passiveRoot.status.name
+                } + "\\n" + passiveRoot.detail,
+            13f, R.color.tas_text
+        ))
+        root.addView(space(8))
+        root.addView(action("View full Bluetooth capability inventory") {
+            val inventory = BluetoothCapabilityCatalog.display(BluetoothCapabilityCatalog.inspect(this))
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Bluetooth capability inventory")
+                .setMessage(inventory)
+                .setPositiveButton("Close", null)
+                .show()
+        })
+        root.addView(action("Verify root access and run read-only Bluetooth diagnostics") {
+            verifyRootAndShowDiagnostics()
+        })
+        root.addView(text(
+            "Root detection is best-effort. Passive checks do not request superuser access. The explicit verification button may show your root manager's approval prompt. Only read-only diagnostics are run; no Bluetooth firmware, pairing, radio power, or system configuration is changed.",
+            12f, R.color.tas_muted
+        ))
+        root.addView(space(22))
+
         root.addView(text("OFFICIAL APP UPDATES", 11f, R.color.tas_primary, true))
         root.addView(space(8))
         root.addView(text(
@@ -418,6 +451,52 @@ class SettingsActivity : FragmentActivity() {
         root.addView(action("Back to protection dashboard") { finish() })
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
+    }
+
+    private fun verifyRootAndShowDiagnostics() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Verify superuser access?")
+            .setMessage(
+                "This explicit check runs the read-only command 'su -c id'. Your installed root manager may ask whether ThiefAlertSeQure may use root. If approved, the app reads Bluetooth service diagnostics and selected system properties only. It will not change Bluetooth settings, pairing, firmware, radio power, or system files."
+            )
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Continue") { _, _ ->
+                android.widget.Toast.makeText(this, "Waiting for root authorization…", android.widget.Toast.LENGTH_LONG).show()
+                ioExecutor.execute {
+                    val report = RootCapabilityInspector.verifyRootAuthorization()
+                    val diagnostics = if (report.isRootAuthorized) {
+                        RootCapabilityInspector.collectBluetoothDiagnostics()
+                    } else {
+                        report.detail
+                    }
+                    runOnUiThread {
+                        if (isFinishing || isDestroyed) return@runOnUiThread
+                        val output = buildString {
+                            append("Root status: ${report.status}\\n")
+                            append(report.detail)
+                            if (report.indicators.isNotEmpty()) {
+                                append("\\n\\nRoot indicators:\\n")
+                                append(report.indicators.joinToString("\\n"))
+                            }
+                            append("\\n\\nREAD-ONLY BLUETOOTH DIAGNOSTICS\\n")
+                            append(diagnostics)
+                        }.take(24000)
+                        val body = android.widget.TextView(this).apply {
+                            text = output
+                            textSize = 12f
+                            setTextColor(getColor(R.color.tas_text))
+                            setPadding(dp(18), dp(12), dp(18), dp(12))
+                        }
+                        val scroll = ScrollView(this).apply { addView(body) }
+                        MaterialAlertDialogBuilder(this)
+                            .setTitle("Device diagnostics")
+                            .setView(scroll)
+                            .setPositiveButton("Close", null)
+                            .show()
+                    }
+                }
+            }
+            .show()
     }
 
     private fun requestTrustedBluetoothDevicePicker() {
