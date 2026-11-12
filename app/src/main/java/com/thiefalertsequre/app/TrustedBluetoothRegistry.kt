@@ -54,7 +54,7 @@ object TrustedBluetoothRegistry {
         val edit = prefs.edit()
             .putString(KEY_DEVICES, encode(updated))
             .putString(KEY_BASELINES, baselines.joinToString("\n"))
-            .putLong(KEY_REVISION, revision(prefs) + 1L)
+            .putLong(deviceRevisionKey(address), deviceRevision(prefs, address) + 1L)
         if (updated.isEmpty()) {
             edit.putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
                 .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
