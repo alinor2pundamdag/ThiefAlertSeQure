@@ -217,7 +217,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                         val status = when (report.status) {
                             RootCapabilityInspector.RootStatus.ROOT_AUTHORIZED -> "ROOT ACCESS GRANTED — UID 0 VERIFIED"
                             RootCapabilityInspector.RootStatus.ROOT_NOT_AUTHORIZED -> "ROOT ACCESS DENIED / NOT GRANTED"
-                            RootCapabilityInspector.RootStatus.SU_NOT_AVAILABLE -> "SU NOT AVAILABLE — ROOT ACCESS NOT VERIFIED"
+                            RootCapabilityInspector.RootStatus.SU_NOT_AVAILABLE -> if (report.mayBeRooted) "POSSIBLE ROOT — SU NOT AVAILABLE" else "NO ROOT ACCESS DETECTED — SU NOT AVAILABLE (HIDDEN ROOT CANNOT BE RULED OUT)"
                             RootCapabilityInspector.RootStatus.ROOT_INDICATORS_FOUND -> "POSSIBLE ROOT — AUTHORIZATION NOT VERIFIED"
                             RootCapabilityInspector.RootStatus.NOT_INDICATED -> "NO ROOT INDICATORS — NOT PROOF OF NON-ROOT"
                             RootCapabilityInspector.RootStatus.ROOT_CHECK_TIMED_OUT -> "ROOT CHECK TIMED OUT"
