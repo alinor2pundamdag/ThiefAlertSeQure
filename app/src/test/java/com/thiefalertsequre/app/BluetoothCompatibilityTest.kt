@@ -26,7 +26,7 @@ class BluetoothCompatibilityTest {
     @Test fun rangingApiIsNotClaimedBeforeAndroidSixteen() {
         assertTrue(BluetoothCompatibility.versionGuide(35).contains("not available") ||
             BluetoothCompatibility.versionGuide(35).contains("Android 15"))
-        assertTrue(BluetoothCompatibility.versionGuide(36).contains("capability-dependent"))
+        assertTrue(BluetoothCompatibility.versionGuide(36).contains("capability-checked"))
         assertTrue(BluetoothCompatibility.versionGuide(37).contains("RFCOMM"))
     }
 }
