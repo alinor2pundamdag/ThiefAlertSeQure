@@ -7,12 +7,14 @@ import androidx.fragment.app.FragmentActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 class SetupStatusActivity:FragmentActivity(){
+ private var rendered=false
  override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);render()}
- override fun onResume(){super.onResume();ThemeRuntime.apply(this,window.decorView)}
+ override fun onResume(){super.onResume();if(rendered)render() }
  private fun dp(v:Int)=(v*resources.displayMetrics.density).toInt()
  private fun render(){
   val scroll=ScrollView(this).apply{isFillViewport=true};val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(20),dp(20),dp(28))};scroll.addView(root)
   root.addView(MaterialButton(this).apply{text="‹ Back";setOnClickListener{finish()}})
+  root.addView(MaterialButton(this).apply{text="Refresh verified status";setOnClickListener{render()}})
   val p=ThemeStore.get(this)
   root.addView(TextView(this).apply{text="VERIFIED ANDROID SETUP";textSize=11f;setTextColor(p.primary)})
   root.addView(TextView(this).apply{text="Protection readiness";textSize=27f;setTextColor(p.text)})
@@ -27,6 +29,6 @@ class SetupStatusActivity:FragmentActivity(){
    SetupStatusSnapshot.action(this,item.id)?.let{intent->body.addView(MaterialButton(this).apply{text="Open Android settings";setOnClickListener{runCatching{startActivity(intent)}}})}
    card.addView(body);root.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(8)})
   }
-  setContentView(scroll);ThemeRuntime.apply(this,scroll)
+  setContentView(scroll);ThemeRuntime.apply(this,scroll);rendered=true
  }
 }
