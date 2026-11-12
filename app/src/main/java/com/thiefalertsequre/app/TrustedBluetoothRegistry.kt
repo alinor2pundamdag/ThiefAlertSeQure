@@ -70,6 +70,13 @@ object TrustedBluetoothRegistry {
 
     fun revision(prefs: SharedPreferences): Long = prefs.getLong(KEY_REVISION, 0L)
 
+    /** Per-address generation prevents unrelated registry edits from canceling another device's timer. */
+    fun deviceRevision(prefs: SharedPreferences, address: String): Long =
+        prefs.getLong(deviceRevisionKey(address), 0L)
+
+    private fun deviceRevisionKey(address: String): String =
+        "trusted_bluetooth_device_revision_v1_" + address.uppercase().replace(":", "_")
+
     fun isBaselineConnected(prefs: SharedPreferences, address: String): Boolean =
         baselineAddresses(prefs).any { it.equals(address, ignoreCase = true) }
 
