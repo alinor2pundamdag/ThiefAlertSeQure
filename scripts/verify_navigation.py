@@ -68,6 +68,18 @@ device_activity = (APP / "DeviceIntelligenceActivity.kt").read_text(encoding="ut
 if "AndroidDeviceCompatibility.appInfoIntent(packageName)" not in device_activity:
     errors.append("DeviceIntelligenceActivity must provide a fallback for app Settings navigation")
 
+for screen in (
+    "MainActivity.kt", "SettingsActivity.kt", "BluetoothCenterActivity.kt",
+    "DeviceIntelligenceActivity.kt", "ThemeActivity.kt", "SetupStatusActivity.kt"
+):
+    source = (APP / screen).read_text(encoding="utf-8")
+    if "applySystemBarInsets" not in source:
+        errors.append(screen + " must apply system-bar/cutout insets")
+
+settings_activity = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
+if "Android access not granted" not in settings_activity or "Open access settings" not in settings_activity:
+    errors.append("Optional full-screen dashboard toggle must disclose missing Android access and provide a settings route")
+
 main_activity = (APP / "MainActivity.kt").read_text(encoding="utf-8")
 if "minHeight = dp(46)" in main_activity:
     errors.append("MainActivity contains a primary touch target below 48dp")

@@ -4,10 +4,10 @@ package com.thiefalertsequre.app
 object FullScreenSetupStatusPolicy {
     fun evaluate(ownerEnabledDashboard: Boolean, sdkInt: Int, systemAccessGranted: Boolean): SetupItem {
         val stateAndDetail = when {
-            sdkInt < 34 -> SetupState.UNSUPPORTED to
-                "Android does not expose a separate full-screen intent access gate on this version."
             !ownerEnabledDashboard -> SetupState.NEUTRAL to
                 "Optional full-screen alarm dashboard is OFF. No full-screen access is required for the current configuration."
+            sdkInt < 34 -> SetupState.VERIFIED to
+                "This Android version has no separate full-screen access gate; the owner-enabled dashboard is permitted."
             systemAccessGranted -> SetupState.VERIFIED to
                 "The owner-enabled full-screen dashboard has the required Android access."
             else -> SetupState.ACTION_REQUIRED to

@@ -14,6 +14,7 @@ Status: active development audit; not a release certification.
 - Theme preview represents dashboard, settings, setup readiness, and confirmation-dialog surfaces.
 - Preview sample controls are visual-only and explicitly identified as non-interactive.
 - Main, Bluetooth capability, Device Intelligence, and setup-status action buttons enforce at least 48dp minimum touch height.
+- All six app screens apply system-bar and display-cutout insets for edge-to-edge devices.
 - Dark/light filters remain tappable, visibly indicate selection, and use 48dp minimum height.
 - All 16 palettes have JVM WCAG AA checks for primary/muted text on background and surface, button text on primary, primary accent on surface, and success/warning/danger status labels on surfaces.
 - Trusted Bluetooth registry supports multiple locally registered accessories, per-device connection baselines, and independent 8-second disconnect grace timers.
@@ -23,7 +24,7 @@ Status: active development audit; not a release certification.
 - Charger unplug countdown remains 10 seconds; A2 grace remains 8 seconds.
 - Setup status distinguishes verified, action-required, unsupported/neutral, and unknown states; action labels identify their destination and external Settings routes use ordered fallbacks with visible failure feedback.
 - Multi-device A2 readiness is not marked verified until every registered accessory has a fresh connection baseline.
-- Full-screen intent permission is optional while the owner-disabled full-screen dashboard is OFF; setup status requests it only after explicit opt-in.
+- Full-screen intent permission is optional while the owner-disabled full-screen dashboard is OFF; setup status requests it only after explicit opt-in. If the owner enables the dashboard without Android 14+ access, the Settings toggle explicitly labels the missing system access and offers the correct settings route.
 - Bluetooth Connect permission and adapter availability are neutral while optional A2 is OFF; they become actionable prerequisites only after the owner enables A2.
 - Setup status displays action buttons only for action-required or unconfirmed states; neutral, unsupported, and verified items do not show misleading action controls.
 - Material dialogs in audited screens use the shared themed-dialog helper.

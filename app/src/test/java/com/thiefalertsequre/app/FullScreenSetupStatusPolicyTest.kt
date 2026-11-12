@@ -5,13 +5,11 @@ import org.junit.Test
 
 class FullScreenSetupStatusPolicyTest {
     @Test fun disabledOptionalDashboardDoesNotRequirePermission() {
-        val item = FullScreenSetupStatusPolicy.evaluate(false, 34, false)
-        assertEquals(SetupState.NEUTRAL, item.state)
+        assertEquals(SetupState.NEUTRAL, FullScreenSetupStatusPolicy.evaluate(false, 34, false).state)
     }
 
     @Test fun enabledDashboardWithAccessIsVerified() {
-        val item = FullScreenSetupStatusPolicy.evaluate(true, 34, true)
-        assertEquals(SetupState.VERIFIED, item.state)
+        assertEquals(SetupState.VERIFIED, FullScreenSetupStatusPolicy.evaluate(true, 34, true).state)
     }
 
     @Test fun enabledDashboardWithoutAccessRequiresAction() {
@@ -20,8 +18,7 @@ class FullScreenSetupStatusPolicyTest {
         assert(item.detail.contains("normal alarm notification and sound remain available"))
     }
 
-    @Test fun olderAndroidDoesNotClaimASeparateAccessRequirement() {
-        val item = FullScreenSetupStatusPolicy.evaluate(true, 33, false)
-        assertEquals(SetupState.UNSUPPORTED, item.state)
+    @Test fun olderAndroidAllowsOwnerEnabledDashboardWithoutSeparateAccessGate() {
+        assertEquals(SetupState.VERIFIED, FullScreenSetupStatusPolicy.evaluate(true, 33, false).state)
     }
 }

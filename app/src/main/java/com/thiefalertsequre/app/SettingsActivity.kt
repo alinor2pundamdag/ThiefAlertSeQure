@@ -140,15 +140,30 @@ class SettingsActivity : FragmentActivity() {
         val showAlarmScreenOverLockScreen = alarmDisplayPrefs.getBoolean(
             MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false
         )
-        root.addView(action(
-            "Full-screen app alarm dashboard: ${if (showAlarmScreenOverLockScreen) "ON" else "OFF"}"
-        ) {
+        val fullScreenAccessGranted = Build.VERSION.SDK_INT < 34 ||
+            getSystemService(android.app.NotificationManager::class.java).canUseFullScreenIntent()
+        val dashboardStateLabel = when {
+            !showAlarmScreenOverLockScreen -> "OFF"
+            fullScreenAccessGranted -> "ON"
+            else -> "ON — Android access not granted"
+        }
+        root.addView(action("Full-screen app alarm dashboard: $dashboardStateLabel") {
             val enabled = !alarmDisplayPrefs.getBoolean(
                 MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false
             )
             alarmDisplayPrefs.edit()
                 .putBoolean(MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, enabled)
                 .apply()
+            if (enabled && Build.VERSION.SDK_INT >= 34 &&
+                !getSystemService(android.app.NotificationManager::class.java).canUseFullScreenIntent()
+            ) {
+                MaterialAlertDialogBuilder(this)
+                    .setTitle("Android access required")
+                    .setMessage("The optional dashboard is enabled in the app, but Android has not granted full-screen intent access. The normal alarm notification and sound remain available.")
+                    .setNegativeButton("Later", null)
+                    .setPositiveButton("Open access settings") { _, _ -> openFullScreenIntentSettings() }
+                    .showThemed(this)
+            }
             render()
         })
         root.addView(space(10))
