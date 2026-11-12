@@ -1,4 +1,4 @@
-package com.thiefalertsequre
+package com.thiefalertsequre.app
 import org.junit.Assert.*
 import org.junit.Test
 class ThemeStoreTest{
