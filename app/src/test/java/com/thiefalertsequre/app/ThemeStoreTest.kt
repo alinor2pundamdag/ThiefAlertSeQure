@@ -11,10 +11,15 @@ class ThemeStoreTest {
         assertEquals(16, ThemeStore.all.map { it.id }.toSet().size)
     }
 
-    @Test fun paletteColorsAreOpaqueAndDeterministic() {
+    @Test fun allPaletteColorsAreOpaque() {
         ThemeStore.all.forEach { palette ->
-            assertEquals(0xff, (palette.background ushr 24) and 0xff)
-            assertEquals(0xff, (palette.surface ushr 24) and 0xff)
+            listOf(
+                palette.primary, palette.onPrimary, palette.background, palette.surface,
+                palette.variant, palette.text, palette.muted, palette.success,
+                palette.warning, palette.danger
+            ).forEach { color ->
+                assertEquals(palette.name + ": palette color must be opaque", 0xff, (color ushr 24) and 0xff)
+            }
         }
     }
 
@@ -29,12 +34,19 @@ class ThemeStoreTest {
         assertTrue(ThemeStore.valid(ThemeStore.DEFAULT_ID))
     }
 
-    @Test fun everyThemeMeetsAaContrastForPrimaryTextMutedTextAndButtonText() {
+    @Test fun everyThemeMeetsAaContrastForTextAndActions() {
         ThemeStore.all.forEach { palette ->
-            assertTrue("${palette.name}: primary text contrast", contrast(palette.text, palette.background) >= 4.5)
-            assertTrue("${palette.name}: muted text contrast", contrast(palette.muted, palette.background) >= 4.5)
-            assertTrue("${palette.name}: button text contrast", contrast(palette.onPrimary, palette.primary) >= 4.5)
+            assertAa(palette, "primary text/background", contrast(palette.text, palette.background))
+            assertAa(palette, "muted text/background", contrast(palette.muted, palette.background))
+            assertAa(palette, "primary text/surface", contrast(palette.text, palette.surface))
+            assertAa(palette, "muted text/surface", contrast(palette.muted, palette.surface))
+            assertAa(palette, "button text/primary", contrast(palette.onPrimary, palette.primary))
+            assertAa(palette, "primary accent/surface", contrast(palette.primary, palette.surface))
         }
+    }
+
+    private fun assertAa(palette: ThemePalette, pair: String, ratio: Double) {
+        assertTrue(palette.name + ": " + pair + " contrast was " + ratio, ratio >= 4.5)
     }
 
     private fun contrast(foreground: Int, background: Int): Double {
@@ -52,8 +64,6 @@ class ThemeStoreTest {
         val red = (color shr 16) and 0xff
         val green = (color shr 8) and 0xff
         val blue = color and 0xff
-        return 0.2126 * channel(red) +
-            0.7152 * channel(green) +
-            0.0722 * channel(blue)
+        return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue)
     }
 }
