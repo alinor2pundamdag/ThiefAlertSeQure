@@ -1,8 +1,5 @@
 package com.thiefalertsequre.app
 
-import android.Manifest
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothDevice
 import android.app.AlarmManager
 import android.content.Intent
 import android.media.MediaPlayer
@@ -17,7 +14,6 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import androidx.fragment.app.FragmentActivity
@@ -45,16 +41,6 @@ class SettingsActivity : FragmentActivity() {
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { renderStatus() }
-    private val bluetoothPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted -> if (granted) showTrustedBluetoothDevicePicker() else android.widget.Toast.makeText(this, "Bluetooth permission is required only for the optional trusted-device separation alert.", android.widget.Toast.LENGTH_LONG).show() }
-    private val rangingPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted && Build.VERSION.SDK_INT >= 36) queryAndroidRangingCapabilities()
-        else android.widget.Toast.makeText(this, "Ranging permission was not granted or this Android version does not support the Ranging API.", android.widget.Toast.LENGTH_LONG).show()
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         render()
@@ -292,63 +278,7 @@ class SettingsActivity : FragmentActivity() {
             12f, R.color.tas_muted
         ))
         root.addView(space(18))
-        root.addView(text("TRUSTED BLUETOOTH SEPARATION ALERT", 11f, R.color.tas_primary, true))
-        root.addView(space(8))
-        root.addView(text(
-            "Optional anti-theft layer. Choose an already-paired trusted Bluetooth device. While phone protection is ARMED, a detected disconnect starts a short grace period; reconnecting cancels it. Android may not deliver connection events if the app/service is stopped. After selecting a device, reconnect it once to establish the monitoring baseline.",
-            13f, R.color.tas_muted
-        ))
-        val bluetoothReport = BluetoothCompatibility.inspect(this)
-        root.addView(text("BLUETOOTH DEVICE COMPATIBILITY", 11f, R.color.tas_primary, true))
-        root.addView(space(6))
-        root.addView(text(BluetoothCompatibility.reportText(bluetoothReport), 13f, R.color.tas_text))
-        val btAlertEnabledNow = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-        val btBaselineReady = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
-        val protectionMonitorEnabledNow = monitorPrefs.getBoolean(
-            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
-        )
-        root.addView(space(6))
-        root.addView(text(
-            "Protection monitor: ${if (protectionMonitorEnabledNow) "enabled" else "disabled"}\\n" +
-                "Trusted separation alert: ${if (btAlertEnabledNow) "enabled" else "disabled"}\\n" +
-                "Trusted-device connection baseline: ${if (btBaselineReady) "established" else "not established — reconnect the selected accessory"}",
-            12f, R.color.tas_text
-        ))
-        root.addView(space(6))
-        root.addView(text(
-            BluetoothCompatibility.versionGuide(bluetoothReport.apiLevel) + "\\n\\n" +
-                BluetoothCompatibility.permissionGuide(bluetoothReport.apiLevel),
-            12f, R.color.tas_muted
-        ))
-        root.addView(action("Open Android Bluetooth settings") {
-            open(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
-        })
-        root.addView(space(8))
-        val trustedAddress = monitorPrefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null)
-        val trustedName = monitorPrefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, null)
-        root.addView(text("Trusted device: " + (trustedName ?: "Not selected"), 13f, R.color.tas_text))
-        root.addView(action("Choose paired Bluetooth device") { requestTrustedBluetoothDevicePicker() })
-        val bluetoothEnabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-        root.addView(action("Bluetooth separation alert: ${if (bluetoothEnabled) "ON" else "OFF"}") {
-            val selected = monitorPrefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null)
-            if (!bluetoothEnabled && selected.isNullOrBlank()) {
-                android.widget.Toast.makeText(this, "Choose a trusted paired device first.", android.widget.Toast.LENGTH_LONG).show()
-            } else {
-                val enabled = !monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-                monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, enabled)
-                    .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false).apply()
-                if (enabled) {
-                    monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).apply()
-                    runCatching { ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java)) }
-                        .onFailure { android.widget.Toast.makeText(this, "Protection monitor could not start: ${it.message}", android.widget.Toast.LENGTH_LONG).show() }
-                    android.widget.Toast.makeText(this, "Reconnect your trusted Bluetooth device once to establish its connection baseline.", android.widget.Toast.LENGTH_LONG).show()
-                } else {
-                    sendBroadcast(Intent(ProtectionMonitorService.ACTION_REFRESH).setPackage(packageName))
-                }
-                render()
-            }
-        })
-        root.addView(space(8))
+        root.addView(space(18))
         val sensitivity = MotionSensitivity.fromStored(
             monitorPrefs.getString(ProtectionMonitorService.KEY_SENSITIVITY, MotionSensitivity.MEDIUM.name)
         )
@@ -440,164 +370,6 @@ class SettingsActivity : FragmentActivity() {
         root.addView(action("Back to protection dashboard") { finish() })
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
-    }
-
-    private fun checkAndroidRangingCapabilities() {
-        if (Build.VERSION.SDK_INT < 36) {
-            android.widget.Toast.makeText(this, "Android Ranging requires Android 16 / API 36 or newer.", android.widget.Toast.LENGTH_LONG).show()
-            return
-        }
-        if (checkSelfPermission("android.permission.RANGING") != PackageManager.PERMISSION_GRANTED) {
-            rangingPermission.launch("android.permission.RANGING")
-            return
-        }
-        queryAndroidRangingCapabilities()
-    }
-
-    @androidx.annotation.RequiresApi(36)
-    private fun queryAndroidRangingCapabilities() {
-        val manager = getSystemService(android.ranging.RangingManager::class.java)
-        if (manager == null) {
-            android.widget.Toast.makeText(this, "Android Ranging service is unavailable on this device.", android.widget.Toast.LENGTH_LONG).show()
-            return
-        }
-        val callback = object : android.ranging.RangingManager.RangingCapabilitiesCallback {
-            override fun onRangingCapabilities(capabilities: android.ranging.RangingCapabilities) {
-                runCatching { manager.unregisterCapabilitiesCallback(this) }
-                val availability = capabilities.technologyAvailability
-                fun status(id: Int): String = when (availability[id]) {
-                    android.ranging.RangingCapabilities.ENABLED -> "SUPPORTED AND ENABLED"
-                    android.ranging.RangingCapabilities.NOT_SUPPORTED -> "NOT SUPPORTED BY THIS DEVICE"
-                    android.ranging.RangingCapabilities.DISABLED_USER -> "DISABLED BY USER"
-                    android.ranging.RangingCapabilities.DISABLED_REGULATORY -> "DISABLED BY REGULATORY POLICY"
-                    android.ranging.RangingCapabilities.DISABLED_USER_RESTRICTIONS -> "DISABLED BY DEVICE POLICY"
-                    null -> "NOT REPORTED BY PLATFORM"
-                    else -> "UNKNOWN PLATFORM STATUS"
-                }
-                val result = buildString {
-                    append("BLUETOOTH CHANNEL SOUNDING: ${status(android.ranging.RangingManager.BLE_CS)}\\n\\n")
-                    append("BLUETOOTH RSSI RANGING: ${status(android.ranging.RangingManager.BLE_RSSI)}\\n\\n")
-                    append("ULTRA-WIDEBAND (NOT BLUETOOTH): ${status(android.ranging.RangingManager.UWB)}\\n\\n")
-                    append("WI-FI NAN RTT (NOT BLUETOOTH): ${status(android.ranging.RangingManager.WIFI_NAN_RTT)}")
-                    if (Build.VERSION.SDK_INT >= 37) {
-                        append("\\n\\nWI-FI PROXIMITY DETECTION (NOT BLUETOOTH): ${status(5)}")
-                    }
-                    append("\\n\\nThese are local-device platform capabilities. A ranging session still requires a compatible peer, an out-of-band connection, permission, and a supported session configuration. No distance or direction is measured by this capability check.")
-                }
-                runOnUiThread {
-                    if (isFinishing || isDestroyed) return@runOnUiThread
-                    MaterialAlertDialogBuilder(this@SettingsActivity)
-                        .setTitle("Android ranging capability results")
-                        .setMessage(result)
-                        .setPositiveButton("Close", null)
-                        .show()
-                }
-            }
-        }
-        runCatching {
-            manager.registerCapabilitiesCallback(mainExecutor, callback)
-        }.onFailure {
-            runOnUiThread {
-                if (!isFinishing && !isDestroyed) {
-                    MaterialAlertDialogBuilder(this)
-                        .setTitle("Ranging capability check unavailable")
-                        .setMessage("${it.javaClass.simpleName}: ${it.message ?: "The platform did not provide capability data."}")
-                        .setPositiveButton("Close", null)
-                        .show()
-                }
-            }
-        }
-    }
-
-    private fun verifyRootAndShowDiagnostics() {
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Verify superuser access?")
-            .setMessage(
-                "This explicit check runs the read-only command 'su -c id'. Your installed root manager may ask whether ThiefAlertSeQure may use root. If approved, the app reads Bluetooth service diagnostics and selected system properties only. It will not change Bluetooth settings, pairing, firmware, radio power, or system files."
-            )
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Continue") { _, _ ->
-                android.widget.Toast.makeText(this, "Waiting for root authorization…", android.widget.Toast.LENGTH_LONG).show()
-                ioExecutor.execute {
-                    val report = RootCapabilityInspector.verifyRootAuthorization()
-                    val diagnostics = if (report.isRootAuthorized) {
-                        RootCapabilityInspector.collectBluetoothDiagnostics()
-                    } else {
-                        report.detail
-                    }
-                    runOnUiThread {
-                        if (isFinishing || isDestroyed) return@runOnUiThread
-                        val output = buildString {
-                            append("Root status: ${report.status}\\n")
-                            append(report.detail)
-                            if (report.indicators.isNotEmpty()) {
-                                append("\\n\\nRoot indicators:\\n")
-                                append(report.indicators.joinToString("\\n"))
-                            }
-                            append("\\n\\nREAD-ONLY BLUETOOTH DIAGNOSTICS\\n")
-                            append(diagnostics)
-                        }.take(24000)
-                        val body = android.widget.TextView(this).apply {
-                            text = output
-                            textSize = 12f
-                            setTextColor(getColor(R.color.tas_text))
-                            setPadding(dp(18), dp(12), dp(18), dp(12))
-                        }
-                        val scroll = ScrollView(this).apply { addView(body) }
-                        MaterialAlertDialogBuilder(this)
-                            .setTitle("Device diagnostics")
-                            .setView(scroll)
-                            .setPositiveButton("Close", null)
-                            .show()
-                    }
-                }
-            }
-            .show()
-    }
-
-    private fun requestTrustedBluetoothDevicePicker() {
-        if (Build.VERSION.SDK_INT >= 31 &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
-        ) {
-            bluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
-            return
-        }
-        showTrustedBluetoothDevicePicker()
-    }
-
-    @Suppress("MissingPermission")
-    private fun showTrustedBluetoothDevicePicker() {
-        val adapter = BluetoothAdapter.getDefaultAdapter()
-        if (adapter == null) {
-            android.widget.Toast.makeText(this, "This device does not support Bluetooth.", android.widget.Toast.LENGTH_LONG).show()
-            return
-        }
-        if (!adapter.isEnabled) {
-            android.widget.Toast.makeText(this, "Turn on Bluetooth and pair your trusted device in Android settings first.", android.widget.Toast.LENGTH_LONG).show()
-            open(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
-            return
-        }
-        val devices = runCatching { adapter.bondedDevices.toList().sortedBy { it.name ?: it.address } }.getOrDefault(emptyList())
-        if (devices.isEmpty()) {
-            android.widget.Toast.makeText(this, "No paired Bluetooth devices found. Pair a trusted device in Android settings first.", android.widget.Toast.LENGTH_LONG).show()
-            open(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
-            return
-        }
-        val labels = devices.map { "${it.name ?: "Bluetooth device"} — ${it.address}" }.toTypedArray()
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Select trusted Bluetooth device")
-            .setItems(labels) { _, which ->
-                val selected = devices[which]
-                getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE).edit()
-                    .putString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, selected.address)
-                    .putString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, selected.name ?: "Bluetooth device")
-                    .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
-                    .apply()
-                render()
-                android.widget.Toast.makeText(this, "Trusted device saved. Enable the alert, then reconnect this device once.", android.widget.Toast.LENGTH_LONG).show()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     private fun isSafeForAppUpdate(): Boolean {
