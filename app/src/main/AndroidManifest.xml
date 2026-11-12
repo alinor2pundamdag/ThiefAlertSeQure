@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Network access is used only for owner-initiated GitHub release checks/downloads. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Optional trusted Bluetooth separation alert; no scanning permission is requested. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -42,7 +46,7 @@
         <service android:name=".AlarmService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
         <service android:name=".ProtectionMonitorService" android:exported="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="User-enabled anti-theft monitoring for charger removal, motion detection, and optional battery threshold alerts" />
+                android:value="User-enabled anti-theft monitoring for charger removal, motion detection, trusted Bluetooth separation, and optional battery threshold alerts" />
         </service>
         <provider
             android:name="androidx.core.content.FileProvider"
