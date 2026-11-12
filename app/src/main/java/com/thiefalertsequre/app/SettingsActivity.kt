@@ -48,6 +48,12 @@ class SettingsActivity : FragmentActivity() {
     private val bluetoothPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted -> if (granted) showTrustedBluetoothDevicePicker() else android.widget.Toast.makeText(this, "Bluetooth permission is required only for the optional trusted-device separation alert.", android.widget.Toast.LENGTH_LONG).show() }
+    private val rangingPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) queryAndroidRangingCapabilities()
+        else android.widget.Toast.makeText(this, "Ranging permission was not granted. No ranging session was started.", android.widget.Toast.LENGTH_LONG).show()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -113,6 +119,11 @@ class SettingsActivity : FragmentActivity() {
                 .setPositiveButton("Close", null)
                 .show()
         })
+        if (Build.VERSION.SDK_INT >= 36) {
+            root.addView(action("Check actual Android ranging hardware capabilities") {
+                checkAndroidRangingCapabilities()
+            })
+        }
         root.addView(action("Verify root access and run read-only Bluetooth diagnostics") {
             verifyRootAndShowDiagnostics()
         })
@@ -451,6 +462,73 @@ class SettingsActivity : FragmentActivity() {
         root.addView(action("Back to protection dashboard") { finish() })
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
+    }
+
+    private fun checkAndroidRangingCapabilities() {
+        if (Build.VERSION.SDK_INT < 36) {
+            android.widget.Toast.makeText(this, "Android Ranging requires Android 16 / API 36 or newer.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        if (checkSelfPermission("android.permission.RANGING") != PackageManager.PERMISSION_GRANTED) {
+            rangingPermission.launch("android.permission.RANGING")
+            return
+        }
+        queryAndroidRangingCapabilities()
+    }
+
+    @androidx.annotation.RequiresApi(36)
+    private fun queryAndroidRangingCapabilities() {
+        val manager = getSystemService(android.ranging.RangingManager::class.java)
+        if (manager == null) {
+            android.widget.Toast.makeText(this, "Android Ranging service is unavailable on this device.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        val callback = object : android.ranging.RangingManager.RangingCapabilitiesCallback {
+            override fun onRangingCapabilities(capabilities: android.ranging.RangingCapabilities) {
+                runCatching { manager.unregisterCapabilitiesCallback(this) }
+                val availability = capabilities.technologyAvailability
+                fun status(id: Int): String = when (availability[id]) {
+                    android.ranging.RangingCapabilities.ENABLED -> "SUPPORTED AND ENABLED"
+                    android.ranging.RangingCapabilities.NOT_SUPPORTED -> "NOT SUPPORTED BY THIS DEVICE"
+                    android.ranging.RangingCapabilities.DISABLED_USER -> "DISABLED BY USER"
+                    android.ranging.RangingCapabilities.DISABLED_REGULATORY -> "DISABLED BY REGULATORY POLICY"
+                    android.ranging.RangingCapabilities.DISABLED_USER_RESTRICTIONS -> "DISABLED BY DEVICE POLICY"
+                    null -> "NOT REPORTED BY PLATFORM"
+                    else -> "UNKNOWN PLATFORM STATUS"
+                }
+                val result = buildString {
+                    append("BLUETOOTH CHANNEL SOUNDING: ${status(android.ranging.RangingManager.BLE_CS)}\\n\\n")
+                    append("BLUETOOTH RSSI RANGING: ${status(android.ranging.RangingManager.BLE_RSSI)}\\n\\n")
+                    append("ULTRA-WIDEBAND (NOT BLUETOOTH): ${status(android.ranging.RangingManager.UWB)}\\n\\n")
+                    append("WI-FI NAN RTT (NOT BLUETOOTH): ${status(android.ranging.RangingManager.WIFI_NAN_RTT)}")
+                    if (Build.VERSION.SDK_INT >= 37) {
+                        append("\\n\\nWI-FI PROXIMITY DETECTION (NOT BLUETOOTH): ${status(5)}")
+                    }
+                    append("\\n\\nThese are local-device platform capabilities. A ranging session still requires a compatible peer, an out-of-band connection, permission, and a supported session configuration. No distance or direction is measured by this capability check.")
+                }
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    MaterialAlertDialogBuilder(this@SettingsActivity)
+                        .setTitle("Android ranging capability results")
+                        .setMessage(result)
+                        .setPositiveButton("Close", null)
+                        .show()
+                }
+            }
+        }
+        runCatching {
+            manager.registerCapabilitiesCallback(mainExecutor, callback)
+        }.onFailure {
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) {
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle("Ranging capability check unavailable")
+                        .setMessage("${it.javaClass.simpleName}: ${it.message ?: "The platform did not provide capability data."}")
+                        .setPositiveButton("Close", null)
+                        .show()
+                }
+            }
+        }
     }
 
     private fun verifyRootAndShowDiagnostics() {
