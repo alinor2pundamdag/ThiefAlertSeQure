@@ -4,7 +4,6 @@ import android.app.ActivityManager
 import android.app.AlarmManager
 import android.app.NotificationManager
 import android.app.KeyguardManager
-import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
@@ -24,7 +23,6 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.FragmentActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
-import java.io.File
 import java.util.Locale
 
 /** Read-only, on-device capability and readiness report. No hardware identifiers are collected. */
@@ -37,7 +35,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         val scroll = ScrollView(this).apply { isFillViewport = true; setBackgroundColor(getColor(R.color.tas_background)) }
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(22), dp(20), dp(30)) }
         scroll.addView(root)
-        root.addView(button("‹  Back to Settings") { finish() }, matchWrap())
+        root.addView(button("‹  Back") { finish() }, matchWrap())
         root.addView(space(18))
         root.addView(label("DEVICE CAPABILITY CENTER", 11f, R.color.tas_primary, true), matchWrap())
         root.addView(space(6))
@@ -86,7 +84,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         addCard("PERFORMANCE AND POWER", listOf(
             "RAM: ${formatBytes(memory.totalMem)} total • ${formatBytes(memory.availMem)} available",
             "Low-memory condition: ${if (memory.lowMemory) "Yes" else "No"}",
-            "App-visible storage volume: ${formatBytes(totalStorage)} total • ${formatBytes(freeStorage)} available",
+            "App data filesystem volume: ${formatBytes(totalStorage)} total • ${formatBytes(freeStorage)} available",
             "CPU logical processors: ${Runtime.getRuntime().availableProcessors()}",
             "Battery: $batteryPercent • ${if (charging || plugged) "External power connected" else "Not charging"}",
             "BatteryManager capacity reading: ${if (capacity in 0..100) "$capacity%" else "Unavailable"}",
@@ -119,7 +117,9 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         )
         val sensorCount = runCatching { sensorManager.getSensorList(Sensor.TYPE_ALL).size }.getOrDefault(0)
         val sensorLines = sensorChecks.map { (type, name) ->
-            "$name: ${if (sensorManager.getDefaultSensor(type) != null) "Available" else "Not detected"}"
+            val sensor = sensorManager.getDefaultSensor(type)
+            if (sensor == null) "$name: Not detected"
+            else "$name: ${sensor.name} • ${sensor.vendor} • range ${sensor.maximumRange} • resolution ${sensor.resolution} • ${sensor.power} mA"
         } + "Total sensor endpoints reported by Android: $sensorCount"
         addCard("SENSOR CAPABILITIES", sensorLines)
 
@@ -150,14 +150,23 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         val exactAlarm = if (Build.VERSION.SDK_INT >= 31) runCatching { alarmManager.canScheduleExactAlarms() }.getOrDefault(false) else true
         val notifications = NotificationManagerCompat.from(this).areNotificationsEnabled()
         val secureLock = getSystemService(KeyguardManager::class.java).isDeviceSecure
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        val fullScreenIntent = if (Build.VERSION.SDK_INT >= 34) runCatching { notificationManager.canUseFullScreenIntent() }.getOrDefault(false) else true
+        val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+        val monitorEnabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        val monitorRunning = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_RUNNING, false)
+        val protectionMode = ProtectionStore(this).read().mode
         val btConnect = Build.VERSION.SDK_INT < 31 || checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
         val ranging = Build.VERSION.SDK_INT >= 36 && checkSelfPermission("android.permission.RANGING") == PackageManager.PERMISSION_GRANTED
         val appReadiness = listOf(
             "Android notifications: ${if (notifications) "Enabled" else "Disabled"}",
+            "Full-screen alarm intent access: ${if (fullScreenIntent) "Available / not restricted" else "Not allowed by current Android settings"}",
             "Exact alarm scheduling: ${if (exactAlarm) "Available / permitted" else "Access not granted"}",
             "Secure screen lock: ${if (secureLock) "Configured" else "Not configured"}",
             "Bluetooth Connect permission: ${if (btConnect) "Granted / not runtime-gated on this Android version" else "Not granted"}",
             "Android Ranging permission: ${if (Build.VERSION.SDK_INT < 36) "Not applicable on this OS" else if (ranging) "Granted" else "Not granted"}",
+            "Protection monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled"} • Runtime status: ${if (monitorRunning) "Running (last recorded state)" else "Not running (last recorded state)"}",
+            "Protection state: $protectionMode",
             "Background guidance family: $family"
         )
         addCard("THIEFALERTSEQuRE READINESS", appReadiness)
@@ -184,7 +193,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     }
 
     private fun rootButtonRow() {
-        root.addView(button("Open Android app battery settings") {
+        root.addView(button("Open Android app settings") {
             runCatching { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName"))) }
         }, matchWrap())
         root.addView(space(8))
