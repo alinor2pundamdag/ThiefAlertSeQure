@@ -23,7 +23,7 @@ Status: active development audit; not a release certification.
 - Setup status distinguishes verified, action-required, unsupported/neutral, and unknown states; action labels identify their destination and external Settings routes use ordered fallbacks with visible failure feedback.
 - Multi-device A2 readiness is not marked verified until every registered accessory has a fresh connection baseline.
 - Material dialogs in audited screens use the shared themed-dialog helper.
-- CI statically checks manifest Activity declarations, internal Activity targets, and themed Material dialog calls.
+- CI statically checks manifest Activity declarations, internal Activity targets, themed Material dialogs, obvious empty click listeners, theme-preview/inset contracts, safe setup-action fallbacks, and A2 readiness/timer invalidation contracts.
 
 ## Security invariants
 - Owner authentication remains Android Keyguard / supported strong biometric verification; app code does not collect or store the device credential.
