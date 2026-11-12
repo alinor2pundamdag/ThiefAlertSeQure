@@ -20,6 +20,8 @@ Status: development audit; not a release certification.
 
 ## Changes in this commit
 - Add a local multi-device trusted Bluetooth registry with legacy single-device migration.
+- Add WCAG AA contrast regression tests for primary text, muted text, and button labels across all 16 palettes.
+- Clear per-device connection baselines when A2 is disabled or re-enabled.
 - Add per-device connection baselines and per-device 8-second disconnect timers.
 - Add explicit confirmation before unregistering an accessory.
 - Unregister affects only the app trust registry; it never unpairs Android Bluetooth devices.

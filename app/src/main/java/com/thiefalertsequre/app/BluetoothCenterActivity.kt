@@ -210,10 +210,8 @@ class BluetoothCenterActivity : FragmentActivity() {
     private fun toggleA2() {
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
         if (prefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)) {
-            prefs.edit()
-                .putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-                .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
-                .apply()
+            prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).apply()
+            TrustedBluetoothRegistry.clearBaselines(prefs)
             render()
             return
         }
@@ -244,10 +242,8 @@ class BluetoothCenterActivity : FragmentActivity() {
             showResult("Alarm is active", "Do not change Bluetooth alert configuration while the theft alarm is active.")
             return
         }
-        prefs.edit()
-            .putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, true)
-            .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
-            .apply()
+        prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, true).apply()
+        TrustedBluetoothRegistry.clearBaselines(prefs)
         runCatching {
             ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
         }.onFailure {
