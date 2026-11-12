@@ -1,8 +1,6 @@
 package com.thiefalertsequre.app
 
 import android.Manifest
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothDevice
 import android.app.AlarmManager
 import android.content.Intent
 import android.media.MediaPlayer
@@ -45,9 +43,6 @@ class SettingsActivity : FragmentActivity() {
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { renderStatus() }
-    private val bluetoothPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted -> if (granted) showTrustedBluetoothDevicePicker() else android.widget.Toast.makeText(this, "Bluetooth permission is required only for the optional trusted-device separation alert.", android.widget.Toast.LENGTH_LONG).show() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -165,7 +160,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(10))
         addSystemSettingAction("Grant notifications permission", "Notifications", "Android 13 (API 33)+ asks for notification permission at runtime. If denied, open App info → Notifications and enable it. Android 8–12 uses per-app notification controls without this runtime prompt. Verify the Anti-theft alarm channel is enabled and allowed to appear on the lock screen.") { requestNotifications() }
         addSystemSettingAction("Alarms & reminders / exact alarm access", "Exact alarms", "Android 12 (API 31)+ exposes special Alarms & reminders access. Allow ThiefAlertSeQure if listed. Android 8–11 does not expose this special access. Without it, countdown delivery may use fallback scheduling and can be delayed.") { openExactAlarmSettings() }
-        addSystemSettingAction("All app permissions and app information", "App permissions", "Open App info → Permissions and review only permissions requested by this build. The local charger-alarm core does not need contacts, location, microphone, camera permission, or SMS. The optional trusted Bluetooth separation alert requests Bluetooth Connect access only when you choose a paired device; it does not scan for nearby devices. Internet access is used only when you manually check for official GitHub updates; the app does not upload protection data. The optional flashlight uses Android's torch API without camera permission and does not capture images or video. Do not grant unrelated permissions.") { openAppInfo() }
+        addSystemSettingAction("All app permissions and app information", "App permissions", "Open App info → Permissions and review only permissions requested by this build. The local charger-alarm core does not need contacts, location, microphone, camera permission, or SMS. Internet access is used only when you manually check for official GitHub updates; the app does not upload protection data. The optional flashlight uses Android's torch API without camera permission and does not capture images or video. Do not grant unrelated permissions.") { openAppInfo() }
         addSystemSettingAction("App notification channels and settings", "App notifications", "This opens ThiefAlertSeQure's own notification settings. Enable app notifications and the Anti-theft alarm channel. Android 8+ uses channels; Android 13+ also requires app-level notification permission.") { open(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)) }
         addSystemSettingAction("Battery and background restrictions", "Background activity", "Review ThiefAlertSeQure battery usage and select Unrestricted / Allow background activity where available. Android 8+ applies background execution limits; Android 9+ adds stricter standby behavior; Android 12+ exposes additional battery controls; Android 13–15 may apply OEM restrictions. Keep the persistent protection notification enabled. No setting overrides Force stop.") { openBatterySettings() }
         addSystemSettingAction("Do Not Disturb settings", "Do Not Disturb", "Review DND mode, schedules, and permitted alarm interruptions. The alarm uses Android alarm audio usage, but DND policy, silent mode, and OEM behavior can still affect audible output. Allow alarms during DND if you require alarm audio to remain audible.") { openDndSettings() }
@@ -269,38 +264,6 @@ class SettingsActivity : FragmentActivity() {
             "Motion is a separate alarm source and can trigger while the charger is still connected. Leave it OFF for charger-removal-only protection.",
             12f, R.color.tas_muted
         ))
-        root.addView(space(18))
-        root.addView(text("TRUSTED BLUETOOTH SEPARATION ALERT", 11f, R.color.tas_primary, true))
-        root.addView(space(8))
-        root.addView(text(
-            "Optional anti-theft layer. Choose an already-paired trusted Bluetooth device. While phone protection is ARMED, a detected disconnect starts a short grace period; reconnecting cancels it. Android may not deliver connection events if the app/service is stopped. After selecting a device, reconnect it once to establish the monitoring baseline.",
-            13f, R.color.tas_muted
-        ))
-        val trustedAddress = monitorPrefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null)
-        val trustedName = monitorPrefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, null)
-        root.addView(text("Trusted device: " + (trustedName ?: "Not selected"), 13f, R.color.tas_text))
-        root.addView(action("Choose paired Bluetooth device") { requestTrustedBluetoothDevicePicker() })
-        val bluetoothEnabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-        root.addView(action("Bluetooth separation alert: ${if (bluetoothEnabled) "ON" else "OFF"}") {
-            val selected = monitorPrefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null)
-            if (!bluetoothEnabled && selected.isNullOrBlank()) {
-                android.widget.Toast.makeText(this, "Choose a trusted paired device first.", android.widget.Toast.LENGTH_LONG).show()
-            } else {
-                val enabled = !monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-                monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, enabled)
-                    .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false).apply()
-                if (enabled) {
-                    monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).apply()
-                    runCatching { ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java)) }
-                        .onFailure { android.widget.Toast.makeText(this, "Protection monitor could not start: ${it.message}", android.widget.Toast.LENGTH_LONG).show() }
-                    android.widget.Toast.makeText(this, "Reconnect your trusted Bluetooth device once to establish its connection baseline.", android.widget.Toast.LENGTH_LONG).show()
-                } else {
-                    sendBroadcast(Intent(ProtectionMonitorService.ACTION_REFRESH).setPackage(packageName))
-                }
-                render()
-            }
-        })
-        root.addView(space(8))
         val sensitivity = MotionSensitivity.fromStored(
             monitorPrefs.getString(ProtectionMonitorService.KEY_SENSITIVITY, MotionSensitivity.MEDIUM.name)
         )
@@ -392,51 +355,6 @@ class SettingsActivity : FragmentActivity() {
         root.addView(action("Back to protection dashboard") { finish() })
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
-    }
-
-    private fun requestTrustedBluetoothDevicePicker() {
-        if (Build.VERSION.SDK_INT >= 31 &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
-        ) {
-            bluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
-            return
-        }
-        showTrustedBluetoothDevicePicker()
-    }
-
-    @Suppress("MissingPermission")
-    private fun showTrustedBluetoothDevicePicker() {
-        val adapter = BluetoothAdapter.getDefaultAdapter()
-        if (adapter == null) {
-            android.widget.Toast.makeText(this, "This device does not support Bluetooth.", android.widget.Toast.LENGTH_LONG).show()
-            return
-        }
-        if (!adapter.isEnabled) {
-            android.widget.Toast.makeText(this, "Turn on Bluetooth and pair your trusted device in Android settings first.", android.widget.Toast.LENGTH_LONG).show()
-            open(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
-            return
-        }
-        val devices = runCatching { adapter.bondedDevices.toList().sortedBy { it.name ?: it.address } }.getOrDefault(emptyList())
-        if (devices.isEmpty()) {
-            android.widget.Toast.makeText(this, "No paired Bluetooth devices found. Pair a trusted device in Android settings first.", android.widget.Toast.LENGTH_LONG).show()
-            open(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
-            return
-        }
-        val labels = devices.map { "${it.name ?: "Bluetooth device"} — ${it.address}" }.toTypedArray()
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Select trusted Bluetooth device")
-            .setItems(labels) { _, which ->
-                val selected = devices[which]
-                getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE).edit()
-                    .putString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, selected.address)
-                    .putString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, selected.name ?: "Bluetooth device")
-                    .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
-                    .apply()
-                render()
-                android.widget.Toast.makeText(this, "Trusted device saved. Enable the alert, then reconnect this device once.", android.widget.Toast.LENGTH_LONG).show()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     private fun isSafeForAppUpdate(): Boolean {
