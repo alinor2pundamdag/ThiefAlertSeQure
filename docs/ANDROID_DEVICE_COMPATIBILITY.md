@@ -39,6 +39,75 @@
 
 The app's updated build configuration is **minSdk 26, compileSdk 36, targetSdk 36**, using Android Gradle Plugin 8.9.1 and Gradle 8.11.1. This meets the current Google Play target-API requirement for new apps and updates (API 36). Android 17 (API 37) is supported as a runtime OS target, but the app does not yet target or compile against API 37. Android 17 target-37-only behavior changes must be re-audited before raising targetSdk to 37.
 
+## Bluetooth compatibility and setup (Android 8–17)
+
+The current A2 implementation uses an already-paired trusted device and Bluetooth ACL connection/disconnection events. It does not scan for nearby devices, advertise the phone, connect to a remote GATT service, or read location. Therefore it requests only Bluetooth Connect on Android 12+; it must not add Bluetooth Scan, Bluetooth Advertise, or location permission unless a separately approved feature genuinely needs them.
+
+| Android release | API | Bluetooth permission / behavior | ThiefAlertSeQure handling |
+|---|---:|---|---|
+| Android 8.0 | 26 | Legacy BLUETOOTH and BLUETOOTH_ADMIN install-time permissions | Runtime event receiver while the user-enabled foreground monitor is active; no nearby-device scan |
+| Android 8.1 | 27 | Same legacy permission model | Same as API 26 |
+| Android 9 | 28 | Legacy permissions; stronger battery/background management varies by OEM | Keep monitor user-visible; show OEM battery guidance |
+| Android 10 | 29 | Legacy permissions; background Activity launches restricted | Do not open UI from background Bluetooth events |
+| Android 11 | 30 | Legacy permissions; package-visibility restrictions affect some Settings discovery | Use public Bluetooth Settings action with fallback |
+| Android 12 | 31 | BLUETOOTH_CONNECT is a runtime Nearby devices permission; legacy permissions capped at API 30 | Request Connect only when owner selects/uses a paired trusted device |
+| Android 12L | 32 | Same Android 12 permission model | Same as API 31 |
+| Android 13 | 33 | Nearby devices permission remains separate from notification permission | Check Connect and POST_NOTIFICATIONS independently |
+| Android 14 | 34 | Connect remains runtime; foreground-service types and background-start rules also apply | Keep Bluetooth event monitoring inside the already-running, user-visible monitor service |
+| Android 15 | 35 | Same Connect permission model; target-35 system behavior changes apply independently | Do not assume an OEM battery or boot setting can be changed by the app |
+| Android 16 | 36 | Android Ranging API introduced; BLE Channel Sounding and RSSI ranging are capability-dependent | Detect Ranging API availability, then query real runtime capabilities before offering ranging |
+| Android 17 | 37 | Ranging API continues; target-37 RFCOMM socket read behavior changes | Current A2 does not use RFCOMM sockets; if future code does, treat read() == -1 as stream closure |
+
+### Runtime checks shown in the app
+
+The Bluetooth compatibility panel reports:
+- Android release and API level.
+- Bluetooth Classic hardware availability.
+- Bluetooth Low Energy hardware availability.
+- Whether Bluetooth Connect permission is granted (API 31+).
+- Adapter state: ON, OFF, permission required, unsupported, or unknown.
+- Whether the Android Ranging API exists at API 36+; this is not a claim that any particular ranging technology is supported.
+
+A status of **available** means the OS exposes the adapter or hardware feature. It does not prove that a particular accessory is connected, that ACL broadcasts will always be delivered, or that the OEM will keep the process alive. A fresh trusted-device connection baseline is still required after enabling or restarting A2.
+
+### Bluetooth settings the owner should review
+
+1. Turn Bluetooth ON in Android Quick Settings or Settings → Connected devices / Bluetooth.
+2. Pair the trusted watch, earbuds, or accessory using Android's own pairing screen first.
+3. Open ThiefAlertSeQure → Settings → Trusted Bluetooth Separation Alert → choose the paired device.
+4. On Android 12+, grant **Nearby devices / Bluetooth Connect** when the app requests it. Do not grant unrelated permissions.
+5. Enable the A2 separation alert and reconnect the selected accessory once to establish a fresh baseline.
+6. Keep ThiefAlertSeQure's foreground protection notification enabled.
+7. Review Settings → Apps → ThiefAlertSeQure → Battery and allow background use / Unrestricted only if the device offers it and the owner accepts the battery trade-off.
+8. Follow the manufacturer-specific background guidance above. OEM auto-start controls are manual and are not universally exposed to third-party apps.
+9. If Bluetooth is turned off, the accessory battery dies, the accessory sleeps, or Android/OEM suppresses an event, the disconnect alert may not be delivered. The app must show this limitation rather than claiming guaranteed detection.
+
+### Distance and direction are separate optional capabilities
+
+- **ACL connect/disconnect:** indicates connection state only. It does not provide compass direction or exact distance.
+- **RSSI:** signal strength can support a rough near/far trend when the OS and accessory expose suitable measurements. It is affected by walls, body position, antenna design, transmit power, interference, and accessory sleep. Never present RSSI as an accurate meter measurement.
+- **Bluetooth Channel Sounding:** Android 16+ exposes a Ranging API, but the actual technology must be supported by the local phone, remote accessory, Bluetooth stack, and OS. Do not enable it merely because API 36 exists.
+- **UWB:** can provide precise ranging only when the phone and remote device both support the required UWB capabilities and the platform exposes them.
+- **Direction finding (AoA/AoD):** requires compatible Bluetooth Direction Finding hardware, including suitable antenna-array support. A phone compass reports the phone's own heading; it cannot locate a generic Bluetooth accessory to the north/south/east/west.
+- If no supported precise-ranging or direction hardware exists, display **Not supported** or **Direction unavailable**. Never fabricate a distance, bearing, map pin, or accuracy percentage.
+
+## Recommended Bluetooth improvements (future work; not release-assigned)
+
+These are proposals, not commitments. The owner decides which release, if any, receives each item.
+
+1. **Capability-aware Bluetooth diagnostics:** show permissions, adapter state, Classic/BLE availability, monitor receiver state, and baseline status.
+2. **Reconnect / baseline recovery:** clearly guide the owner to reconnect the trusted accessory after permission changes, service restart, reboot, or Bluetooth toggle.
+3. **Bluetooth adapter-state monitoring:** detect adapter OFF/ON transitions while the monitor is active, but do not treat an OFF event alone as proof of theft without an explicitly approved policy.
+4. **RSSI proximity trend:** optional foreground-only near/far trend with smoothing and a clear estimate label; no exact meters or compass direction.
+5. **Android Ranging integration:** explore BLE Channel Sounding / UWB through API 36+ only after verifying both endpoint capabilities and a real supported accessory.
+6. **Directional finding:** consider only if the phone/accessory hardware supports AoA/AoD; otherwise keep it unavailable.
+7. **Accessory battery / link health:** show battery only if the paired accessory exposes a standard, accessible battery service; do not guess battery percentage.
+8. **Per-device trust management:** allow owner-controlled rename, replace, disable, and explicit re-pairing of the trusted device without clearing other protection preferences.
+9. **False-disconnect resilience:** record event time, reconnect cancellation, and bounded debounce; never delay or silence the existing charger alarm.
+10. **Local diagnostic export:** owner-initiated, redacted Bluetooth event report with Android API, adapter state, permission state, and timestamps; no automatic upload or telemetry.
+
+Every improvement must preserve the existing charger alarm, authentication path, local-only privacy model, app ID, signing certificate, stored settings, and upgrade-over-install compatibility. Bluetooth enhancements must remain optional and must never interfere with an active theft alarm.
+
 ## Manufacturer guidance
 
 The app detects the device's reported manufacturer and brand and selects matching instructions. These settings are user-controlled and are not automatically toggled by the app.
