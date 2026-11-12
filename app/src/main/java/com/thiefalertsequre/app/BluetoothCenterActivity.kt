@@ -127,23 +127,41 @@ class BluetoothCenterActivity : FragmentActivity() {
 
     private fun addTrustedDeviceSection() {
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        val name = prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, null)
+        val devices = TrustedBluetoothRegistry.read(prefs)
         val enabled = prefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-        val baseline = prefs.getBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
+        val baselineCount = devices.count { TrustedBluetoothRegistry.isBaselineConnected(prefs, it.address) }
         val monitorEnabled = prefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         val protectionMode = ProtectionStore(this).read().mode
         addCard("TRUSTED ACCESSORY SEPARATION ALERT (A2)", listOf(
             "Feature: ${if (enabled) "ON" else "OFF"}",
-            "Trusted accessory: ${name ?: "Not selected"}",
-            "Connection baseline: ${if (baseline) "Established" else "Not established — connect/reconnect the accessory after enabling"}",
+            "Registered trusted accessories: ${devices.size}",
+            "Connection baselines confirmed: $baselineCount / ${devices.size}",
             "Protection monitor: ${if (monitorEnabled) "Enabled" else "Disabled by owner"}",
             "Protection state: $protectionMode",
-            "When armed, a matching disconnect starts an 8-second grace period. Reconnection cancels the pending alert."
+            "Each registered accessory is monitored independently. A confirmed disconnect starts an 8-second grace period; reconnecting that accessory cancels its pending alert.",
+            "Unregistering removes only this app's trust. Android pairing remains unchanged."
         ))
-        root.addView(button("Choose or change trusted paired device") { requestTrustedDevicePicker() }, matchWrap())
+        root.addView(button("Add trusted paired device") { requestTrustedDevicePicker() }, matchWrap())
+        devices.forEach { device ->
+            root.addView(space(6))
+            root.addView(button("Unregister: ${device.name}") { confirmUnregister(device) }, matchWrap())
+        }
         root.addView(space(7))
         root.addView(button(if (enabled) "Disable trusted-device separation alert" else "Enable trusted-device separation alert") { toggleA2() }, matchWrap())
         root.addView(space(14))
+    }
+
+    private fun confirmUnregister(device: TrustedBluetoothDevice) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Unregister trusted accessory?")
+            .setMessage("${device.name} will no longer be trusted by A2. It will remain paired in Android Bluetooth settings.")
+            .setNegativeButton("Keep registered", null)
+            .setPositiveButton("Unregister") { _, _ ->
+                val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+                TrustedBluetoothRegistry.remove(prefs, device.address)
+                render()
+            }
+            .show()
     }
 
     private fun requestTrustedDevicePicker() {
@@ -177,11 +195,12 @@ class BluetoothCenterActivity : FragmentActivity() {
             .setTitle("Select trusted paired accessory")
             .setItems(labels) { _, which ->
                 val selected = devices[which]
-                getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE).edit()
-                    .putString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, selected.address)
-                    .putString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, selected.name ?: "Bluetooth accessory")
-                    .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
-                    .apply()
+                val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+                TrustedBluetoothRegistry.add(
+                    prefs,
+                    selected.address,
+                    selected.name ?: "Bluetooth accessory"
+                )
                 render()
             }
             .setNegativeButton("Cancel", null)
@@ -198,7 +217,7 @@ class BluetoothCenterActivity : FragmentActivity() {
             render()
             return
         }
-        if (prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null).isNullOrBlank()) {
+        if (TrustedBluetoothRegistry.read(prefs).isEmpty()) {
             requestTrustedDevicePicker()
             return
         }
@@ -213,7 +232,7 @@ class BluetoothCenterActivity : FragmentActivity() {
     private fun enableA2() {
         enableAfterPermission = false
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        if (prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null).isNullOrBlank()) {
+        if (TrustedBluetoothRegistry.read(prefs).isEmpty()) {
             showTrustedDevicePicker()
             return
         }

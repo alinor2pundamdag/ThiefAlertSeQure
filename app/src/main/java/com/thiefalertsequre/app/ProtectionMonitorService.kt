@@ -45,6 +45,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private var powerReceiverRegistered = false
     private var bluetoothReceiverRegistered = false
     private val powerTransitionReceiver = PowerTransitionReceiver()
+    private val pendingBluetoothRunnables = mutableMapOf<String, Runnable>()
     private val bluetoothSeparationReceiver = object : BroadcastReceiver() {
         @Suppress("DEPRECATION", "MissingPermission")
         override fun onReceive(context: Context, intent: Intent) {
@@ -54,42 +55,48 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                 return
             }
             val device = runCatching { intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE) }.getOrNull() ?: return
-            val trustedAddress = prefs.getString(KEY_BT_TRUSTED_ADDRESS, null) ?: return
-            if (device.address != trustedAddress) return
+            val address = device.address ?: return
+            if (!TrustedBluetoothRegistry.isTrusted(prefs, address)) return
             when (intent.action) {
                 BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                    prefs.edit().putBoolean(KEY_BT_BASELINE_CONNECTED, true).apply()
-                    handler.removeCallbacks(bluetoothSeparationRunnable)
-                    LocalTamperHistory.record(context, "trusted_bluetooth_connected", "Trusted Bluetooth device connected")
+                    TrustedBluetoothRegistry.markConnected(prefs, address, true)
+                    pendingBluetoothRunnables.remove(address)?.let(handler::removeCallbacks)
+                    LocalTamperHistory.record(context, "trusted_bluetooth_connected", "A registered trusted Bluetooth device connected")
                 }
                 BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
-                    val hadConnectionBaseline = prefs.getBoolean(KEY_BT_BASELINE_CONNECTED, false)
-                    prefs.edit().putBoolean(KEY_BT_BASELINE_CONNECTED, false).apply()
+                    val hadConnectionBaseline = TrustedBluetoothRegistry.markConnected(prefs, address, false)
                     if (hadConnectionBaseline && ProtectionStore(context).read().mode == ProtectionMode.ARMED) {
-                        handler.removeCallbacks(bluetoothSeparationRunnable)
-                        handler.postDelayed(bluetoothSeparationRunnable, BLUETOOTH_DISCONNECT_GRACE_MS)
-                        LocalTamperHistory.record(context, "trusted_bluetooth_disconnected", "Trusted device disconnected; grace period started")
+                        pendingBluetoothRunnables.remove(address)?.let(handler::removeCallbacks)
+                        val registryRevision = TrustedBluetoothRegistry.revision(prefs)
+                        val runnable = Runnable {
+                            pendingBluetoothRunnables.remove(address)
+                            val stillTrusted = TrustedBluetoothRegistry.isTrusted(prefs, address)
+                            val unchangedRegistry = TrustedBluetoothRegistry.revision(prefs) == registryRevision
+                            val stillDisconnected = !TrustedBluetoothRegistry.isBaselineConnected(prefs, address)
+                            if (prefs.getBoolean(KEY_BT_ALERT_ENABLED, false) && stillTrusted &&
+                                unchangedRegistry && stillDisconnected &&
+                                ProtectionStore(this@ProtectionMonitorService).read().mode == ProtectionMode.ARMED
+                            ) {
+                                val now = System.currentTimeMillis()
+                                var transitioned = false
+                                val next = ProtectionStore(this@ProtectionMonitorService).update { current ->
+                                    if (current.mode != ProtectionMode.ARMED) current else {
+                                        transitioned = true
+                                        ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, now, 0L, ProtectionClock.bootCount(this@ProtectionMonitorService))
+                                    }
+                                }
+                                if (transitioned && next.mode == ProtectionMode.ALARM_TRIGGERED) {
+                                    LocalTamperHistory.record(this@ProtectionMonitorService, "trusted_bluetooth_separation_alarm", "A registered trusted Bluetooth device remained disconnected beyond grace period")
+                                    unregisterMotionSensor()
+                                    startTheftAlarm()
+                                }
+                            }
+                        }
+                        pendingBluetoothRunnables[address] = runnable
+                        handler.postDelayed(runnable, BLUETOOTH_DISCONNECT_GRACE_MS)
+                        LocalTamperHistory.record(context, "trusted_bluetooth_disconnected", "Registered trusted device disconnected; 8-second grace period started")
                     }
                 }
-            }
-        }
-    }
-    private val bluetoothSeparationRunnable = Runnable {
-        val enabled = prefs.getBoolean(KEY_BT_ALERT_ENABLED, false)
-        val stillDisconnected = !prefs.getBoolean(KEY_BT_BASELINE_CONNECTED, false)
-        if (enabled && stillDisconnected && ProtectionStore(this).read().mode == ProtectionMode.ARMED) {
-            val now = System.currentTimeMillis()
-            var transitioned = false
-            val next = ProtectionStore(this).update { current ->
-                if (current.mode != ProtectionMode.ARMED) current else {
-                    transitioned = true
-                    ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, now, 0L, ProtectionClock.bootCount(this))
-                }
-            }
-            if (transitioned && next.mode == ProtectionMode.ALARM_TRIGGERED) {
-                LocalTamperHistory.record(this, "trusted_bluetooth_separation_alarm", "Trusted Bluetooth device remained disconnected beyond grace period")
-                unregisterMotionSensor()
-                startTheftAlarm()
             }
         }
     }
@@ -211,8 +218,8 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         bluetoothReceiverRegistered = true
         // A service restart cannot prove the trusted accessory is currently connected.
         // Require a fresh ACL_CONNECTED event before treating a later disconnect as theft.
-        prefs.edit().putBoolean(KEY_BT_BASELINE_CONNECTED, false).apply()
-        LocalTamperHistory.record(this, "trusted_bluetooth_receiver_registered", "Trusted Bluetooth separation monitoring active; reconnect accessory to establish baseline")
+        TrustedBluetoothRegistry.clearBaselines(prefs)
+        LocalTamperHistory.record(this, "trusted_bluetooth_receiver_registered", "Trusted Bluetooth separation monitoring active; reconnect registered accessories to establish fresh baselines")
     }
 
     private fun reconcileStablePowerState() {
@@ -557,7 +564,8 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         receiverRegistered = false
         if (powerReceiverRegistered) runCatching { unregisterReceiver(powerTransitionReceiver) }
         powerReceiverRegistered = false
-        handler.removeCallbacks(bluetoothSeparationRunnable)
+        pendingBluetoothRunnables.values.forEach(handler::removeCallbacks)
+        pendingBluetoothRunnables.clear()
         if (bluetoothReceiverRegistered) runCatching { unregisterReceiver(bluetoothSeparationReceiver) }
         bluetoothReceiverRegistered = false
         releaseAlertPlayer()
