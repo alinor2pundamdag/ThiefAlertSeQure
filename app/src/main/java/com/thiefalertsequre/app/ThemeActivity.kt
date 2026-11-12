@@ -13,16 +13,16 @@ class ThemeActivity:FragmentActivity(){
  override fun onResume(){super.onResume();ThemeRuntime.apply(this,window.decorView,preview)}
  private fun dp(v:Int)=(v*resources.displayMetrics.density).toInt()
  private fun render(){
-  val scroll=ScrollView(this).apply{isFillViewport=true};val root=LinearLayout(this).apply{orientation=1;setPadding(dp(20),dp(20),dp(20),dp(28))};scroll.addView(root)
+  val scroll=ScrollView(this).apply{isFillViewport=true};val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(20),dp(20),dp(28))};scroll.addView(root)
   root.addView(MaterialButton(this).apply{text="‹ Back";setOnClickListener{finish()}})
   root.addView(TextView(this).apply{text="APPEARANCE";textSize=11f;setTextColor(ThemeStore.get(this@ThemeActivity,preview).primary)})
   root.addView(TextView(this).apply{text="Choose your theme";textSize=28f;setTextColor(ThemeStore.get(this@ThemeActivity,preview).text)})
   root.addView(TextView(this).apply{text="Tap a theme to preview it. Apply saves it locally; Cancel leaves your current theme unchanged.";textSize=13f;setTextColor(ThemeStore.get(this@ThemeActivity,preview).muted)})
-  val filters=LinearLayout(this).apply{orientation=0;gravity=Gravity.CENTER}
+  val filters=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
   listOf("Dark","Light").forEach{v->filters.addView(MaterialButton(this).apply{text=v;setOnClickListener{mode=v;render()}},LinearLayout.LayoutParams(0,dp(48),1f))}
   root.addView(filters)
   val p=ThemeStore.get(this,preview);val card=MaterialCardView(this).apply{radius=dp(16).toFloat();setCardBackgroundColor(p.surface);strokeColor=p.variant;strokeWidth=dp(1)}
-  val sample=LinearLayout(this).apply{orientation=1;setPadding(dp(15),dp(15),dp(15),dp(15))}
+  val sample=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(15),dp(15),dp(15),dp(15))}
   sample.addView(TextView(this).apply{text="LIVE PREVIEW • ${p.name}";textSize=12f;setTextColor(p.primary)})
   sample.addView(TextView(this).apply{text="Protection dashboard";textSize=22f;setTextColor(p.text)})
   sample.addView(TextView(this).apply{text="Verified setup • Local protection";textSize=13f;setTextColor(p.muted)})
