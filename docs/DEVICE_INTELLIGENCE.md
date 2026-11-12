@@ -29,7 +29,7 @@ The Device Intelligence page reads Android public APIs and package-manager featu
 - Build fingerprint is deliberately withheld from the displayed report.
 - No runtime permission is requested automatically by opening the page.
 - No system setting is changed automatically.
-- Root checks remain passive unless the owner explicitly chooses a separate root diagnostic action.
+- Passive root indicators are shown separately from active root authorization. The Device Intelligence page provides an explicit **Check Root Status (run su -c id)** action. After owner confirmation, it executes the read-only command off the UI thread and displays ROOT ACCESS GRANTED (uid=0), ROOT ACCESS NOT GRANTED, SU NOT AVAILABLE, POSSIBLE ROOT, TIMEOUT, or ERROR. A missing su command and no common indicators are reported as no root access detected, not as proof that hidden root is impossible. No root prompt runs automatically on page open.
 - Capability presence does not imply that a corresponding ThiefAlertSeQure feature is implemented or enabled.
 
 ## UI/UX structure
@@ -37,6 +37,7 @@ The Device Intelligence page reads Android public APIs and package-manager featu
 - Dedicated Device Intelligence page, separate from Settings.
 - Grouped cards: Device Identity, Android Platform, Performance and Power, Display, Sensor Capabilities, Android Hardware Features, ThiefAlertSeQure Readiness, Root Indicators, and Manufacturer Background Guidance.
 - Explicit refresh action; no continuous polling or long-running sensor sampling.
+- Root status includes a real owner-triggered `su -c id` check and a visible result, not only passive filesystem/build-tag hints.
 - Dashboard and Settings contain concise navigation cards rather than duplicating the full report.
 
 ## Compatibility and validation
