@@ -10,12 +10,20 @@ object A2DisconnectPolicy {
     ): Boolean = alertEnabled && trusted && hadConnectionBaseline &&
         protectionMode == ProtectionMode.ARMED
 
+    fun isPendingDisconnectCurrent(
+        capturedMonitorRevision: Long,
+        currentMonitorRevision: Long,
+        capturedDeviceRevision: Long,
+        currentDeviceRevision: Long
+    ): Boolean = capturedMonitorRevision == currentMonitorRevision &&
+        capturedDeviceRevision == currentDeviceRevision
+
     fun shouldTriggerAlarm(
         alertEnabled: Boolean,
         trusted: Boolean,
-        registryUnchanged: Boolean,
+        pendingDisconnectCurrent: Boolean,
         stillDisconnected: Boolean,
         protectionMode: ProtectionMode
-    ): Boolean = alertEnabled && trusted && registryUnchanged && stillDisconnected &&
+    ): Boolean = alertEnabled && trusted && pendingDisconnectCurrent && stillDisconnected &&
         protectionMode == ProtectionMode.ARMED
 }

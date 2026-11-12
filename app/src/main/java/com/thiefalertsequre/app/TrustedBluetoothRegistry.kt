@@ -40,7 +40,7 @@ object TrustedBluetoothRegistry {
         prefs.edit()
             .putString(KEY_DEVICES, encode(updated))
             .putString(KEY_BASELINES, baselines.joinToString("\n"))
-            .putLong(KEY_REVISION, revision(prefs) + 1L)
+            .putLong(deviceRevisionKey(address), deviceRevision(prefs, address) + 1L)
             .apply()
         return true
     }

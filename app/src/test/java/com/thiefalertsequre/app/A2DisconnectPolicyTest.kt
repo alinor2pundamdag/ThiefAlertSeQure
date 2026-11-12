@@ -8,39 +8,39 @@ class A2DisconnectPolicyTest {
     @Test fun gracePeriodRequiresEnabledTrustedDeviceWithConfirmedBaselineWhileArmed() {
         assertTrue(A2DisconnectPolicy.shouldStartGracePeriod(true, true, true, ProtectionMode.ARMED))
     }
-
     @Test fun disabledAlertCannotStartGracePeriod() {
         assertFalse(A2DisconnectPolicy.shouldStartGracePeriod(false, true, true, ProtectionMode.ARMED))
     }
-
     @Test fun unregisteredDeviceCannotStartGracePeriod() {
         assertFalse(A2DisconnectPolicy.shouldStartGracePeriod(true, false, true, ProtectionMode.ARMED))
     }
-
     @Test fun transientDisconnectWithoutBaselineCannotStartGracePeriod() {
         assertFalse(A2DisconnectPolicy.shouldStartGracePeriod(true, true, false, ProtectionMode.ARMED))
     }
-
     @Test fun disarmedProtectionCannotStartGracePeriod() {
         assertFalse(A2DisconnectPolicy.shouldStartGracePeriod(true, true, true, ProtectionMode.DISARMED))
     }
-
+    @Test fun unchangedDeviceTimerSurvivesUnrelatedRegistryChanges() {
+        assertTrue(A2DisconnectPolicy.isPendingDisconnectCurrent(7L, 7L, 3L, 3L))
+    }
+    @Test fun targetDeviceReregistrationInvalidatesItsOldTimer() {
+        assertFalse(A2DisconnectPolicy.isPendingDisconnectCurrent(7L, 7L, 3L, 4L))
+    }
+    @Test fun monitorResetInvalidatesEveryPendingDeviceTimer() {
+        assertFalse(A2DisconnectPolicy.isPendingDisconnectCurrent(7L, 8L, 3L, 3L))
+    }
     @Test fun alarmRequiresEveryGuardToRemainValidAfterGracePeriod() {
         assertTrue(A2DisconnectPolicy.shouldTriggerAlarm(true, true, true, true, ProtectionMode.ARMED))
     }
-
     @Test fun unregisterInvalidatesPendingAlarm() {
         assertFalse(A2DisconnectPolicy.shouldTriggerAlarm(true, false, false, true, ProtectionMode.ARMED))
     }
-
-    @Test fun registryChangeInvalidatesPendingAlarm() {
+    @Test fun staleTimerInvalidatesPendingAlarm() {
         assertFalse(A2DisconnectPolicy.shouldTriggerAlarm(true, true, false, true, ProtectionMode.ARMED))
     }
-
     @Test fun reconnectCancelsPendingAlarm() {
         assertFalse(A2DisconnectPolicy.shouldTriggerAlarm(true, true, true, false, ProtectionMode.ARMED))
     }
-
     @Test fun disarmedOrAlreadyLatchedStateCannotTriggerA2Alarm() {
         assertFalse(A2DisconnectPolicy.shouldTriggerAlarm(true, true, true, true, ProtectionMode.DISARMED))
         assertFalse(A2DisconnectPolicy.shouldTriggerAlarm(true, true, true, true, ProtectionMode.ALARM_TRIGGERED))

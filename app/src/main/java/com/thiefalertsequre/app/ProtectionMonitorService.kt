@@ -73,16 +73,22 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                         )
                     ) {
                         pendingBluetoothRunnables.remove(address)?.let(handler::removeCallbacks)
-                        val registryRevision = TrustedBluetoothRegistry.revision(prefs)
+                        val monitorRevision = TrustedBluetoothRegistry.revision(prefs)
+                        val deviceRevision = TrustedBluetoothRegistry.deviceRevision(prefs, address)
                         val runnable = Runnable {
                             pendingBluetoothRunnables.remove(address)
                             val stillTrusted = TrustedBluetoothRegistry.isTrusted(prefs, address)
-                            val unchangedRegistry = TrustedBluetoothRegistry.revision(prefs) == registryRevision
+                            val pendingDisconnectCurrent = A2DisconnectPolicy.isPendingDisconnectCurrent(
+                                monitorRevision,
+                                TrustedBluetoothRegistry.revision(prefs),
+                                deviceRevision,
+                                TrustedBluetoothRegistry.deviceRevision(prefs, address)
+                            )
                             val stillDisconnected = !TrustedBluetoothRegistry.isBaselineConnected(prefs, address)
                             if (A2DisconnectPolicy.shouldTriggerAlarm(
                                     alertEnabled = prefs.getBoolean(KEY_BT_ALERT_ENABLED, false),
                                     trusted = stillTrusted,
-                                    registryUnchanged = unchangedRegistry,
+                                    pendingDisconnectCurrent = pendingDisconnectCurrent,
                                     stillDisconnected = stillDisconnected,
                                     protectionMode = ProtectionStore(this@ProtectionMonitorService).read().mode
                                 )
