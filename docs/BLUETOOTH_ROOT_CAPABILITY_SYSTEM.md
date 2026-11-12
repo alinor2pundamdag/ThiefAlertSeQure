@@ -43,7 +43,7 @@ Root does not create missing controller features, antenna arrays, firmware suppo
 | 16 | 36 | Android Ranging module/API introduced | Query runtime RangingManager capabilities; API presence alone does not prove BLE Channel Sounding, RSSI ranging, or UWB support |
 | 17 | 37 | Ranging module plus RFCOMM behavior change for apps targeting API 37+ | RFCOMM InputStream.read() returns -1 on closed/dropped socket; future RFCOMM loops must handle EOF |
 
-The app currently compiles against SDK 36 and targets API 36. Android 17 behavior is documented for forward compatibility; do not claim API 37-target validation until SDK 37 builds and device tests exist.
+The app currently compiles against SDK 36 and targets API 36. On Android 16+, the owner can explicitly grant the RANGING permission and request a RangingManager capability callback. The app reports BLE Channel Sounding, BLE RSSI ranging, UWB, and Wi-Fi NAN RTT availability from the platform; Android 17 Wi-Fi Proximity Detection is queried when running on API 37+. This is a capability query only, not a ranging session or distance measurement. Android 17 behavior is documented for forward compatibility; do not claim API 37-target validation until SDK 37 builds and device tests exist.
 
 ## Capability inventory
 
