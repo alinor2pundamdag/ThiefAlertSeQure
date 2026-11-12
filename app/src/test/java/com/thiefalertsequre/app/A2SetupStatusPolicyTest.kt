@@ -48,6 +48,10 @@ class A2SetupStatusPolicyTest {
         assertEquals(SetupState.ACTION_REQUIRED, evaluate(baselines = 0).state)
     }
 
+    @Test fun partialMultiDeviceBaselineNeverAppearsVerified() {
+        assertEquals(SetupState.ACTION_REQUIRED, evaluate(trusted = 2, baselines = 1).state)
+    }
+
     @Test fun verifiedRequiresEveryPrerequisite() {
         assertEquals(SetupState.VERIFIED, evaluate().state)
     }

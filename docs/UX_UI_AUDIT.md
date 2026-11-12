@@ -20,7 +20,8 @@ Status: active development audit; not a release certification.
 - A2 alarm gates require enabled feature, trusted address, fresh per-device connection baseline, unchanged registry revision, continued disconnection, and ARMED protection state.
 - Service restart clears Bluetooth baselines; a fresh connection event is required before a later disconnect can trigger A2.
 - Charger unplug countdown remains 10 seconds; A2 grace remains 8 seconds.
-- Setup status distinguishes verified, action-required, unsupported/neutral, and unknown states; action labels identify their destination.
+- Setup status distinguishes verified, action-required, unsupported/neutral, and unknown states; action labels identify their destination and external Settings routes use ordered fallbacks with visible failure feedback.
+- Multi-device A2 readiness is not marked verified until every registered accessory has a fresh connection baseline.
 - Material dialogs in audited screens use the shared themed-dialog helper.
 - CI statically checks manifest Activity declarations, internal Activity targets, and themed Material dialog calls.
 

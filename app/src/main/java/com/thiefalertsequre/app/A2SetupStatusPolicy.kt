@@ -18,7 +18,7 @@ object A2SetupStatusPolicy {
             adapterEnabled == null -> SetupState.UNKNOWN to "Bluetooth adapter state could not be verified."
             !monitorEnabled -> SetupState.ACTION_REQUIRED to "A2 is enabled, but the protection monitor is disabled. Enable it in Settings."
             !monitorRunning -> SetupState.UNKNOWN to "The monitor is enabled in preferences, but Android has not confirmed that its service is running."
-            connectedBaselineCount <= 0 -> SetupState.ACTION_REQUIRED to "Reconnect a registered accessory to establish a fresh connection baseline."
+            connectedBaselineCount < trustedDeviceCount -> SetupState.ACTION_REQUIRED to "Reconnect every registered accessory to establish a fresh connection baseline ($connectedBaselineCount/$trustedDeviceCount confirmed)."
             else -> SetupState.VERIFIED to "Bluetooth permission, adapter, monitor service, and at least one registered-device baseline are confirmed."
         }
         return SetupItem("a2", "Bluetooth separation alert", stateAndDetail.first, stateAndDetail.second)

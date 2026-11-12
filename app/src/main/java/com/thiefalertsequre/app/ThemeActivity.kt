@@ -203,6 +203,7 @@ class ThemeActivity : FragmentActivity() {
         }, params(6))
 
         setContentView(scroll)
+        AndroidDeviceCompatibility.applySystemBarInsets(scroll)
         ThemeRuntime.apply(this, scroll, previewId)
     }
 }
