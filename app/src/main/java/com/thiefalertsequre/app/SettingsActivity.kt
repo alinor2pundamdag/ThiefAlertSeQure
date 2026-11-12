@@ -51,8 +51,8 @@ class SettingsActivity : FragmentActivity() {
     private val rangingPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) queryAndroidRangingCapabilities()
-        else android.widget.Toast.makeText(this, "Ranging permission was not granted. No ranging session was started.", android.widget.Toast.LENGTH_LONG).show()
+        if (granted && Build.VERSION.SDK_INT >= 36) queryAndroidRangingCapabilities()
+        else android.widget.Toast.makeText(this, "Ranging permission was not granted or this Android version does not support the Ranging API.", android.widget.Toast.LENGTH_LONG).show()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
