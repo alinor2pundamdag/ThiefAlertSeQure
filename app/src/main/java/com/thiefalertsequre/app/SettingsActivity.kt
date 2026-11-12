@@ -95,42 +95,20 @@ class SettingsActivity : FragmentActivity() {
         root.addView(statusCard, matchWrap())
         root.addView(space(22))
 
-        root.addView(text("BLUETOOTH & ROOT CAPABILITY INTELLIGENCE", 11f, R.color.tas_primary, true))
+        root.addView(text("DEVICE CAPABILITY CENTERS", 11f, R.color.tas_primary, true))
         root.addView(space(8))
-        val btReport = BluetoothCompatibility.inspect(this)
-        val passiveRoot = RootCapabilityInspector.inspectPassive()
         root.addView(text(
-            AndroidDeviceCompatibility.deviceSummary(
-                Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.VERSION.RELEASE, Build.VERSION.SDK_INT
-            ) + "\\n" + BluetoothCompatibility.reportText(btReport) +
-                "\\nRoot status: " + when (passiveRoot.status) {
-                    RootCapabilityInspector.RootStatus.NOT_INDICATED -> "No common indicators found (not proof of unrooted)"
-                    RootCapabilityInspector.RootStatus.ROOT_INDICATORS_FOUND -> "Possible root indicators found; authorization not verified"
-                    else -> passiveRoot.status.name
-                } + "\\n" + passiveRoot.detail,
-            13f, R.color.tas_text
+            "Explore your phone's Bluetooth controller and Android hardware capabilities in dedicated, organized pages. Each page refreshes local device information on demand.",
+            13f, R.color.tas_muted
         ))
+        root.addView(space(10))
+        root.addView(action("Bluetooth capability center") {
+            startActivity(Intent(this, BluetoothCenterActivity::class.java))
+        })
         root.addView(space(8))
-        root.addView(action("View full Bluetooth capability inventory") {
-            val inventory = BluetoothCapabilityCatalog.display(BluetoothCapabilityCatalog.inspect(this))
-            MaterialAlertDialogBuilder(this)
-                .setTitle("Bluetooth capability inventory")
-                .setMessage(inventory)
-                .setPositiveButton("Close", null)
-                .show()
+        root.addView(action("Device intelligence") {
+            startActivity(Intent(this, DeviceIntelligenceActivity::class.java))
         })
-        if (Build.VERSION.SDK_INT >= 36) {
-            root.addView(action("Check actual Android ranging hardware capabilities") {
-                checkAndroidRangingCapabilities()
-            })
-        }
-        root.addView(action("Verify root access and run read-only Bluetooth diagnostics") {
-            verifyRootAndShowDiagnostics()
-        })
-        root.addView(text(
-            "Root detection is best-effort. Passive checks do not request superuser access. The explicit verification button may show your root manager's approval prompt. Only read-only diagnostics are run; no Bluetooth firmware, pairing, radio power, or system configuration is changed.",
-            12f, R.color.tas_muted
-        ))
         root.addView(space(22))
 
         root.addView(text("OFFICIAL APP UPDATES", 11f, R.color.tas_primary, true))
