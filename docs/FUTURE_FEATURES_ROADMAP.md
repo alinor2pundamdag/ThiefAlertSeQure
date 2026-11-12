@@ -1,6 +1,6 @@
 # Future Features Roadmap
 
-Status: planning ideas only. Nothing in this document is approved for implementation or assigned to v1.1.4 or any other release. The owner will choose what belongs in a future version.
+Status: A1–A7 remain in the future-feature roadmap. A2 has been selected for implementation work now, but is not assigned to v1.1.4 or any other release. All release placement remains the owner's decision.
 
 ## Scope decision
 
@@ -16,6 +16,7 @@ Keep future work small and independently testable. Add only features that solve 
 - Do not run sensors continuously while disarmed. Do not claim it can distinguish an owner from a thief.
 
 ### A2 — Trusted Bluetooth Device Separation Alert
+Implementation status: in progress on the development branch; release version unassigned.
 - Optionally pair a trusted watch, earbuds, or other Bluetooth device.
 - Warn when the trusted device disconnects while anti-theft protection is armed.
 - Treat Bluetooth range and disconnect events as approximate; avoid claiming precise distance or guaranteed background detection.
