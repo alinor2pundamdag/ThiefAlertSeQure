@@ -24,9 +24,23 @@ class BluetoothCompatibilityTest {
     }
 
     @Test fun rangingApiIsNotClaimedBeforeAndroidSixteen() {
-        assertTrue(BluetoothCompatibility.versionGuide(35).contains("not available") ||
-            BluetoothCompatibility.versionGuide(35).contains("Android 15"))
+        assertTrue(BluetoothCompatibility.versionGuide(35).contains("Android 15"))
         assertTrue(BluetoothCompatibility.versionGuide(36).contains("capability-checked"))
         assertTrue(BluetoothCompatibility.versionGuide(37).contains("RFCOMM"))
+    }
+
+    @Test fun catalogStatesDoNotConflateApiPresenceWithImplementation() {
+        assertEquals(
+            BluetoothCapabilityCatalog.State.NOT_IMPLEMENTED,
+            BluetoothCapabilityCatalog.State.valueOf("NOT_IMPLEMENTED")
+        )
+        assertEquals(
+            BluetoothCapabilityCatalog.State.PEER_REQUIRED,
+            BluetoothCapabilityCatalog.State.valueOf("PEER_REQUIRED")
+        )
+        assertEquals(
+            BluetoothCapabilityCatalog.State.PERMISSION_REQUIRED,
+            BluetoothCapabilityCatalog.State.valueOf("PERMISSION_REQUIRED")
+        )
     }
 }
