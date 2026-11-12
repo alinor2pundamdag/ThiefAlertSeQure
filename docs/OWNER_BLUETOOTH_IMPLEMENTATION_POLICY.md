@@ -19,3 +19,6 @@ Status: active project instruction, not a release assignment.
 
 ## Feature-request log
 Append each future owner-requested Bluetooth feature here with date, branch/PR, implementation status, tests, and hardware validation status.
+
+
+- 2026-11-12: Added dedicated Bluetooth capability center and Device Intelligence pages. Settings and dashboard now link to separate organized screens instead of embedding the Bluetooth inventory in a long settings scroll. Added local inspection for Android platform, hardware feature flags, sensors, display, RAM/storage, battery/thermal/power, and app readiness. No telemetry or new automatic permission prompts.
