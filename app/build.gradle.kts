@@ -40,8 +40,7 @@ android {
         // This prevents debug builds from replacing the production package.
         getByName("debug") {
             applicationIdSuffix = ".v114test"
-            versionCode = 6
-            versionName = "1.1.4-test"
+            versionNameSuffix = "-v1.1.4-test"
         }
         getByName("release") {
             isMinifyEnabled = false
