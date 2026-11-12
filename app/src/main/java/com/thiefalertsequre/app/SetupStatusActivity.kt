@@ -92,7 +92,8 @@ class SetupStatusActivity : FragmentActivity() {
                 textSize = 13f
                 setTextColor(palette.muted)
             })
-            SetupStatusSnapshot.action(this, item.id)?.let { intent ->
+            if (item.state == SetupState.ACTION_REQUIRED || item.state == SetupState.UNKNOWN) {
+                SetupStatusSnapshot.action(this, item.id)?.let { intent ->
                 val actionLabel = when (item.id) {
                     "monitor" -> "Review monitor settings"
                     "a2" -> "Manage trusted accessories"
@@ -105,6 +106,7 @@ class SetupStatusActivity : FragmentActivity() {
                     minHeight = dp(48)
                     setOnClickListener { openStatusAction(item.id, intent) }
                 })
+                }
             }
             card.addView(body)
             root.addView(card, LinearLayout.LayoutParams(-1, -2).apply {

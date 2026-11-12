@@ -42,6 +42,9 @@ class ThemeStoreTest {
             assertAa(palette, "muted text/surface", contrast(palette.muted, palette.surface))
             assertAa(palette, "button text/primary", contrast(palette.onPrimary, palette.primary))
             assertAa(palette, "primary accent/surface", contrast(palette.primary, palette.surface))
+            assertAa(palette, "success status/surface", contrast(palette.success, palette.surface))
+            assertAa(palette, "warning status/surface", contrast(palette.warning, palette.surface))
+            assertAa(palette, "danger status/surface", contrast(palette.danger, palette.surface))
         }
     }
 

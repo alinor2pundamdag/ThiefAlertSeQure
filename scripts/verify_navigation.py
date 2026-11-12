@@ -85,6 +85,18 @@ for required in (
     if required not in setup_activity:
         errors.append("SetupStatusActivity missing safe action/inset contract: " + required)
 
+full_screen_policy = (APP / "FullScreenSetupStatusPolicy.kt").read_text(encoding="utf-8")
+if "!ownerEnabledDashboard" not in full_screen_policy or "SetupState.NEUTRAL" not in full_screen_policy:
+    errors.append("Full-screen intent access must remain optional until the owner enables the dashboard")
+
+setup_snapshot = (APP / "SetupStatusSnapshot.kt").read_text(encoding="utf-8")
+if "FullScreenSetupStatusPolicy.evaluate" not in setup_snapshot:
+    errors.append("Setup status must use the owner-aware full-screen access policy")
+
+setup_activity = (APP / "SetupStatusActivity.kt").read_text(encoding="utf-8")
+if "item.state == SetupState.ACTION_REQUIRED || item.state == SetupState.UNKNOWN" not in setup_activity:
+    errors.append("Setup status must not show action buttons for neutral/unsupported/verified items")
+
 a2_policy = (APP / "A2SetupStatusPolicy.kt").read_text(encoding="utf-8")
 if "connectedBaselineCount < trustedDeviceCount" not in a2_policy:
     errors.append("A2 setup readiness must require a fresh baseline for every registered device")

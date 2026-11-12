@@ -15,7 +15,7 @@ Status: active development audit; not a release certification.
 - Preview sample controls are visual-only and explicitly identified as non-interactive.
 - Main, Bluetooth capability, Device Intelligence, and setup-status action buttons enforce at least 48dp minimum touch height.
 - Dark/light filters remain tappable, visibly indicate selection, and use 48dp minimum height.
-- All 16 palettes have JVM WCAG AA checks for primary/muted text on background and surface, button text on primary, and primary accent on surface.
+- All 16 palettes have JVM WCAG AA checks for primary/muted text on background and surface, button text on primary, primary accent on surface, and success/warning/danger status labels on surfaces.
 - Trusted Bluetooth registry supports multiple locally registered accessories, per-device connection baselines, and independent 8-second disconnect grace timers.
 - Unregister confirmation states that only app trust is removed; Android pairing is not modified.
 - A2 alarm gates require enabled feature, trusted address, fresh per-device connection baseline, unchanged registry revision, continued disconnection, and ARMED protection state.
@@ -23,6 +23,8 @@ Status: active development audit; not a release certification.
 - Charger unplug countdown remains 10 seconds; A2 grace remains 8 seconds.
 - Setup status distinguishes verified, action-required, unsupported/neutral, and unknown states; action labels identify their destination and external Settings routes use ordered fallbacks with visible failure feedback.
 - Multi-device A2 readiness is not marked verified until every registered accessory has a fresh connection baseline.
+- Full-screen intent permission is optional while the owner-disabled full-screen dashboard is OFF; setup status requests it only after explicit opt-in.
+- Setup status displays action buttons only for action-required or unconfirmed states; neutral, unsupported, and verified items do not show misleading action controls.
 - Material dialogs in audited screens use the shared themed-dialog helper.
 - CI statically checks manifest Activity declarations, internal Activity targets, themed Material dialogs, obvious empty click listeners, theme-preview/inset contracts, safe setup-action fallbacks, Bluetooth/Device Intelligence Settings fallbacks, and A2 readiness/timer invalidation contracts.
 
