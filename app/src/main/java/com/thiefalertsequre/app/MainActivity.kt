@@ -1014,7 +1014,7 @@ class MainActivity : FragmentActivity() {
         text = value
         isAllCaps = false
         cornerRadius = dp(14)
-        minHeight = dp(46)
+        minHeight = dp(48)
         backgroundTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.tas_surface_variant))
         setTextColor(getColor(R.color.tas_text))
         setOnClickListener { action() }

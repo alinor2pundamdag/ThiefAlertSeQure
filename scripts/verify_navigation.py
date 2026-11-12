@@ -68,6 +68,15 @@ device_activity = (APP / "DeviceIntelligenceActivity.kt").read_text(encoding="ut
 if "AndroidDeviceCompatibility.appInfoIntent(packageName)" not in device_activity:
     errors.append("DeviceIntelligenceActivity must provide a fallback for app Settings navigation")
 
+main_activity = (APP / "MainActivity.kt").read_text(encoding="utf-8")
+if "minHeight = dp(46)" in main_activity:
+    errors.append("MainActivity contains a primary touch target below 48dp")
+
+for screen in ("BluetoothCenterActivity.kt", "DeviceIntelligenceActivity.kt"):
+    source = (APP / screen).read_text(encoding="utf-8")
+    if "minHeight = dp(48)" not in source:
+        errors.append(screen + " button helper must enforce a 48dp minimum touch target")
+
 setup_activity = (APP / "SetupStatusActivity.kt").read_text(encoding="utf-8")
 for required in (
     "AndroidDeviceCompatibility.open", "AndroidDeviceCompatibility.applySystemBarInsets",

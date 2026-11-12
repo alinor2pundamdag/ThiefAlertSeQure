@@ -13,6 +13,7 @@ Status: active development audit; not a release certification.
 - Theme selection remains a local preview until Apply; Cancel does not persist the selection.
 - Theme preview represents dashboard, settings, setup readiness, and confirmation-dialog surfaces.
 - Preview sample controls are visual-only and explicitly identified as non-interactive.
+- Main, Bluetooth capability, Device Intelligence, and setup-status action buttons enforce at least 48dp minimum touch height.
 - Dark/light filters remain tappable, visibly indicate selection, and use 48dp minimum height.
 - All 16 palettes have JVM WCAG AA checks for primary/muted text on background and surface, button text on primary, and primary accent on surface.
 - Trusted Bluetooth registry supports multiple locally registered accessories, per-device connection baselines, and independent 8-second disconnect grace timers.
