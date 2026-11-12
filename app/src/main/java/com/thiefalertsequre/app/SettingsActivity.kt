@@ -298,7 +298,7 @@ class SettingsActivity : FragmentActivity() {
                     render()
                 }
                 .setNegativeButton("Cancel", null)
-                .show()
+                .showThemed(this)
         })
         val batteryAlertEnabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BATTERY_ALERT_ENABLED, false)
         root.addView(action("Battery threshold alert: ${if (batteryAlertEnabled) "ON" else "OFF"}") {
@@ -333,7 +333,7 @@ class SettingsActivity : FragmentActivity() {
                     render()
                 }
                 .setNegativeButton("Cancel", null)
-                .show()
+                .showThemed(this)
         })
         root.addView(space(22))
 
@@ -356,7 +356,7 @@ class SettingsActivity : FragmentActivity() {
                     LocalTamperHistory.clear(this)
                     LocalTamperHistory.record(this, "history_cleared", "Owner cleared local event history")
                     render()
-                }.show()
+                }.showThemed(this)
         })
         root.addView(space(22))
 
@@ -393,7 +393,7 @@ class SettingsActivity : FragmentActivity() {
                 .setTitle("Disable protection before updating")
                 .setMessage("For safety, turn off background monitoring and make sure no countdown or alarm is active. Updating can restart the app process.")
                 .setPositiveButton("OK", null)
-                .show()
+                .showThemed(this)
             return
         }
         android.widget.Toast.makeText(this, "Checking official GitHub release…", android.widget.Toast.LENGTH_SHORT).show()
@@ -410,7 +410,7 @@ class SettingsActivity : FragmentActivity() {
                         )
                         .setNegativeButton("Later", null)
                         .setPositiveButton("Install update") { _, _ -> beginUpdateInstall(result.apkFile) }
-                        .show()
+                        .showThemed(this)
                 }
                 AppUpdateResult.UpToDate -> android.widget.Toast.makeText(
                     this, "ThiefAlertSeQure is already up to date.", android.widget.Toast.LENGTH_LONG
@@ -419,7 +419,7 @@ class SettingsActivity : FragmentActivity() {
                     .setTitle("Update unavailable")
                     .setMessage(result.reason)
                     .setPositiveButton("OK", null)
-                    .show()
+                    .showThemed(this)
             }
         }
     }
@@ -450,7 +450,7 @@ class SettingsActivity : FragmentActivity() {
                         )
                     )
                 }
-                .show()
+                .showThemed(this)
             return
         }
         launchAndroidInstaller(apkFile)
@@ -545,7 +545,7 @@ class SettingsActivity : FragmentActivity() {
                         validateAndSaveSound(matches[index].uri, slot, treeUri)
                     }
                     .setNegativeButton("Cancel", null)
-                    .show()
+                    .showThemed(this)
             }
         }
     }
@@ -857,7 +857,7 @@ class SettingsActivity : FragmentActivity() {
     private fun showRecentAppsTutorial() {
         MaterialAlertDialogBuilder(this).setTitle("Keep ThiefAlertSeQure in Recents")
             .setMessage(androidVersionContext() + "\n\nOpen Recents, locate ThiefAlertSeQure, then use the app-card menu or manufacturer-specific gesture to choose Lock / Keep open if available. Android may still stop the app.")
-            .setPositiveButton("OK", null).show()
+            .setPositiveButton("OK", null).showThemed(this)
     }
 
     private fun androidVersionContext(): String {
@@ -906,7 +906,7 @@ class SettingsActivity : FragmentActivity() {
                 MaterialAlertDialogBuilder(this@SettingsActivity)
                     .setTitle(tutorialTitle + " • Android " + Build.VERSION.SDK_INT)
                     .setMessage(androidVersionContext() + "\n\n" + tutorial)
-                    .setPositiveButton("Got it", null).show()
+                    .setPositiveButton("Got it", null).showThemed(this)
             }
         }
         row.addView(launch); row.addView(info, LinearLayout.LayoutParams(dp(48), dp(52)))

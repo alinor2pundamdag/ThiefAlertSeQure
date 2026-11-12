@@ -8,6 +8,8 @@ import android.view.ViewGroup
 import android.widget.TextView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import androidx.appcompat.app.AlertDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 data class ThemePalette(val id:String,val name:String,val mode:String,val primary:Int,val onPrimary:Int,val background:Int,val surface:Int,val variant:Int,val text:Int,val muted:Int,val success:Int,val warning:Int,val danger:Int)
 object ThemeStore {
@@ -60,4 +62,28 @@ object ThemeRuntime {
   }
   walk(root); root.setBackgroundColor(p.background); decor.tag=id
  }
+
+ fun applyDialog(activity:Activity,dialog:AlertDialog){
+  val p=ThemeStore.get(activity)
+  val density=activity.resources.displayMetrics.density
+  dialog.window?.setBackgroundDrawable(ColorDrawable(p.surface))
+  val dialogRoot=dialog.window?.decorView
+  fun recolor(view:View){
+   if(view is TextView) view.setTextColor(p.text)
+   if(view is MaterialCardView){view.setCardBackgroundColor(p.surface);view.strokeColor=p.variant}
+   if(view is ViewGroup) for(index in 0 until view.childCount) recolor(view.getChildAt(index))
+  }
+  if(dialogRoot!=null) recolor(dialogRoot)
+  val minimumButtonHeight=(48f*density).toInt()
+  dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.apply{setTextColor(p.primary);minHeight=minimumButtonHeight}
+  dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply{setTextColor(p.muted);minHeight=minimumButtonHeight}
+  dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.apply{setTextColor(p.muted);minHeight=minimumButtonHeight}
+ }
+}
+
+fun MaterialAlertDialogBuilder.showThemed(activity:Activity):AlertDialog{
+ val dialog=create()
+ dialog.setOnShowListener{ThemeRuntime.applyDialog(activity,dialog)}
+ dialog.show()
+ return dialog
 }

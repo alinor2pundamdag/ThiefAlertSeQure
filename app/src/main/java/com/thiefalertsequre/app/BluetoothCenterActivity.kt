@@ -161,7 +161,7 @@ class BluetoothCenterActivity : FragmentActivity() {
                 TrustedBluetoothRegistry.remove(prefs, device.address)
                 render()
             }
-            .show()
+            .showThemed(this)
     }
 
     private fun requestTrustedDevicePicker() {
@@ -204,7 +204,7 @@ class BluetoothCenterActivity : FragmentActivity() {
                 render()
             }
             .setNegativeButton("Cancel", null)
-            .show()
+            .showThemed(this)
     }
 
     private fun toggleA2() {
@@ -345,13 +345,13 @@ class BluetoothCenterActivity : FragmentActivity() {
                     }.take(24000)
                     runOnUiThread { if (!isFinishing && !isDestroyed) showResult("Device diagnostics", output) }
                 }
-            }.show()
+            }.showThemed(this)
     }
 
     private fun showResult(title: String, message: String) {
         val body = TextView(this).apply { text = message; textSize = 13f; setTextColor(getColor(R.color.tas_text)); setPadding(dp(18), dp(12), dp(18), dp(12)) }
         val scroll = ScrollView(this).apply { addView(body) }
-        MaterialAlertDialogBuilder(this).setTitle(title).setView(scroll).setPositiveButton("Close", null).show()
+        MaterialAlertDialogBuilder(this).setTitle(title).setView(scroll).setPositiveButton("Close", null).showThemed(this)
     }
 
     private fun addCard(title: String, lines: List<String>) {

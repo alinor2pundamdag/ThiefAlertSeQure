@@ -431,7 +431,7 @@ class MainActivity : FragmentActivity() {
                 )
                 .setPositiveButton("Open Android settings") { _, _ -> openAppSettings() }
                 .setNegativeButton("Close", null)
-                .show()
+                .showThemed(this)
             return
         }
 
@@ -447,7 +447,7 @@ class MainActivity : FragmentActivity() {
                         .onSuccess { render() }
                         .onFailure { showError("Could not disable managed policies: ${it.message}") }
                 }
-                .show()
+                .showThemed(this)
         } else {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Enable managed lockdown?")
@@ -458,7 +458,7 @@ class MainActivity : FragmentActivity() {
                         .onSuccess { render() }
                         .onFailure { showError("Managed protection could not be enabled: ${it.message}") }
                 }
-                .show()
+                .showThemed(this)
         }
     }
 
@@ -467,7 +467,7 @@ class MainActivity : FragmentActivity() {
             .setTitle("Protection setup")
             .setMessage(message)
             .setPositiveButton("OK", null)
-            .show()
+            .showThemed(this)
     }
 
     private fun reconcileCharging() {
@@ -641,7 +641,7 @@ class MainActivity : FragmentActivity() {
                     .setTitle(tutorialTitle + " • Android " + Build.VERSION.SDK_INT)
                     .setMessage(androidVersionGuide() + "\n\n" + tutorial)
                     .setPositiveButton("Got it", null)
-                    .show()
+                    .showThemed(this)
             }
         }
         row.addView(launch)

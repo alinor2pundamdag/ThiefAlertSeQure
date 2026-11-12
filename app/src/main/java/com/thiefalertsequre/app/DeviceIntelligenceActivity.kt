@@ -239,10 +239,10 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                             .setTitle("Root status: ${report.status.name}")
                             .setMessage(details)
                             .setPositiveButton("Close", null)
-                            .show()
+                            .showThemed(this)
                     }
                 }
-            }.show()
+            }.showThemed(this)
     }
 
     private fun rootButtonRow() {
