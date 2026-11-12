@@ -33,6 +33,7 @@ class MainActivity : FragmentActivity() {
     private lateinit var status: TextView
     private lateinit var shield: ProtectionShieldView
     private lateinit var details: TextView
+    private lateinit var setupSummary: TextView
     private lateinit var biometricButton: MaterialButton
     private lateinit var credentialButton: MaterialButton
     private lateinit var cancelButton: MaterialButton
@@ -191,6 +192,8 @@ class MainActivity : FragmentActivity() {
         details = label("Reading local protection state.", 14f, getColor(R.color.tas_muted), false)
         details.setLineSpacing(dp(4).toFloat(), 1f)
         statusContent.addView(details, matchWrap())
+        setupSummary = label("Checking Android setup…", 12f, getColor(R.color.tas_muted), false)
+        statusContent.addView(setupSummary, matchWrap())
         statusCard.addView(statusContent)
         root.addView(statusCard, matchWrap())
         root.addView(space(20))
@@ -303,6 +306,8 @@ class MainActivity : FragmentActivity() {
 
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
+        ThemeRuntime.apply(this, scroll)
+        setupSummary.text = SetupStatusSnapshot.read(this).dashboardSummary()
         reconcileCharging()
         render()
         status.removeCallbacks(ticker)
@@ -321,6 +326,8 @@ class MainActivity : FragmentActivity() {
         reconcileCharging()
         ManagedProtectionController.startIfConfigured(this)
         if (!::status.isInitialized) return
+        ThemeRuntime.apply(this, window.decorView)
+        if (::setupSummary.isInitialized) setupSummary.text = SetupStatusSnapshot.read(this).dashboardSummary()
         render()
         launchAutomaticOwnerAuthenticationIfNeeded()
         status.removeCallbacks(ticker)

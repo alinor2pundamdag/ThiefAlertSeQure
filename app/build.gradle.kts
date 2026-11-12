@@ -39,7 +39,9 @@ android {
         // Keep CI/device-test APKs side-by-side with the production installation.
         // This prevents debug builds from replacing the production package.
         getByName("debug") {
-            applicationIdSuffix = ".v113test"
+            applicationIdSuffix = ".v114test"
+            versionCode = 6
+            versionName = "1.1.4-test"
         }
         getByName("release") {
             isMinifyEnabled = false

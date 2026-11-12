@@ -39,6 +39,8 @@ class BluetoothCenterActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); render() }
 
+    override fun onResume() { super.onResume(); ThemeRuntime.apply(this, window.decorView) }
+
     private fun render() {
         val scroll = ScrollView(this).apply { isFillViewport = true; setBackgroundColor(getColor(R.color.tas_background)) }
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(22), dp(20), dp(30)) }
@@ -120,6 +122,7 @@ class BluetoothCenterActivity : FragmentActivity() {
         root.addView(label("Capability labels are conservative. SUPPORTED means the local device/controller reported support; it does not mean ThiefAlertSeQure has implemented a complete user workflow. Peer-dependent profiles require compatible accessories. Unsupported hardware cannot be enabled by software or root.", 12f, R.color.tas_muted, false), matchWrap())
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
+        ThemeRuntime.apply(this, scroll)
     }
 
     private fun addTrustedDeviceSection() {

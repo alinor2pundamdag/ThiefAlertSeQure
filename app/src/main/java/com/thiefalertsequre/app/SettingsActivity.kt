@@ -63,6 +63,10 @@ class SettingsActivity : FragmentActivity() {
         root.addView(text("Settings", 32f, R.color.tas_text, true))
         root.addView(space(8))
         root.addView(text("Manage Android permissions and reliability settings. Android remains in control of system-level access.", 14f, R.color.tas_muted))
+        root.addView(space(10))
+        root.addView(action("Appearance & 16 themes") { startActivity(Intent(this, ThemeActivity::class.java)) })
+        root.addView(space(7))
+        root.addView(action("Verified Android setup status") { startActivity(Intent(this, SetupStatusActivity::class.java)) })
         root.addView(space(18))
 
         val statusCard = MaterialCardView(this).apply {
@@ -372,6 +376,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(action("Back to protection dashboard") { finish() })
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
+        ThemeRuntime.apply(this, scroll)
     }
 
     private fun isSafeForAppUpdate(): Boolean {
