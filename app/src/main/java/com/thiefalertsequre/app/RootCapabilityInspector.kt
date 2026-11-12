@@ -15,6 +15,7 @@ object RootCapabilityInspector {
         ROOT_INDICATORS_FOUND,
         ROOT_AUTHORIZED,
         ROOT_NOT_AUTHORIZED,
+        SU_NOT_AVAILABLE,
         ROOT_CHECK_TIMED_OUT,
         ROOT_CHECK_ERROR
     }
@@ -80,8 +81,8 @@ object RootCapabilityInspector {
             ProcessBuilder("su", "-c", "id").redirectErrorStream(true).start()
         } catch (e: Exception) {
             return passive.copy(
-                status = if (passive.mayBeRooted) RootStatus.ROOT_NOT_AUTHORIZED else RootStatus.NOT_INDICATED,
-                detail = "The su command could not be started. Root authorization is not available to this app."
+                status = RootStatus.SU_NOT_AVAILABLE,
+                detail = if (passive.mayBeRooted) "The su command could not be started, but passive root indicators exist. Root may be hidden or inaccessible." else "No usable su command was found. No root access is available to this app through the standard su interface; concealed root cannot be ruled out."
             )
         }
 
@@ -98,12 +99,12 @@ object RootCapabilityInspector {
                 if (process.exitValue() == 0 && output.contains("uid=0")) {
                     passive.copy(
                         status = RootStatus.ROOT_AUTHORIZED,
-                        detail = "Superuser authorization verified for this explicit diagnostic check. Only read-only Bluetooth diagnostics are enabled."
+                        detail = "ROOT ACCESS GRANTED: this app received uid=0 for this explicit diagnostic check. Only the separately approved read-only diagnostics may use this authorization."
                     )
                 } else {
                     passive.copy(
                         status = RootStatus.ROOT_NOT_AUTHORIZED,
-                        detail = "Root indicators may exist, but superuser authorization was denied or unavailable."
+                        detail = "The su command ran but did not return uid=0. Superuser authorization was denied, unavailable, or not granted. This does not prove the operating system has no root modifications."
                     )
                 }
             }
