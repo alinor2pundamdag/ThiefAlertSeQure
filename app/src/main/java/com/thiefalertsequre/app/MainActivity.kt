@@ -200,7 +200,7 @@ class MainActivity : FragmentActivity() {
         capabilityContent.addView(label(
             AndroidDeviceCompatibility.deviceSummary(
                 Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.VERSION.RELEASE, Build.VERSION.SDK_INT
-            ) + "\\n" + BluetoothCompatibility.reportText(bluetoothReport),
+            ) + "\\n" + BluetoothCompatibility.reportText(bluetoothReport) + "\n" + BluetoothCapabilityCatalog.summary(this),
             13f, getColor(R.color.tas_text), false
         ), matchWrap())
         capabilityContent.addView(space(10))
