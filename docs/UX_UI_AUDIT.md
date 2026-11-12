@@ -40,7 +40,7 @@ Status: development audit; not a release certification.
 
 ## Required verification before phone testing
 - Run unit tests and Android lint on the new commit.
-- Contrast tests use JVM-safe RGB bit extraction rather than Android SDK color helpers.
+- Theme hex parsing is pure Kotlin so JVM tests exercise the exact palette RGB values; contrast calculations use bit extraction rather than Android SDK color helpers.
 - Inspect merged manifest and debug APK package/version/signer metadata.
 - Verify no A2 receiver path can alarm for an unregistered address.
 - Verify reconnect cancels only the matching device's pending timer.

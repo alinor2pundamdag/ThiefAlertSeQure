@@ -2,7 +2,6 @@ package com.thiefalertsequre.app
 import android.app.Activity
 import android.content.Context
 import android.content.res.ColorStateList
-import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.view.View
 import android.view.ViewGroup
@@ -13,7 +12,15 @@ import com.google.android.material.card.MaterialCardView
 data class ThemePalette(val id:String,val name:String,val mode:String,val primary:Int,val onPrimary:Int,val background:Int,val surface:Int,val variant:Int,val text:Int,val muted:Int,val success:Int,val warning:Int,val danger:Int)
 object ThemeStore {
  const val DEFAULT_ID="midnight"; private const val PREFS="tas_theme_preferences_v1"; private const val KEY="selected_theme_id"
- private fun p(id:String,n:String,m:String,a:String,on:String,b:String,s:String,v:String,t:String,mu:String,ok:String,w:String,d:String)=ThemePalette(id,n,m,Color.parseColor(a),Color.parseColor(on),Color.parseColor(b),Color.parseColor(s),Color.parseColor(v),Color.parseColor(t),Color.parseColor(mu),Color.parseColor(ok),Color.parseColor(w),Color.parseColor(d))
+ private fun color(hex:String):Int {
+  val value=hex.removePrefix("#")
+  require(value.length==6) { "Theme colors must be six-digit RGB values" }
+  return (0xFF shl 24) or
+   (value.substring(0,2).toInt(16) shl 16) or
+   (value.substring(2,4).toInt(16) shl 8) or
+   value.substring(4,6).toInt(16)
+ }
+ private fun p(id:String,n:String,m:String,a:String,on:String,b:String,s:String,v:String,t:String,mu:String,ok:String,w:String,d:String)=ThemePalette(id,n,m,color(a),color(on),color(b),color(s),color(v),color(t),color(mu),color(ok),color(w),color(d))
  val all=listOf(
  p("midnight","Midnight","Dark","#57C7FF","#002B43","#07111F","#111F31","#1A2B40","#F2F7FC","#A8B8CA","#43D6A1","#FFC66D","#FF647C"),
  p("ocean","Ocean","Dark","#42B8E8","#062B3A","#061722","#0B2635","#12394A","#EAF8FF","#9BBAC8","#52D6A7","#F5C66B","#FF7185"),

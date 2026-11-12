@@ -11,6 +11,13 @@ class ThemeStoreTest {
         assertEquals(16, ThemeStore.all.map { it.id }.toSet().size)
     }
 
+    @Test fun paletteColorsAreOpaqueAndDeterministic() {
+        ThemeStore.all.forEach { palette ->
+            assertEquals(0xff, (palette.background ushr 24) and 0xff)
+            assertEquals(0xff, (palette.surface ushr 24) and 0xff)
+        }
+    }
+
     @Test fun hasEightDarkAndEightLight() {
         assertEquals(8, ThemeStore.all.count { it.mode == "Dark" })
         assertEquals(8, ThemeStore.all.count { it.mode == "Light" })
