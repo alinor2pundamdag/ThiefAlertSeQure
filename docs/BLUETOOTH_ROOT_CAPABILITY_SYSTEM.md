@@ -190,3 +190,8 @@ Bluetooth inventory is presented on its own BluetoothCenterActivity page, reacha
 The page provides explicit refresh, Android Bluetooth Settings navigation, an owner-triggered Bluetooth Connect permission request when needed, an Android 16+ Ranging capability query, and optional read-only root diagnostics. Opening the page does not scan, advertise, pair, stream, or modify Bluetooth configuration. It does not show paired-device addresses.
 
 The inventory is comprehensive for Android APIs and controller capability signals exposed to an ordinary app, but it is not a promise that every Bluetooth SIG profile, vendor extension, firmware command, or accessory feature is implemented. Profiles requiring peer negotiation remain peer-required; APIs without a reliable local hardware probe remain API-present/unknown; dangerous firmware writes remain intentionally unimplemented.
+
+
+### Trusted accessory controls
+
+The dedicated Bluetooth center also exposes A2 owner controls: choose an already-paired accessory, enable/disable separation alerts, and inspect whether the connection baseline has been established. Android 12+ Bluetooth Connect permission is requested only when the owner chooses a paired accessory or enables A2. No Scan or Advertise permission is requested. Enabling A2 does not silently re-enable the overall protection monitor; if the owner has disabled that monitor, the page explains that A2 cannot run until the monitor is explicitly re-enabled from the main dashboard. After service startup or accessory changes, the owner must reconnect the accessory to establish a fresh baseline.
