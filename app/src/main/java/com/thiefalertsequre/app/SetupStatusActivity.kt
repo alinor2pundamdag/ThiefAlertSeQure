@@ -1,4 +1,4 @@
-package com.thiefalertsequre
+package com.thiefalertsequre.app
 import android.os.Bundle
 import android.widget.LinearLayout
 import android.widget.ScrollView
