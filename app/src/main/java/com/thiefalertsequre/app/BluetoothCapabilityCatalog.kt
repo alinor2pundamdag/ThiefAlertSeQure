@@ -1,5 +1,7 @@
 package com.thiefalertsequre.app
 
+import android.annotation.SuppressLint
+
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
@@ -56,6 +58,7 @@ object BluetoothCapabilityCatalog {
         root: RootCapabilityInspector.Report = RootCapabilityInspector.inspectPassive()
     ): List<Item> = snapshot(context, root).items
 
+    @SuppressLint("NewApi")
     fun snapshot(
         context: Context,
         root: RootCapabilityInspector.Report = RootCapabilityInspector.inspectPassive()
