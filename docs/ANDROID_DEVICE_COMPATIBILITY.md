@@ -8,7 +8,7 @@
 
 # Android device and manufacturer compatibility
 
-**Scope:** Android 8.0 (API 26) through Android 17 (API 37), including Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO MIUI and HyperOS, OPPO ColorOS, realme UI, OnePlus OxygenOS, vivo Funtouch OS / OriginOS, Google Pixel, Motorola, ASUS, Sony Xperia, Nothing OS, Lenovo, TECNO, Infinix, ZTE / nubia, and other Android-derived builds.
+**Scope:** Android 6.0 (API 23) through Android 17 (API 37), including Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO MIUI and HyperOS, OPPO ColorOS, realme UI, OnePlus OxygenOS, vivo Funtouch OS / OriginOS, Google Pixel, Motorola, ASUS, Sony Xperia, Nothing OS, Lenovo, TECNO, Infinix, ZTE / nubia, and other Android-derived builds.
 
 **Important:** This is a compatibility strategy and source-level audit, not a certification of every handset. Actual behavior must be tested on physical devices and OS builds.
 
@@ -26,6 +26,9 @@
 
 | Android release | API | Relevant platform behavior | App handling |
 |---|---:|---|---|
+| Android 6.0 / 6.0.1 | 23 | Runtime permission model; Doze and App Standby; exact idle alarms available | Legacy Bluetooth permissions remain install-time; request runtime permissions only for features that actually need them; use `setExactAndAllowWhileIdle` for deadline alarms |
+| Android 7.0 / 7.1 | 24–25 | Doze on the go, background execution and notification behavior changes | Use foreground monitoring while enabled; runtime power/Bluetooth receivers; no notification-channel or POST_NOTIFICATIONS assumptions |
+|---|---:|---|---|
 | Android 8.0 / 8.1 | 26–27 | Background execution limits; notification channels; runtime restrictions on implicit broadcasts | Runtime-registered power-connected/disconnected receiver while the user-enabled foreground monitoring service is active; notification channels |
 | Android 9 | 28 | Additional background and standby restrictions | Keep monitoring user-visible through foreground service; show battery guidance |
 | Android 10 | 29 | Background activity-launch restrictions and evolving full-screen behavior | Use alarm notification and public Settings routes; do not rely on arbitrary background Activity launches |
@@ -37,9 +40,9 @@
 | Android 16 | 36 | Edge-to-edge enforcement and large-screen resizability/orientation changes for apps targeting API 36 | Apply insets; keep layouts adaptive and verify landscape, split-screen, foldables, and tablets |
 | Android 17 | 37 | Background audio hardening for all apps; target-37 apps have additional while-in-use FGS rules, with an exact-alarm + USAGE_ALARM exception; target-37 large-screen resizability restrictions cannot be opted out | Alarm audio and volume operations must remain inside a qualifying non-short foreground service; the project uses a mediaPlayback alarm FGS and a specialUse monitor FGS. Test Android 17 audio hardening with the platform ADB command |
 
-The app's updated build configuration is **minSdk 26, compileSdk 36, targetSdk 36**, using Android Gradle Plugin 8.9.1 and Gradle 8.11.1. This meets the current Google Play target-API requirement for new apps and updates (API 36). Android 17 (API 37) is supported as a runtime OS target, but the app does not yet target or compile against API 37. Android 17 target-37-only behavior changes must be re-audited before raising targetSdk to 37.
+The app's updated build configuration is **minSdk 23, compileSdk 36, targetSdk 36**, using Android Gradle Plugin 8.9.1 and Gradle 8.11.1. This meets the current Google Play target-API requirement for new apps and updates (API 36). Android 17 (API 37) is supported as a runtime OS target, but the app does not yet target or compile against API 37. Android 17 target-37-only behavior changes must be re-audited before raising targetSdk to 37.
 
-## Bluetooth compatibility and setup (Android 8–17)
+## Bluetooth compatibility and setup (Android 6–17)
 
 The current A2 implementation uses an already-paired trusted device and Bluetooth ACL connection/disconnection events. It does not scan for nearby devices, advertise the phone, connect to a remote GATT service, or read location. Therefore it requests only Bluetooth Connect on Android 12+; it must not add Bluetooth Scan, Bluetooth Advertise, or location permission unless a separately approved feature genuinely needs them.
 
@@ -279,3 +282,10 @@ The Android CI workflow now runs the instrumentation smoke suite on emulator API
 
 This is framework-level compatibility evidence only. It does not certify OEM Settings screens, proprietary battery managers, real Bluetooth accessory callbacks, charger broadcasts on physical hardware, biometric sensors, torch hardware, force-stop behavior, or manufacturer-specific background process policies. Those remain physical-device acceptance tests and must be recorded per model and OS build.
 
+
+
+## Expanded minimum Android support
+
+The app minimum was lowered from API 26 to API 23 after auditing the current AndroidX dependency baseline and the guarded platform calls. The emulator CI matrix now includes API 23, 24, and 25 in addition to API 26–37. This expands installation coverage to Android 6.0+ while retaining runtime checks for notification channels, foreground-service start APIs, exact-alarm special access, Bluetooth Connect, and newer platform capabilities.
+
+This change must pass lint and emulator instrumentation on API 23–25 before the expanded minimum is considered verified.
