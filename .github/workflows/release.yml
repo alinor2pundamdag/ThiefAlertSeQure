@@ -183,7 +183,12 @@ jobs:
               --pattern "ThiefAlertSeQure-$PREVIOUS_RELEASE_TAG-release.apk*" --dir "$PREVIOUS_DIR"
             PREVIOUS_APK="$PREVIOUS_DIR/ThiefAlertSeQure-$PREVIOUS_RELEASE_TAG-release.apk"
             test -s "$PREVIOUS_APK"
-            (cd "$PREVIOUS_DIR" && sha256sum -c "ThiefAlertSeQure-$PREVIOUS_RELEASE_TAG-release.apk.sha256")
+            EXPECTED_OLD_SHA="$(awk '{print $1}' "$PREVIOUS_DIR/ThiefAlertSeQure-$PREVIOUS_RELEASE_TAG-release.apk.sha256")"
+            ACTUAL_OLD_SHA="$(sha256sum "$PREVIOUS_APK" | cut -d' ' -f1)"
+            [[ -n "$EXPECTED_OLD_SHA" && "$ACTUAL_OLD_SHA" == "$EXPECTED_OLD_SHA" ]] || {
+              echo "::error::Previous official APK checksum verification failed."
+              exit 1
+            }
             BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
             EXPECTED_CERT="9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64"
             OLD_BADGING="$("$BUILD_TOOLS/aapt" dump badging "$PREVIOUS_APK")"

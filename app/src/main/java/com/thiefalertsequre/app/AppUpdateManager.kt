@@ -37,7 +37,6 @@ object AppUpdateManager {
     private const val RELEASE_API =
         "https://api.github.com/repos/alinor2pundamdag/ThiefAlertSeQure/releases/latest"
     private const val EXPECTED_PACKAGE = AppUpdatePolicy.EXPECTED_PACKAGE
-    private const val EXPECTED_CERT_SHA256 = AppUpdatePolicy.EXPECTED_CERT_SHA256
     private const val MAX_APK_BYTES = 100L * 1024L * 1024L
     private val allowedHosts = setOf(
         "api.github.com",
