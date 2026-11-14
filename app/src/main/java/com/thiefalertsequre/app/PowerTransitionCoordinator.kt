@@ -30,6 +30,7 @@ object PowerTransitionCoordinator {
         val currentBoot = ProtectionClock.bootCount(context)
         val priorBoot = prefs.getInt(BASELINE_BOOT_COUNT, -1)
         val newBoot = forceBootReconciliation || (currentBoot >= 0 && currentBoot != priorBoot)
+        if (newBoot) clearPendingDisconnectLocked(context)
 
         // Old COUNTDOWN states have no trusted unplug-event provenance. Only
         // discard them on first migration; a valid reboot countdown is recovered
@@ -225,7 +226,7 @@ object PowerTransitionCoordinator {
         val epoch = prefs.getLong(PENDING_EVENT_EPOCH, 0L)
         val elapsed = prefs.getLong(PENDING_EVENT_ELAPSED, 0L)
         val boot = prefs.getInt(PENDING_EVENT_BOOT, -1)
-        if (epoch <= 0L || elapsed <= 0L || boot < 0) {
+        if (epoch <= 0L || elapsed <= 0L) {
             synchronized(lock) { clearPendingDisconnectLocked(appContext) }
             return ProtectionStore(appContext).read()
         }
@@ -288,7 +289,8 @@ object PowerTransitionCoordinator {
             val currentBoot = ProtectionClock.bootCount(appContext)
             val priorBoot = prefs.getInt(BASELINE_BOOT_COUNT, -1)
             val bootChanged = currentBoot >= 0 && currentBoot != priorBoot
-            if (!prefs.getBoolean(KNOWN, false) || bootChanged) {
+            val eventFromDifferentBoot = currentBoot >= 0 && eventBootCount >= 0 && currentBoot != eventBootCount
+            if (!prefs.getBoolean(KNOWN, false) || bootChanged || eventFromDifferentBoot) {
                 clearPendingDisconnectLocked(appContext)
                 initializeBaselineLocked(appContext)
                 LocalTamperHistory.record(
