@@ -45,14 +45,14 @@ class TrustedBluetoothRegistryTest {
     }
 
     @Test fun base64DecoderRejectsInvalidPaddingAndCharacters() {
-        assertTrue(TrustedBluetoothRegistry.decode("AA:00\\tA===").isEmpty())
-        assertTrue(TrustedBluetoothRegistry.decode("AA:00\\t!!!!").isEmpty())
+        assertTrue(TrustedBluetoothRegistry.decode("AA:00\tA===").isEmpty())
+        assertTrue(TrustedBluetoothRegistry.decode("AA:00\t!!!!").isEmpty())
     }
 
     @Test fun base64DecoderPreservesPreviouslyStoredJavaBase64Values() {
         assertEquals(
             listOf(TrustedBluetoothDevice("AA:00", "Watch One")),
-            TrustedBluetoothRegistry.decode("AA:00\\tV2F0Y2ggT25l")
+            TrustedBluetoothRegistry.decode("AA:00\tV2F0Y2ggT25l")
         )
     }
 }
