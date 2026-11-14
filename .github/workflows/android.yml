@@ -133,6 +133,9 @@ jobs:
             VERSION_CODE=6
             VERSION_NAME="1.1.4-test"
           fi
+          # Keep the production Gradle baseline separate from the debug-test override.
+          echo "RELEASE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "RELEASE_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           echo "APP_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "APP_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           echo "Building application version $VERSION_NAME ($VERSION_CODE)"
@@ -208,27 +211,64 @@ jobs:
               )
           PY
 
-      - name: Verify minified release build without mislabeling test signing
+      - name: Verify minified release APK and structured metadata
         shell: bash
         run: |
           set -euo pipefail
           ./gradlew :app:lintRelease :app:assembleRelease --no-daemon --stacktrace
           RELEASE_APK="app/build/outputs/apk/release/app-release.apk"
+          RELEASE_METADATA="app/build/outputs/apk/release/output-metadata.json"
+          RELEASE_MANIFEST="app/build/intermediates/packaged_manifests/release/processReleaseManifestForPackage/AndroidManifest.xml"
           test -s "$RELEASE_APK"
-          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          BADGING="$("$BUILD_TOOLS/aapt" dump badging "$RELEASE_APK")"
-          PACKAGE_LINE="$(printf '%s\\n' "$BADGING" | grep -m1 "^package:")"
-          echo "Minified release build metadata: $PACKAGE_LINE"
-          [[ "$PACKAGE_LINE" == *"name='com.thiefalertsequre.app'"* ]]
-          [[ "$PACKAGE_LINE" == *"versionCode='5'"* ]]
-          [[ "$PACKAGE_LINE" == *"versionName='1.1.3'"* ]]
+          test -s "$RELEASE_METADATA"
+          test -s "$RELEASE_MANIFEST"
+          test -s "app/build/outputs/mapping/release/mapping.txt"
+          python3 - "$RELEASE_APK" "$RELEASE_METADATA" "$RELEASE_MANIFEST" "$RELEASE_VERSION_CODE" "$RELEASE_VERSION_NAME" <<'PY'
+          import json
+          import sys
+          import zipfile
+          import xml.etree.ElementTree as ET
+
+          apk_path, metadata_path, manifest_path, expected_code, expected_name = sys.argv[1:]
+          expected_package = "com.thiefalertsequre.app"
+          with open(metadata_path, encoding="utf-8") as source:
+              metadata = json.load(source)
+          assert metadata.get("applicationId") == expected_package, (
+              f"Release applicationId mismatch: {metadata.get('applicationId')!r}"
+          )
+          assert metadata.get("variantName", "").lower() == "release", (
+              f"Expected release variant metadata, got {metadata.get('variantName')!r}"
+          )
+          elements = metadata.get("elements", [])
+          assert len(elements) == 1, f"Expected one release APK output, got {elements!r}"
+          element = elements[0]
+          assert str(element.get("versionCode")) == expected_code, (
+              f"Release versionCode mismatch: expected {expected_code}, got {element.get('versionCode')}"
+          )
+          assert element.get("versionName") == expected_name, (
+              f"Release versionName mismatch: expected {expected_name!r}, got {element.get('versionName')!r}"
+          )
+          assert element.get("outputFile") == "app-release.apk", (
+              f"Unexpected release output file: {element.get('outputFile')!r}"
+          )
+          root = ET.parse(manifest_path).getroot()
+          assert root.get("package") == expected_package, (
+              f"Packaged manifest package mismatch: {root.get('package')!r}"
+          )
+          with zipfile.ZipFile(apk_path) as apk:
+              assert apk.testzip() is None, "Release APK contains a corrupt ZIP entry"
+              assert "AndroidManifest.xml" in apk.namelist(), "Release APK has no AndroidManifest.xml"
+          print(
+              f"Verified minified release APK: package={expected_package}, "
+              f"version={expected_name} ({expected_code}), R8 mapping present, APK archive valid."
+          )
+          PY
           if [[ "$RELEASE_SIGNING_CONFIGURED" == "true" ]]; then
-            echo "Permanent release signing is configured; signer verification follows."
+            echo "Permanent release signing is configured; the following signer step verifies the official certificate."
           else
             echo "::notice::Release APK is unsigned because permanent owner signing secrets are not configured. This is a build/minification check only, not a distributable production APK."
-            echo "Production artifact upload remains disabled for this branch."
+            echo "The upload step uses only the separately verified debug-test APK."
           fi
-
       - name: Verify APK package, version, and signer
         shell: bash
         run: |
