@@ -21,14 +21,19 @@ object LocalTamperHistory {
         val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
         val line = "$stamp | $safeEvent" + if (safeDetail.isBlank()) "" else " | $safeDetail"
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val existing = prefs.getString(KEY_EVENTS, "").orEmpty()
+        val existing = runCatching { prefs.getString(KEY_EVENTS, "").orEmpty() }.getOrElse {
+            prefs.edit().remove(KEY_EVENTS).commit()
+            ""
+        }
         val next = (existing.split('\n').filter { it.isNotBlank() } + line).takeLast(MAX_EVENTS)
         prefs.edit().putString(KEY_EVENTS, next.joinToString("\n")).commit()
     }
 
     fun read(context: Context, limit: Int = 100): List<String> =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_EVENTS, "").orEmpty()
+        runCatching {
+            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString(KEY_EVENTS, "").orEmpty()
+        }.getOrDefault("")
             .split('\n').filter { it.isNotBlank() }.takeLast(limit.coerceIn(1, MAX_EVENTS))
             .reversed()
 
