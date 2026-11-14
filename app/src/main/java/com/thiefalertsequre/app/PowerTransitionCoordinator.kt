@@ -200,6 +200,11 @@ object PowerTransitionCoordinator {
         }
     }
 
+    fun hasPendingDisconnectRetry(context: Context): Boolean = runCatching {
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(PENDING_DISCONNECT, false)
+    }.getOrDefault(false)
+
     /** Retry a previously observed OS unplug only after a later live battery snapshot confirms disconnection. */
     fun retryPendingDisconnect(context: Context): ProtectionState {
         val appContext = context.applicationContext
