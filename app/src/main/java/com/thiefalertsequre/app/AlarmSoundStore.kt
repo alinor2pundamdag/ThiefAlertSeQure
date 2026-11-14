@@ -38,8 +38,8 @@ object AlarmSoundStore {
         val granted = runCatching { prefs.getString("grant_uri_$slot", null) }.getOrNull()
         val otherSlot = if (slot == ALARM) ALERT else ALARM
         val otherGrant = runCatching { prefs.getString("grant_uri_$otherSlot", null) }.getOrNull()
-        prefs.edit().remove(key(slot)).remove("grant_uri_$slot").commit()
-        if (granted != null && granted != otherGrant) runCatching {
+        val cleared = prefs.edit().remove(key(slot)).remove("grant_uri_$slot").commit()
+        if (cleared && granted != null && granted != otherGrant) runCatching {
             context.contentResolver.releasePersistableUriPermission(
                 Uri.parse(granted),
                 Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -62,6 +62,13 @@ object AlarmSoundStore {
                 .putString(key(slot), soundUri.toString())
                 .putString("grant_uri_$slot", permissionUri.toString())
                 .commit()
+            if (!saved && permissionUri.toString() != oldGrant && permissionUri.toString() != otherGrant) {
+                runCatching {
+                    context.contentResolver.releasePersistableUriPermission(
+                        permissionUri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
+            }
             if (saved && oldGrant != null && oldGrant != permissionUri.toString() && oldGrant != otherGrant) {
                 runCatching {
                     context.contentResolver.releasePersistableUriPermission(
