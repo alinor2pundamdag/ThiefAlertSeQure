@@ -53,6 +53,9 @@ android {
             // A release APK is signed only with the persistent owner-controlled key.
             if (releaseSigningReady) {
                 signingConfig = signingConfigs.getByName("release")
+            } else if (providers.gradleProperty("signReleaseForTests").orNull == "true") {
+                // CI-only minified instrumentation uses the local debug key; never publish this APK.
+                signingConfig = signingConfigs.getByName("debug")
             }
         }
     }
