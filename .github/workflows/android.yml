@@ -124,6 +124,9 @@ jobs:
           done
           echo "Kotlin DSL is the only Gradle build configuration."
 
+      - name: Verify permanent production identity stays synchronized
+        run: python3 scripts/verify_release_identity.py
+
       - name: Read application version
         shell: bash
         run: |

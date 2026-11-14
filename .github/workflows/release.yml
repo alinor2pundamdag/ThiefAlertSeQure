@@ -114,6 +114,9 @@ jobs:
           echo "Release version $VERSION_NAME ($VERSION_CODE) passed tag/version checks."
         env:
           GH_TOKEN: ${{ github.token }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
       - name: Run unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
@@ -206,9 +209,28 @@ jobs:
             }
             TEST_APK="app/build/outputs/apk/androidTest/release/app-release-androidTest.apk"
             test -s "$TEST_APK"
+            TEST_PACKAGE_LINE="$("$BUILD_TOOLS/aapt" dump badging "$TEST_APK" | grep -m1 "^package:")"
+            [[ "$TEST_PACKAGE_LINE" == *"name='com.thiefalertsequre.app.test'"* ]] || {
+              echo "::error::Unexpected release instrumentation package: $TEST_PACKAGE_LINE"
+              exit 1
+            }
             TEST_CERT="$("$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$TEST_APK" | sed -n 's/.*SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
+            if [[ "$TEST_CERT" != "$EXPECTED_CERT" ]]; then
+              echo "Re-signing the private regression test APK with the verified production certificate."
+              UNSIGNED_TEST_APK="$RUNNER_TEMP/release-test-unsigned.apk"
+              ALIGNED_TEST_APK="$RUNNER_TEMP/release-test-aligned.apk"
+              SIGNED_TEST_APK="$RUNNER_TEMP/release-test-signed.apk"
+              cp "$TEST_APK" "$UNSIGNED_TEST_APK"
+              zip -q -d "$UNSIGNED_TEST_APK" 'META-INF/*.SF' 'META-INF/*.RSA' 'META-INF/*.DSA' 'META-INF/*.EC' || true
+              "$BUILD_TOOLS/zipalign" -f -p 4 "$UNSIGNED_TEST_APK" "$ALIGNED_TEST_APK"
+              "$BUILD_TOOLS/apksigner" sign --ks "$ANDROID_KEYSTORE_PATH" --ks-key-alias "$ANDROID_KEY_ALIAS" \
+                --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD \
+                --out "$SIGNED_TEST_APK" "$ALIGNED_TEST_APK"
+              cp "$SIGNED_TEST_APK" "$TEST_APK"
+              TEST_CERT="$("$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$TEST_APK" | sed -n 's/.*SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
+            fi
             [[ "$TEST_CERT" == "$EXPECTED_CERT" ]] || {
-              echo "::error::Release instrumentation APK must use the official signer to inspect production app data."
+              echo "::error::Unable to sign release instrumentation APK with the official certificate."
               exit 1
             }
             adb install "$PREVIOUS_APK"

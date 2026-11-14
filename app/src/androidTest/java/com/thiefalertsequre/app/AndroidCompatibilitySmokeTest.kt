@@ -47,19 +47,29 @@ class AndroidCompatibilitySmokeTest {
         )
         val markerKey = "v113_private_data_marker"
         val markerValue = "preserve-me-across-in-place-upgrade"
+        val markerFile = java.io.File(context.filesDir, "upgrade_compatibility_regression.marker")
         when (instrumentation.arguments.getString("upgradePhase")) {
-            "seed" -> assertTrue(
-                "The pre-upgrade marker must be durably committed",
-                preferences.edit().putString(markerKey, markerValue).commit()
-            )
-            "verify" -> assertEquals(
-                "Private app data must survive an in-place APK update",
-                markerValue,
-                preferences.getString(markerKey, null)
-            )
+            "seed" -> {
+                assertTrue(
+                    "The pre-upgrade preference marker must be durably committed",
+                    preferences.edit().putString(markerKey, markerValue).commit()
+                )
+                markerFile.writeText(markerValue)
+            }
+            "verify" -> {
+                assertEquals(
+                    "Private SharedPreferences must survive an in-place APK update",
+                    markerValue,
+                    preferences.getString(markerKey, null)
+                )
+                assertTrue("Private files directory must survive an in-place APK update", markerFile.isFile)
+                assertEquals(markerValue, markerFile.readText())
+            }
             else -> {
                 assertTrue(preferences.edit().putString(markerKey, markerValue).commit())
+                markerFile.writeText(markerValue)
                 assertEquals(markerValue, preferences.getString(markerKey, null))
+                assertEquals(markerValue, markerFile.readText())
             }
         }
     }

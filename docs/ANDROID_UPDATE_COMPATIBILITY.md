@@ -7,7 +7,9 @@
 - Application ID / package: `com.thiefalertsequre.app`
 - Official signing certificate SHA-256: `9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64`
 - Preserve the original owner-controlled production keystore, private key, alias and credentials. Never regenerate or replace them to make CI pass.
-- v1.1.3 baseline: versionCode 5, versionName 1.1.3.
+- v1.1.3 baseline: versionCode 5, versionName 1.1.3, minSdk 26.
+- v1.1.4 candidate on the compatibility branch: versionCode 6, versionName 1.1.4, minSdk 23.
+- Do not raise minSdk above 23 in a future release without an explicit compatibility decision.
 - Every subsequent official release must have a strictly higher versionCode.
 
 ## Mandatory release gates
@@ -25,7 +27,7 @@
 
 Android's in-place package update preserves app-private data when package identity, signing identity and version ordering are accepted by Package Installer. The app must not clear or migrate user data destructively during an ordinary update. `android:allowBackup="false"` does not disable normal in-place update data preservation.
 
-The automated marker test proves that app-private preferences survive an actual `adb install -r` upgrade on its emulator API. It does not replace physical HONOR 200 Pro acceptance or prove every individual feature's data migration.
+The automated marker test proves that app-private SharedPreferences and files survive an actual `adb install -r` upgrade on its emulator API. It does not replace physical HONOR 200 Pro acceptance or prove every individual feature's data migration.
 
 ## Safe development builds
 
