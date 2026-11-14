@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out tagged source and release history
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -46,12 +46,12 @@ jobs:
             exit 1
           }
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
         with:
           cache-provider: basic
 
@@ -177,7 +177,7 @@ jobs:
 
       - name: Verify previous official APK upgrades in place without losing private data
         timeout-minutes: 20
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         env:
           GH_TOKEN: ${{ github.token }}
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/thiefalertsequre-release.jks
@@ -195,7 +195,7 @@ jobs:
 
       - name: Upload signed release preflight artifact (manual runs only)
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ThiefAlertSeQure-v${{ env.APP_VERSION_NAME }}-release-preflight
           path: |

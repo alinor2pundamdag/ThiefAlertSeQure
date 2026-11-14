@@ -54,8 +54,6 @@ internal object OwnerAuthenticationCrypto {
                 0,
                 KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL
             )
-        } else {
-            builder.setInvalidatedByBiometricEnrollment(true)
         }
         generator.init(builder.build())
         return generator.generateKey()

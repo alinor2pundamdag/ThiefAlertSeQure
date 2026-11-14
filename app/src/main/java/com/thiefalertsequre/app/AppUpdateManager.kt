@@ -19,7 +19,8 @@ sealed class AppUpdateResult {
         val apkFile: File,
         val versionName: String,
         val versionCode: Long,
-        val releaseNotes: String
+        val releaseNotes: String,
+        val sha256: String
     ) : AppUpdateResult()
 
     object UpToDate : AppUpdateResult()
@@ -125,7 +126,7 @@ object AppUpdateManager {
             val actualHash = sha256(temporaryFile)
             require(actualHash == expectedHash) { "The downloaded APK failed SHA-256 verification." }
             val candidateVersionCode = verifyApk(
-                context.packageManager, temporaryFile, remoteVersionName, installedVersionCode
+                context.packageManager, temporaryFile, remoteVersionName
             )
             if (!AppUpdatePolicy.isNewerVersionCode(installedVersionCode, candidateVersionCode)) {
                 return AppUpdateResult.UpToDate
@@ -137,7 +138,8 @@ object AppUpdateManager {
                 apkFile = apkFile,
                 versionName = remoteVersionName,
                 versionCode = readApkVersionCode(context, apkFile),
-                releaseNotes = release.optString("body").trim().take(1200)
+                releaseNotes = release.optString("body").trim().take(1200),
+                sha256 = actualHash
             )
         } finally {
             temporaryFile.delete()
@@ -227,7 +229,7 @@ object AppUpdateManager {
         error("GitHub returned too many update redirects.")
     }
 
-    private fun verifyApk(packageManager: PackageManager, file: File, expectedVersionName: String, installedVersionCode: Long): Long {
+    private fun verifyApk(packageManager: PackageManager, file: File, expectedVersionName: String): Long {
         val archive = packageManager.getPackageArchiveInfo(file.absolutePath, signingFlags())
             ?: error("Android could not inspect the downloaded APK.")
         AppUpdatePolicy.requireCandidatePackage(EXPECTED_PACKAGE, archive.packageName)
@@ -252,7 +254,25 @@ object AppUpdateManager {
         return candidateVersionCode
     }
 
-    private fun installedSignerMatchesOfficialKey(context: Context): Boolean {
+    /** Revalidates the private cached artifact immediately before Android Package Installer receives it. */
+    fun isVerifiedCachedApk(context: Context, update: AppUpdateResult.Ready): Boolean = runCatching {
+        AppUpdatePolicy.requireInstalledPackage(context.packageName)
+        AppUpdatePolicy.requireSafeUpdateMode(ProtectionStore(context).read().mode)
+        require(installedSignerMatchesOfficialKey(context))
+        val expectedDirectory = File(context.cacheDir, "updates").canonicalFile
+        val candidateFile = update.apkFile.canonicalFile
+        require(candidateFile.parentFile == expectedDirectory)
+        require(candidateFile.name == "ThiefAlertSeQure-v${update.versionName}-release.apk")
+        require(candidateFile.isFile && candidateFile.length() in 1..MAX_APK_BYTES)
+        require(sha256(candidateFile) == update.sha256)
+        val installed = context.packageManager.getPackageInfo(context.packageName, 0)
+        val installedCode = versionCode(installed)
+        val candidateCode = verifyApk(context.packageManager, candidateFile, update.versionName)
+        require(candidateCode == update.versionCode)
+        AppUpdatePolicy.isNewerVersionCode(installedCode, candidateCode)
+    }.getOrDefault(false)
+
+
         val packageManager = context.packageManager
         val installed = packageManager.getPackageInfo(context.packageName, signingFlags())
         val signatures = if (Build.VERSION.SDK_INT >= 28) {
