@@ -79,10 +79,9 @@ object AppUpdateManager {
             "The latest release tag has an invalid version format."
         }
         val remoteVersionName = tag.removePrefix("v")
-        if (AppVersionComparator.compare(remoteVersionName, installedVersionName) <= 0) {
-            return AppUpdateResult.UpToDate
-        }
-
+        // versionCode is Android's authoritative update ordering. Do not return
+        // UpToDate merely because versionName is unchanged: hotfix releases may
+        // legitimately keep the same display version while increasing versionCode.
         val assets = release.optJSONArray("assets")
             ?: error("The GitHub release has no downloadable assets.")
         var apkName: String? = null
@@ -125,7 +124,13 @@ object AppUpdateManager {
             }
             val actualHash = sha256(temporaryFile)
             require(actualHash == expectedHash) { "The downloaded APK failed SHA-256 verification." }
-            verifyApk(context.packageManager, temporaryFile, remoteVersionName, installedVersionCode)
+            val candidateVersionCode = verifyApk(
+                context.packageManager, temporaryFile, remoteVersionName, installedVersionCode
+            )
+            if (!AppUpdatePolicy.isNewerVersionCode(installedVersionCode, candidateVersionCode)) {
+                return AppUpdateResult.UpToDate
+            }
+            AppUpdatePolicy.requireNewerVersionCode(installedVersionCode, candidateVersionCode)
             if (apkFile.exists()) apkFile.delete()
             check(temporaryFile.renameTo(apkFile)) { "Could not prepare the verified APK for installation." }
             return AppUpdateResult.Ready(
@@ -222,14 +227,14 @@ object AppUpdateManager {
         error("GitHub returned too many update redirects.")
     }
 
-    private fun verifyApk(packageManager: PackageManager, file: File, expectedVersionName: String, installedVersionCode: Long) {
+    private fun verifyApk(packageManager: PackageManager, file: File, expectedVersionName: String, installedVersionCode: Long): Long {
         val archive = packageManager.getPackageArchiveInfo(file.absolutePath, signingFlags())
             ?: error("Android could not inspect the downloaded APK.")
         AppUpdatePolicy.requireCandidatePackage(EXPECTED_PACKAGE, archive.packageName)
         require(archive.versionName == expectedVersionName) {
             "The APK version does not match its GitHub release tag."
         }
-        AppUpdatePolicy.requireNewerVersionCode(installedVersionCode, versionCode(archive))
+        val candidateVersionCode = versionCode(archive)
         val signatures = if (Build.VERSION.SDK_INT >= 28) {
             archive.signingInfo?.apkContentsSigners
         } else {
@@ -244,6 +249,7 @@ object AppUpdateManager {
         require(AppUpdatePolicy.hasOfficialSigner(signerDigests)) {
             "The APK is not signed with the pinned official ThiefAlertSeQure release key."
         }
+        return candidateVersionCode
     }
 
     private fun installedSignerMatchesOfficialKey(context: Context): Boolean {

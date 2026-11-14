@@ -28,8 +28,11 @@ internal object AppUpdatePolicy {
         }
     }
 
+    fun isNewerVersionCode(installedVersionCode: Long, candidateVersionCode: Long): Boolean =
+        candidateVersionCode > installedVersionCode
+
     fun requireNewerVersionCode(installedVersionCode: Long, candidateVersionCode: Long) {
-        require(candidateVersionCode > installedVersionCode) {
+        require(isNewerVersionCode(installedVersionCode, candidateVersionCode)) {
             "The APK version code is not newer than the installed version."
         }
     }

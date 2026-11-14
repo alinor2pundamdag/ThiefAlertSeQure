@@ -30,6 +30,13 @@ class AppUpdatePolicyTest {
         )))
     }
 
+    @Test fun versionCodeIsAuthoritativeEvenWhenDisplayVersionIsUnchanged() {
+        assertTrue(AppUpdatePolicy.isNewerVersionCode(5L, 6L))
+        assertTrue(AppUpdatePolicy.isNewerVersionCode(6L, 7L))
+        assertFalse(AppUpdatePolicy.isNewerVersionCode(6L, 6L))
+        assertFalse(AppUpdatePolicy.isNewerVersionCode(7L, 6L))
+    }
+
     @Test fun versionCodeMustIncreaseForEveryUpdate() {
         AppUpdatePolicy.requireNewerVersionCode(5L, 6L)
         AppUpdatePolicy.requireNewerVersionCode(6L, 7L)
