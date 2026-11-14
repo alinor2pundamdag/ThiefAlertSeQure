@@ -15,7 +15,7 @@
     <a href="https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/workflows/android.yml">
       <img src="https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/workflows/android.yml/badge.svg?branch=main" alt="Android CI status" />
     </a>
-    <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" alt="Android 8.0 and newer" />
+    <img src="https://img.shields.io/badge/Android-6.0%2B-3DDC84?logo=android&logoColor=white" alt="Android 6.0 and newer" />
     <img src="https://img.shields.io/badge/Privacy-On--device-2D6CDF" alt="On-device privacy" />
     <img src="https://img.shields.io/badge/Version-1.1.3-1677D2" alt="Version 1.1.3" />
     <img src="https://img.shields.io/badge/Owner%20device%20tests-11%2F11%20PASS-2E8B57" alt="Owner-reported 11 of 11 physical test scenarios passed" />
@@ -151,7 +151,7 @@ Read the complete [Privacy Policy](docs/PRIVACY_POLICY.md).
 
 ## 📱 Android and manufacturer compatibility
 
-- **Minimum Android:** 8.0 (API 26).
+- **Minimum Android:** 6.0 (API 23).
 - **Compile / target Android:** API 36 / API 36 (Android 16 target). Android 17 background-audio behavior has not yet been physically verified.
 - **Manufacturer-aware setup:** Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO, OPPO, realme, OnePlus, vivo / iQOO, Google Pixel, Motorola, ASUS, Sony Xperia, Nothing OS, Lenovo, TECNO / Infinix / itel, ZTE / nubia, and safe generic Android guidance.
 - **Settings fallback:** Public Android Settings action → app-specific settings → general Settings.
@@ -160,7 +160,7 @@ Read the complete [Privacy Policy](docs/PRIVACY_POLICY.md).
 
 - **Interface:** Material-based dark UI with a scrollable layout, readable text sizing, and large touch targets.
 
-See the full [Android Device Compatibility Matrix](docs/ANDROID_DEVICE_COMPATIBILITY.md) for API 26–37 behavior, OEM background controls, system-setting fallbacks, limitations, official manufacturer references, and physical-device acceptance tests.
+See the full [Android Device Compatibility Matrix](docs/ANDROID_DEVICE_COMPATIBILITY.md) for API 23–37 behavior, OEM background controls, system-setting fallbacks, limitations, official manufacturer references, and physical-device acceptance tests.
 
 No ordinary app can use one universal setting to override every manufacturer's power manager.
 
@@ -224,7 +224,7 @@ A successful CI build confirms that the configured automated checks and APK asse
 | [Requirement Traceability Matrix](docs/REQUIREMENT_TRACEABILITY_MATRIX.md) | Requirement IDs mapped to owner files, tests, CI evidence, device validation, and release gates. |
 | [Device Owner Mode](docs/DEVICE_OWNER_MODE.md) | Managed-device requirements, capabilities, and rollback. |
 | [Android Settings & Alarm Hardening](docs/ANDROID_SETTINGS_AND_ALARM_HARDENING.md) | System settings and reliability guidance. |
-| [Android Device Compatibility](docs/ANDROID_DEVICE_COMPATIBILITY.md) | API 26–37 behavior, OEM-specific setup, fallback navigation, and device test matrix. |
+| [Android Device Compatibility](docs/ANDROID_DEVICE_COMPATIBILITY.md) | API 23–37 behavior, OEM-specific setup, fallback navigation, and device test matrix. |
 
 ## ⚠️ Honest security and reliability boundaries
 

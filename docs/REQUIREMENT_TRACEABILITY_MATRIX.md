@@ -61,7 +61,7 @@
 
 | ID | Requirement / acceptance condition | Primary owner(s) | Existing test / evidence | Baseline status |
 |---|---|---|---|---|
-| AND-01 | minSdk 26 and target/compile SDK 36 are consistent with current project build | `app/build.gradle.kts` | CI build/lint | CI-verified at baseline; re-evaluate on SDK upgrades |
+| AND-01 | minSdk 23 and target/compile SDK 36 are consistent with current project build | `app/build.gradle.kts` | CI build/lint | CI-verified at baseline; re-evaluate on SDK upgrades |
 | AND-02 | Charger events are registered at runtime from foreground monitor; do not rely on manifest-only implicit broadcast delivery | monitor service, receiver, manifest | source inspection | Implemented; Android-version device matrix required |
 | AND-03 | Foreground-service declarations/types/permissions match service behavior and target SDK | manifest, monitor/alarm service | CI lint/build | Needs API 34–36 emulator/instrumentation validation and policy review |
 | AND-04 | Exact-alarm denial does not silently claim precise delivery; fallback/recovery is surfaced | scheduler, boot receiver, UI | scheduler test not identified | Needs explicit tests and UI state verification |
@@ -102,7 +102,7 @@
 ### Automated
 - Unit tests for state transitions, stale event rejection, monotonic deadlines, reboot identity, authentication throttling, compatibility-family mapping, alarm volume restoration, corrupted storage, and failed persistence writes.
 - Android instrumentation tests for runtime receiver registration, foreground-service start restrictions, exact-alarm permission changes, notification permission/channel behavior, keyguard dismissal, Device Admin lock behavior, audio routing, and process recreation.
-- Emulator runs for API 26, 28, 29, 30, 31, 32, 33, 34, 35, and 36 (at minimum, representative API levels plus boundary versions).
+- Emulator matrix: API 23–37 (all API levels in the configured matrix) (at minimum, representative API levels plus boundary versions).
 - Static checks: lint, manifest/permission audit (confirm no CAMERA permission and optional camera/flash hardware features), dependency audit, packaged asset integrity, APK package/version/signer verification.
 - Alarm flashlight unit checks for ALARM_TRIGGERED-only gating and slow pulse cadence; physical test must confirm LED pulses with audio and turns off after successful authentication.
 

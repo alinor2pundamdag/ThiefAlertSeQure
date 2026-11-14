@@ -146,6 +146,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                 else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
             }
             if (disabledState.mode != ProtectionMode.ALARM_TRIGGERED) AlarmScheduler.cancel(this)
+            PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Protection monitor disabled by owner")
             stopSelf()
             return START_NOT_STICKY
         }
@@ -183,6 +184,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         registerPowerTransitionReceiver()
         registerBluetoothSeparationReceiver()
         PowerTransitionCoordinator.initializeBaseline(this)
+        PowerTransitionReceiver.enqueuePendingRecovery(this)
         reconcileStablePowerState()
         syncMotionSensor()
         LocalTamperHistory.record(this, "monitor_started", "Persistent foreground charger monitor active; motion sensing is armed-state only")

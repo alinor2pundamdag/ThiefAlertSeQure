@@ -102,6 +102,7 @@ class SetupStatusActivity : FragmentActivity() {
                     "exact" -> "Open exact-alarm access"
                     "fullscreen" -> "Open full-screen access"
                     "battery" -> "Review battery restrictions"
+                    "oem_background" -> "Open Settings and search App launch"
                     "notifications" -> "Open notification settings"
                     "lock" -> "Open Android screen-lock settings"
                     else -> "Open relevant Android settings"

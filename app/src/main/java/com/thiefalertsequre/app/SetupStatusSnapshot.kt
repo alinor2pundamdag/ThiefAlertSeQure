@@ -19,7 +19,7 @@ data class SetupItem(val id:String,val title:String,val state:SetupState,val det
 data class SetupSnapshot(val items:List<SetupItem>){
  fun dashboardSummary():String{
   val ok=items.count{it.state==SetupState.VERIFIED};val action=items.count{it.state==SetupState.ACTION_REQUIRED};val unknown=items.count{it.state==SetupState.UNKNOWN}
-  val rows=items.take(9).joinToString("\n"){ val mark=when(it.state){SetupState.VERIFIED->"✓";SetupState.ACTION_REQUIRED->"!";SetupState.NEUTRAL->"—";SetupState.UNSUPPORTED->"N/A";SetupState.UNKNOWN->"?"};"$mark ${it.title}: ${it.state.name.replace('_',' ')}" }
+  val rows=items.take(10).joinToString("\n"){ val mark=when(it.state){SetupState.VERIFIED->"✓";SetupState.ACTION_REQUIRED->"!";SetupState.NEUTRAL->"—";SetupState.UNSUPPORTED->"N/A";SetupState.UNKNOWN->"?"};"$mark ${it.title}: ${it.state.name.replace('_',' ')}" }
   return "ANDROID SETUP • $ok verified • $action need attention • $unknown unconfirmed\n$rows\nSee Settings → Verified Android setup status."
  }
 }
@@ -33,6 +33,7 @@ object SetupStatusSnapshot {
   x+=FullScreenSetupStatusPolicy.evaluate(dashboardEnabled,Build.VERSION.SDK_INT,fullScreenAccess)
   if(Build.VERSION.SDK_INT>=23){val ok=runCatching{c.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(c.packageName)}.getOrDefault(false);x+=SetupItem("battery","Battery optimization exemption",if(ok)SetupState.VERIFIED else SetupState.ACTION_REQUIRED,if(ok)"Android confirms exemption." else "App remains subject to battery optimization.")}
   val lock=runCatching{c.getSystemService(KeyguardManager::class.java).isDeviceSecure}.getOrDefault(false);x+=SetupItem("lock","Secure device lock",if(lock)SetupState.VERIFIED else SetupState.ACTION_REQUIRED,if(lock)"Android confirms a secure lock." else "No secure PIN, pattern, or password is configured.")
+  OemBackgroundSetupPolicy.evaluate(Build.MANUFACTURER, Build.BRAND)?.let(x::add)
   val prefs=c.getSharedPreferences(ProtectionMonitorService.PREFS,0)
   val a2Enabled=prefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED,false)
   val perm=Build.VERSION.SDK_INT<31||c.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)==PackageManager.PERMISSION_GRANTED
@@ -53,6 +54,7 @@ object SetupStatusSnapshot {
  "notifications"->Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,c.packageName)
  "fullscreen"->if(Build.VERSION.SDK_INT>=34)Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,Uri.parse("package:${c.packageName}"))else null
  "battery"->if(Build.VERSION.SDK_INT>=23)Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:${c.packageName}"))else null
+ "oem_background"->Intent(Settings.ACTION_SETTINGS)
  "lock"->Intent(Settings.ACTION_SECURITY_SETTINGS)
  "bt"->Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
  "bt_permission"->Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:${c.packageName}"))
