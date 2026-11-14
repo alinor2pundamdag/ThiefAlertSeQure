@@ -68,7 +68,6 @@ object AppUpdateManager {
         }
 
         val installed = context.packageManager.getPackageInfo(context.packageName, 0)
-        val installedVersionName = installed.versionName ?: "0"
         val installedVersionCode = versionCode(installed)
         val release = JSONObject(readHttpsText(RELEASE_API))
         require(!release.optBoolean("draft") && !release.optBoolean("prerelease")) {
@@ -272,7 +271,7 @@ object AppUpdateManager {
         AppUpdatePolicy.isNewerVersionCode(installedCode, candidateCode)
     }.getOrDefault(false)
 
-
+    private fun installedSignerMatchesOfficialKey(context: Context): Boolean {
         val packageManager = context.packageManager
         val installed = packageManager.getPackageInfo(context.packageName, signingFlags())
         val signatures = if (Build.VERSION.SDK_INT >= 28) {
