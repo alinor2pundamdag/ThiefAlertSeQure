@@ -48,6 +48,7 @@ The current A2 implementation uses an already-paired trusted device and Bluetoot
 
 | Android release | API | Bluetooth permission / behavior | ThiefAlertSeQure handling |
 |---|---:|---|---|
+| Android 6.0–7.1 | 23–25 | Legacy BLUETOOTH and BLUETOOTH_ADMIN install-time permissions; Doze and App Standby introduced | Runtime event receiver while the user-enabled monitor is active; no nearby-device scan; use exact idle alarm APIs for deadlines |
 | Android 8.0 | 26 | Legacy BLUETOOTH and BLUETOOTH_ADMIN install-time permissions | Runtime event receiver while the user-enabled foreground monitor is active; no nearby-device scan |
 | Android 8.1 | 27 | Same legacy permission model | Same as API 26 |
 | Android 9 | 28 | Legacy permissions; stronger battery/background management varies by OEM | Keep monitor user-visible; show OEM battery guidance |
