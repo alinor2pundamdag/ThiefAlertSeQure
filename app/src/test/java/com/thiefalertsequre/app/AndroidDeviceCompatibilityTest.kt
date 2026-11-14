@@ -86,8 +86,8 @@ class AndroidDeviceCompatibilityTest {
         val guide = AndroidDeviceCompatibility.backgroundSettingsGuide("HONOR", "HONOR")
         listOf(
             "Manage automatically OFF", "Auto-launch", "Secondary launch",
-            "Run in background", "Battery optimization", "All apps", "Don't allow",
-            "Recents", "lock icon", "Power saving", "Force stop"
+            "Run in background", "Optimizer", "App launch", "Battery optimization",
+            "All apps", "Don't allow", "Recents", "lock icon", "Power saving", "Force stop"
         ).forEach { expected ->
             assertTrue("HONOR guide must include $expected", guide.contains(expected, ignoreCase = true))
         }

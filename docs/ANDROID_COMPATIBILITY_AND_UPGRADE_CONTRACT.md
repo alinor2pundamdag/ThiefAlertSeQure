@@ -29,11 +29,11 @@ Every official update must:
 
 ## HONOR 200 Pro background acceptance
 
-HONOR's published guidance confirms that its App launch manager, battery optimization, Recents lock and power-saving controls can stop or restrict background apps. The app must guide the owner; ordinary Android APIs cannot read or change these private OEM switches.
+HONOR's published guidance confirms that its App launch manager, battery optimization, Recents lock and power-saving controls can stop or restrict background apps. See [HONOR background app guidance](https://www.honor.com/global/support/content/en-us00406916/) and [HONOR app launch guidance](https://www.honor.com/uk/support/content/en-us00406923/). The app must guide the owner; ordinary Android APIs cannot read or change these private OEM switches.
 
 For the HONOR 200 Pro, detect and display the actual installed model, Android release and API level at runtime. The owner should manually verify:
 
-1. Settings search → **App launch** → ThiefAlertSeQure.
+1. Settings search → **App launch** → ThiefAlertSeQure. On some MagicOS versions, use **Optimizer / Phone Manager → Battery** (or **% remaining**) → **App launch**.
 2. Turn **Manage automatically** OFF.
 3. Enable **Auto-launch**, **Secondary launch**, and **Run in background**, then confirm.
 4. Settings search → **Battery optimization** → **All apps** → ThiefAlertSeQure → **Don't allow**, if this list is present.
@@ -48,7 +48,8 @@ HONOR menus vary by region and MagicOS version. The device's actual Settings UI 
 
 ## Android lifecycle and security invariants
 
-- Charger unplug is accepted only after a previously confirmed connected baseline and stable live-state sampling. Unknown or stale power snapshots must never create a countdown.
+- Charger unplug is accepted only after a previously confirmed connected baseline and stable live-state sampling. The protected OS event, original timestamps, boot identity and transition generation are persisted before debounce. If the monitor process dies, recovery revalidates live power and same-boot identity before resuming; stale or cross-boot candidates are discarded. Unknown or stale power snapshots must never create a countdown.
+- Optional device-admin screen locking is best-effort. Failure to lock the screen must never stop alarm audio or vibration.
 - Countdown state is persisted with wall-clock and monotonic deadline data plus boot identity. Reboot recovery must revalidate live charger state and never compare an old boot's elapsedRealtime value with a new boot.
 - The monitor foreground service remains private and uses the declared `specialUse` type. The alarm foreground service remains private and uses `mediaPlayback`; boot recovery must not start a prohibited mediaPlayback foreground service directly from BOOT_COMPLETED.
 - Alarm playback, vibration and flash remain independent of optional device-admin screen locking. Failure of the optional lock request must not stop alarm audio.
@@ -61,7 +62,7 @@ HONOR menus vary by region and MagicOS version. The device's actual Settings UI 
 
 - Unit tests and Android lint pass.
 - Internal navigation, manifest permissions, component exposure and foreground-service declarations pass instrumentation.
-- Emulator instrumentation matrix covers API 23–37; distinguish emulator-image/infrastructure failures from app failures.
+- Emulator instrumentation matrix covers API 23–37; distinguish emulator-image/infrastructure failures from app failures. The CI emulator-readiness shim must remain before each emulator action: Android can report `sys.boot_completed=1` before InputManager and SettingsProvider are ready.
 - Release APK is minified, package/version metadata is verified, official certificate matches, and APK ZIP integrity/checksum pass.
 - The previous official APK installs first, test markers are seeded, candidate installs with `adb install -r`, and markers/versionCode/monitor restart are verified.
 - Signed preflight artifact is not an official release until the release is deliberately merged/tagged through the approved production process.
