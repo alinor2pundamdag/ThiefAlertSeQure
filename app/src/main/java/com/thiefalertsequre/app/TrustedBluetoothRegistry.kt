@@ -33,6 +33,7 @@ object TrustedBluetoothRegistry {
                     .remove(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS)
                     .remove(ProtectionMonitorService.KEY_BT_TRUSTED_NAME)
                     .commit()
+                disableA2AndInvalidateBaselines(prefs)
                 return emptyList()
             }
             val legacyName = runCatching {
