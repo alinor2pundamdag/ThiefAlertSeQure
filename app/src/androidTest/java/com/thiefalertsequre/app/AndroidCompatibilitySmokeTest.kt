@@ -54,6 +54,57 @@ class AndroidCompatibilitySmokeTest {
     }
 
     @Test
+    fun setupSnapshotCanInspectPermissionsAndSettingsOnEverySupportedApi() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val snapshot = SetupStatusSnapshot.read(context)
+
+        assertTrue("Setup snapshot must contain readiness items", snapshot.items.isNotEmpty())
+        listOf("exact", "notifications", "battery", "lock", "monitor").forEach { id ->
+            assertTrue("Missing setup status item: $id", snapshot.items.any { it.id == id })
+        }
+    }
+
+    @Test
+    fun alarmDeadlineSchedulingHasACompatibleFallback() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val nowWall = System.currentTimeMillis()
+        val nowElapsed = android.os.SystemClock.elapsedRealtime()
+        val bootCount = ProtectionClock.bootCount(context)
+
+        AlarmScheduler.schedule(
+            context,
+            nowWall + 60_000L,
+            nowElapsed + 60_000L,
+            bootCount
+        )
+        AlarmScheduler.cancel(context)
+    }
+
+    @Test
+    fun manufacturerSettingsFallbacksAreConstructible() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val families = listOf(
+            "samsung", "HONOR", "Huawei", "Xiaomi", "OPPO", "realme",
+            "OnePlus", "vivo", "Google", "Motorola", "ASUS", "Sony",
+            "Nothing", "TECNO", "Infinix", "ZTE", "Lenovo", "unknown"
+        )
+        families.forEach { manufacturer ->
+            val family = AndroidDeviceCompatibility.family(manufacturer, manufacturer)
+            assertNotNull(family)
+            val intent = AndroidDeviceCompatibility.launchControlSettingsIntent(
+                manufacturer,
+                manufacturer,
+                context.packageName,
+                AndroidDeviceCompatibility.LaunchControl.RUN_IN_BACKGROUND
+            )
+            assertNotNull(intent.action)
+            assertTrue(
+                AndroidDeviceCompatibility.backgroundSettingsGuide(manufacturer, manufacturer).isNotBlank()
+            )
+        }
+    }
+
+    @Test
     fun deviceCapabilityInspectionIsSafeOnEverySupportedApi() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val report = BluetoothCompatibility.inspect(context)
