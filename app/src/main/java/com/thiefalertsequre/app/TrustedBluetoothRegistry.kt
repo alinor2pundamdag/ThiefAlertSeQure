@@ -16,11 +16,18 @@ object TrustedBluetoothRegistry {
     private const val KEY_REVISION = "trusted_bluetooth_registry_revision_v1"
 
     fun read(prefs: SharedPreferences): List<TrustedBluetoothDevice> {
-        val raw = prefs.getString(KEY_DEVICES, null)
+        val raw = runCatching { prefs.getString(KEY_DEVICES, null) }.getOrElse {
+            prefs.edit().remove(KEY_DEVICES).apply()
+            null
+        }
         if (raw == null) {
-            val legacyAddress = prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null)
-            if (!legacyAddress.isNullOrBlank()) {
-                val legacyName = prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, null)
+            val legacyAddress = runCatching {
+                prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null)
+            }.getOrNull()
+            if (!legacyAddress.isNullOrBlank() && isValidAddress(legacyAddress)) {
+                val legacyName = runCatching {
+                    prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, null)
+                }.getOrNull()
                     ?.takeIf { it.isNotBlank() } ?: "Bluetooth accessory"
                 val migrated = listOf(TrustedBluetoothDevice(legacyAddress, legacyName))
                 prefs.edit().putString(KEY_DEVICES, encode(migrated)).putString(KEY_BASELINES, "").apply()
@@ -28,11 +35,11 @@ object TrustedBluetoothRegistry {
             }
             return emptyList()
         }
-        return decode(raw)
+        return decode(raw).filter { isValidAddress(it.address) }
     }
 
     fun add(prefs: SharedPreferences, address: String, name: String): Boolean {
-        if (address.isBlank()) return false
+        if (!isValidAddress(address)) return false
         val current = read(prefs).filterNot { it.address.equals(address, ignoreCase = true) }
         val updated = (current + TrustedBluetoothDevice(address, name.ifBlank { "Bluetooth accessory" }))
             .sortedBy { it.name.lowercase() }
@@ -68,11 +75,11 @@ object TrustedBluetoothRegistry {
     fun isTrusted(prefs: SharedPreferences, address: String): Boolean =
         read(prefs).any { it.address.equals(address, ignoreCase = true) }
 
-    fun revision(prefs: SharedPreferences): Long = prefs.getLong(KEY_REVISION, 0L)
+    fun revision(prefs: SharedPreferences): Long = runCatching { prefs.getLong(KEY_REVISION, 0L) }.getOrDefault(0L)
 
     /** Per-address generation prevents unrelated registry edits from canceling another device's timer. */
     fun deviceRevision(prefs: SharedPreferences, address: String): Long =
-        prefs.getLong(deviceRevisionKey(address), 0L)
+        runCatching { prefs.getLong(deviceRevisionKey(address), 0L) }.getOrDefault(0L)
 
     private fun deviceRevisionKey(address: String): String =
         "trusted_bluetooth_device_revision_v1_" + address.uppercase().replace(":", "_")
@@ -117,6 +124,9 @@ object TrustedBluetoothRegistry {
         .toList()
 
     private fun baselineAddresses(prefs: SharedPreferences): Set<String> =
-        prefs.getString(KEY_BASELINES, "").orEmpty().lineSequence()
-            .filter { it.isNotBlank() }.toSet()
+        runCatching { prefs.getString(KEY_BASELINES, "").orEmpty() }.getOrDefault("")
+            .lineSequence().filter { isValidAddress(it) }.toSet()
+
+    internal fun isValidAddress(address: String): Boolean =
+        Regex("(?i)^[0-9a-f]{2}(:[0-9a-f]{2}){5}$").matches(address)
 }
