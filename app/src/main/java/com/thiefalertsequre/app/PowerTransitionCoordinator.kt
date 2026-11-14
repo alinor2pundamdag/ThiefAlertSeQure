@@ -213,11 +213,13 @@ object PowerTransitionCoordinator {
     private fun isPendingCandidateCurrent(
         prefs: SharedPreferences,
         candidate: DisconnectCandidate
-    ): Boolean =
-        prefs.getBoolean(PENDING_DISCONNECT, false) &&
-            prefs.getLong(PENDING_GENERATION, -1L) == candidate.generation &&
-            prefs.getLong(GENERATION, -1L) == candidate.generation &&
-            !prefs.getBoolean(CONNECTED, true)
+    ): Boolean = PowerTransitionRecoveryPolicy.isCurrentCandidate(
+        pending = prefs.getBoolean(PENDING_DISCONNECT, false),
+        pendingGeneration = prefs.getLong(PENDING_GENERATION, -1L),
+        currentGeneration = prefs.getLong(GENERATION, -1L),
+        baselineConnected = prefs.getBoolean(CONNECTED, true)
+    ) && prefs.getLong(PENDING_GENERATION, -1L) == candidate.generation &&
+        candidate.generation == prefs.getLong(GENERATION, -1L)
 
     private fun notifyMonitorStateChanged(context: Context) {
         context.applicationContext.sendBroadcast(

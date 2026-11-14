@@ -5,6 +5,14 @@ package com.thiefalertsequre.app
  * the same boot. BOOT_COUNT strengthens this check when Android exposes it.
  */
 internal object PowerTransitionRecoveryPolicy {
+    fun isCurrentCandidate(
+        pending: Boolean,
+        pendingGeneration: Long,
+        currentGeneration: Long,
+        baselineConnected: Boolean
+    ): Boolean =
+        pending && pendingGeneration == currentGeneration && !baselineConnected
+
     fun isSameBoot(
         candidateBootCount: Int,
         currentBootCount: Int,
