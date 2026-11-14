@@ -20,7 +20,6 @@
     <img src="https://img.shields.io/badge/Version-1.1.3-1677D2" alt="Version 1.1.3" />
     <img src="https://img.shields.io/badge/Owner%20device%20tests-11%2F11%20PASS-2E8B57" alt="Owner-reported 11 of 11 physical test scenarios passed" />
     <img src="https://img.shields.io/badge/Updates-Owner--initiated%20GitHub%20releases-2D6CDF" alt="Owner initiated GitHub updates" />
-    <img src="https://img.shields.io/badge/License-See%20LICENSE-lightgrey" alt="License information" />
   </p>
 </div>
 
@@ -209,7 +208,7 @@ Build a debug APK and run unit tests:
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 ```
 
-Branch and pull-request GitHub Actions run unit tests, Android lint, asset validation, APK assembly, package/version verification, and debug-signer verification. They upload a development-only side-by-side test APK using package ID `com.thiefalertsequre.app.v113test`, so it can be installed alongside v1.1.2 without replacing the production app. The test APK is not eligible for official in-app updates. After merge, a manual release preflight can build and verify a permanent-key production APK without publishing; only a `v*` tag push publishes an official release after the permanent signing secrets, version monotonicity, package identity, tests, and pinned certificate all pass.
+Branch and pull-request GitHub Actions run unit tests, Android lint, asset validation, APK assembly, package/version verification, and debug-signer verification. They upload a development-only side-by-side test APK using package ID `com.thiefalertsequre.app.v114test`, version name `1.1.4-test`, and version code `6`. It is a debug-signed development build intended to install alongside the production package without replacing the production app. It cannot perform an in-place update of the production installation. The test APK is not eligible for official in-app updates. After merge, a manual release preflight can build and verify a permanent-key production APK without publishing; only a `v*` tag push publishes an official release after the permanent signing secrets, version monotonicity, package identity, tests, and pinned certificate all pass.
 
 A successful CI build confirms that the configured automated checks and APK assembly passed. It does **not** prove correct behavior on every physical phone. Charger broadcasts, alarm timing, sound output, reboot recovery, notifications, and manufacturer battery controls still require real-device testing.
 
