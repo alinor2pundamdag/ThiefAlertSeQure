@@ -24,10 +24,11 @@ The app stores only the operational information needed to provide its functions:
 - The previous alarm-stream volume while an alarm is active, so it can be restored after successful disarm.
 - A bounded local protection event history (up to 100 entries), which the owner can review or export as CSV.
 - Monitor preferences such as enablement, motion sensitivity and optional battery-alert threshold.
+- Names and Bluetooth hardware addresses (MAC addresses) of accessories the owner explicitly registers as trusted for A2, plus per-device connection-baseline state. These identifiers are stored in the app's private preferences and encrypted at rest with an AES-GCM key held by Android Keystore. They are used only for local trusted-device separation monitoring and are not uploaded or synced.
 - The owner's local preference for enabling or disabling the alarm flashlight.
 - URI references and Android read-access grants for owner-selected alarm and secondary-alert audio. The app stores references/permissions, not a second copy of the selected audio file.
 
-This information is stored in the app's private local preferences. The app does not upload it.
+This information is stored in the app's private local preferences. Trusted Bluetooth identifiers and baselines are encrypted at rest with Android Keystore; other operational preferences are stored in app-private storage. If Android Keystore data is invalidated or lost, encrypted trusted-device entries may become unreadable and the owner may need to register those accessories again. The app does not upload or cloud-sync this information.
 
 ## 3. Credentials and biometrics
 
