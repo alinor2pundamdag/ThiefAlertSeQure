@@ -172,7 +172,11 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew :app:assembleReleaseAndroidTest -PinstrumentationTestBuild=true --no-daemon --stacktrace
 
+      - name: Prepare Android emulator framework-readiness shim
+        run: bash .github/scripts/prepare-adb-readiness-wrapper.sh
+
       - name: Verify previous official APK upgrades in place without losing private data
+        timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
         env:
           GH_TOKEN: ${{ github.token }}

@@ -357,13 +357,18 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         with:
           cache-provider: basic
+      - name: Prepare Android emulator framework-readiness shim
+        run: bash .github/scripts/prepare-adb-readiness-wrapper.sh
+
       - name: Run Android instrumentation tests on API ${{ matrix.api-level }}
+        timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
           target: default
           arch: x86_64
           profile: pixel_2
+          emulator-boot-timeout: 900
           disable-animations: true
           script: |
             set -euo pipefail
