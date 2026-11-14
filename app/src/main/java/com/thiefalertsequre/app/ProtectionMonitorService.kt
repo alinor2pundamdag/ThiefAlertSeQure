@@ -453,6 +453,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
 
     /** Battery snapshots may retry an existing OS unplug event, but can never create one. */
     private fun retryPendingDisconnectFromBatterySnapshot() {
+        if (!PowerTransitionCoordinator.hasPendingDisconnectRetry(applicationContext)) return
         if (!disconnectRetryRunning.compareAndSet(false, true)) return
         Thread {
             try {
