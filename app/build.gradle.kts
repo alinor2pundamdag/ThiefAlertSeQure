@@ -3,8 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val appVersionCode = 5
-val appVersionName = "1.1.3"
+val appVersionCode = 6
+val appVersionName = "1.1.4"
 
 val releaseSigningReady = listOf(
     "ANDROID_KEYSTORE_PATH",
@@ -43,7 +43,13 @@ android {
 
         }
         getByName("release") {
-            isMinifyEnabled = false
+            // Harden only distributable builds; keep debug APKs readable for device diagnostics.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             // A release APK is signed only with the persistent owner-controlled key.
             if (releaseSigningReady) {
                 signingConfig = signingConfigs.getByName("release")
