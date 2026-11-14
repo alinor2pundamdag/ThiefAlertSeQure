@@ -70,6 +70,12 @@ class UpgradeDataPreservationTest {
                     "The monitor enabled preference must survive the in-place update",
                     monitorPrefs.getBoolean("monitor_enabled", false)
                 )
+                val restartDeadline = android.os.SystemClock.elapsedRealtime() + 15_000L
+                while (!monitorPrefs.getBoolean("monitor_running", false) &&
+                    android.os.SystemClock.elapsedRealtime() < restartDeadline
+                ) {
+                    android.os.SystemClock.sleep(250L)
+                }
                 assertTrue(
                     "The protection monitor must be restarted after package replacement",
                     monitorPrefs.getBoolean("monitor_running", false)

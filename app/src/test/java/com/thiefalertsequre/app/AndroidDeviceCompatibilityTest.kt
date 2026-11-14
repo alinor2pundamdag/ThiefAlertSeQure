@@ -152,4 +152,14 @@ class AndroidDeviceCompatibilityTest {
         assertEquals(null, OemBackgroundSetupPolicy.evaluate("Google", "Pixel"))
     }
 
+    @Test fun HONORSetupSummaryRetainsAllTenReadinessItems() {
+        val items = (1..9).map { index ->
+            SetupItem("item_$index", "Readiness $index", SetupState.UNKNOWN, "Manual check")
+        } + SetupItem(
+            "a2", "Trusted Bluetooth readiness", SetupState.UNKNOWN, "Reconnect trusted accessory"
+        )
+        val summary = SetupSnapshot(items).dashboardSummary()
+        assertTrue(summary.contains("Trusted Bluetooth readiness"))
+    }
+
 }

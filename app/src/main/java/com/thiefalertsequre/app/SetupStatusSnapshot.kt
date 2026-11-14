@@ -19,7 +19,7 @@ data class SetupItem(val id:String,val title:String,val state:SetupState,val det
 data class SetupSnapshot(val items:List<SetupItem>){
  fun dashboardSummary():String{
   val ok=items.count{it.state==SetupState.VERIFIED};val action=items.count{it.state==SetupState.ACTION_REQUIRED};val unknown=items.count{it.state==SetupState.UNKNOWN}
-  val rows=items.take(9).joinToString("\n"){ val mark=when(it.state){SetupState.VERIFIED->"✓";SetupState.ACTION_REQUIRED->"!";SetupState.NEUTRAL->"—";SetupState.UNSUPPORTED->"N/A";SetupState.UNKNOWN->"?"};"$mark ${it.title}: ${it.state.name.replace('_',' ')}" }
+  val rows=items.take(10).joinToString("\n"){ val mark=when(it.state){SetupState.VERIFIED->"✓";SetupState.ACTION_REQUIRED->"!";SetupState.NEUTRAL->"—";SetupState.UNSUPPORTED->"N/A";SetupState.UNKNOWN->"?"};"$mark ${it.title}: ${it.state.name.replace('_',' ')}" }
   return "ANDROID SETUP • $ok verified • $action need attention • $unknown unconfirmed\n$rows\nSee Settings → Verified Android setup status."
  }
 }
