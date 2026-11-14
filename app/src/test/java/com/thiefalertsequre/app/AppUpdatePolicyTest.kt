@@ -40,4 +40,16 @@ class AppUpdatePolicyTest {
             AppUpdatePolicy.requireNewerVersionCode(6L, 5L)
         }
     }
+    @Test fun updateRequiresDisarmedProtectionButDoesNotRequireMonitorOptOut() {
+        assertTrue(AppUpdatePolicy.canUpdateWhileProtectionDisarmed(ProtectionMode.DISARMED))
+        listOf(ProtectionMode.ARMED, ProtectionMode.COUNTDOWN, ProtectionMode.ALARM_TRIGGERED)
+            .forEach { mode ->
+                assertFalse(AppUpdatePolicy.canUpdateWhileProtectionDisarmed(mode))
+                assertThrows(IllegalArgumentException::class.java) {
+                    AppUpdatePolicy.requireSafeUpdateMode(mode)
+                }
+            }
+        AppUpdatePolicy.requireSafeUpdateMode(ProtectionMode.DISARMED)
+    }
+
 }

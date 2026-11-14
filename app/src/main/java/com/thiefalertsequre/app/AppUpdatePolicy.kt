@@ -19,6 +19,15 @@ internal object AppUpdatePolicy {
         }
     }
 
+    fun canUpdateWhileProtectionDisarmed(mode: ProtectionMode): Boolean =
+        mode == ProtectionMode.DISARMED
+
+    fun requireSafeUpdateMode(mode: ProtectionMode) {
+        require(canUpdateWhileProtectionDisarmed(mode)) {
+            "Disable protection and clear any active countdown or alarm before updating."
+        }
+    }
+
     fun requireNewerVersionCode(installedVersionCode: Long, candidateVersionCode: Long) {
         require(candidateVersionCode > installedVersionCode) {
             "The APK version code is not newer than the installed version."

@@ -61,12 +61,7 @@ object AppUpdateManager {
     private fun resolveLatestUpdate(context: Context): AppUpdateResult {
         AppUpdatePolicy.requireInstalledPackage(context.packageName)
         val protectionState = ProtectionStore(context).read()
-        val monitoringEnabled = context.getSharedPreferences(
-            ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
-        ).getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
-        require(protectionState.mode == ProtectionMode.DISARMED && !monitoringEnabled) {
-            "For safety, disable background monitoring and ensure no countdown or alarm is active before updating."
-        }
+        AppUpdatePolicy.requireSafeUpdateMode(protectionState.mode)
         require(installedSignerMatchesOfficialKey(context)) {
             "This installation does not use the official release signing key. A one-time migration is required before in-app updates can work."
         }

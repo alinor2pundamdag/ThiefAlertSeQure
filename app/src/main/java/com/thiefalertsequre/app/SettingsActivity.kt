@@ -396,17 +396,14 @@ class SettingsActivity : FragmentActivity() {
 
     private fun isSafeForAppUpdate(): Boolean {
         val state = ProtectionStore(this).read()
-        val monitoringEnabled = getSharedPreferences(
-            ProtectionMonitorService.PREFS, MODE_PRIVATE
-        ).getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
-        return state.mode == ProtectionMode.DISARMED && !monitoringEnabled
+        return AppUpdatePolicy.canUpdateWhileProtectionDisarmed(state.mode)
     }
 
     private fun checkForOfficialUpdate() {
         if (!isSafeForAppUpdate()) {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Disable protection before updating")
-                .setMessage("For safety, turn off background monitoring and make sure no countdown or alarm is active. Updating can restart the app process.")
+                .setMessage("For safety, protection must be DISARMED with no countdown or active alarm. If background monitoring was enabled, Android stops the old process during installation and the app attempts to restart the monitor after package replacement.")
                 .setPositiveButton("OK", null)
                 .showThemed(this)
             return
@@ -421,7 +418,7 @@ class SettingsActivity : FragmentActivity() {
                         .setTitle("Version \${result.versionName} is available")
                         .setMessage(
                             notes + "\n\nAndroid will ask you to confirm installation. " +
-                                "Because the package ID and official signing key match, this is an in-place update; your app data is retained."
+                                "Because the package ID and official signing key match, this is an in-place update; Android preserves app-private data. Any enabled background monitor is restored after package replacement."
                         )
                         .setNegativeButton("Later", null)
                         .setPositiveButton("Install update") { _, _ -> beginUpdateInstall(result.apkFile) }
@@ -441,7 +438,7 @@ class SettingsActivity : FragmentActivity() {
 
     private fun beginUpdateInstall(apkFile: File) {
         if (!isSafeForAppUpdate()) {
-            android.widget.Toast.makeText(this, "Update paused: disable background monitoring and clear any countdown/alarm first.", android.widget.Toast.LENGTH_LONG).show()
+            android.widget.Toast.makeText(this, "Update paused: disarm protection and clear any countdown/alarm first.", android.widget.Toast.LENGTH_LONG).show()
             return
         }
         if (!apkFile.isFile || apkFile.length() <= 0L) {
