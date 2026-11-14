@@ -2,46 +2,66 @@ package com.thiefalertsequre.app
 
 import android.content.SharedPreferences
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 
 data class TrustedBluetoothDevice(val address: String, val name: String)
 
 /**
- * Local allow-list for A2. This registry never pairs/unpairs devices; Android owns bonding.
- * Baselines are per-device and are intentionally cleared when the monitor service restarts.
+ * Local allow-list for A2. Android owns pairing; this registry only stores app trust.
+ * MAC addresses, names and connection baselines are encrypted at rest with Android Keystore.
+ * Plaintext v1 data is migrated on first read without changing trusted-device membership.
  */
 object TrustedBluetoothRegistry {
     const val KEY_DEVICES = "trusted_bluetooth_devices_v1"
-    private const val KEY_BASELINES = "trusted_bluetooth_baselines_v1"
+    internal const val KEY_BASELINES = "trusted_bluetooth_baselines_v1"
     private const val KEY_REVISION = "trusted_bluetooth_registry_revision_v1"
+    private const val DEVICE_REVISION_PREFIX = "trusted_bluetooth_device_revision_v1_"
 
     fun read(prefs: SharedPreferences): List<TrustedBluetoothDevice> {
         val raw = prefs.getString(KEY_DEVICES, null)
-        if (raw == null) {
-            val legacyAddress = prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null)
-            if (!legacyAddress.isNullOrBlank()) {
-                val legacyName = prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, null)
-                    ?.takeIf { it.isNotBlank() } ?: "Bluetooth accessory"
-                val migrated = listOf(TrustedBluetoothDevice(legacyAddress, legacyName))
-                prefs.edit().putString(KEY_DEVICES, encode(migrated)).putString(KEY_BASELINES, "").apply()
-                return migrated
-            }
-            return emptyList()
+        val legacyAddress = prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null)
+        val legacyName = prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, null)
+        val devices = if (raw == null) {
+            if (legacyAddress.isNullOrBlank()) emptyList()
+            else listOf(TrustedBluetoothDevice(legacyAddress, legacyName?.takeIf { it.isNotBlank() } ?: "Bluetooth accessory"))
+        } else {
+            decode(readOrMigratePayload(prefs, KEY_DEVICES, raw))
         }
-        return decode(raw)
+
+        val editor = prefs.edit()
+        var changed = false
+        if (raw == null && devices.isNotEmpty()) {
+            editor.putString(KEY_DEVICES, LocalPreferenceCipher.encrypt(KEY_DEVICES, encode(devices)))
+            if (!prefs.contains(KEY_BASELINES)) {
+                editor.putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, ""))
+            }
+            changed = true
+        }
+        if (prefs.contains(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS)) {
+            editor.remove(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS)
+            changed = true
+        }
+        if (prefs.contains(ProtectionMonitorService.KEY_BT_TRUSTED_NAME)) {
+            editor.remove(ProtectionMonitorService.KEY_BT_TRUSTED_NAME)
+            changed = true
+        }
+        if (changed) check(editor.commit()) { "Could not securely migrate trusted Bluetooth preferences." }
+        migrateLegacyDeviceRevisionKeys(prefs)
+        return devices
     }
 
     fun add(prefs: SharedPreferences, address: String, name: String): Boolean {
         if (address.isBlank()) return false
         val current = read(prefs).filterNot { it.address.equals(address, ignoreCase = true) }
+        val currentRevision = deviceRevision(prefs, address)
+        val baselines = baselineAddresses(prefs).filterNot { it.equals(address, ignoreCase = true) }
         val updated = (current + TrustedBluetoothDevice(address, name.ifBlank { "Bluetooth accessory" }))
             .sortedBy { it.name.lowercase() }
-        val baselines = baselineAddresses(prefs).filterNot { it.equals(address, ignoreCase = true) }
-        prefs.edit()
-            .putString(KEY_DEVICES, encode(updated))
-            .putString(KEY_BASELINES, baselines.joinToString("\n"))
-            .putLong(deviceRevisionKey(address), deviceRevision(prefs, address) + 1L)
-            .apply()
-        return true
+        return prefs.edit()
+            .putString(KEY_DEVICES, LocalPreferenceCipher.encrypt(KEY_DEVICES, encode(updated)))
+            .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, baselines.joinToString("\n")))
+            .putLong(deviceRevisionKey(address), currentRevision + 1L)
+            .commit()
     }
 
     /** Removes only the app's trust relationship. Android pairing is never modified. */
@@ -49,19 +69,19 @@ object TrustedBluetoothRegistry {
         val current = read(prefs)
         val updated = current.filterNot { it.address.equals(address, ignoreCase = true) }
         if (updated.size == current.size) return false
+        val currentRevision = deviceRevision(prefs, address)
         val baselines = baselineAddresses(prefs).filterNot { it.equals(address, ignoreCase = true) }
         val edit = prefs.edit()
-            .putString(KEY_DEVICES, encode(updated))
-            .putString(KEY_BASELINES, baselines.joinToString("\n"))
-            .putLong(deviceRevisionKey(address), deviceRevision(prefs, address) + 1L)
+            .putString(KEY_DEVICES, LocalPreferenceCipher.encrypt(KEY_DEVICES, encode(updated)))
+            .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, baselines.joinToString("\n")))
+            .putLong(deviceRevisionKey(address), currentRevision + 1L)
         if (updated.isEmpty()) {
             edit.putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
                 .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
                 .remove(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS)
                 .remove(ProtectionMonitorService.KEY_BT_TRUSTED_NAME)
         }
-        edit.apply()
-        return true
+        return edit.commit()
     }
 
     fun isTrusted(prefs: SharedPreferences, address: String): Boolean =
@@ -70,11 +90,39 @@ object TrustedBluetoothRegistry {
     fun revision(prefs: SharedPreferences): Long = prefs.getLong(KEY_REVISION, 0L)
 
     /** Per-address generation prevents unrelated registry edits from canceling another device's timer. */
-    fun deviceRevision(prefs: SharedPreferences, address: String): Long =
-        prefs.getLong(deviceRevisionKey(address), 0L)
+    fun deviceRevision(prefs: SharedPreferences, address: String): Long {
+        val key = deviceRevisionKey(address)
+        if (prefs.contains(key)) return prefs.getLong(key, 0L)
+        val legacyKey = legacyDeviceRevisionKey(address)
+        if (!prefs.contains(legacyKey)) return 0L
+        val previous = prefs.getLong(legacyKey, 0L)
+        check(prefs.edit().putLong(key, previous).remove(legacyKey).commit()) {
+            "Could not securely migrate a trusted-device revision."
+        }
+        return previous
+    }
 
     private fun deviceRevisionKey(address: String): String =
-        "trusted_bluetooth_device_revision_v1_" + address.uppercase().replace(":", "_")
+        DEVICE_REVISION_PREFIX + sha256(address.trim().uppercase())
+
+    private fun legacyDeviceRevisionKey(address: String): String =
+        DEVICE_REVISION_PREFIX + address.trim().uppercase().replace(":", "_")
+
+    private fun migrateLegacyDeviceRevisionKeys(prefs: SharedPreferences) {
+        val legacyKeys = prefs.all.keys.filter { key ->
+            if (!key.startsWith(DEVICE_REVISION_PREFIX)) return@filter false
+            key.removePrefix(DEVICE_REVISION_PREFIX).matches(Regex("(?i)([0-9a-f]{2}_){5}[0-9a-f]{2}"))
+        }
+        if (legacyKeys.isEmpty()) return
+        val edit = prefs.edit()
+        legacyKeys.forEach { oldKey ->
+            val address = oldKey.removePrefix(DEVICE_REVISION_PREFIX).replace("_", ":")
+            val newKey = deviceRevisionKey(address)
+            if (!prefs.contains(newKey)) edit.putLong(newKey, prefs.getLong(oldKey, 0L))
+            edit.remove(oldKey)
+        }
+        check(edit.commit()) { "Could not securely migrate trusted-device revision keys." }
+    }
 
     fun isBaselineConnected(prefs: SharedPreferences, address: String): Boolean =
         baselineAddresses(prefs).any { it.equals(address, ignoreCase = true) }
@@ -84,18 +132,36 @@ object TrustedBluetoothRegistry {
         val hadBaseline = old.any { it.equals(address, ignoreCase = true) }
         val updated = old.filterNot { it.equals(address, ignoreCase = true) }.toMutableSet()
         if (connected && isTrusted(prefs, address)) updated.add(address)
-        prefs.edit().putString(KEY_BASELINES, updated.joinToString("\n")).apply()
-        return hadBaseline
+        val committed = prefs.edit()
+            .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, updated.joinToString("\n")))
+            .commit()
+        return committed && hadBaseline
     }
 
     fun clearBaselines(prefs: SharedPreferences) {
-        // Invalidate queued 8-second callbacks when A2 is disabled, re-enabled, or restarted.
-        prefs.edit()
-            .putString(KEY_BASELINES, "")
+        check(prefs.edit()
+            .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, ""))
             .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
             .putLong(KEY_REVISION, revision(prefs) + 1L)
-            .apply()
+            .commit()) { "Could not securely clear trusted Bluetooth baselines." }
     }
+
+    private fun baselineAddresses(prefs: SharedPreferences): Set<String> {
+        val raw = prefs.getString(KEY_BASELINES, null) ?: return emptySet()
+        return readOrMigratePayload(prefs, KEY_BASELINES, raw).lineSequence()
+            .filter { it.isNotBlank() }.toSet()
+    }
+
+    private fun readOrMigratePayload(prefs: SharedPreferences, key: String, raw: String): String {
+        if (LocalPreferenceCipher.isEncrypted(raw)) return LocalPreferenceCipher.decrypt(key, raw)
+        val encrypted = LocalPreferenceCipher.encrypt(key, raw)
+        check(prefs.edit().putString(key, encrypted).commit()) { "Could not securely migrate legacy trusted Bluetooth data." }
+        return raw
+    }
+
+    private fun sha256(value: String): String =
+        MessageDigest.getInstance("SHA-256").digest(value.toByteArray(StandardCharsets.UTF_8))
+            .joinToString("") { byte -> "%02x".format(byte) }
 
     private const val BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
@@ -156,8 +222,4 @@ object TrustedBluetoothRegistry {
         }
         .distinctBy { it.address.lowercase() }
         .toList()
-
-    private fun baselineAddresses(prefs: SharedPreferences): Set<String> =
-        prefs.getString(KEY_BASELINES, "").orEmpty().lineSequence()
-            .filter { it.isNotBlank() }.toSet()
 }
