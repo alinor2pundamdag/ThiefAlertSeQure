@@ -65,6 +65,7 @@ class AlarmService : Service() {
             // Promote immediately before locking the device; lockNow() may
             // turn the display off and must not delay the FGS startup deadline.
             startForeground(NOTIFICATION_ID, notification())
+            AlarmRecoveryNotice.cancel(this)
             val alarmStartedAt = ProtectionStore(this).read().changedAtEpochMs
             lockDeviceIfAdminEnabled(alarmStartedAt)
             LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active; device-lock request issued")
