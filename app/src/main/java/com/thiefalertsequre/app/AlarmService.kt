@@ -57,7 +57,12 @@ class AlarmService : Service() {
         if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED) {
             LocalTamperHistory.record(this, "alarm_service_rejected", "Protection state was not ALARM_TRIGGERED")
             stopAlarm()
-            stopForeground(STOP_FOREGROUND_REMOVE)
+            if (Build.VERSION.SDK_INT >= 24) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
             stopSelf()
             return START_NOT_STICKY
         }
