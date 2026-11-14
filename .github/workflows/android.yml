@@ -208,6 +208,20 @@ jobs:
               )
           PY
 
+      - name: Verify minified release build
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew :app:lintRelease :app:assembleRelease --no-daemon --stacktrace
+          RELEASE_APK="app/build/outputs/apk/release/app-release.apk"
+          test -s "$RELEASE_APK"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          BADGING="$("$BUILD_TOOLS/aapt" dump badging "$RELEASE_APK")"
+          PACKAGE_LINE="$(printf '%s\\n' "$BADGING" | grep -m1 "^package:")"
+          echo "Minified release candidate: $PACKAGE_LINE"
+          [[ "$PACKAGE_LINE" == *"name='com.thiefalertsequre.app'"* ]]
+          [[ "$PACKAGE_LINE" == *"versionCode='6'"* ]]
+          [[ "$PACKAGE_LINE" == *"versionName='1.1.4'"* ]]
       - name: Verify APK package, version, and signer
         shell: bash
         run: |
