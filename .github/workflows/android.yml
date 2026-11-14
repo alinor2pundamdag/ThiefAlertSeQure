@@ -129,13 +129,13 @@ jobs:
           VERSION_NAME="$(sed -n 's/^val appVersionName = "\([^"]*\)"$/\1/p' app/build.gradle.kts | head -n 1)"
           test -n "$VERSION_CODE"
           test -n "$VERSION_NAME"
+          # Preserve the production baseline before applying the debug-only override.
+          echo "RELEASE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "RELEASE_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           if [[ "$RELEASE_SIGNING_CONFIGURED" != "true" ]]; then
             VERSION_CODE=6
             VERSION_NAME="1.1.4-test"
           fi
-          # Keep the production Gradle baseline separate from the debug-test override.
-          echo "RELEASE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
-          echo "RELEASE_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           echo "APP_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "APP_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           echo "Building application version $VERSION_NAME ($VERSION_CODE)"
