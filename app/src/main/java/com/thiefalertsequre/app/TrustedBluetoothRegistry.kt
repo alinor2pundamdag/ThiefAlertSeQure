@@ -163,10 +163,19 @@ object TrustedBluetoothRegistry {
     }
 
     private fun baselineAddresses(prefs: SharedPreferences): Set<String> {
-        val raw = runCatching { prefs.getString(KEY_BASELINES, null) }.getOrNull() ?: return emptySet()
-        val plaintext = runCatching { readOrMigratePayload(prefs, KEY_BASELINES, raw) }.getOrNull()
-            ?: return emptySet()
-        return plaintext.lineSequence().filter { isValidAddress(it) }.toSet()
+        val rawResult = runCatching { prefs.getString(KEY_BASELINES, null) }
+        if (rawResult.isFailure) {
+            disableA2AndInvalidateBaselines(prefs)
+            return emptySet()
+        }
+        val raw = rawResult.getOrNull() ?: return emptySet()
+        val plaintextResult = runCatching { readOrMigratePayload(prefs, KEY_BASELINES, raw) }
+        if (plaintextResult.isFailure) {
+            disableA2AndInvalidateBaselines(prefs)
+            return emptySet()
+        }
+        return plaintextResult.getOrNull().orEmpty().lineSequence()
+            .filter { isValidAddress(it) }.toSet()
     }
 
     private fun readOrMigratePayload(prefs: SharedPreferences, key: String, raw: String): String {
