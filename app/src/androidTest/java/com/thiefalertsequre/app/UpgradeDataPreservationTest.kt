@@ -14,6 +14,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class UpgradeDataPreservationTest {
     @Test
+    @Suppress("NewApi", "DEPRECATION")
     fun upgradeDataCanBeSeededOrVerifiedAcrossPackageReplacement() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
@@ -68,6 +69,10 @@ class UpgradeDataPreservationTest {
                 assertTrue(
                     "The monitor enabled preference must survive the in-place update",
                     monitorPrefs.getBoolean("monitor_enabled", false)
+                )
+                assertTrue(
+                    "The protection monitor must be restarted after package replacement",
+                    monitorPrefs.getBoolean("monitor_running", false)
                 )
             }
             else -> {
