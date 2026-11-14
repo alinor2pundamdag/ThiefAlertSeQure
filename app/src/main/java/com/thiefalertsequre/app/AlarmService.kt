@@ -244,32 +244,41 @@ class AlarmService : Service() {
 
     /** Force the keyguard before presenting the full-screen owner-authentication activity. */
     private fun lockDeviceIfAdminEnabled(alarmStartedAtEpochMs: Long) {
-        val manager = getSystemService(DevicePolicyManager::class.java)
-        val admin = ComponentName(this, ThiefAlertAdminReceiver::class.java)
-        val lockPrefs = getSharedPreferences("alarm_service_lock_v1", MODE_PRIVATE)
-        if (alarmStartedAtEpochMs > 0L &&
-            lockPrefs.getLong(KEY_LOCK_REQUESTED_FOR_ALARM_AT, 0L) == alarmStartedAtEpochMs
-        ) {
-            // Service starts may be repeated while the same alarm is active. Never
-            // re-lock a phone the owner has already unlocked for this alarm episode.
-            return
-        }
-        if (!getSystemService(android.app.KeyguardManager::class.java).isDeviceSecure) {
-            LocalTamperHistory.record(this, "automatic_screen_lock_unavailable", "No secure device PIN, pattern or password is configured")
-            return
-        }
-        if (!manager.isAdminActive(admin)) {
-            LocalTamperHistory.record(this, "automatic_screen_lock_unavailable", "Device administrator has not been activated")
-            return
-        }
-        runCatching {
+        // Device locking is an optional secondary response. Corrupt preferences,
+        // missing admin access, or OEM policy must never stop the audible alarm.
+        try {
+            val manager = getSystemService(DevicePolicyManager::class.java)
+            val keyguard = getSystemService(android.app.KeyguardManager::class.java)
+            val admin = ComponentName(this, ThiefAlertAdminReceiver::class.java)
+            val lockPrefs = getSharedPreferences("alarm_service_lock_v1", MODE_PRIVATE)
+            val previouslyRequested = runCatching {
+                lockPrefs.getLong(KEY_LOCK_REQUESTED_FOR_ALARM_AT, 0L)
+            }.getOrDefault(0L)
+            if (alarmStartedAtEpochMs > 0L && previouslyRequested == alarmStartedAtEpochMs) {
+                // Service starts may repeat during one alarm episode. Do not re-lock
+                // a phone the owner has already unlocked for this same alarm.
+                return
+            }
+            if (!keyguard.isDeviceSecure) {
+                LocalTamperHistory.record(this, "automatic_screen_lock_unavailable", "No secure device PIN, pattern or password is configured")
+                return
+            }
+            if (!manager.isAdminActive(admin)) {
+                LocalTamperHistory.record(this, "automatic_screen_lock_unavailable", "Device administrator has not been activated")
+                return
+            }
             manager.lockNow()
-            if (alarmStartedAtEpochMs > 0L) {
-                lockPrefs.edit().putLong(KEY_LOCK_REQUESTED_FOR_ALARM_AT, alarmStartedAtEpochMs).apply()
+            if (alarmStartedAtEpochMs > 0L &&
+                !lockPrefs.edit().putLong(KEY_LOCK_REQUESTED_FOR_ALARM_AT, alarmStartedAtEpochMs).commit()
+            ) {
+                LocalTamperHistory.record(this, "automatic_screen_lock_state_not_saved", "Device was locked, but the once-per-alarm marker could not be persisted")
             }
             LocalTamperHistory.record(this, "automatic_screen_lock_requested", "Screen lock requested once for this alarm episode")
-        }.onFailure {
-            LocalTamperHistory.record(this, "automatic_screen_lock_failed", it.javaClass.simpleName + ": " + it.message)
+        } catch (error: Exception) {
+            // Never let a failed optional lock request abort alarm audio/vibration.
+            runCatching {
+                LocalTamperHistory.record(this, "automatic_screen_lock_failed", error.javaClass.simpleName + ": " + error.message)
+            }
         }
     }
 
