@@ -189,8 +189,8 @@ jobs:
           script: |
             set -euo pipefail
             test -n "$PREVIOUS_RELEASE_TAG"
-            PREVIOUS_DIR="$RUNNER_TEMP/previous-release"
-            mkdir -p "$PREVIOUS_DIR"
+            PREVIOUS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/thiefalert-previous-release.XXXXXX")"
+            test -d "$PREVIOUS_DIR"
             gh release download "$PREVIOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
               --pattern "ThiefAlertSeQure-$PREVIOUS_RELEASE_TAG-release.apk*" --dir "$PREVIOUS_DIR"
             PREVIOUS_APK="$PREVIOUS_DIR/ThiefAlertSeQure-$PREVIOUS_RELEASE_TAG-release.apk"
@@ -226,9 +226,9 @@ jobs:
             TEST_CERT="$("$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$TEST_APK" | sed -n 's/.*SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
             if [[ "$TEST_CERT" != "$EXPECTED_CERT" ]]; then
               echo "Re-signing the private regression test APK with the verified production certificate."
-              UNSIGNED_TEST_APK="$RUNNER_TEMP/release-test-unsigned.apk"
-              ALIGNED_TEST_APK="$RUNNER_TEMP/release-test-aligned.apk"
-              SIGNED_TEST_APK="$RUNNER_TEMP/release-test-signed.apk"
+              UNSIGNED_TEST_APK="$PREVIOUS_DIR/release-test-unsigned.apk"
+              ALIGNED_TEST_APK="$PREVIOUS_DIR/release-test-aligned.apk"
+              SIGNED_TEST_APK="$PREVIOUS_DIR/release-test-signed.apk"
               cp "$TEST_APK" "$UNSIGNED_TEST_APK"
               zip -q -d "$UNSIGNED_TEST_APK" 'META-INF/*.SF' 'META-INF/*.RSA' 'META-INF/*.DSA' 'META-INF/*.EC' || true
               "$BUILD_TOOLS/zipalign" -f -p 4 "$UNSIGNED_TEST_APK" "$ALIGNED_TEST_APK"
