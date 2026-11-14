@@ -208,7 +208,7 @@ jobs:
               )
           PY
 
-      - name: Verify production-baseline release build
+      - name: Verify minified release build without mislabeling test signing
         shell: bash
         run: |
           set -euo pipefail
@@ -217,11 +217,18 @@ jobs:
           test -s "$RELEASE_APK"
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           BADGING="$("$BUILD_TOOLS/aapt" dump badging "$RELEASE_APK")"
-          PACKAGE_LINE="$(printf '%s\n' "$BADGING" | grep -m1 "^package:")"
-          echo "Production-baseline release variant: $PACKAGE_LINE"
+          PACKAGE_LINE="$(printf '%s\\n' "$BADGING" | grep -m1 "^package:")"
+          echo "Minified release build metadata: $PACKAGE_LINE"
           [[ "$PACKAGE_LINE" == *"name='com.thiefalertsequre.app'"* ]]
           [[ "$PACKAGE_LINE" == *"versionCode='5'"* ]]
           [[ "$PACKAGE_LINE" == *"versionName='1.1.3'"* ]]
+          if [[ "$RELEASE_SIGNING_CONFIGURED" == "true" ]]; then
+            echo "Permanent release signing is configured; signer verification follows."
+          else
+            echo "::notice::Release APK is unsigned because permanent owner signing secrets are not configured. This is a build/minification check only, not a distributable production APK."
+            echo "Production artifact upload remains disabled for this branch."
+          fi
+
       - name: Verify APK package, version, and signer
         shell: bash
         run: |
