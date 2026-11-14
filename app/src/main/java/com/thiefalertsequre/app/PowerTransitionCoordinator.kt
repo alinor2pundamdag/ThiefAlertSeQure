@@ -176,6 +176,14 @@ object PowerTransitionCoordinator {
 
     fun onPowerConnected(context: Context): ProtectionState {
         val appContext = context.applicationContext
+        // A newer OS connect event invalidates any pending disconnect retry immediately,
+        // even if its first battery snapshots are stale. The event cannot arm protection
+        // until live connected-state confirmation succeeds below.
+        synchronized(lock) {
+            clearPendingDisconnectLocked(appContext)
+            val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            prefs.edit().putLong(GENERATION, prefs.getLong(GENERATION, 0L) + 1L).commit()
+        }
         // Keep a five-read window so one or two stale snapshots after the OS
         // broadcast do not reject a real reconnect. Three consecutive positives
         // are enough; 100 ms spacing bounds normal confirmation to about 400 ms.
@@ -381,8 +389,8 @@ object PowerTransitionCoordinator {
                     old, eventEpochMs, eventElapsedRealtimeMs, eventBootCount
                 ) else old
             }
+            clearPendingDisconnectLocked(appContext)
             if (next.mode == ProtectionMode.COUNTDOWN) {
-                clearPendingDisconnectLocked(appContext)
                 AlarmScheduler.schedule(appContext, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
                 LocalTamperHistory.record(appContext, "charger_countdown_started", "OS unplug event confirmed by five reads, including three consecutive disconnected samples, and a final live-state read")
                 notifyMonitorStateChanged(appContext)
