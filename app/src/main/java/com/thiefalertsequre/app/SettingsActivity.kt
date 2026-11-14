@@ -267,7 +267,11 @@ class SettingsActivity : FragmentActivity() {
                 runCatching {
                     ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
                 }.onFailure {
-                    android.widget.Toast.makeText(this, "Monitor could not start: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+                    monitorPrefs.edit()
+                        .putBoolean(ProtectionMonitorService.KEY_ENABLED, false)
+                        .putBoolean(ProtectionMonitorService.KEY_RUNNING, false)
+                        .apply()
+                    android.widget.Toast.makeText(this, "Monitor could not start; monitoring remains OFF: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
                 }
             } else if (!enabled) {
                 // Explicit owner opt-out stops pending charger countdowns too,
@@ -330,7 +334,12 @@ class SettingsActivity : FragmentActivity() {
                     runCatching {
                         ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
                     }.onFailure {
-                        android.widget.Toast.makeText(this, "Battery monitor could not start: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+                        monitorPrefs.edit()
+                            .putBoolean(ProtectionMonitorService.KEY_ENABLED, false)
+                            .putBoolean(ProtectionMonitorService.KEY_RUNNING, false)
+                            .putBoolean(ProtectionMonitorService.KEY_BATTERY_ALERT_ENABLED, false)
+                            .apply()
+                        android.widget.Toast.makeText(this, "Battery alert and monitoring were turned OFF because the monitor could not start: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
                     }
                 }
             }
