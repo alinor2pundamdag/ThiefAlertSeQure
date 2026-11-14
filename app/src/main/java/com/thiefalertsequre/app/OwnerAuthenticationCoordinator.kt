@@ -20,6 +20,7 @@ object OwnerAuthenticationCoordinator {
         }
         if (authenticated.mode != ProtectionMode.DISARMED) return null
 
+        AlarmRecoveryNotice.cancel(appContext)
         store.resetAuthenticationFailures()
         runCatching { AlarmScheduler.cancel(appContext) }.onFailure {
             LocalTamperHistory.record(appContext, "deadline_cancel_after_auth_failed", it.javaClass.simpleName + ": " + it.message)
