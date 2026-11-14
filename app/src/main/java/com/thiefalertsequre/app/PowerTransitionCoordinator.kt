@@ -130,9 +130,21 @@ object PowerTransitionCoordinator {
                     .putBoolean(CONNECTED, false)
                     .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
                     .putLong(GENERATION, generation)
+                    .putBoolean(PENDING_DISCONNECT, false)
+                    .remove(PENDING_EPOCH_MS)
+                    .remove(PENDING_ELAPSED_MS)
+                    .remove(PENDING_BOOT_COUNT)
+                    .remove(PENDING_GENERATION)
                     .commit()
             } else {
-                prefs.edit().putLong(GENERATION, generation).commit()
+                prefs.edit()
+                    .putLong(GENERATION, generation)
+                    .putBoolean(PENDING_DISCONNECT, false)
+                    .remove(PENDING_EPOCH_MS)
+                    .remove(PENDING_ELAPSED_MS)
+                    .remove(PENDING_BOOT_COUNT)
+                    .remove(PENDING_GENERATION)
+                    .commit()
             }
             LocalTamperHistory.record(context, "power_baseline_unknown", "$reason; no new transition accepted until a reliable power state is available")
             return@synchronized
@@ -459,8 +471,8 @@ object PowerTransitionCoordinator {
             if (current.mode == ProtectionMode.COUNTDOWN) {
                 // A process may have died after the state write but before the
                 // pending-event marker was cleared. Resume the existing deadline.
-                clearPendingDisconnectLocked(prefs)
                 AlarmScheduler.schedule(context, current.deadlineEpochMs, current.deadlineElapsedRealtimeMs, current.bootCount)
+                clearPendingDisconnectLocked(prefs)
                 return@synchronized current
             }
             if (current.mode != ProtectionMode.ARMED) {
@@ -478,8 +490,8 @@ object PowerTransitionCoordinator {
                 ) else old
             }
             if (next.mode == ProtectionMode.COUNTDOWN) {
-                clearPendingDisconnectLocked(prefs)
                 AlarmScheduler.schedule(context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
+                clearPendingDisconnectLocked(prefs)
                 LocalTamperHistory.record(context, "charger_countdown_started", "OS unplug event confirmed by stable live-state samples; recovered candidates retain their original event time")
                 notifyMonitorStateChanged(context)
             } else if (next.mode != ProtectionMode.ARMED) {
