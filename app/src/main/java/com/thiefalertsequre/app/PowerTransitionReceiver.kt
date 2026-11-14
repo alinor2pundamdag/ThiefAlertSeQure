@@ -7,8 +7,21 @@ import java.util.concurrent.Executors
 
 class PowerTransitionReceiver : BroadcastReceiver() {
     companion object {
-        // Preserve event order across CONNECTED and DISCONNECTED work.
+        // Preserve event order across CONNECTED, DISCONNECTED and restart recovery work.
         private val powerEventExecutor = Executors.newSingleThreadExecutor()
+
+        fun enqueuePendingRecovery(context: Context) {
+            try {
+                powerEventExecutor.execute {
+                    PowerTransitionCoordinator.recoverPendingDisconnectCandidate(context.applicationContext)
+                }
+            } catch (error: Exception) {
+                LocalTamperHistory.record(
+                    context, "pending_unplug_recovery_queue_failed",
+                    error.javaClass.simpleName + ": " + error.message
+                )
+            }
+        }
     }
     override fun onReceive(context: Context, intent: Intent?) {
         val action = intent?.action ?: return

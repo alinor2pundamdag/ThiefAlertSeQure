@@ -93,10 +93,8 @@ class BootReceiver : BroadcastReceiver() {
 
     private fun enforceMonitorOptOut(context: Context): ProtectionState {
         if (monitorEnabled(context)) return ProtectionStore(context).read()
-        return ProtectionStore(context).update { current ->
-            if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
-            else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
-        }
+        PowerTransitionCoordinator.resetBaselineToCurrentPower(context, "Protection monitor is disabled")
+        return ProtectionStore(context).read()
     }
 
     private fun monitorEnabled(context: Context): Boolean =
