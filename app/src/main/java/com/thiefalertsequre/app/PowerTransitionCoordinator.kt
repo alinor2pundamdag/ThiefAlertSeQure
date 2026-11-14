@@ -18,6 +18,15 @@ object PowerTransitionCoordinator {
     private const val PENDING_EVENT_BOOT = "pending_disconnect_event_boot"
     private val lock = Any()
 
+    private fun booleanPref(prefs: android.content.SharedPreferences, key: String, default: Boolean) =
+        runCatching { prefs.getBoolean(key, default) }.getOrDefault(default)
+
+    private fun intPref(prefs: android.content.SharedPreferences, key: String, default: Int) =
+        runCatching { prefs.getInt(key, default) }.getOrDefault(default)
+
+    private fun longPref(prefs: android.content.SharedPreferences, key: String, default: Long) =
+        runCatching { prefs.getLong(key, default) }.getOrDefault(default)
+
     internal fun acceptsPowerConnectedEvent(liveConnected: Boolean?): Boolean = liveConnected == true
 
     fun initializeBaseline(context: Context, forceBootReconciliation: Boolean = false) = synchronized(lock) {
@@ -26,9 +35,9 @@ object PowerTransitionCoordinator {
 
     private fun initializeBaselineLocked(context: Context, forceBootReconciliation: Boolean = false) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val baselineKnown = prefs.getBoolean(KNOWN, false)
+        val baselineKnown = booleanPref(prefs, KNOWN, false)
         val currentBoot = ProtectionClock.bootCount(context)
-        val priorBoot = prefs.getInt(BASELINE_BOOT_COUNT, -1)
+        val priorBoot = intPref(prefs, BASELINE_BOOT_COUNT, -1)
         val newBoot = forceBootReconciliation || (currentBoot >= 0 && currentBoot != priorBoot)
         if (newBoot) clearPendingDisconnectLocked(context)
 
@@ -56,7 +65,7 @@ object PowerTransitionCoordinator {
                 .putBoolean(CONNECTED, false)
                 .putBoolean(KNOWN, true)
                 .putInt(BASELINE_BOOT_COUNT, currentBoot)
-                .putLong(GENERATION, prefs.getLong(GENERATION, 0L) + 1L)
+                .putLong(GENERATION, longPref(prefs, GENERATION, 0L) + 1L)
                 .commit()
             LocalTamperHistory.record(
                 context, "power_baseline_unknown_after_boot",
@@ -73,7 +82,7 @@ object PowerTransitionCoordinator {
                 .putBoolean(CONNECTED, connected)
                 .putBoolean(KNOWN, true)
                 .putInt(BASELINE_BOOT_COUNT, currentBoot)
-                .putLong(GENERATION, prefs.getLong(GENERATION, 0L) + 1L)
+                .putLong(GENERATION, longPref(prefs, GENERATION, 0L) + 1L)
                 .commit()
             LocalTamperHistory.record(
                 context,
@@ -102,7 +111,7 @@ object PowerTransitionCoordinator {
     fun resetBaselineToCurrentPower(context: Context, reason: String) = synchronized(lock) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val connected = ExternalPowerState.readConnected(context)
-        val generation = prefs.getLong(GENERATION, 0L) + 1L
+        val generation = longPref(prefs, GENERATION, 0L) + 1L
         if (connected == null) {
             // Preserve an already-valid countdown; clearing KNOWN would make
             // first-run migration discard it on the monitor's next startup.
@@ -151,8 +160,8 @@ object PowerTransitionCoordinator {
      */
     private fun restoreDisconnectCandidateLocked(context: Context, expectedGeneration: Long) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (prefs.getLong(GENERATION, -1L) != expectedGeneration ||
-            prefs.getBoolean(CONNECTED, true)
+        if (longPref(prefs, GENERATION, -1L) != expectedGeneration ||
+            booleanPref(prefs, CONNECTED, true)
         ) return
         prefs.edit()
             .putBoolean(CONNECTED, true)
@@ -183,7 +192,7 @@ object PowerTransitionCoordinator {
         synchronized(lock) {
             clearPendingDisconnectLocked(appContext)
             val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            prefs.edit().putLong(GENERATION, prefs.getLong(GENERATION, 0L) + 1L).commit()
+            prefs.edit().putLong(GENERATION, longPref(prefs, GENERATION, 0L) + 1L).commit()
         }
         // Keep a five-read window so one or two stale snapshots after the OS
         // broadcast do not reject a real reconnect. Three consecutive positives
@@ -219,13 +228,13 @@ object PowerTransitionCoordinator {
         val appContext = context.applicationContext
         val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (!PowerTransitionRecoveryPolicy.shouldRetry(
-                prefs.getBoolean(PENDING_DISCONNECT, false),
+                booleanPref(prefs, PENDING_DISCONNECT, false),
                 ExternalPowerState.readConnected(appContext)
             )
         ) return ProtectionStore(appContext).read()
-        val epoch = prefs.getLong(PENDING_EVENT_EPOCH, 0L)
-        val elapsed = prefs.getLong(PENDING_EVENT_ELAPSED, 0L)
-        val boot = prefs.getInt(PENDING_EVENT_BOOT, -1)
+        val epoch = runCatching { prefs.getLong(PENDING_EVENT_EPOCH, 0L) }.getOrDefault(0L)
+        val elapsed = runCatching { prefs.getLong(PENDING_EVENT_ELAPSED, 0L) }.getOrDefault(0L)
+        val boot = runCatching { prefs.getInt(PENDING_EVENT_BOOT, -1) }.getOrDefault(-1)
         if (epoch <= 0L || elapsed <= 0L) {
             synchronized(lock) { clearPendingDisconnectLocked(appContext) }
             return ProtectionStore(appContext).read()
@@ -246,7 +255,7 @@ object PowerTransitionCoordinator {
             .putBoolean(CONNECTED, true)
             .putBoolean(KNOWN, true)
             .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
-            .putLong(GENERATION, prefs.getLong(GENERATION, 0L) + 1L)
+            .putLong(GENERATION, longPref(prefs, GENERATION, 0L) + 1L)
             .commit()
 
         val monitorEnabled = context.getSharedPreferences(
@@ -287,10 +296,10 @@ object PowerTransitionCoordinator {
         val candidateGeneration = synchronized(lock) {
             val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val currentBoot = ProtectionClock.bootCount(appContext)
-            val priorBoot = prefs.getInt(BASELINE_BOOT_COUNT, -1)
+            val priorBoot = intPref(prefs, BASELINE_BOOT_COUNT, -1)
             val bootChanged = currentBoot >= 0 && currentBoot != priorBoot
             val eventFromDifferentBoot = currentBoot >= 0 && eventBootCount >= 0 && currentBoot != eventBootCount
-            if (!prefs.getBoolean(KNOWN, false) || bootChanged || eventFromDifferentBoot) {
+            if (!booleanPref(prefs, KNOWN, false) || bootChanged || eventFromDifferentBoot) {
                 clearPendingDisconnectLocked(appContext)
                 initializeBaselineLocked(appContext)
                 LocalTamperHistory.record(
@@ -302,7 +311,7 @@ object PowerTransitionCoordinator {
             // Do not reject on the first live snapshot: some devices update
             // ACTION_BATTERY_CHANGED just after ACTION_POWER_DISCONNECTED.
             // Five reads with three consecutive negatives plus a final live read are authoritative.
-            if (!prefs.getBoolean(CONNECTED, false)) {
+            if (!booleanPref(prefs, CONNECTED, false)) {
                 clearPendingDisconnectLocked(appContext)
                 LocalTamperHistory.record(
                     appContext, "charger_unplug_rejected",
@@ -310,7 +319,7 @@ object PowerTransitionCoordinator {
                 )
                 return@synchronized null
             }
-            val nextGeneration = prefs.getLong(GENERATION, 0L) + 1L
+            val nextGeneration = longPref(prefs, GENERATION, 0L) + 1L
             prefs.edit()
                 .putBoolean(CONNECTED, false)
                 .putLong(GENERATION, nextGeneration)
@@ -359,8 +368,8 @@ object PowerTransitionCoordinator {
 
         return synchronized(lock) {
             val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            if (prefs.getLong(GENERATION, -1L) != candidateGeneration ||
-                prefs.getBoolean(CONNECTED, true)
+            if (longPref(prefs, GENERATION, -1L) != candidateGeneration ||
+                booleanPref(prefs, CONNECTED, true)
             ) {
                 LocalTamperHistory.record(appContext, "stale_power_candidate_rejected", "A newer power event superseded this unplug candidate")
                 return@synchronized ProtectionStore(appContext).read()
