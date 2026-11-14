@@ -1,6 +1,5 @@
 package com.thiefalertsequre.app
 
-import android.os.Build
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -155,7 +154,6 @@ object RootCapabilityInspector {
         }
     }
     private fun waitForProcess(process: Process, timeoutSeconds: Long): Boolean {
-        if (Build.VERSION.SDK_INT >= 26) return process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
         val waiter = Thread { runCatching { process.waitFor() } }.apply { isDaemon = true; start() }
         waiter.join(TimeUnit.SECONDS.toMillis(timeoutSeconds))
         if (waiter.isAlive) {
@@ -167,8 +165,7 @@ object RootCapabilityInspector {
     }
 
     private fun terminateProcess(process: Process) {
-        if (Build.VERSION.SDK_INT >= 26) runCatching { process.destroyForcibly() }
-        else runCatching { process.destroy() }
+        runCatching { process.destroy() }
     }
 
 }
