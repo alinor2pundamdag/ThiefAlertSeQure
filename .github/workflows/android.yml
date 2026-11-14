@@ -19,18 +19,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
 
       # AGP on this runner resolves the debug key under ~/.config/.android.
       # Cache the exact path Gradle uses. Debug signing is for CI/dev installs;
       # official release builds use the separately configured permanent keystore.
       - name: Restore cached debug signing key
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.config/.android/debug.keystore
           key: android-debug-keystore-v2
@@ -216,27 +218,24 @@ jobs:
         run: |
           set -euo pipefail
           ./gradlew :app:lintRelease :app:assembleRelease --no-daemon --stacktrace
-          RELEASE_APK="app/build/outputs/apk/release/app-release.apk"
-          RELEASE_METADATA="app/build/outputs/apk/release/output-metadata.json"
-          RELEASE_MANIFEST="app/build/intermediates/packaged_manifests/release/processReleaseManifestForPackage/AndroidManifest.xml"
-          test -s "$RELEASE_APK"
+          RELEASE_DIR="app/build/outputs/apk/release"
+          RELEASE_METADATA="$RELEASE_DIR/output-metadata.json"
           test -s "$RELEASE_METADATA"
-          test -s "$RELEASE_MANIFEST"
           test -s "app/build/outputs/mapping/release/mapping.txt"
-          python3 - "$RELEASE_APK" "$RELEASE_METADATA" "$RELEASE_MANIFEST" "$RELEASE_VERSION_CODE" "$RELEASE_VERSION_NAME" <<'PY'
+          RELEASE_APK="$(python3 - "$RELEASE_METADATA" "$RELEASE_DIR" "$RELEASE_VERSION_CODE" "$RELEASE_VERSION_NAME" <<'PY'
           import json
           import sys
           import zipfile
-          import xml.etree.ElementTree as ET
+          from pathlib import Path
 
-          apk_path, metadata_path, manifest_path, expected_code, expected_name = sys.argv[1:]
+          metadata_path, release_dir, expected_code, expected_name = sys.argv[1:]
           expected_package = "com.thiefalertsequre.app"
           with open(metadata_path, encoding="utf-8") as source:
               metadata = json.load(source)
           assert metadata.get("applicationId") == expected_package, (
               f"Release applicationId mismatch: {metadata.get('applicationId')!r}"
           )
-          assert metadata.get("variantName", "").lower() == "release", (
+          assert str(metadata.get("variantName", "")).lower() == "release", (
               f"Expected release variant metadata, got {metadata.get('variantName')!r}"
           )
           elements = metadata.get("elements", [])
@@ -248,21 +247,31 @@ jobs:
           assert element.get("versionName") == expected_name, (
               f"Release versionName mismatch: expected {expected_name!r}, got {element.get('versionName')!r}"
           )
-          assert element.get("outputFile") == "app-release.apk", (
-              f"Unexpected release output file: {element.get('outputFile')!r}"
+          output_name = element.get("outputFile", "")
+          assert output_name and Path(output_name).name == output_name, (
+              f"Unsafe or missing release output filename: {output_name!r}"
           )
-          root = ET.parse(manifest_path).getroot()
-          assert root.get("package") == expected_package, (
-              f"Packaged manifest package mismatch: {root.get('package')!r}"
+          apk_path = Path(release_dir) / output_name
+          assert apk_path.is_file() and apk_path.stat().st_size > 0, (
+              f"AGP metadata points to a missing release APK: {apk_path}"
           )
           with zipfile.ZipFile(apk_path) as apk:
               assert apk.testzip() is None, "Release APK contains a corrupt ZIP entry"
               assert "AndroidManifest.xml" in apk.namelist(), "Release APK has no AndroidManifest.xml"
-          print(
-              f"Verified minified release APK: package={expected_package}, "
-              f"version={expected_name} ({expected_code}), R8 mapping present, APK archive valid."
-          )
+          print(apk_path)
           PY
+          )"
+          test -s "$RELEASE_APK"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          BADGING="$("$BUILD_TOOLS/aapt" dump badging "$RELEASE_APK")"
+          PACKAGE_LINE="$(printf '%s\\n' "$BADGING" | grep -m1 "^package:")"
+          for EXPECTED in "name='com.thiefalertsequre.app'" "versionCode='$RELEASE_VERSION_CODE'" "versionName='$RELEASE_VERSION_NAME'"; do
+            [[ "$PACKAGE_LINE" == *"$EXPECTED"* ]] || {
+              echo "::error::Minified release APK mismatch: expected $EXPECTED; got $PACKAGE_LINE"
+              exit 1
+            }
+          done
+          echo "Verified minified release APK: $PACKAGE_LINE"
           if [[ "$RELEASE_SIGNING_CONFIGURED" == "true" ]]; then
             echo "Permanent release signing is configured; the following signer step verifies the official certificate."
           else
@@ -319,7 +328,7 @@ jobs:
           fi
           echo "Verified APK signer against $KEYSTORE_LABEL."
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ env.APK_ARTIFACT_NAME }}
           path: ${{ env.APK_PATH }}
@@ -337,12 +346,14 @@ jobs:
       matrix:
         api-level: [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
       - name: Run Android instrumentation tests on API ${{ matrix.api-level }}
         uses: reactivecircus/android-emulator-runner@v2
         with:
