@@ -6,6 +6,8 @@ plugins {
 val appVersionCode = 6
 val appVersionName = "1.1.4"
 
+val instrumentationTestBuild = providers.gradleProperty("instrumentationTestBuild").orNull == "true"
+
 val releaseSigningReady = listOf(
     "ANDROID_KEYSTORE_PATH",
     "ANDROID_KEYSTORE_PASSWORD",
@@ -44,8 +46,10 @@ android {
         }
         getByName("release") {
             // Harden only distributable builds; keep debug APKs readable for device diagnostics.
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // The dedicated instrumentation build is unminified so test bytecode can inspect
+            // framework-facing app classes. The distributable release never sets this property.
+            isMinifyEnabled = !instrumentationTestBuild
+            isShrinkResources = !instrumentationTestBuild
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -65,7 +69,10 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     androidResources { noCompress += "opus" }
-    testOptions { unitTests.isReturnDefaultValues = true }
+    testOptions {
+        testBuildType = "release"
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 

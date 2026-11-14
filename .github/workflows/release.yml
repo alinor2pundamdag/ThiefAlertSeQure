@@ -170,7 +170,7 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew :app:assembleReleaseAndroidTest --no-daemon --stacktrace
+        run: ./gradlew :app:assembleReleaseAndroidTest -PinstrumentationTestBuild=true --no-daemon --stacktrace
 
       - name: Verify previous official APK upgrades in place without losing private data
         uses: reactivecircus/android-emulator-runner@v2
@@ -241,7 +241,7 @@ jobs:
             adb install "$PREVIOUS_APK"
             adb install -t "$TEST_APK"
             TEST_RUNNER="com.thiefalertsequre.app.test/androidx.test.runner.AndroidJUnitRunner"
-            TEST_CLASS="com.thiefalertsequre.app.AndroidCompatibilitySmokeTest#upgradeDataCanBeSeededOrVerifiedAcrossPackageReplacement"
+            TEST_CLASS="com.thiefalertsequre.app.UpgradeDataPreservationTest#upgradeDataCanBeSeededOrVerifiedAcrossPackageReplacement"
             adb shell am instrument -w -r -e class "$TEST_CLASS" -e upgradePhase seed "$TEST_RUNNER"
             adb install -r "$APK_PATH"
             adb shell am instrument -w -r -e class "$TEST_CLASS" -e upgradePhase verify "$TEST_RUNNER"

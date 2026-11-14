@@ -15,9 +15,10 @@ import org.junit.runner.RunWith
 /**
  * Framework-level smoke coverage across Android API 23–37.
  *
- * These tests verify app launch, manifest declarations and guarded capability
- * inspection. They do not claim to simulate OEM battery managers, real Bluetooth
- * accessories, charger hardware, biometric hardware, camera LEDs or force-stop.
+ * These tests verify app launch and manifest declarations on the release package.
+ * OEM-specific guidance and capability logic have JVM regression coverage; these
+ * tests do not simulate OEM battery managers, real accessories, charger hardware,
+ * biometric hardware, camera LEDs or force-stop.
  */
 @RunWith(AndroidJUnit4::class)
 class AndroidCompatibilitySmokeTest {
@@ -30,48 +31,6 @@ class AndroidCompatibilitySmokeTest {
         launch(SetupStatusActivity::class.java)
         launch(BluetoothCenterActivity::class.java)
         launch(DeviceIntelligenceActivity::class.java)
-    }
-
-    @Test
-    fun upgradeDataCanBeSeededOrVerifiedAcrossPackageReplacement() {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val context = instrumentation.targetContext
-        assertTrue(
-            "The test must run against either the isolated development package or the official package",
-            context.packageName == "com.thiefalertsequre.app" ||
-                context.packageName == "com.thiefalertsequre.app.v114test"
-        )
-        val preferences = context.getSharedPreferences(
-            "upgrade_compatibility_regression",
-            android.content.Context.MODE_PRIVATE
-        )
-        val markerKey = "v113_private_data_marker"
-        val markerValue = "preserve-me-across-in-place-upgrade"
-        val markerFile = java.io.File(context.filesDir, "upgrade_compatibility_regression.marker")
-        when (instrumentation.arguments.getString("upgradePhase")) {
-            "seed" -> {
-                assertTrue(
-                    "The pre-upgrade preference marker must be durably committed",
-                    preferences.edit().putString(markerKey, markerValue).commit()
-                )
-                markerFile.writeText(markerValue)
-            }
-            "verify" -> {
-                assertEquals(
-                    "Private SharedPreferences must survive an in-place APK update",
-                    markerValue,
-                    preferences.getString(markerKey, null)
-                )
-                assertTrue("Private files directory must survive an in-place APK update", markerFile.isFile)
-                assertEquals(markerValue, markerFile.readText())
-            }
-            else -> {
-                assertTrue(preferences.edit().putString(markerKey, markerValue).commit())
-                markerFile.writeText(markerValue)
-                assertEquals(markerValue, preferences.getString(markerKey, null))
-                assertEquals(markerValue, markerFile.readText())
-            }
-        }
     }
 
     @Test
