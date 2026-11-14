@@ -178,7 +178,10 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         } catch (error: Exception) {
             LocalTamperHistory.record(this, "monitor_fgs_start_failed", error.javaClass.simpleName + ": " + error.message)
             isRunning = false
-            prefs.edit().putBoolean(KEY_RUNNING, false).apply()
+            prefs.edit()
+                .putBoolean(KEY_RUNNING, false)
+                .putBoolean(KEY_ENABLED, false)
+                .apply()
             stopSelf()
             return START_NOT_STICKY
         }
