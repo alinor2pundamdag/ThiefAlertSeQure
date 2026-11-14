@@ -308,5 +308,5 @@ jobs:
             set -euo pipefail
             ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
             if [[ "${{ matrix.api-level }}" == "23" || "${{ matrix.api-level }}" == "37" ]]; then
-              ./gradlew :app:connectedReleaseAndroidTest --no-daemon --stacktrace
+              ./gradlew :app:connectedReleaseAndroidTest -PsignReleaseForTests=true --no-daemon --stacktrace
             fi
