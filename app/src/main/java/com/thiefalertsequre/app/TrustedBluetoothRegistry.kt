@@ -2,7 +2,6 @@ package com.thiefalertsequre.app
 
 import android.content.SharedPreferences
 import java.nio.charset.StandardCharsets
-import java.util.Base64
 
 data class TrustedBluetoothDevice(val address: String, val name: String)
 
@@ -98,10 +97,52 @@ object TrustedBluetoothRegistry {
             .apply()
     }
 
+    private const val BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+    private fun encodeBase64(input: ByteArray): String {
+        val output = StringBuilder(((input.size + 2) / 3) * 4)
+        var index = 0
+        while (index < input.size) {
+            val first = input[index].toInt() and 0xff
+            val hasSecond = index + 1 < input.size
+            val hasThird = index + 2 < input.size
+            val second = if (hasSecond) input[index + 1].toInt() and 0xff else 0
+            val third = if (hasThird) input[index + 2].toInt() and 0xff else 0
+            output.append(BASE64_ALPHABET[first ushr 2])
+            output.append(BASE64_ALPHABET[((first and 3) shl 4) or (second ushr 4)])
+            output.append(if (hasSecond) BASE64_ALPHABET[((second and 15) shl 2) or (third ushr 6)] else '=')
+            output.append(if (hasThird) BASE64_ALPHABET[third and 63] else '=')
+            index += 3
+        }
+        return output.toString()
+    }
+
+    private fun decodeBase64(value: String): ByteArray {
+        require(value.length % 4 == 0) { "Invalid Base64 length" }
+        val output = java.io.ByteArrayOutputStream((value.length / 4) * 3)
+        var index = 0
+        while (index < value.length) {
+            val c0 = BASE64_ALPHABET.indexOf(value[index])
+            val c1 = BASE64_ALPHABET.indexOf(value[index + 1])
+            val c2 = if (value[index + 2] == '=') -2 else BASE64_ALPHABET.indexOf(value[index + 2])
+            val c3 = if (value[index + 3] == '=') -2 else BASE64_ALPHABET.indexOf(value[index + 3])
+            require(c0 >= 0 && c1 >= 0 && c2 != -1 && c3 != -1) { "Invalid Base64 character" }
+            require(c2 != -2 || c3 == -2) { "Invalid Base64 padding" }
+            require((c2 == -2 || c3 == -2).not() || index + 4 == value.length) { "Invalid Base64 padding position" }
+            output.write((c0 shl 2) or (c1 ushr 4))
+            if (c2 >= 0) {
+                output.write(((c1 and 15) shl 4) or (c2 ushr 2))
+                if (c3 >= 0) output.write(((c2 and 3) shl 6) or c3)
+            }
+            index += 4
+        }
+        return output.toByteArray()
+    }
+
     internal fun encode(devices: List<TrustedBluetoothDevice>): String = devices
         .distinctBy { it.address.lowercase() }
         .joinToString("\n") { device ->
-            val name = Base64.getEncoder().encodeToString(device.name.toByteArray(StandardCharsets.UTF_8))
+            val name = encodeBase64(device.name.toByteArray(StandardCharsets.UTF_8))
             "${device.address}\t$name"
         }
 
@@ -109,7 +150,7 @@ object TrustedBluetoothRegistry {
         .mapNotNull { line ->
             val split = line.split('\t', limit = 2)
             if (split.size != 2 || split[0].isBlank()) null else runCatching {
-                val name = String(Base64.getDecoder().decode(split[1]), StandardCharsets.UTF_8)
+                val name = String(decodeBase64(split[1]), StandardCharsets.UTF_8)
                 TrustedBluetoothDevice(split[0], name.ifBlank { "Bluetooth accessory" })
             }.getOrNull()
         }
