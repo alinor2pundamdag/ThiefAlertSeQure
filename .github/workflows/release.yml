@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out tagged source and release history
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -46,12 +46,14 @@ jobs:
             exit 1
           }
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
 
       - name: Require and verify permanent release keystore
         shell: bash
@@ -107,6 +109,8 @@ jobs:
           fi
           echo "APP_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "APP_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "PREVIOUS_RELEASE_TAG=$PREVIOUS_TAG" >> "$GITHUB_ENV"
+          echo "PREVIOUS_RELEASE_VERSION_CODE=$PREVIOUS_CODE" >> "$GITHUB_ENV"
           echo "Release version $VERSION_NAME ($VERSION_CODE) passed tag/version checks."
         env:
           GH_TOKEN: ${{ github.token }}
@@ -157,9 +161,72 @@ jobs:
           echo "Verified official APK: $PACKAGE_LINE"
           echo "Verified release signer: $ACTUAL_CERT"
 
+      - name: Assemble release instrumentation test APK
+        run: ./gradlew :app:assembleReleaseAndroidTest --no-daemon --stacktrace
+
+      - name: Verify previous official APK upgrades in place without losing private data
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          api-level: 35
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            test -n "$PREVIOUS_RELEASE_TAG"
+            PREVIOUS_DIR="$RUNNER_TEMP/previous-release"
+            mkdir -p "$PREVIOUS_DIR"
+            gh release download "$PREVIOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern "ThiefAlertSeQure-$PREVIOUS_RELEASE_TAG-release.apk*" --dir "$PREVIOUS_DIR"
+            PREVIOUS_APK="$PREVIOUS_DIR/ThiefAlertSeQure-$PREVIOUS_RELEASE_TAG-release.apk"
+            test -s "$PREVIOUS_APK"
+            (cd "$PREVIOUS_DIR" && sha256sum -c "ThiefAlertSeQure-$PREVIOUS_RELEASE_TAG-release.apk.sha256")
+            BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+            EXPECTED_CERT="9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64"
+            OLD_BADGING="$("$BUILD_TOOLS/aapt" dump badging "$PREVIOUS_APK")"
+            OLD_PACKAGE_LINE="$(printf '%s\n' "$OLD_BADGING" | grep -m1 "^package:")"
+            for EXPECTED in "name='com.thiefalertsequre.app'" "versionCode='$PREVIOUS_RELEASE_VERSION_CODE'" "versionName='${PREVIOUS_RELEASE_TAG#v}'"; do
+              [[ "$OLD_PACKAGE_LINE" == *"$EXPECTED"* ]] || {
+                echo "::error::Previous release APK mismatch: expected $EXPECTED; got $OLD_PACKAGE_LINE"
+                exit 1
+              }
+            done
+            OLD_CERT="$("$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$PREVIOUS_APK" | sed -n 's/.*SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
+            [[ "$OLD_CERT" == "$EXPECTED_CERT" ]] || {
+              echo "::error::Previous official APK signer differs from the pinned production certificate."
+              exit 1
+            }
+            TEST_APK="app/build/outputs/apk/androidTest/release/app-release-androidTest.apk"
+            test -s "$TEST_APK"
+            TEST_CERT="$("$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$TEST_APK" | sed -n 's/.*SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
+            [[ "$TEST_CERT" == "$EXPECTED_CERT" ]] || {
+              echo "::error::Release instrumentation APK must use the official signer to inspect production app data."
+              exit 1
+            }
+            adb install "$PREVIOUS_APK"
+            adb install -t "$TEST_APK"
+            TEST_RUNNER="com.thiefalertsequre.app.test/androidx.test.runner.AndroidJUnitRunner"
+            TEST_CLASS="com.thiefalertsequre.app.AndroidCompatibilitySmokeTest#upgradeDataCanBeSeededOrVerifiedAcrossPackageReplacement"
+            adb shell am instrument -w -r -e class "$TEST_CLASS" -e upgradePhase seed "$TEST_RUNNER"
+            adb install -r "$APK_PATH"
+            adb shell am instrument -w -r -e class "$TEST_CLASS" -e upgradePhase verify "$TEST_RUNNER"
+            NEW_BADGING="$("$BUILD_TOOLS/aapt" dump badging "$APK_PATH")"
+            NEW_PACKAGE_LINE="$(printf '%s\n' "$NEW_BADGING" | grep -m1 "^package:")"
+            for EXPECTED in "name='com.thiefalertsequre.app'" "versionCode='$APP_VERSION_CODE'" "versionName='$APP_VERSION_NAME'"; do
+              [[ "$NEW_PACKAGE_LINE" == *"$EXPECTED"* ]] || {
+                echo "::error::Candidate APK mismatch: expected $EXPECTED; got $NEW_PACKAGE_LINE"
+                exit 1
+              }
+            done
+            echo "Verified in-place upgrade: $OLD_PACKAGE_LINE -> $NEW_PACKAGE_LINE"
+            echo "Verified app-private SharedPreferences survived adb install -r without uninstall."
+
       - name: Upload signed release preflight artifact (manual runs only)
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ThiefAlertSeQure-v${{ env.APP_VERSION_NAME }}-release-preflight
           path: |
