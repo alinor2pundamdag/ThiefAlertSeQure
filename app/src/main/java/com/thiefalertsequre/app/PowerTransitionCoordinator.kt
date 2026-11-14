@@ -12,6 +12,10 @@ object PowerTransitionCoordinator {
     private const val CONNECTED = "baseline_connected"
     private const val BASELINE_BOOT_COUNT = "baseline_boot_count"
     private const val GENERATION = "transition_generation"
+    private const val PENDING_DISCONNECT = "pending_disconnect_retry"
+    private const val PENDING_EVENT_EPOCH = "pending_disconnect_event_epoch"
+    private const val PENDING_EVENT_ELAPSED = "pending_disconnect_event_elapsed"
+    private const val PENDING_EVENT_BOOT = "pending_disconnect_event_boot"
     private val lock = Any()
 
     internal fun acceptsPowerConnectedEvent(liveConnected: Boolean?): Boolean = liveConnected == true
@@ -155,6 +159,15 @@ object PowerTransitionCoordinator {
             .commit()
     }
 
+    private fun clearPendingDisconnectLocked(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(PENDING_DISCONNECT, false)
+            .remove(PENDING_EVENT_EPOCH)
+            .remove(PENDING_EVENT_ELAPSED)
+            .remove(PENDING_EVENT_BOOT)
+            .commit()
+    }
+
     private fun notifyMonitorStateChanged(context: Context) {
         context.applicationContext.sendBroadcast(
             Intent(ProtectionMonitorService.ACTION_REFRESH).setPackage(context.packageName)
@@ -182,8 +195,27 @@ object PowerTransitionCoordinator {
             return ProtectionStore(appContext).read()
         }
         return synchronized(lock) {
+            clearPendingDisconnectLocked(appContext)
             confirmConnectedAndArmLocked(appContext, "Power-connected event confirmed by five reads including three consecutive live-state samples")
         }
+    }
+
+    /** Retry a previously observed OS unplug only after a later live battery snapshot confirms disconnection. */
+    fun retryPendingDisconnect(context: Context): ProtectionState {
+        val appContext = context.applicationContext
+        val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (!prefs.getBoolean(PENDING_DISCONNECT, false) || ExternalPowerState.readConnected(appContext) != false) {
+            return ProtectionStore(appContext).read()
+        }
+        val epoch = prefs.getLong(PENDING_EVENT_EPOCH, 0L)
+        val elapsed = prefs.getLong(PENDING_EVENT_ELAPSED, 0L)
+        val boot = prefs.getInt(PENDING_EVENT_BOOT, -1)
+        if (epoch <= 0L || elapsed <= 0L || boot < 0) {
+            synchronized(lock) { clearPendingDisconnectLocked(appContext) }
+            return ProtectionStore(appContext).read()
+        }
+        LocalTamperHistory.record(appContext, "charger_unplug_retry", "Retrying previously observed unplug after battery state confirmed disconnection")
+        return onPowerDisconnected(appContext, epoch, elapsed, boot)
     }
 
     /** Used only after a live connected-state confirmation, including post-auth recovery. */
@@ -192,6 +224,7 @@ object PowerTransitionCoordinator {
     }
 
     private fun confirmConnectedAndArmLocked(context: Context, reason: String): ProtectionState {
+        clearPendingDisconnectLocked(context)
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         prefs.edit()
             .putBoolean(CONNECTED, true)
@@ -241,6 +274,7 @@ object PowerTransitionCoordinator {
             val priorBoot = prefs.getInt(BASELINE_BOOT_COUNT, -1)
             val bootChanged = currentBoot >= 0 && currentBoot != priorBoot
             if (!prefs.getBoolean(KNOWN, false) || bootChanged) {
+                clearPendingDisconnectLocked(appContext)
                 initializeBaselineLocked(appContext)
                 LocalTamperHistory.record(
                     appContext, "charger_unplug_rejected",
@@ -252,6 +286,7 @@ object PowerTransitionCoordinator {
             // ACTION_BATTERY_CHANGED just after ACTION_POWER_DISCONNECTED.
             // Five reads with three consecutive negatives plus a final live read are authoritative.
             if (!prefs.getBoolean(CONNECTED, false)) {
+                clearPendingDisconnectLocked(appContext)
                 LocalTamperHistory.record(
                     appContext, "charger_unplug_rejected",
                     "No previously confirmed connected baseline; disconnected snapshots never create transitions"
@@ -262,6 +297,10 @@ object PowerTransitionCoordinator {
             prefs.edit()
                 .putBoolean(CONNECTED, false)
                 .putLong(GENERATION, nextGeneration)
+                .putBoolean(PENDING_DISCONNECT, true)
+                .putLong(PENDING_EVENT_EPOCH, eventEpochMs)
+                .putLong(PENDING_EVENT_ELAPSED, eventElapsedRealtimeMs)
+                .putInt(PENDING_EVENT_BOOT, eventBootCount)
                 .commit()
             nextGeneration
         } ?: return ProtectionStore(appContext).read()
@@ -280,13 +319,14 @@ object PowerTransitionCoordinator {
                     synchronized(lock) {
                         restoreDisconnectCandidateLocked(appContext, candidateGeneration)
                     }
-                    LocalTamperHistory.record(appContext, "charger_unplug_rejected", "Debounce sampling interrupted; connected baseline restored for a future genuine transition")
+                    LocalTamperHistory.record(appContext, "charger_unplug_rejected", "Debounce sampling interrupted; pending OS unplug retained for retry after a reliable battery snapshot")
                     return ProtectionStore(appContext).read()
                 }
             }
         }
         if (consecutiveDisconnected < 3) {
             if (lastObserved == true) {
+                synchronized(lock) { clearPendingDisconnectLocked(appContext) }
                 confirmConnectedAndArm(appContext, "Final debounce sample confirms external power is connected")
             } else {
                 synchronized(lock) {
@@ -295,7 +335,7 @@ object PowerTransitionCoordinator {
             }
             LocalTamperHistory.record(
                 appContext, "charger_unplug_rejected",
-                "Five-read debounce did not produce three consecutive disconnected readings; final=$lastObserved"
+                "Five-read debounce did not produce three consecutive disconnected readings; pending OS event retained for retry; final=$lastObserved"
             )
             return ProtectionStore(appContext).read()
         }
@@ -312,10 +352,11 @@ object PowerTransitionCoordinator {
             val finalConnected = ExternalPowerState.readConnected(appContext)
             if (finalConnected != false) {
                 if (finalConnected == true) {
+                    clearPendingDisconnectLocked(appContext)
                     confirmConnectedAndArmLocked(appContext, "Final connected snapshot invalidated unplug candidate")
                 } else {
                     restoreDisconnectCandidateLocked(appContext, candidateGeneration)
-                    LocalTamperHistory.record(appContext, "charger_unplug_rejected", "Final power-state sample was unknown; connected baseline restored for a future genuine transition")
+                    LocalTamperHistory.record(appContext, "charger_unplug_rejected", "Final power-state sample was unknown; pending OS unplug retained for later retry")
                 }
                 return@synchronized ProtectionStore(appContext).read()
             }
@@ -323,6 +364,7 @@ object PowerTransitionCoordinator {
             val store = ProtectionStore(appContext)
             val current = store.read()
             if (current.mode != ProtectionMode.ARMED) {
+                clearPendingDisconnectLocked(appContext)
                 LocalTamperHistory.record(appContext, "charger_unplug_ignored", "Confirmed unplug while protection was not armed")
                 return@synchronized current
             }
@@ -333,6 +375,7 @@ object PowerTransitionCoordinator {
                 ) else old
             }
             if (next.mode == ProtectionMode.COUNTDOWN) {
+                clearPendingDisconnectLocked(appContext)
                 AlarmScheduler.schedule(appContext, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
                 LocalTamperHistory.record(appContext, "charger_countdown_started", "OS unplug event confirmed by five reads, including three consecutive disconnected samples, and a final live-state read")
                 notifyMonitorStateChanged(appContext)
