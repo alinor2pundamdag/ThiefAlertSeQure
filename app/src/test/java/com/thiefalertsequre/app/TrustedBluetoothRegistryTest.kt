@@ -41,7 +41,7 @@ class TrustedBluetoothRegistryTest {
     }
 
     @Test fun base64DecoderRejectsInvalidPaddingAndCharacters() {
-        assertTrue(TrustedBluetoothRegistry.decode("AA:00\\tA===" ).isEmpty())
-        assertTrue(TrustedBluetoothRegistry.decode("AA:00\\t!!!!").isEmpty())
+        assertTrue(TrustedBluetoothRegistry.decode("AA:00\tA===" ).isEmpty())
+        assertTrue(TrustedBluetoothRegistry.decode("AA:00\t!!!!").isEmpty())
     }
 }
