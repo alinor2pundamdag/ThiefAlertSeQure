@@ -304,4 +304,9 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
+          script: |
+            set -euo pipefail
+            ./gradlew :app:connectedDebugAndroidTest --no-daemon --stacktrace
+            if [[ "${{ matrix.api-level }}" == "23" || "${{ matrix.api-level }}" == "37" ]]; then
+              ./gradlew :app:connectedReleaseAndroidTest --no-daemon --stacktrace
+            fi
