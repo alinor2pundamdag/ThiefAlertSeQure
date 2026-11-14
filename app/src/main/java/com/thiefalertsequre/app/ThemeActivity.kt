@@ -192,6 +192,12 @@ class ThemeActivity : FragmentActivity() {
                 if (ThemeStore.save(this@ThemeActivity, previewId)) {
                     setResult(RESULT_OK)
                     finish()
+                } else {
+                    android.widget.Toast.makeText(
+                        this@ThemeActivity,
+                        "Theme could not be saved. Your previous theme remains active.",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         }, params(16))
