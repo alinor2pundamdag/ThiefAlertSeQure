@@ -702,7 +702,7 @@ class MainActivity : FragmentActivity() {
             "Precise alarm scheduling is available on this device."
         }
         val notificationManager = getSystemService(NotificationManager::class.java)
-        val notificationsAllowed = notificationManager.areNotificationsEnabled() &&
+        val notificationsAllowed = androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled() &&
             (Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
         val notificationMessage = if (!notificationsAllowed) {
             "Notifications are disabled; enable them for alarm presentation and recovery controls."
@@ -724,8 +724,12 @@ class MainActivity : FragmentActivity() {
             else ->
                 "Optional full-screen alarm dashboard: ON and Android full-screen access is available."
         }
-        val alarmChannel = if (Build.VERSION.SDK_INT >= 26) notificationManager.getNotificationChannel(AlarmService.CHANNEL_ID) else null
-        val alarmChannelReady = alarmChannel == null || alarmChannel.importance >= NotificationManager.IMPORTANCE_HIGH
+        val alarmChannelReady = if (Build.VERSION.SDK_INT >= 26) {
+            val alarmChannel = notificationManager.getNotificationChannel(AlarmService.CHANNEL_ID)
+            alarmChannel == null || alarmChannel.importance >= NotificationManager.IMPORTANCE_HIGH
+        } else {
+            true
+        }
         val alarmChannelMessage = if (!alarmChannelReady) {
             "Alarm notification channel is below High importance; Android may suppress full-screen presentation. Open Alarm notification settings and set importance to High."
         } else {
