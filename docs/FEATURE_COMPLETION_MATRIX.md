@@ -8,7 +8,7 @@
 
 # ThiefAlertSeQure — Feature Completion Matrix
 
-> **Detailed v1.1.4 coding percentages, device acceptance, and source-file traceability:** [V1.1.4 Feature Implementation Status](V1.1.4_FEATURE_IMPLEMENTATION_STATUS.md). The branch-scope coding estimate is 94%; v1.1.4 physical-device acceptance is not yet recorded.
+> **Historical feature implementation snapshot:** [V1.1.4 Feature Implementation Status](V1.1.4_FEATURE_IMPLEMENTATION_STATUS.md). Its 94% coding estimate and recorded CI run describe an earlier commit, not the current working branch. See [Repository-Wide Audit](REPOSITORY_WIDE_AUDIT.md) for current fixes and outstanding verification.
 
 > **Official successor baseline: v1.1.3 (versionCode 5).** This release line preserves the completed v1.1.2 feature set; its intended functional addition is the synchronized rear-LED flashlight during a latched alarm. No v1.1.2 protection, alarm, authentication, privacy, settings, history, or managed-device feature is intentionally removed. Flashlight availability is optional and cannot block audio.
 
@@ -96,4 +96,4 @@ Strong face authentication is available only if Android reports the enrolled fac
 9. Verify repeated five-failure / 30-second cooldown and cancellation.
 10. Verify volume restoration, DND, silent mode, notification denial, battery settings, and full-screen dashboard with Android 14+ access both granted and denied.
 11. Device Owner enrollment, lock-task restrictions and in-app rollback are user-reported PASS on a separate test device; record its Android build and repeat after managed-policy changes.
-12. Complete Google Play foreground-service declaration for specialUse; approval is not guaranteed. The four permanent release-signing secrets are configured, but no signed production APK or Play approval exists yet. Branch CI intentionally uploads only the isolated debug test APK. Keep the PR unmerged until source review and fresh CI pass; the 11 HONOR 200 Pro physical scenarios are owner-reported PASS, while Android 17 and the remaining platform edge cases stay pending.
+12. Verify the permanent production signing identity and in-place upgrade without changing app identity or erasing user data. Branch CI intentionally uploads only the isolated debug test APK. Keep the PR unmerged until source review, current-head CI and device acceptance pass; the 11 HONOR 200 Pro physical scenarios are owner-reported PASS for v1.1.3 only, while v1.1.4 physical acceptance remains pending.
