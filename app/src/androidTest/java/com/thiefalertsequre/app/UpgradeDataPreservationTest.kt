@@ -27,7 +27,7 @@ class UpgradeDataPreservationTest {
         val markerValue = "preserve-me-across-in-place-upgrade"
         val markerFile = java.io.File(context.filesDir, "upgrade_compatibility_regression.marker")
 
-        when (instrumentation.arguments.getString("upgradePhase")) {
+        when (InstrumentationRegistry.getArguments().getString("upgradePhase")) {
             "seed" -> {
                 assertTrue(
                     "The pre-upgrade preference marker must be durably committed",
