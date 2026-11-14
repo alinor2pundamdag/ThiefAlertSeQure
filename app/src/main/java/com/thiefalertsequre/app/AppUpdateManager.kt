@@ -169,7 +169,7 @@ object AppUpdateManager {
     private fun downloadHttps(address: String, destination: File, expectedSize: Long) {
         val connection = openHttps(address)
         try {
-            val contentLength = if (Build.VERSION.SDK_INT >= 24) connection.contentLengthLong else connection.contentLength.toLong()
+            val contentLength = connection.contentLength.toLong()
             require(contentLength <= 0L || contentLength == expectedSize) {
                 "The release APK size does not match GitHub release metadata."
             }
