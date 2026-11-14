@@ -18,7 +18,7 @@ android {
     compileSdk = 36
     defaultConfig {
         applicationId = "com.thiefalertsequre.app"
-        minSdk = 26
+        minSdk = 23
         targetSdk = 36
         // Increase this for every distributable update. Never reset it between releases.
         versionCode = appVersionCode
