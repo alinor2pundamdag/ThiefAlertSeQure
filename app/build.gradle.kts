@@ -3,8 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val appVersionCode = 6
-val appVersionName = "1.1.4"
+val appVersionCode = 5
+val appVersionName = "1.1.3"
 
 val releaseSigningReady = listOf(
     "ANDROID_KEYSTORE_PATH",
