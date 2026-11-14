@@ -51,7 +51,12 @@ class UpgradeDataPreservationTest {
                 markerFile.writeText(markerValue)
                 assertTrue(
                     "The prior release monitor preference must be seeded",
-                    monitorPrefs.edit().putBoolean("monitor_enabled", true).commit()
+                    monitorPrefs.edit()
+                        .putBoolean("monitor_enabled", true)
+                        // A stale true value can survive abrupt process death and would make
+                        // the post-update restart assertion pass without a real service start.
+                        .putBoolean("monitor_running", false)
+                        .commit()
                 )
             }
             "verify" -> {
