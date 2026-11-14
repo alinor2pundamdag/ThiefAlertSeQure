@@ -657,6 +657,20 @@ class MainActivity : FragmentActivity() {
         )
     }
 
+    private fun isAlarmChannelReady(manager: NotificationManager): Boolean {
+        return if (Build.VERSION.SDK_INT >= 26) {
+            isAlarmChannelReadyApi26(manager)
+        } else {
+            true
+        }
+    }
+
+    @androidx.annotation.RequiresApi(26)
+    private fun isAlarmChannelReadyApi26(manager: NotificationManager): Boolean {
+        val channel = manager.getNotificationChannel(AlarmService.CHANNEL_ID)
+        return channel == null || channel.importance >= NotificationManager.IMPORTANCE_HIGH
+    }
+
     private fun render() {
         val store = ProtectionStore(this)
         val state = store.read()
@@ -724,12 +738,7 @@ class MainActivity : FragmentActivity() {
             else ->
                 "Optional full-screen alarm dashboard: ON and Android full-screen access is available."
         }
-        val alarmChannelReady = if (Build.VERSION.SDK_INT >= 26) {
-            val alarmChannel = notificationManager.getNotificationChannel(AlarmService.CHANNEL_ID)
-            alarmChannel == null || alarmChannel.importance >= NotificationManager.IMPORTANCE_HIGH
-        } else {
-            true
-        }
+        val alarmChannelReady = isAlarmChannelReady(notificationManager)
         val alarmChannelMessage = if (!alarmChannelReady) {
             "Alarm notification channel is below High importance; Android may suppress full-screen presentation. Open Alarm notification settings and set importance to High."
         } else {
