@@ -82,6 +82,17 @@ class AndroidDeviceCompatibilityTest {
             .forEach { expected -> assertTrue(guides.any { it.contains(expected, ignoreCase = true) }) }
     }
 
+    @Test fun honorBackgroundGuideIncludesBatteryAndRecentsSafeguards() {
+        val guide = AndroidDeviceCompatibility.backgroundSettingsGuide("HONOR", "HONOR")
+        listOf(
+            "Manage automatically OFF", "Auto-launch", "Secondary launch",
+            "Run in background", "Battery optimization", "All apps", "Don't allow",
+            "Recents", "lock icon", "Power saving", "Force stop"
+        ).forEach { expected ->
+            assertTrue("HONOR guide must include $expected", guide.contains(expected, ignoreCase = true))
+        }
+    }
+
     @Test fun everyRecognizedFamilyHasGuidanceForAllThreeControls() {
         val devices = listOf("Samsung", "HONOR", "Huawei", "Xiaomi", "OPPO", "realme",
             "OnePlus", "vivo", "iQOO", "Google", "Motorola", "Unknown")

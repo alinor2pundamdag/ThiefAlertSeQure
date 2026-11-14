@@ -13,7 +13,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Framework-level smoke coverage across Android API 26–37.
+ * Framework-level smoke coverage across Android API 23–37.
  *
  * These tests verify app launch, manifest declarations and guarded capability
  * inspection. They do not claim to simulate OEM battery managers, real Bluetooth
@@ -30,6 +30,34 @@ class AndroidCompatibilitySmokeTest {
         launch(SetupStatusActivity::class.java)
         launch(BluetoothCenterActivity::class.java)
         launch(DeviceIntelligenceActivity::class.java)
+    }
+
+    @Test
+    fun upgradeDataCanBeSeededOrVerifiedAcrossPackageReplacement() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        assertEquals("com.thiefalertsequre.app", context.packageName)
+        val preferences = context.getSharedPreferences(
+            "upgrade_compatibility_regression",
+            android.content.Context.MODE_PRIVATE
+        )
+        val markerKey = "v113_private_data_marker"
+        val markerValue = "preserve-me-across-in-place-upgrade"
+        when (instrumentation.arguments.getString("upgradePhase")) {
+            "seed" -> assertTrue(
+                "The pre-upgrade marker must be durably committed",
+                preferences.edit().putString(markerKey, markerValue).commit()
+            )
+            "verify" -> assertEquals(
+                "Private app data must survive an in-place APK update",
+                markerValue,
+                preferences.getString(markerKey, null)
+            )
+            else -> {
+                assertTrue(preferences.edit().putString(markerKey, markerValue).commit())
+                assertEquals(markerValue, preferences.getString(markerKey, null))
+            }
+        }
     }
 
     @Test

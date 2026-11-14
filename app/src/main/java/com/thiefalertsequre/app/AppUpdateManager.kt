@@ -36,9 +36,8 @@ sealed class AppUpdateResult {
 object AppUpdateManager {
     private const val RELEASE_API =
         "https://api.github.com/repos/alinor2pundamdag/ThiefAlertSeQure/releases/latest"
-    private const val EXPECTED_PACKAGE = "com.thiefalertsequre.app"
-    private const val EXPECTED_CERT_SHA256 =
-        "9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64"
+    private const val EXPECTED_PACKAGE = AppUpdatePolicy.EXPECTED_PACKAGE
+    private const val EXPECTED_CERT_SHA256 = AppUpdatePolicy.EXPECTED_CERT_SHA256
     private const val MAX_APK_BYTES = 100L * 1024L * 1024L
     private val allowedHosts = setOf(
         "api.github.com",
@@ -61,6 +60,7 @@ object AppUpdateManager {
     }
 
     private fun resolveLatestUpdate(context: Context): AppUpdateResult {
+        AppUpdatePolicy.requireInstalledPackage(context.packageName)
         val protectionState = ProtectionStore(context).read()
         val monitoringEnabled = context.getSharedPreferences(
             ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
@@ -231,15 +231,11 @@ object AppUpdateManager {
     private fun verifyApk(packageManager: PackageManager, file: File, expectedVersionName: String, installedVersionCode: Long) {
         val archive = packageManager.getPackageArchiveInfo(file.absolutePath, signingFlags())
             ?: error("Android could not inspect the downloaded APK.")
-        require(archive.packageName == EXPECTED_PACKAGE) {
-            "The downloaded APK has the wrong application ID."
-        }
+        AppUpdatePolicy.requireCandidatePackage(EXPECTED_PACKAGE, archive.packageName)
         require(archive.versionName == expectedVersionName) {
             "The APK version does not match its GitHub release tag."
         }
-        require(versionCode(archive) > installedVersionCode) {
-            "The APK version code is not newer than the installed version."
-        }
+        AppUpdatePolicy.requireNewerVersionCode(installedVersionCode, versionCode(archive))
         val signatures = if (Build.VERSION.SDK_INT >= 28) {
             archive.signingInfo?.apkContentsSigners
         } else {
@@ -251,7 +247,7 @@ object AppUpdateManager {
             MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
                 .joinToString("") { byte -> "%02x".format(byte) }
         }
-        require(signerDigests.size == 1 && signerDigests.single() == EXPECTED_CERT_SHA256) {
+        require(AppUpdatePolicy.hasOfficialSigner(signerDigests)) {
             "The APK is not signed with the pinned official ThiefAlertSeQure release key."
         }
     }
@@ -270,7 +266,7 @@ object AppUpdateManager {
             MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
                 .joinToString("") { byte -> "%02x".format(byte) }
         }
-        return digests.size == 1 && digests.single() == EXPECTED_CERT_SHA256
+        return AppUpdatePolicy.hasOfficialSigner(digests)
     }
 
     private fun signingFlags(): Int =
