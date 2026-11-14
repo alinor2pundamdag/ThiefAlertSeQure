@@ -135,4 +135,21 @@ class AndroidDeviceCompatibilityTest {
             )
         }
     }
+    @Test fun honorBackgroundLaunchControlsRemainExplicitlyUnverified() {
+        val item = OemBackgroundSetupPolicy.evaluate("HONOR", "HONOR")
+        assertEquals("oem_background", item?.id)
+        assertEquals(SetupState.UNKNOWN, item?.state)
+        listOf("Manage automatically OFF", "Auto-launch", "Secondary launch",
+            "Run in background", "Battery optimization", "Recents", "Power saving")
+            .forEach { assertTrue(item!!.detail.contains(it, ignoreCase = true)) }
+    }
+
+    @Test fun huaweiUsesTheSameManualBackgroundLaunchPolicy() {
+        assertEquals(SetupState.UNKNOWN, OemBackgroundSetupPolicy.evaluate("HUAWEI", "HUAWEI")?.state)
+    }
+
+    @Test fun nonHonorDevicesDoNotReceiveHonorOnlySetupItem() {
+        assertEquals(null, OemBackgroundSetupPolicy.evaluate("Google", "Pixel"))
+    }
+
 }
