@@ -272,3 +272,10 @@ Recommended representative test devices: one Pixel/AOSP device, Samsung One UI, 
 Source-level OEM detection, manufacturer-specific guidance, public Settings fallback navigation, and edge-to-edge inset handling have been added to the active feature branch. These changes still require a fresh CI build and physical-device testing. Do not describe every Android model as verified until the matrix above has been completed.
 
 ---
+
+## Automated emulator smoke-test coverage
+
+The Android CI workflow now runs the instrumentation smoke suite on emulator API levels 26 through 37. The matrix checks that all internal screens can be created, required manifest permissions remain declared, and device-capability inspection does not crash across the supported API range.
+
+This is framework-level compatibility evidence only. It does not certify OEM Settings screens, proprietary battery managers, real Bluetooth accessory callbacks, charger broadcasts on physical hardware, biometric sensors, torch hardware, force-stop behavior, or manufacturer-specific background process policies. Those remain physical-device acceptance tests and must be recorded per model and OS build.
+
