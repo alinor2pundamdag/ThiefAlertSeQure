@@ -204,9 +204,11 @@ object PowerTransitionCoordinator {
     fun retryPendingDisconnect(context: Context): ProtectionState {
         val appContext = context.applicationContext
         val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (!prefs.getBoolean(PENDING_DISCONNECT, false) || ExternalPowerState.readConnected(appContext) != false) {
-            return ProtectionStore(appContext).read()
-        }
+        if (!PowerTransitionRecoveryPolicy.shouldRetry(
+                prefs.getBoolean(PENDING_DISCONNECT, false),
+                ExternalPowerState.readConnected(appContext)
+            )
+        ) return ProtectionStore(appContext).read()
         val epoch = prefs.getLong(PENDING_EVENT_EPOCH, 0L)
         val elapsed = prefs.getLong(PENDING_EVENT_ELAPSED, 0L)
         val boot = prefs.getInt(PENDING_EVENT_BOOT, -1)
