@@ -36,7 +36,11 @@ class AndroidCompatibilitySmokeTest {
     fun upgradeDataCanBeSeededOrVerifiedAcrossPackageReplacement() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
-        assertEquals(BuildConfig.APPLICATION_ID, context.packageName)
+        assertTrue(
+            "The test must run against either the isolated development package or the official package",
+            context.packageName == "com.thiefalertsequre.app" ||
+                context.packageName == "com.thiefalertsequre.app.v114test"
+        )
         val preferences = context.getSharedPreferences(
             "upgrade_compatibility_regression",
             android.content.Context.MODE_PRIVATE
