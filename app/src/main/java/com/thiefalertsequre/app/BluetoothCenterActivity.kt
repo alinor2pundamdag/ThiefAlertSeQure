@@ -164,7 +164,12 @@ class BluetoothCenterActivity : FragmentActivity() {
             .setNegativeButton("Keep registered", null)
             .setPositiveButton("Unregister") { _, _ ->
                 val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-                TrustedBluetoothRegistry.remove(prefs, device.address)
+                if (!TrustedBluetoothRegistry.remove(prefs, device.address)) {
+                    showResult(
+                        "Could not unregister accessory",
+                        "The trusted-device registry could not be updated. A2 is disabled if secure storage failed. Android Bluetooth pairing was not changed."
+                    )
+                }
                 render()
             }
             .showThemed(this)
@@ -202,11 +207,17 @@ class BluetoothCenterActivity : FragmentActivity() {
             .setItems(labels) { _, which ->
                 val selected = devices[which]
                 val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-                TrustedBluetoothRegistry.add(
-                    prefs,
-                    selected.address,
-                    selected.name ?: "Bluetooth accessory"
-                )
+                if (!TrustedBluetoothRegistry.add(
+                        prefs,
+                        selected.address,
+                        selected.name ?: "Bluetooth accessory"
+                    )
+                ) {
+                    showResult(
+                        "Could not register accessory",
+                        "Secure local storage could not save this trusted accessory. Check device storage/Android Keystore and try again."
+                    )
+                }
                 render()
             }
             .setNegativeButton("Cancel", null)
