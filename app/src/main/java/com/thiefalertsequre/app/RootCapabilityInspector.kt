@@ -87,8 +87,8 @@ object RootCapabilityInspector {
         }
 
         return try {
-            if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
-                process.destroyForcibly()
+            if (!waitForProcess(process, timeoutSeconds)) {
+                terminateProcess(process)
                 passive.copy(
                     status = RootStatus.ROOT_CHECK_TIMED_OUT,
                     detail = "The superuser request timed out or was not answered. No system changes were made."
@@ -109,7 +109,7 @@ object RootCapabilityInspector {
                 }
             }
         } catch (e: Exception) {
-            process.destroyForcibly()
+            terminateProcess(process)
             passive.copy(
                 status = RootStatus.ROOT_CHECK_ERROR,
                 detail = "Root authorization could not be verified: ${e.javaClass.simpleName}. No system changes were made."
@@ -139,8 +139,8 @@ object RootCapabilityInspector {
             }
         }.apply { isDaemon = true; start() }
         return try {
-            if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
-                process.destroyForcibly()
+            if (!waitForProcess(process, timeoutSeconds)) {
+                terminateProcess(process)
                 reader.join(500L)
                 "Root Bluetooth diagnostics timed out. No system changes were made."
             } else {
@@ -150,8 +150,25 @@ object RootCapabilityInspector {
                 else "Diagnostics returned no readable Bluetooth system information."
             }
         } catch (e: Exception) {
-            process.destroyForcibly()
+            terminateProcess(process)
             "Diagnostics failed: ${e.javaClass.simpleName}"
         }
     }
+    private fun waitForProcess(process: Process, timeoutSeconds: Long): Boolean {
+        if (Build.VERSION.SDK_INT >= 26) return process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+        val waiter = Thread { runCatching { process.waitFor() } }.apply { isDaemon = true; start() }
+        waiter.join(TimeUnit.SECONDS.toMillis(timeoutSeconds))
+        if (waiter.isAlive) {
+            terminateProcess(process)
+            waiter.join(500L)
+            return false
+        }
+        return true
+    }
+
+    private fun terminateProcess(process: Process) {
+        if (Build.VERSION.SDK_INT >= 26) runCatching { process.destroyForcibly() }
+        else runCatching { process.destroy() }
+    }
+
 }
