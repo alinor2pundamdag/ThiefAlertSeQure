@@ -54,7 +54,10 @@ object TrustedBluetoothRegistry {
         val decoded = runCatching {
             decode(readOrMigratePayload(prefs, KEY_DEVICES, raw))
                 .filter { isValidAddress(it.address) }
-        }.getOrNull() ?: return null
+        }.getOrNull() ?: run {
+            disableA2AndInvalidateBaselines(prefs)
+            return null
+        }
         // Legacy single-device fields are removed only after the new registry is readable.
         if (prefs.contains(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS) ||
             prefs.contains(ProtectionMonitorService.KEY_BT_TRUSTED_NAME)
