@@ -27,6 +27,7 @@ At the reviewed baseline, the repository tree contained 126 files, including 44 
 | Foreground monitor startup failure could leave the enabled preference true | High | Service failure clears enabled/running state; synchronous Settings launch failures roll back the corresponding toggles. | CI and induced Android FGS-start failure test |
 | Alarm recovery notification could remain after successful owner authentication/alarm service recovery | Medium | Added explicit cancellation on authenticated disarm and successful alarm FGS startup. | Notification permission/API-level device test |
 | Corrupt/wrong-type local preferences could crash A2/history/audio reads | Medium | Added defensive reads and safe fallback/removal for malformed local values. | Corrupt-preference instrumentation tests |
+| Trusted Bluetooth identifiers were stored as plaintext | High | Added AES-GCM encryption using an Android Keystore key; plaintext single-device and multi-device registry values migrate on read without changing membership. Privacy Policy now discloses the locally stored identifiers. | API 35 Android Keystore/migration instrumentation and real-device migration test |
 | Trusted Bluetooth registry accepted arbitrary address strings | Medium | Added MAC-address format validation at registry input/read boundary. | Unit tests and paired-device test |
 | Theme persistence failure had no user feedback | Low | Apply now reports save failure and preserves prior selected theme. | UI test |
 | Theme palette contrast had no regression gate | Medium | Added WCAG contrast calculations for text, muted, primary, semantic colors, and button foreground across all 16 palettes. | CI result and visual/TalkBack verification |
@@ -42,7 +43,7 @@ At the reviewed baseline, the repository tree contained 126 files, including 44 
 - Preserve alarm/authentication invariants; no unauthenticated path may disarm a latched alarm.
 
 ### P1 — Local security and data integrity
-- Encrypt trusted Bluetooth identifiers at rest with Android Keystore and test migration from existing plaintext registry values without losing registered devices.
+- Verify Android Keystore encryption, authenticated purpose binding, legacy plaintext migration, corrupt ciphertext fail-closed behavior, and key invalidation handling using the new instrumentation suite and a physical device.
 - Test corrupted, wrong-type, missing, revoked, and inaccessible preference/URI data.
 - Review every SharedPreferences read/write for type mismatch, commit failure, stale values, and migration atomicity.
 - Review update download/install flow, signature continuity, rollback/failure behavior, and production data preservation.
@@ -56,7 +57,7 @@ At the reviewed baseline, the repository tree contained 126 files, including 44 
 - Confirm no decorative or capability-catalog action falsely implies an implemented hardware workflow.
 
 ### P1 — Android compatibility and instrumentation
-- Add Android instrumentation for preferences, migration, Android Keystore, notification cancellation, service startup failure, permission denial, and upgrade preservation.
+- Extend Android instrumentation beyond the newly added Keystore/registry tests to cover notification cancellation, service startup failure, permission denial, and upgrade preservation.
 - Run supported API-level instrumentation. Diagnose emulator/ADB startup failures separately from app test failures.
 - Test on the HONOR 200 Pro: cold start, background/foreground, screen off, battery optimization, charger connect/disconnect, Bluetooth separation/reconnect, reboot, alarm audio/vibration, owner authentication, and recovery.
 - Verify an in-place update using the actual permanent production signing identity and existing user data. Never use a debug APK to update the production install.
@@ -88,7 +89,7 @@ Do not mark any check PASS unless the exact commit, workflow, test output, and (
 | Repository/static source inventory | Reviewed at baseline; follow-up edits require re-review |
 | JVM unit tests on current working HEAD | Pending CI |
 | Android lint/build/APK metadata | Pending CI |
-| Android instrumentation | Not yet complete |
+| Android instrumentation | Keystore/registry tests added; API 35 emulator CI pending |
 | HONOR 200 Pro physical validation | Pending owner device test |
 | Production-signing in-place upgrade | Pending; requires production signing identity |
 | Release readiness | Not certified |
