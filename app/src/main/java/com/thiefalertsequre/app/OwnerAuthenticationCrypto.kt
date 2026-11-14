@@ -16,23 +16,34 @@ internal object OwnerAuthenticationCrypto {
     private const val KEY_ALIAS = "com.thiefalertsequre.owner_auth_hmac_v1"
     private const val MAC_ALGORITHM = "HmacSHA256"
 
-    fun createCryptoObject(): BiometricPrompt.CryptoObject {
+    data class PreparedAuthentication(
+        val cryptoObject: BiometricPrompt.CryptoObject,
+        internal val challenge: ByteArray
+    )
+
+    fun createCryptoObject(): PreparedAuthentication {
         val mac = try {
             newMac(getOrCreateKey())
         } catch (error: InvalidKeyException) {
             deleteKey()
             newMac(generateKey())
         }
+        // Do not update an authentication-bound Mac before the system prompt. Older
+        // Android Keystore providers reject all cryptographic operations until auth.
         val challenge = ByteArray(32).also { SecureRandom().nextBytes(it) }
-        mac.update(challenge)
-        return BiometricPrompt.CryptoObject(mac)
+        return PreparedAuthentication(BiometricPrompt.CryptoObject(mac), challenge)
     }
 
-    fun consume(result: BiometricPrompt.AuthenticationResult): ByteArray? {
+    fun consume(
+        result: BiometricPrompt.AuthenticationResult,
+        prepared: PreparedAuthentication
+    ): ByteArray? {
         val authenticatedMac = result.cryptoObject?.mac ?: return null
-        return runCatching { authenticatedMac.doFinal() }
-            .getOrNull()
-            ?.takeIf { it.size == 32 }
+        if (authenticatedMac !== prepared.cryptoObject.mac) return null
+        return runCatching {
+            authenticatedMac.update(prepared.challenge)
+            authenticatedMac.doFinal()
+        }.getOrNull()?.takeIf { it.size == 32 }
     }
 
     private fun newMac(key: SecretKey): Mac = Mac.getInstance(MAC_ALGORITHM).apply { init(key) }

@@ -1,6 +1,5 @@
 package com.thiefalertsequre.app
 
-import android.security.keystore.UserNotAuthenticatedException
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.fail
@@ -10,15 +9,19 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class OwnerAuthenticationCryptoTest {
     @Test
-    fun biometricMacCannotCompleteBeforeSystemAuthentication() {
-        val crypto = OwnerAuthenticationCrypto.createCryptoObject()
-        val mac = crypto.mac
+    fun createsPromptCryptoObjectWithoutUsingKeyBeforeAuthentication() {
+        val prepared = OwnerAuthenticationCrypto.createCryptoObject()
+        val mac = prepared.cryptoObject.mac
         assertNotNull("Biometric prompt must receive a Keystore-backed MAC", mac)
+
+        // Android 7 reports ProviderException; newer providers may report a
+        // more specific authentication exception. Both are expected denial outcomes.
         try {
-            mac!!.doFinal()
+            mac!!.update(ByteArray(32) { 1 })
+            mac.doFinal()
             fail("The owner-authentication key must reject use before system authentication")
-        } catch (_: UserNotAuthenticatedException) {
-            // Expected: only a successful system prompt can authorize the MAC operation.
+        } catch (_: Exception) {
+            // Expected: unauthenticated use of this key must fail closed.
         }
     }
 }

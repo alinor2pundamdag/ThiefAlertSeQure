@@ -850,7 +850,7 @@ class MainActivity : FragmentActivity() {
             return
         }
 
-        val cryptoObject = runCatching { OwnerAuthenticationCrypto.createCryptoObject() }.getOrElse {
+        val preparedAuthentication = runCatching { OwnerAuthenticationCrypto.createCryptoObject() }.getOrElse {
             if (keyguard.isDeviceSecure) authenticateDeviceCredential()
             else {
                 autoAuthenticationRequested = false
@@ -864,7 +864,7 @@ class MainActivity : FragmentActivity() {
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     biometricPrompt = null
-                    val proof = OwnerAuthenticationCrypto.consume(result)
+                    val proof = OwnerAuthenticationCrypto.consume(result, preparedAuthentication)
                     if (proof != null) {
                         completeOwnerAuthentication(cryptoProof = proof)
                     } else if (Build.VERSION.SDK_INT >= 30 &&
@@ -941,7 +941,7 @@ class MainActivity : FragmentActivity() {
         if ((allowedAuthenticators and BiometricManager.Authenticators.DEVICE_CREDENTIAL) == 0) {
             promptInfo.setNegativeButtonText(if (keyguard.isDeviceSecure) "Use device PIN or password" else "Cancel")
         }
-        prompt.authenticate(promptInfo.build(), cryptoObject)
+        prompt.authenticate(promptInfo.build(), preparedAuthentication.cryptoObject)
         render()
     }
 
