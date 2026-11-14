@@ -31,6 +31,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class MainActivity : FragmentActivity() {
     private lateinit var status: TextView
+    private lateinit var shield: ProtectionShieldView
     private lateinit var details: TextView
     private lateinit var biometricButton: MaterialButton
     private lateinit var credentialButton: MaterialButton
@@ -178,7 +179,12 @@ class MainActivity : FragmentActivity() {
         val statusContent = column()
         statusContent.setPadding(dp(20), dp(20), dp(20), dp(20))
         statusContent.addView(label("LIVE PROTECTION STATUS", 11f, getColor(R.color.tas_muted), true), matchWrap())
-        statusContent.addView(space(12))
+        statusContent.addView(space(4))
+        val shieldRow = LinearLayout(this).apply { gravity = Gravity.CENTER }
+        shield = ProtectionShieldView(this)
+        shieldRow.addView(shield, LinearLayout.LayoutParams(dp(68), dp(68)))
+        statusContent.addView(shieldRow, matchWrap())
+        statusContent.addView(space(8))
         status = label("Checking device…", 24f, getColor(R.color.tas_text), true)
         statusContent.addView(status, matchWrap())
         statusContent.addView(space(12))
@@ -187,6 +193,27 @@ class MainActivity : FragmentActivity() {
         statusContent.addView(details, matchWrap())
         statusCard.addView(statusContent)
         root.addView(statusCard, matchWrap())
+        root.addView(space(20))
+
+        root.addView(sectionTitle("DEVICE INTELLIGENCE"), matchWrap())
+        root.addView(space(10))
+        val intelligenceCard = card()
+        val intelligenceContent = column()
+        intelligenceContent.setPadding(dp(16), dp(16), dp(16), dp(16))
+        intelligenceContent.addView(label(
+            "Automatically inspect this phone's Bluetooth controller, Android platform, sensors, hardware, resources, and protection-related readiness. Each capability has its own organized page.",
+            13f, getColor(R.color.tas_muted), false
+        ), matchWrap())
+        intelligenceContent.addView(space(12))
+        intelligenceContent.addView(outlinedButton("Open Bluetooth capability center") {
+            startActivity(Intent(this, BluetoothCenterActivity::class.java))
+        }, matchWrap())
+        intelligenceContent.addView(space(8))
+        intelligenceContent.addView(outlinedButton("Open Device Intelligence") {
+            startActivity(Intent(this, DeviceIntelligenceActivity::class.java))
+        }, matchWrap())
+        intelligenceCard.addView(intelligenceContent)
+        root.addView(intelligenceCard, matchWrap())
         root.addView(space(20))
 
         root.addView(sectionTitle("OWNER AUTHENTICATION"), matchWrap())
@@ -718,6 +745,7 @@ class MainActivity : FragmentActivity() {
             ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
         val monitorRunning = ProtectionMonitorService.isRunning
+        shield.update(state.mode, monitorEnabled && monitorRunning)
         val bootIdentityReady = ProtectionClock.bootCount(this) >= 0
         val bootIdentityMessage = if (bootIdentityReady) {
             "Boot identity: available for monotonic countdown recovery."

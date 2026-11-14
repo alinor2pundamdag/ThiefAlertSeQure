@@ -1,6 +1,7 @@
 package com.thiefalertsequre.app
 
 import android.app.Notification
+import android.bluetooth.BluetoothDevice
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -42,7 +43,56 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private var sensorRegistered = false
     private var receiverRegistered = false
     private var powerReceiverRegistered = false
+    private var bluetoothReceiverRegistered = false
     private val powerTransitionReceiver = PowerTransitionReceiver()
+    private val bluetoothSeparationReceiver = object : BroadcastReceiver() {
+        @Suppress("DEPRECATION", "MissingPermission")
+        override fun onReceive(context: Context, intent: Intent) {
+            if (!prefs.getBoolean(KEY_BT_ALERT_ENABLED, false)) return
+            if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                LocalTamperHistory.record(context, "bluetooth_permission_missing", "Trusted Bluetooth disconnect monitoring paused; grant Bluetooth Connect permission")
+                return
+            }
+            val device = runCatching { intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE) }.getOrNull() ?: return
+            val trustedAddress = prefs.getString(KEY_BT_TRUSTED_ADDRESS, null) ?: return
+            if (device.address != trustedAddress) return
+            when (intent.action) {
+                BluetoothDevice.ACTION_ACL_CONNECTED -> {
+                    prefs.edit().putBoolean(KEY_BT_BASELINE_CONNECTED, true).apply()
+                    handler.removeCallbacks(bluetoothSeparationRunnable)
+                    LocalTamperHistory.record(context, "trusted_bluetooth_connected", "Trusted Bluetooth device connected")
+                }
+                BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                    val hadConnectionBaseline = prefs.getBoolean(KEY_BT_BASELINE_CONNECTED, false)
+                    prefs.edit().putBoolean(KEY_BT_BASELINE_CONNECTED, false).apply()
+                    if (hadConnectionBaseline && ProtectionStore(context).read().mode == ProtectionMode.ARMED) {
+                        handler.removeCallbacks(bluetoothSeparationRunnable)
+                        handler.postDelayed(bluetoothSeparationRunnable, BLUETOOTH_DISCONNECT_GRACE_MS)
+                        LocalTamperHistory.record(context, "trusted_bluetooth_disconnected", "Trusted device disconnected; grace period started")
+                    }
+                }
+            }
+        }
+    }
+    private val bluetoothSeparationRunnable = Runnable {
+        val enabled = prefs.getBoolean(KEY_BT_ALERT_ENABLED, false)
+        val stillDisconnected = !prefs.getBoolean(KEY_BT_BASELINE_CONNECTED, false)
+        if (enabled && stillDisconnected && ProtectionStore(this).read().mode == ProtectionMode.ARMED) {
+            val now = System.currentTimeMillis()
+            var transitioned = false
+            val next = ProtectionStore(this).update { current ->
+                if (current.mode != ProtectionMode.ARMED) current else {
+                    transitioned = true
+                    ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, now, 0L, ProtectionClock.bootCount(this))
+                }
+            }
+            if (transitioned && next.mode == ProtectionMode.ALARM_TRIGGERED) {
+                LocalTamperHistory.record(this, "trusted_bluetooth_separation_alarm", "Trusted Bluetooth device remained disconnected beyond grace period")
+                unregisterMotionSensor()
+                startTheftAlarm()
+            }
+        }
+    }
     private var alertPlayer: MediaPlayer? = null
     private val prefs by lazy { getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
 
@@ -108,6 +158,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
 
         registerSystemReceiver()
         registerPowerTransitionReceiver()
+        registerBluetoothSeparationReceiver()
         PowerTransitionCoordinator.initializeBaseline(this)
         reconcileStablePowerState()
         syncMotionSensor()
@@ -142,6 +193,26 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         )
         powerReceiverRegistered = true
         LocalTamperHistory.record(this, "power_event_receiver_registered", "Runtime charger connect/disconnect receiver active")
+    }
+
+    private fun registerBluetoothSeparationReceiver() {
+        if (bluetoothReceiverRegistered || !prefs.getBoolean(KEY_BT_ALERT_ENABLED, false)) return
+        if (Build.VERSION.SDK_INT >= 31 &&
+            checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            LocalTamperHistory.record(this, "bluetooth_permission_missing", "Trusted Bluetooth separation alert cannot monitor without Bluetooth Connect permission")
+            return
+        }
+        val filter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+            addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+        }
+        ContextCompat.registerReceiver(this, bluetoothSeparationReceiver, filter, ContextCompat.RECEIVER_EXPORTED)
+        bluetoothReceiverRegistered = true
+        // A service restart cannot prove the trusted accessory is currently connected.
+        // Require a fresh ACL_CONNECTED event before treating a later disconnect as theft.
+        prefs.edit().putBoolean(KEY_BT_BASELINE_CONNECTED, false).apply()
+        LocalTamperHistory.record(this, "trusted_bluetooth_receiver_registered", "Trusted Bluetooth separation monitoring active; reconnect accessory to establish baseline")
     }
 
     private fun reconcileStablePowerState() {
@@ -449,7 +520,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         if (Build.VERSION.SDK_INT >= 26) {
             getSystemService(NotificationManager::class.java).createNotificationChannel(
                 NotificationChannel(CHANNEL_ID, "Protection monitoring", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "Visible notification while motion and battery protection monitoring is enabled"
+                    description = "Visible notification while charger, motion, trusted Bluetooth, and optional battery protection monitoring is enabled"
                     setSound(null, null)
                 }
             )
@@ -468,7 +539,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("ThiefAlertSeQure protection monitor")
-            .setContentText("Charger monitoring is active; motion alarm is opt-in; battery alert is optional.")
+            .setContentText("Charger monitoring is active; motion and trusted Bluetooth alerts are optional.")
             .setContentIntent(open)
             .addAction(android.R.drawable.ic_media_pause, "Stop monitoring", stop)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
@@ -486,6 +557,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         receiverRegistered = false
         if (powerReceiverRegistered) runCatching { unregisterReceiver(powerTransitionReceiver) }
         powerReceiverRegistered = false
+        handler.removeCallbacks(bluetoothSeparationRunnable)
+        if (bluetoothReceiverRegistered) runCatching { unregisterReceiver(bluetoothSeparationReceiver) }
+        bluetoothReceiverRegistered = false
         releaseAlertPlayer()
         isRunning = false
         prefs.edit().putBoolean(KEY_RUNNING, false).apply()
@@ -505,6 +579,10 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         const val KEY_MOTION_ENABLED = "motion_enabled"
         const val KEY_BATTERY_ALERT_ENABLED = "battery_alert_enabled"
         const val KEY_BATTERY_THRESHOLD = "battery_threshold"
+        const val KEY_BT_ALERT_ENABLED = "trusted_bluetooth_alert_enabled"
+        const val KEY_BT_TRUSTED_ADDRESS = "trusted_bluetooth_address"
+        const val KEY_BT_TRUSTED_NAME = "trusted_bluetooth_name"
+        const val KEY_BT_BASELINE_CONNECTED = "trusted_bluetooth_baseline_connected"
         private const val KEY_BATTERY_ALERT_FIRED = "battery_alert_fired"
         private const val KEY_LAST_BATTERY_LEVEL = "last_battery_level"
         private const val CHANNEL_ID = "protection_monitor"
@@ -513,5 +591,6 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         const val ACTION_REFRESH = "com.thiefalertsequre.REFRESH_MONITOR"
         private const val MOTION_COOLDOWN_MS = 5_000L
         private const val POWER_RETRY_MS = 1_000L
+        private const val BLUETOOTH_DISCONNECT_GRACE_MS = 8_000L
     }
 }

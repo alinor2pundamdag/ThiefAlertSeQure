@@ -14,8 +14,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import androidx.fragment.app.FragmentActivity
@@ -43,7 +43,6 @@ class SettingsActivity : FragmentActivity() {
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { renderStatus() }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         render()
@@ -82,6 +81,22 @@ class SettingsActivity : FragmentActivity() {
         statusContent.addView(text(statusSummary(), 13f, R.color.tas_text))
         statusCard.addView(statusContent)
         root.addView(statusCard, matchWrap())
+        root.addView(space(22))
+
+        root.addView(text("DEVICE CAPABILITY CENTERS", 11f, R.color.tas_primary, true))
+        root.addView(space(8))
+        root.addView(text(
+            "Explore your phone's Bluetooth controller and Android hardware capabilities in dedicated, organized pages. Each page refreshes local device information on demand.",
+            13f, R.color.tas_muted
+        ))
+        root.addView(space(10))
+        root.addView(action("Bluetooth capability center") {
+            startActivity(Intent(this, BluetoothCenterActivity::class.java))
+        })
+        root.addView(space(8))
+        root.addView(action("Device intelligence") {
+            startActivity(Intent(this, DeviceIntelligenceActivity::class.java))
+        })
         root.addView(space(22))
 
         root.addView(text("OFFICIAL APP UPDATES", 11f, R.color.tas_primary, true))
@@ -160,7 +175,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(10))
         addSystemSettingAction("Grant notifications permission", "Notifications", "Android 13 (API 33)+ asks for notification permission at runtime. If denied, open App info → Notifications and enable it. Android 8–12 uses per-app notification controls without this runtime prompt. Verify the Anti-theft alarm channel is enabled and allowed to appear on the lock screen.") { requestNotifications() }
         addSystemSettingAction("Alarms & reminders / exact alarm access", "Exact alarms", "Android 12 (API 31)+ exposes special Alarms & reminders access. Allow ThiefAlertSeQure if listed. Android 8–11 does not expose this special access. Without it, countdown delivery may use fallback scheduling and can be delayed.") { openExactAlarmSettings() }
-        addSystemSettingAction("All app permissions and app information", "App permissions", "Open App info → Permissions and review only permissions requested by this build. The local charger-alarm core does not need contacts, location, microphone, camera permission, or SMS. Internet access is used only when you manually check for official GitHub updates; the app does not upload protection data. The optional flashlight uses Android's torch API without camera permission and does not capture images or video. Do not grant unrelated permissions.") { openAppInfo() }
+        addSystemSettingAction("All app permissions and app information", "App permissions", "Open App info → Permissions and review only permissions requested by this build. The local charger-alarm core does not need contacts, location, microphone, camera permission, or SMS. The optional trusted Bluetooth separation alert requests Bluetooth Connect access only when you choose a paired device; it does not scan for nearby devices. Internet access is used only when you manually check for official GitHub updates; the app does not upload protection data. The optional flashlight uses Android's torch API without camera permission and does not capture images or video. Do not grant unrelated permissions.") { openAppInfo() }
         addSystemSettingAction("App notification channels and settings", "App notifications", "This opens ThiefAlertSeQure's own notification settings. Enable app notifications and the Anti-theft alarm channel. Android 8+ uses channels; Android 13+ also requires app-level notification permission.") { open(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)) }
         addSystemSettingAction("Battery and background restrictions", "Background activity", "Review ThiefAlertSeQure battery usage and select Unrestricted / Allow background activity where available. Android 8+ applies background execution limits; Android 9+ adds stricter standby behavior; Android 12+ exposes additional battery controls; Android 13–15 may apply OEM restrictions. Keep the persistent protection notification enabled. No setting overrides Force stop.") { openBatterySettings() }
         addSystemSettingAction("Do Not Disturb settings", "Do Not Disturb", "Review DND mode, schedules, and permitted alarm interruptions. The alarm uses Android alarm audio usage, but DND policy, silent mode, and OEM behavior can still affect audible output. Allow alarms during DND if you require alarm audio to remain audible.") { openDndSettings() }
@@ -264,6 +279,8 @@ class SettingsActivity : FragmentActivity() {
             "Motion is a separate alarm source and can trigger while the charger is still connected. Leave it OFF for charger-removal-only protection.",
             12f, R.color.tas_muted
         ))
+        root.addView(space(18))
+        root.addView(space(18))
         val sensitivity = MotionSensitivity.fromStored(
             monitorPrefs.getString(ProtectionMonitorService.KEY_SENSITIVITY, MotionSensitivity.MEDIUM.name)
         )
