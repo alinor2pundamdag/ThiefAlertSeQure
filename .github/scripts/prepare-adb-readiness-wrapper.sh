@@ -1,7 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-real_adb="$(command -v adb)"
+real_adb="$(command -v adb || true)"
+if [[ -z "$real_adb" ]]; then
+    sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+    for candidate in "$sdk_root/platform-tools/adb" \
+        /usr/local/lib/android/sdk/platform-tools/adb \
+        /opt/android-sdk/platform-tools/adb \
+        "$HOME/Android/Sdk/platform-tools/adb"; do
+        if [[ -x "$candidate" ]]; then
+            real_adb="$candidate"
+            break
+        fi
+    done
+fi
+if [[ -z "$real_adb" || ! -x "$real_adb" ]]; then
+    echo "Android platform-tools adb was not found on this runner" >&2
+    exit 1
+fi
+echo "Using Android platform-tools: $real_adb"
 wrapper_dir="${RUNNER_TEMP:-/tmp}/thiefalert-adb-readiness"
 mkdir -p "$wrapper_dir"
 
