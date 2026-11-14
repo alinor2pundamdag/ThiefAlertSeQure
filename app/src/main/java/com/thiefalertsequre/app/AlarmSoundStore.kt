@@ -14,9 +14,15 @@ object AlarmSoundStore {
     const val ALERT = "alert"
     private const val PREFS = "user_alarm_sounds_v1"
 
-    fun uri(context: Context, slot: String): Uri? =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(key(slot), null)?.let { runCatching { Uri.parse(it) }.getOrNull() }
+    fun uri(context: Context, slot: String): Uri? {
+        if (slot != ALARM && slot != ALERT) return null
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val stored = runCatching { prefs.getString(key(slot), null) }.getOrElse {
+            prefs.edit().remove(key(slot)).commit()
+            null
+        }
+        return stored?.let { runCatching { Uri.parse(it) }.getOrNull() }
+    }
 
     fun hasAlarmSound(context: Context): Boolean = effectiveUri(context, ALARM) != null
 
@@ -29,9 +35,9 @@ object AlarmSoundStore {
     fun clear(context: Context, slot: String) {
         require(slot == ALARM || slot == ALERT)
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val granted = prefs.getString("grant_uri_$slot", null)
+        val granted = runCatching { prefs.getString("grant_uri_$slot", null) }.getOrNull()
         val otherSlot = if (slot == ALARM) ALERT else ALARM
-        val otherGrant = prefs.getString("grant_uri_$otherSlot", null)
+        val otherGrant = runCatching { prefs.getString("grant_uri_$otherSlot", null) }.getOrNull()
         prefs.edit().remove(key(slot)).remove("grant_uri_$slot").commit()
         if (granted != null && granted != otherGrant) runCatching {
             context.contentResolver.releasePersistableUriPermission(
@@ -49,7 +55,7 @@ object AlarmSoundStore {
                 Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
             val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            val oldGrant = prefs.getString("grant_uri_$slot", null)
+            val oldGrant = runCatching { prefs.getString("grant_uri_$slot", null) }.getOrNull()
             val otherSlot = if (slot == ALARM) ALERT else ALARM
             val otherGrant = prefs.getString("grant_uri_$otherSlot", null)
             val saved = prefs.edit()
