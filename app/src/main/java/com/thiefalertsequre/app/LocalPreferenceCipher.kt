@@ -39,7 +39,7 @@ internal object LocalPreferenceCipher {
         val payload = Base64.decode(encoded.removePrefix(PREFIX), Base64.NO_WRAP)
         require(payload.isNotEmpty()) { "Private preference payload is empty." }
         val ivSize = payload[0].toInt() and 0xff
-        require(ivSize == IV_BYTES && payload.size > 1 + ivSize + 16) {
+        require(ivSize == IV_BYTES && payload.size >= 1 + ivSize + 16) {
             "Private preference payload has an invalid AES-GCM structure."
         }
         val iv = payload.copyOfRange(1, 1 + ivSize)

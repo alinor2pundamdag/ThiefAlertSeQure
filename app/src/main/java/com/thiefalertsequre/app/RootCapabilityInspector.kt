@@ -32,18 +32,26 @@ object RootCapabilityInspector {
     }
 
     private val suPaths = listOf(
-        "/system/bin/su",
-        "/system/xbin/su",
-        "/sbin/su",
-        "/system/su",
-        "/system/bin/.ext/.su",
-        "/system/usr/we-need-root/su",
-        "/data/local/bin/su",
-        "/data/local/xbin/su",
-        "/data/adb/magisk",
-        "/sbin/.magisk",
-        "/debug_ramdisk/.magisk"
+        "/system/bin/su", "/system/xbin/su", "/sbin/su", "/system/su",
+        "/system/bin/.ext/.su", "/system/usr/we-need-root/su",
+        "/data/local/bin/su", "/data/local/xbin/su", "/data/adb/magisk",
+        "/sbin/.magisk", "/debug_ramdisk/.magisk", "/vendor/bin/su", "/su/bin/su"
     )
+
+    private val suExecutablePaths = listOf(
+        "/system/bin/su", "/system/xbin/su", "/sbin/su", "/system/su",
+        "/system/bin/.ext/.su", "/system/usr/we-need-root/su",
+        "/data/local/bin/su", "/data/local/xbin/su", "/vendor/bin/su", "/su/bin/su"
+    )
+
+    private fun findSuExecutable(): String? = suExecutablePaths.firstNotNullOfOrNull { path ->
+        runCatching {
+            val file = File(path)
+            if (RootExecutablePathPolicy.isSafeAbsoluteExecutable(path) && file.isFile && file.canExecute()) {
+                file.canonicalPath.takeIf(RootExecutablePathPolicy::isSafeAbsoluteExecutable)
+            } else null
+        }.getOrNull()
+    }
 
     fun inspectPassive(): Report {
         val indicators = buildList {
@@ -77,8 +85,12 @@ object RootCapabilityInspector {
      */
     fun verifyRootAuthorization(timeoutSeconds: Long = 8L): Report {
         val passive = inspectPassive()
+        val suExecutable = findSuExecutable() ?: return passive.copy(
+            status = RootStatus.SU_NOT_AVAILABLE,
+            detail = if (passive.mayBeRooted) "Root indicators exist, but no executable su binary was found at a verified absolute path." else "No executable su binary was found at a verified absolute path."
+        )
         val process = try {
-            ProcessBuilder("su", "-c", "id").redirectErrorStream(true).start()
+            ProcessBuilder(suExecutable, "-c", "id").redirectErrorStream(true).start()
         } catch (e: Exception) {
             return passive.copy(
                 status = RootStatus.SU_NOT_AVAILABLE,
@@ -122,8 +134,10 @@ object RootCapabilityInspector {
      * Never changes controller configuration, power, pairing, or system properties.
      */
     fun collectBluetoothDiagnostics(timeoutSeconds: Long = 8L): String {
+        val suExecutable = findSuExecutable()
+            ?: return "No executable su binary was found at a verified absolute path."
         val process = ProcessBuilder(
-            "su", "-c",
+            suExecutable, "-c",
             "dumpsys bluetooth_manager; echo '\\n--- Bluetooth system properties ---'; getprop | grep -i bluetooth; echo '\\n--- Bluetooth sysfs devices ---'; ls -la /sys/class/bluetooth 2>/dev/null"
         ).redirectErrorStream(true).start()
         val output = StringBuilder()
