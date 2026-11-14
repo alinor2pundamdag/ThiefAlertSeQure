@@ -217,7 +217,7 @@ jobs:
           test -s "$RELEASE_APK"
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           BADGING="$("$BUILD_TOOLS/aapt" dump badging "$RELEASE_APK")"
-          PACKAGE_LINE="$(printf '%s\\n' "$BADGING" | grep -m1 "^package:")"
+          PACKAGE_LINE="$(printf '%s\n' "$BADGING" | grep -m1 "^package:")"
           echo "Production-baseline release variant: $PACKAGE_LINE"
           [[ "$PACKAGE_LINE" == *"name='com.thiefalertsequre.app'"* ]]
           [[ "$PACKAGE_LINE" == *"versionCode='5'"* ]]
@@ -234,7 +234,7 @@ jobs:
           echo "Source APK SHA-256: $(sha256sum "$SOURCE_APK" | cut -d' ' -f1)"
           echo "Distribution APK SHA-256: $(sha256sum "$APK_PATH" | cut -d' ' -f1)"
           BADGING="$("$BUILD_TOOLS/aapt" dump badging "$APK_PATH")"
-          PACKAGE_LINE="$(printf '%s\\n' "$BADGING" | grep -m1 "^package:")"
+          PACKAGE_LINE="$(printf '%s\n' "$BADGING" | grep -m1 "^package:")"
           echo "APK metadata: $PACKAGE_LINE"
           if [[ "$APK_VARIANT" == "debug" ]]; then
             EXPECTED_PACKAGE="name='com.thiefalertsequre.app.v114test'"
@@ -250,8 +250,8 @@ jobs:
             fi
           done
           SIGNER_OUTPUT="$("$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK_PATH")"
-          printf '%s\\n' "$SIGNER_OUTPUT"
-          ACTUAL_SIGNER_CERT="$(printf '%s\\n' "$SIGNER_OUTPUT" | sed -n 's/.*SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          printf '%s\n' "$SIGNER_OUTPUT"
+          ACTUAL_SIGNER_CERT="$(printf '%s\n' "$SIGNER_OUTPUT" | sed -n 's/.*SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
           if [[ "$RELEASE_SIGNING_CONFIGURED" == "true" ]]; then
             KEYSTORE_TO_VERIFY="$ANDROID_KEYSTORE_PATH"
             VERIFY_ALIAS="$ANDROID_KEY_ALIAS"
