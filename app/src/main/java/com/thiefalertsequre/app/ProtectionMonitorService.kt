@@ -120,12 +120,16 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private val prefs by lazy { getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
 
     private val countdownValidationRunning = AtomicBoolean(false)
+    private val disconnectRetryRunning = AtomicBoolean(false)
     @Volatile private var countdownExpected: ProtectionState? = null
     private val countdownRunnable = Runnable { countdownExpected?.let(::evaluateCountdown) }
     private val systemReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
-                Intent.ACTION_BATTERY_CHANGED -> handleBatteryChanged(intent)
+                Intent.ACTION_BATTERY_CHANGED -> {
+                    retryPendingDisconnectFromBatterySnapshot()
+                    handleBatteryChanged(intent)
+                }
                 ACTION_REFRESH -> refreshProtectionState()
             }
         }
@@ -442,6 +446,20 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             unregisterMotionSensor()
             startTheftAlarm()
         }
+    }
+
+    /** Battery snapshots may retry an existing OS unplug event, but can never create one. */
+    private fun retryPendingDisconnectFromBatterySnapshot() {
+        if (!disconnectRetryRunning.compareAndSet(false, true)) return
+        Thread {
+            try {
+                PowerTransitionCoordinator.retryPendingDisconnect(applicationContext)
+            } catch (error: Exception) {
+                LocalTamperHistory.record(this, "charger_unplug_retry_failed", error.javaClass.simpleName + ": " + error.message)
+            } finally {
+                disconnectRetryRunning.set(false)
+            }
+        }.start()
     }
 
     private fun handleBatteryChanged(intent: Intent) {
