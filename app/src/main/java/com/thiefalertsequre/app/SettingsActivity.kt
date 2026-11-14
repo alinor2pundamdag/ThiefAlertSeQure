@@ -662,7 +662,7 @@ class SettingsActivity : FragmentActivity() {
         val device = AndroidDeviceCompatibility.deviceSummary(
             Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.VERSION.RELEASE, Build.VERSION.SDK_INT
         )
-        return "$device\n$alarm\n$notifications\n$batteryUnrestricted\nMinimum supported Android: 8.0 (API 26)"
+        return "$device\n$alarm\n$notifications\n$batteryUnrestricted\nMinimum supported Android: 6.0 (API 23)"
     }
 
 
@@ -857,119 +857,5 @@ class SettingsActivity : FragmentActivity() {
                     .setData(Uri.parse("package:$packageName")),
                 Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                     .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
-            )
-        } else {
-            android.widget.Toast.makeText(this,
-                "Android " + Build.VERSION.SDK_INT + " does not have a separate full-screen intent access page.",
-                android.widget.Toast.LENGTH_LONG).show()
-            open(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                .putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
-        }
-    }
-
-    private fun requestDeviceAdministrator() {
-        val component = android.content.ComponentName(this, ThiefAlertAdminReceiver::class.java)
-        val intent = Intent(android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
-            .putExtra(android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN, component)
-            .putExtra(android.app.admin.DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                "Allow ThiefAlertSeQure to lock the screen when its anti-theft alarm is triggered.")
-        open(intent, Intent(Settings.ACTION_SECURITY_SETTINGS))
-    }
-
-    private fun showRecentAppsTutorial() {
-        MaterialAlertDialogBuilder(this).setTitle("Keep ThiefAlertSeQure in Recents")
-            .setMessage(androidVersionContext() + "\n\nOpen Recents, locate ThiefAlertSeQure, then use the app-card menu or manufacturer-specific gesture to choose Lock / Keep open if available. Android may still stop the app.")
-            .setPositiveButton("OK", null).showThemed(this)
-    }
-
-    private fun androidVersionContext(): String {
-        val release = Build.VERSION.RELEASE ?: "unknown"
-        val name = when (Build.VERSION.SDK_INT) {
-            26 -> "Android 8.0"; 27 -> "Android 8.1"; 28 -> "Android 9"; 29 -> "Android 10"
-            30 -> "Android 11"; 31 -> "Android 12"; 32 -> "Android 12L"; 33 -> "Android 13"
-            34 -> "Android 14"; 35 -> "Android 15"; 36 -> "Android 16"; 37 -> "Android 17"
-            else -> "Android API " + Build.VERSION.SDK_INT
-        }
-        val route = when (Build.VERSION.SDK_INT) {
-            26, 27 -> "Typical route: Settings → Apps & notifications → App info → ThiefAlertSeQure. Battery optimization is usually under Settings → Battery. Notification controls are under App info → Notifications."
-            28 -> "Typical route: Settings → Apps & notifications → ThiefAlertSeQure → Battery. For optimization, check Settings → Apps & notifications → Special app access → Battery optimization."
-            29 -> "Typical route: Settings → Apps → ThiefAlertSeQure → Battery. Check Settings → Apps & notifications → Special app access → Battery optimization for the allowlist."
-            30 -> "Typical route: Settings → Apps & notifications → ThiefAlertSeQure → Battery. Review Background restriction and Unrestricted options where present."
-            31, 32 -> "Typical route: Settings → Apps → ThiefAlertSeQure → App battery usage. Exact alarms are under Settings → Apps → Special app access → Alarms & reminders."
-            33 -> "Typical route: Settings → Apps → ThiefAlertSeQure → Notifications and Battery. Notification permission is runtime-controlled; exact alarms remain under Special app access."
-            34 -> "Typical route: Settings → Apps → Special app access → Full-screen notifications, and Settings → Apps → ThiefAlertSeQure → Notifications / Battery."
-            35, 36, 37 -> "Typical route: Settings → Apps → Special app access → Full-screen notifications / Alarms & reminders, and App info → ThiefAlertSeQure → Notifications / Battery. Android 17 also requires background audio to run with a qualifying foreground service."
-            else -> "Use Settings search for ThiefAlertSeQure, Battery, Notifications, Alarms & reminders, or Full-screen notifications."
-        }
-        val device = AndroidDeviceCompatibility.deviceSummary(
-            Build.MANUFACTURER, Build.BRAND, Build.MODEL, release, Build.VERSION.SDK_INT
-        )
-        val oemGuide = AndroidDeviceCompatibility.backgroundSettingsGuide(Build.MANUFACTURER, Build.BRAND)
-        return "$device\n$route\n\n$oemGuide\n\nManufacturer menus can differ; use Settings search if a label is unavailable."
-    }
-
-    private fun addSystemSettingAction(label: String, tutorialTitle: String, tutorial: String, click: () -> Unit) {
-        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
-        val launch = action(label, click).apply {
-            val statusId = when (tutorialTitle) { "Notifications", "App notifications" -> "notifications"; "Exact alarms" -> "exact"; "Full-screen intent permission" -> "fullscreen"; "Secure device lock" -> "lock"; "Battery optimization", "Background activity" -> "battery"; "Bluetooth permission" -> "bt_permission"; else -> null }
-            statusId?.let { id ->
-                val p = ThemeStore.get(this@SettingsActivity)
-                val state = SetupStatusSnapshot.read(this@SettingsActivity).items.firstOrNull { it.id == id }?.state
-                val accent = when (state) { SetupState.VERIFIED -> p.success; SetupState.ACTION_REQUIRED -> p.warning; SetupState.NEUTRAL, SetupState.UNSUPPORTED -> p.muted; SetupState.UNKNOWN -> p.danger; null -> p.primary }
-                strokeColor = android.content.res.ColorStateList.valueOf(accent)
-                setTextColor(accent)
-            }
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(8) }
-        }
-        val info = MaterialButton(this).apply {
-            text = "i"; isAllCaps = false; minWidth = dp(44); minHeight = dp(48); cornerRadius = dp(14)
-            contentDescription = "Tutorial: $tutorialTitle"
-            setOnClickListener {
-                MaterialAlertDialogBuilder(this@SettingsActivity)
-                    .setTitle(tutorialTitle + " • Android " + Build.VERSION.SDK_INT)
-                    .setMessage(androidVersionContext() + "\n\n" + tutorial)
-                    .setPositiveButton("Got it", null).showThemed(this@SettingsActivity)
-            }
-        }
-        row.addView(launch); row.addView(info, LinearLayout.LayoutParams(dp(48), dp(52)))
-        root.addView(row, matchWrap())
-    }
-
-    private fun open(primary: Intent, fallback: Intent? = null) {
-        if (fallback == null) {
-            AndroidDeviceCompatibility.open(this, primary)
-        } else {
-            AndroidDeviceCompatibility.open(this, primary, fallback)
-        }
-    }
-
-    private fun action(value: String, click: () -> Unit) = MaterialButton(this).apply {
-        text = value
-        isAllCaps = false
-        cornerRadius = dp(15)
-        minHeight = dp(52)
-        strokeWidth = dp(1)
-        strokeColor = android.content.res.ColorStateList.valueOf(getColor(R.color.tas_primary))
-        backgroundTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.tas_surface))
-        setTextColor(getColor(R.color.tas_text))
-        setOnClickListener { click() }
-        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-            bottomMargin = dp(8)
-        }
-    }
-
-    private fun text(value: String, size: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
-        text = value
-        textSize = size
-        setTextColor(getColor(color))
-        if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
-        setLineSpacing(dp(3).toFloat(), 1f)
-    }
-
-    private fun space(height: Int) = View(this).apply {
-        layoutParams = LinearLayout.LayoutParams(1, dp(height))
-    }
-
-    private fun matchWrap() = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
-}
+   
+[TRUNCATED]
