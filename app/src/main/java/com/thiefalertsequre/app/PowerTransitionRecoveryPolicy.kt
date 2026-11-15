@@ -19,15 +19,13 @@ internal object PowerTransitionRecoveryPolicy {
         eventElapsedRealtimeMs: Long,
         currentElapsedRealtimeMs: Long
     ): Boolean {
+        // elapsedRealtime is monotonic only within a boot. When either boot
+        // identity is unavailable, elapsed time alone cannot prove provenance.
+        if (candidateBootCount < 0 || currentBootCount < 0) return false
+        if (candidateBootCount != currentBootCount) return false
         if (eventElapsedRealtimeMs <= 0L || currentElapsedRealtimeMs <= 0L ||
             currentElapsedRealtimeMs < eventElapsedRealtimeMs
         ) return false
-
-        return when {
-            candidateBootCount >= 0 || currentBootCount >= 0 ->
-                candidateBootCount >= 0 && currentBootCount >= 0 &&
-                    candidateBootCount == currentBootCount
-            else -> true
-        }
+        return true
     }
 }
