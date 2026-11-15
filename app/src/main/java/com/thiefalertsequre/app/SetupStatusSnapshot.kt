@@ -28,19 +28,19 @@ object SetupStatusSnapshot {
   val x=mutableListOf<SetupItem>();val alarm=c.getSystemService(AlarmManager::class.java)
   if(Build.VERSION.SDK_INT>=31){val ok=runCatching{alarm.canScheduleExactAlarms()}.getOrDefault(false);x+=SetupItem("exact","Exact 10-second alarm access",if(ok)SetupState.VERIFIED else SetupState.ACTION_REQUIRED,if(ok)"Android confirms exact-alarm scheduling access." else "Android has not granted exact-alarm special access.")}else x+=SetupItem("exact","Exact alarm access",SetupState.UNSUPPORTED,"No separate access gate on this Android version.")
   val notifs=runCatching{NotificationManagerCompat.from(c).areNotificationsEnabled()}.getOrDefault(false);x+=SetupItem("notifications","App notifications",if(notifs)SetupState.VERIFIED else SetupState.ACTION_REQUIRED,if(notifs)"Android reports notifications enabled." else "Android reports notifications disabled.")
-  val dashboardEnabled=c.getSharedPreferences(MainActivity.ALARM_DISPLAY_PREFS,0).getBoolean(MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN,false)
+  val dashboardEnabled=SafePreferences.boolean(c.getSharedPreferences(MainActivity.ALARM_DISPLAY_PREFS,0),MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN,false)
   val fullScreenAccess=Build.VERSION.SDK_INT<34||runCatching{c.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()}.getOrDefault(false)
   x+=FullScreenSetupStatusPolicy.evaluate(dashboardEnabled,Build.VERSION.SDK_INT,fullScreenAccess)
   if(Build.VERSION.SDK_INT>=23){val ok=runCatching{c.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(c.packageName)}.getOrDefault(false);x+=SetupItem("battery","Battery optimization exemption",if(ok)SetupState.VERIFIED else SetupState.ACTION_REQUIRED,if(ok)"Android confirms exemption." else "App remains subject to battery optimization.")}
   val lock=runCatching{c.getSystemService(KeyguardManager::class.java).isDeviceSecure}.getOrDefault(false);x+=SetupItem("lock","Secure device lock",if(lock)SetupState.VERIFIED else SetupState.ACTION_REQUIRED,if(lock)"Android confirms a secure lock." else "No secure PIN, pattern, or password is configured.")
   OemBackgroundSetupPolicy.evaluate(Build.MANUFACTURER, Build.BRAND)?.let(x::add)
   val prefs=c.getSharedPreferences(ProtectionMonitorService.PREFS,0)
-  val a2Enabled=prefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED,false)
+  val a2Enabled=SafePreferences.boolean(prefs,ProtectionMonitorService.KEY_BT_ALERT_ENABLED,false)
   val perm=Build.VERSION.SDK_INT<31||c.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)==PackageManager.PERMISSION_GRANTED
   x+=BluetoothSetupStatusPolicy.permission(a2Enabled,perm)
   val adapter=runCatching{if(perm)c.getSystemService(BluetoothManager::class.java)?.adapter?.isEnabled else null}.getOrNull()
   x+=BluetoothSetupStatusPolicy.adapter(a2Enabled,adapter)
-  val enabled=prefs.getBoolean(ProtectionMonitorService.KEY_ENABLED,ProtectionMonitorPolicy.DEFAULT_ENABLED)
+  val enabled=SafePreferences.boolean(prefs,ProtectionMonitorService.KEY_ENABLED,ProtectionMonitorPolicy.DEFAULT_ENABLED)
   val running=runCatching{c.getSystemService(ActivityManager::class.java).getRunningServices(100).any{it.service.className==ProtectionMonitorService::class.java.name}}.getOrDefault(false)
   x+=when{!enabled->SetupItem("monitor","Protection monitor",SetupState.NEUTRAL,"Monitor is disabled by owner.");running->SetupItem("monitor","Protection monitor",SetupState.VERIFIED,"Android process list confirms the service is running.");else->SetupItem("monitor","Protection monitor",SetupState.UNKNOWN,"Enabled preference exists, but running service is not confirmed.")}
   val a2=a2Enabled
