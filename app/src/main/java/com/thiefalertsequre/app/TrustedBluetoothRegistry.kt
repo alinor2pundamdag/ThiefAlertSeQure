@@ -19,36 +19,45 @@ object TrustedBluetoothRegistry {
     private const val DEVICE_REVISION_PREFIX = "trusted_bluetooth_device_revision_v1_"
     private const val TAG = "TrustedBluetoothRegistry"
 
-    fun read(prefs: SharedPreferences): List<TrustedBluetoothDevice> {
+    fun read(prefs: SharedPreferences): List<TrustedBluetoothDevice> =
+        when (val result = readStrict(prefs)) {
+            is PreferenceRead.Value -> result.value
+            is PreferenceRead.Corrupt -> emptyList()
+        }
+
+    private fun readStrict(prefs: SharedPreferences): PreferenceRead<List<TrustedBluetoothDevice>> {
         val raw = when (val stored = SafePreferences.readString(prefs, KEY_DEVICES, null)) {
             is PreferenceRead.Value -> stored.value
-            is PreferenceRead.Corrupt -> return emptyList()
+            is PreferenceRead.Corrupt -> return PreferenceRead.Corrupt(KEY_DEVICES)
         }
         val legacyAddress = when (val stored = SafePreferences.readString(
             prefs, ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null
         )) {
             is PreferenceRead.Value -> stored.value
-            is PreferenceRead.Corrupt -> return emptyList()
+            is PreferenceRead.Corrupt -> return PreferenceRead.Corrupt(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS)
         }
         val legacyName = when (val stored = SafePreferences.readString(
             prefs, ProtectionMonitorService.KEY_BT_TRUSTED_NAME, null
         )) {
             is PreferenceRead.Value -> stored.value
-            is PreferenceRead.Corrupt -> return emptyList()
+            is PreferenceRead.Corrupt -> return PreferenceRead.Corrupt(ProtectionMonitorService.KEY_BT_TRUSTED_NAME)
         }
+
         val devices = if (raw == null) {
             if (legacyAddress.isNullOrBlank()) emptyList()
             else if (!isValidAddress(legacyAddress)) {
                 Log.e(TAG, "Legacy trusted-device address is malformed; source retained")
-                return emptyList()
-            } else listOf(TrustedBluetoothDevice(
-                legacyAddress.trim().uppercase(),
-                legacyName?.takeIf { it.isNotBlank() } ?: "Bluetooth accessory"
-            ))
+                return PreferenceRead.Corrupt(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS)
+            } else listOf(
+                TrustedBluetoothDevice(
+                    legacyAddress.trim().uppercase(),
+                    legacyName?.takeIf { it.isNotBlank() } ?: "Bluetooth accessory"
+                )
+            )
         } else {
             runCatching { decode(readOrMigratePayload(prefs, KEY_DEVICES, raw)) }
                 .onFailure { Log.e(TAG, "Trusted-device payload is unreadable; encrypted source retained", it) }
-                .getOrElse { return emptyList() }
+                .getOrElse { return PreferenceRead.Corrupt(KEY_DEVICES) }
         }
 
         val editor = prefs.edit()
@@ -68,11 +77,18 @@ object TrustedBluetoothRegistry {
             editor.remove(ProtectionMonitorService.KEY_BT_TRUSTED_NAME)
             changed = true
         }
-        if (changed) check(editor.commit()) { "Could not securely migrate trusted Bluetooth preferences." }
-        migrateLegacyDeviceRevisionKeys(prefs)
-        return devices
+        if (changed && !editor.commit()) {
+            Log.e(TAG, "Trusted-device migration commit failed; source data retained where possible")
+            return PreferenceRead.Corrupt(KEY_DEVICES)
+        }
+        return runCatching {
+            migrateLegacyDeviceRevisionKeys(prefs)
+            PreferenceRead.Value(devices)
+        }.getOrElse {
+            Log.e(TAG, "Trusted-device revision migration failed; source data retained", it)
+            PreferenceRead.Corrupt(KEY_DEVICES)
+        }
     }
-
     fun add(prefs: SharedPreferences, address: String, name: String): Boolean {
         if (!isValidAddress(address)) return false
         val normalizedAddress = address.trim().uppercase()
