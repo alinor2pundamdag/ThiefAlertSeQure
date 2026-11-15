@@ -164,7 +164,14 @@ class BluetoothCenterActivity : FragmentActivity() {
             .setNegativeButton("Keep registered", null)
             .setPositiveButton("Unregister") { _, _ ->
                 val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-                TrustedBluetoothRegistry.remove(prefs, device.address)
+                val removed = runCatching {
+                    TrustedBluetoothRegistry.remove(prefs, device.address)
+                }.getOrDefault(false)
+                if (removed) {
+                    showResult("Accessory unregistered", "${device.name} is no longer trusted by A2. Android pairing was not changed.")
+                } else {
+                    showResult("Unregister failed", "The trust record was not confirmed as removed. The existing record has been left unchanged where possible.")
+                }
                 render()
             }
             .showThemed(this)
@@ -202,11 +209,18 @@ class BluetoothCenterActivity : FragmentActivity() {
             .setItems(labels) { _, which ->
                 val selected = devices[which]
                 val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-                TrustedBluetoothRegistry.add(
-                    prefs,
-                    selected.address,
-                    selected.name ?: "Bluetooth accessory"
-                )
+                val added = runCatching {
+                    TrustedBluetoothRegistry.add(
+                        prefs,
+                        selected.address,
+                        selected.name ?: "Bluetooth accessory"
+                    )
+                }.getOrDefault(false)
+                if (added) {
+                    showResult("Accessory registered", "${selected.name ?: "Bluetooth accessory"} was saved as an A2 trusted device. Reconnect it to establish a fresh connection baseline.")
+                } else {
+                    showResult("Registration failed", "The trusted-device record could not be saved. No success was reported.")
+                }
                 render()
             }
             .setNegativeButton("Cancel", null)
@@ -216,8 +230,19 @@ class BluetoothCenterActivity : FragmentActivity() {
     private fun toggleA2() {
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
         if (SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)) {
-            prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).apply()
-            TrustedBluetoothRegistry.clearBaselines(prefs)
+            if (!prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).commit()) {
+                showResult("Could not disable A2", "Android did not confirm the preference change. The previous setting is retained.")
+                return
+            }
+            val baselinesCleared = runCatching {
+                TrustedBluetoothRegistry.clearBaselines(prefs)
+                true
+            }.getOrDefault(false)
+            if (!baselinesCleared) {
+                showResult("A2 disabled; cleanup needs attention", "The OFF setting was saved, but the connection baseline could not be cleared. The stored data was retained.")
+            } else {
+                showResult("A2 disabled", "Trusted-device separation alerts are now off.")
+            }
             render()
             return
         }
@@ -248,13 +273,36 @@ class BluetoothCenterActivity : FragmentActivity() {
             showResult("Alarm is active", "Do not change Bluetooth alert configuration while the theft alarm is active.")
             return
         }
-        prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, true).apply()
-        TrustedBluetoothRegistry.clearBaselines(prefs)
-        runCatching {
+        if (!prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, true).commit()) {
+            showResult("Could not enable A2", "Android did not confirm that the ON setting was saved.")
+            return
+        }
+        val baselinesCleared = runCatching {
+            TrustedBluetoothRegistry.clearBaselines(prefs)
+            true
+        }.getOrDefault(false)
+        if (!baselinesCleared) {
+            prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).commit()
+            showResult("Could not enable A2", "The trusted-device baseline could not be reset. A2 was rolled back to OFF.")
+            render()
+            return
+        }
+        val started = runCatching {
             ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
-        }.onFailure {
-            prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).apply()
-            showResult("Could not start monitoring", "${it.javaClass.simpleName}: ${it.message ?: "Android blocked the foreground service."}")
+            true
+        }.getOrElse {
+            val rolledBack = prefs.edit()
+                .putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+                .commit()
+            showResult(
+                "Could not start monitoring",
+                "${it.javaClass.simpleName}: ${it.message ?: "Android blocked the foreground service."}" +
+                    if (rolledBack) "\nA2 was rolled back to OFF." else "\nWARNING: the OFF rollback could not be saved."
+            )
+            false
+        }
+        if (started) {
+            showResult("A2 enabled", "The ON setting was saved and service startup was requested. Check the runtime status shown on this screen; Android may still stop a foreground service.")
         }
         render()
     }
