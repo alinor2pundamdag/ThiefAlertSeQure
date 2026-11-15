@@ -542,13 +542,18 @@ object PowerTransitionCoordinator {
                 return@synchronized current
             }
 
-            val next = store.update { old ->
+            val update = store.updatePersisted { old ->
                 if (old.mode == ProtectionMode.ARMED) ProtectionEngine.chargerDisconnected(
                     old,
                     candidate.eventEpochMs,
                     candidate.eventElapsedRealtimeMs,
                     candidate.eventBootCount
                 ) else old
+            }
+            val next = update.state
+            if (!update.persisted) {
+                LocalTamperHistory.record(context, "charger_countdown_persist_pending", "Protection state commit failed; durable unplug provenance retained for recovery")
+                return@synchronized next
             }
             if (next.mode == ProtectionMode.COUNTDOWN) {
                 if (AlarmScheduler.schedule(
