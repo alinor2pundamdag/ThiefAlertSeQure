@@ -18,14 +18,18 @@ object TrustedBluetoothRegistry {
     private const val DEVICE_REVISION_PREFIX = "trusted_bluetooth_device_revision_v1_"
 
     fun read(prefs: SharedPreferences): List<TrustedBluetoothDevice> {
-        val raw = prefs.getString(KEY_DEVICES, null)
-        val legacyAddress = prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null)
-        val legacyName = prefs.getString(ProtectionMonitorService.KEY_BT_TRUSTED_NAME, null)
+        val raw = when (val stored = SafePreferences.readString(prefs, KEY_DEVICES, null)) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> return emptyList()
+        }
+        val legacyAddress = SafePreferences.string(prefs, ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null)
+        val legacyName = SafePreferences.string(prefs, ProtectionMonitorService.KEY_BT_TRUSTED_NAME, null)
         val devices = if (raw == null) {
             if (legacyAddress.isNullOrBlank()) emptyList()
             else listOf(TrustedBluetoothDevice(legacyAddress, legacyName?.takeIf { it.isNotBlank() } ?: "Bluetooth accessory"))
         } else {
-            decode(readOrMigratePayload(prefs, KEY_DEVICES, raw))
+            runCatching { decode(readOrMigratePayload(prefs, KEY_DEVICES, raw)) }
+                .getOrElse { return emptyList() }
         }
 
         val editor = prefs.edit()
@@ -87,15 +91,16 @@ object TrustedBluetoothRegistry {
     fun isTrusted(prefs: SharedPreferences, address: String): Boolean =
         read(prefs).any { it.address.equals(address, ignoreCase = true) }
 
-    fun revision(prefs: SharedPreferences): Long = prefs.getLong(KEY_REVISION, 0L)
+    fun revision(prefs: SharedPreferences): Long =
+        SafePreferences.long(prefs, KEY_REVISION, 0L)
 
     /** Per-address generation prevents unrelated registry edits from canceling another device's timer. */
     fun deviceRevision(prefs: SharedPreferences, address: String): Long {
         val key = deviceRevisionKey(address)
-        if (prefs.contains(key)) return prefs.getLong(key, 0L)
+        if (prefs.contains(key)) return SafePreferences.long(prefs, key, Long.MIN_VALUE)
         val legacyKey = legacyDeviceRevisionKey(address)
         if (!prefs.contains(legacyKey)) return 0L
-        val previous = prefs.getLong(legacyKey, 0L)
+        val previous = SafePreferences.long(prefs, legacyKey, Long.MIN_VALUE)
         check(prefs.edit().putLong(key, previous).remove(legacyKey).commit()) {
             "Could not securely migrate a trusted-device revision."
         }
@@ -118,8 +123,13 @@ object TrustedBluetoothRegistry {
         legacyKeys.forEach { oldKey ->
             val address = oldKey.removePrefix(DEVICE_REVISION_PREFIX).replace("_", ":")
             val newKey = deviceRevisionKey(address)
-            if (!prefs.contains(newKey)) edit.putLong(newKey, prefs.getLong(oldKey, 0L))
-            edit.remove(oldKey)
+            when (val previous = SafePreferences.readLong(prefs, oldKey, 0L)) {
+                is PreferenceRead.Value -> {
+                    if (!prefs.contains(newKey)) edit.putLong(newKey, previous.value)
+                    edit.remove(oldKey)
+                }
+                is PreferenceRead.Corrupt -> Unit // retain malformed legacy entry
+            }
         }
         check(edit.commit()) { "Could not securely migrate trusted-device revision keys." }
     }
@@ -147,9 +157,14 @@ object TrustedBluetoothRegistry {
     }
 
     private fun baselineAddresses(prefs: SharedPreferences): Set<String> {
-        val raw = prefs.getString(KEY_BASELINES, null) ?: return emptySet()
-        return readOrMigratePayload(prefs, KEY_BASELINES, raw).lineSequence()
-            .filter { it.isNotBlank() }.toSet()
+        val raw = when (val stored = SafePreferences.readString(prefs, KEY_BASELINES, null)) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> return emptySet()
+        } ?: return emptySet()
+        return runCatching {
+            readOrMigratePayload(prefs, KEY_BASELINES, raw).lineSequence()
+                .filter { it.isNotBlank() }.toSet()
+        }.getOrElse { emptySet() }
     }
 
     private fun readOrMigratePayload(prefs: SharedPreferences, key: String, raw: String): String {
