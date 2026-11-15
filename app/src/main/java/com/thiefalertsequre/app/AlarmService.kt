@@ -41,16 +41,7 @@ class AlarmService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        val nm = getSystemService(NotificationManager::class.java)
-        if (Build.VERSION.SDK_INT >= 26) {
-            nm.createNotificationChannel(
-                NotificationChannel(channelId, "Anti-theft alarm", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Active ThiefAlertSeQure alarm"
-                    setSound(null, null)
-                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                }
-            )
-        }
+        ensureNotificationChannel(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -303,6 +294,24 @@ class AlarmService : Service() {
     companion object {
         private const val NOTIFICATION_ID = 42
         const val CHANNEL_ID = "anti_theft_alarm"
+
+        /** Idempotently create the alarm channel before setup status is evaluated. */
+        fun ensureNotificationChannel(context: Context) {
+            if (Build.VERSION.SDK_INT < 26) return
+            val manager = context.getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_ID,
+                    "Anti-theft alarm",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Active ThiefAlertSeQure alarm"
+                    setSound(null, null)
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                }
+            )
+        }
+
         const val ACTION_START = "com.thiefalertsequre.START"
         const val ACTION_STOP_IF_AUTHENTICATED = "com.thiefalertsequre.STOP_AUTH"
         const val ACTION_REFRESH_FLASH = "com.thiefalertsequre.REFRESH_ALARM_FLASH"
