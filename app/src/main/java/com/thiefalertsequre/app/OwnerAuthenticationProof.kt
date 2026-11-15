@@ -1,6 +1,8 @@
 package com.thiefalertsequre.app
 
+import android.app.Activity
 import android.content.Context
+import androidx.biometric.BiometricPrompt
 
 /**
  * Ephemeral proof emitted only after an Android credential callback or a
@@ -38,7 +40,20 @@ internal class OwnerAuthenticationProof private constructor(
             )
         }
 
-        fun fromAndroidDeviceCredentialResult(context: Context): OwnerAuthenticationProof =
+        fun fromBiometricPromptCredentialResult(
+            context: Context,
+            authenticationType: Int
+        ): OwnerAuthenticationProof? {
+            if (authenticationType != BiometricPrompt.AUTHENTICATION_RESULT_TYPE_DEVICE_CREDENTIAL) return null
+            return deviceCredential(context)
+        }
+
+        fun fromKeyguardResult(context: Context, resultCode: Int): OwnerAuthenticationProof? {
+            if (resultCode != Activity.RESULT_OK) return null
+            return deviceCredential(context)
+        }
+
+        private fun deviceCredential(context: Context): OwnerAuthenticationProof =
             OwnerAuthenticationProof(
                 SOURCE_DEVICE_CREDENTIAL,
                 ProtectionClock.elapsedRealtime(),
