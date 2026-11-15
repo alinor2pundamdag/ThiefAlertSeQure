@@ -272,9 +272,8 @@ object PowerTransitionCoordinator {
             .remove(PENDING_GENERATION)
             .commit()
 
-        val monitorEnabled = context.getSharedPreferences(
-            ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
-        ).getBoolean(
+        val monitorEnabled = SafePreferences.boolean(
+            context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE),
             ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
         val state = ProtectionStore(context).update { current ->
