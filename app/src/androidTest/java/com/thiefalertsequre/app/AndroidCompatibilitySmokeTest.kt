@@ -15,7 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Framework-level smoke coverage across Android API 23–37.
+ * Framework-level smoke coverage across the supported Android API 26–36 range.
  *
  * These tests verify app launch and manifest declarations on the release package.
  * OEM-specific guidance and capability logic have JVM regression coverage; these
@@ -27,6 +27,7 @@ class AndroidCompatibilitySmokeTest {
 
     @Test
     fun everyInternalScreenCanBeCreatedAndDestroyed() {
+        grantNotificationPermissionForTest()
         launch(MainActivity::class.java)
         launch(SettingsActivity::class.java)
         launch(ThemeActivity::class.java)
@@ -122,7 +123,7 @@ class AndroidCompatibilitySmokeTest {
         val snapshot = SetupStatusSnapshot.read(context)
 
         assertTrue("Setup snapshot must contain readiness items", snapshot.items.isNotEmpty())
-        listOf("exact", "notifications", "battery", "lock", "monitor").forEach { id ->
+        listOf("exact", "notifications", "alarm_channel", "fullscreen", "battery", "lock", "monitor", "bt", "a2").forEach { id ->
             assertTrue("Missing setup status item: $id", snapshot.items.any { it.id == id })
         }
     }
@@ -181,6 +182,16 @@ class AndroidCompatibilitySmokeTest {
                 Build.BRAND
             )
         )
+    }
+
+    private fun grantNotificationPermissionForTest() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(
+                "pm grant ${context.packageName} android.permission.POST_NOTIFICATIONS"
+            )
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).bufferedReader().use { it.readText() }
+        }
     }
 
     private fun <T : Activity> launch(activityClass: Class<T>) {
