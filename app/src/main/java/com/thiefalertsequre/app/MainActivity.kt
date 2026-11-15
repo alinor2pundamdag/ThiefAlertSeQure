@@ -873,9 +873,9 @@ class MainActivity : FragmentActivity() {
                     } else if (Build.VERSION.SDK_INT >= 30 &&
                         result.authenticationType == BiometricPrompt.AUTHENTICATION_RESULT_TYPE_DEVICE_CREDENTIAL
                     ) {
-                        completeOwnerAuthentication(
-                            OwnerAuthenticationProof.fromAndroidDeviceCredentialResult(this@MainActivity)
-                        )
+                        OwnerAuthenticationProof.fromBiometricPromptCredentialResult(
+                            this@MainActivity, result.authenticationType
+                        )?.let(::completeOwnerAuthentication)
                     } else {
                         autoAuthenticationRequested = false
                         details.text = "Android authentication did not complete the protected Keystore operation. The alarm remains active."
@@ -990,7 +990,7 @@ class MainActivity : FragmentActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_DEVICE_CREDENTIAL) {
             if (resultCode == RESULT_OK) {
-                completeOwnerAuthentication(OwnerAuthenticationProof.fromAndroidDeviceCredentialResult(this))
+                OwnerAuthenticationProof.fromKeyguardResult(this, resultCode)?.let(::completeOwnerAuthentication)
             }
             else {
                 autoAuthenticationRequested = false
