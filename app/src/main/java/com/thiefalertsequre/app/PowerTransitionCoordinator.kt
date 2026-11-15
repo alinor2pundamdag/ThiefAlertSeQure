@@ -382,7 +382,7 @@ object PowerTransitionCoordinator {
                 .commit()
             if (!saved) {
                 // A transition is not actionable until its provenance is durable.
-                prefs.edit()
+                val restored = prefs.edit()
                     .putBoolean(CONNECTED, true)
                     .putLong(GENERATION, nextGeneration + 1L)
                     .putBoolean(PENDING_DISCONNECT, false)
@@ -391,7 +391,11 @@ object PowerTransitionCoordinator {
                     .remove(PENDING_BOOT_COUNT)
                     .remove(PENDING_GENERATION)
                     .commit()
-                LocalTamperHistory.record(appContext, "charger_candidate_persist_failed", "Unplug candidate was not accepted because its event provenance could not be saved")
+                LocalTamperHistory.record(
+                    appContext,
+                    if (restored) "charger_candidate_persist_failed" else "charger_candidate_rollback_failed",
+                    "Unplug candidate was not accepted because its event provenance could not be saved"
+                )
                 return@synchronized null
             }
             DisconnectCandidate(nextGeneration, eventEpochMs, eventElapsedRealtimeMs, eventBootCount)
