@@ -54,8 +54,13 @@ object AlarmRecoveryCoordinator {
 
     private fun clearRecoveryState(context: Context) {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (!prefs.edit().remove(KEY_RETRIES).commit()) {
-            LocalTamperHistory.record(context, "alarm_recovery_counter_clear_failed", "Recovery counter could not be cleared")
+        when (SafePreferences.readInt(prefs, KEY_RETRIES, 0)) {
+            is PreferenceRead.Value -> if (!prefs.edit().remove(KEY_RETRIES).commit()) {
+                LocalTamperHistory.record(context, "alarm_recovery_counter_clear_failed", "Recovery counter could not be cleared")
+            }
+            is PreferenceRead.Corrupt -> LocalTamperHistory.record(
+                context, "alarm_recovery_counter_corrupt", "Malformed recovery counter retained after alarm recovery"
+            )
         }
         runCatching { AlarmScheduler.cancel(context) }.onFailure {
             LocalTamperHistory.record(context, "alarm_recovery_alarm_cancel_failed", it.javaClass.simpleName + ": " + it.message)
