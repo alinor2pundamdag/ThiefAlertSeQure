@@ -77,6 +77,18 @@ class TrustedBluetoothRegistryEncryptionTest {
     }
 
     @Test
+    fun malformedEncryptedRegistryFailsClosedAndIsRetained() {
+        val malformed = "tas-aesgcm:v1:not-valid-base64"
+        prefs.edit().clear().putString(TrustedBluetoothRegistry.KEY_DEVICES, malformed).commit()
+        try {
+            assertTrue(TrustedBluetoothRegistry.read(prefs).isEmpty())
+            assertEquals(malformed, prefs.getString(TrustedBluetoothRegistry.KEY_DEVICES, null))
+        } finally {
+            prefs.edit().clear().commit()
+        }
+    }
+
+    @Test
     fun legacySingleDeviceFieldsMigrateAndAreRemoved() {
         prefs.edit().clear().commit()
         val address = "AA:BB:CC:DD:EE:03"
