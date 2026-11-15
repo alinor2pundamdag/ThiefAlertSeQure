@@ -26,4 +26,11 @@ class PowerTransitionRecoveryPolicyTest {
         assertTrue(PowerTransitionRecoveryPolicy.canAcceptDisconnectCandidate(true, false))
         assertFalse(PowerTransitionRecoveryPolicy.canAcceptDisconnectCandidate(false, false))
     }
+
+    @Test fun connectEventOnlyWinsAfterLiveConfirmationAndWithoutNewerPowerEvent() {
+        assertTrue(PowerTransitionRecoveryPolicy.acceptsConnectedEvent(true, 4L, 4L))
+        assertFalse(PowerTransitionRecoveryPolicy.acceptsConnectedEvent(false, 4L, 4L))
+        assertFalse(PowerTransitionRecoveryPolicy.acceptsConnectedEvent(null, 4L, 4L))
+        assertFalse(PowerTransitionRecoveryPolicy.acceptsConnectedEvent(true, 4L, 5L))
+    }
 }
