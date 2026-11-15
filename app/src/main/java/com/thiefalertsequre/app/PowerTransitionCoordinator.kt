@@ -260,7 +260,7 @@ object PowerTransitionCoordinator {
 
     private fun confirmConnectedAndArmLocked(context: Context, reason: String): ProtectionState {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        prefs.edit()
+        val baselineSaved = prefs.edit()
             .putBoolean(CONNECTED, true)
             .putBoolean(KNOWN, true)
             .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
@@ -271,12 +271,19 @@ object PowerTransitionCoordinator {
             .remove(PENDING_BOOT_COUNT)
             .remove(PENDING_GENERATION)
             .commit()
+        if (!baselineSaved) {
+            LocalTamperHistory.record(
+                context, "power_connected_baseline_persist_failed",
+                "Connected event was not accepted because its baseline could not be durably saved"
+            )
+            return ProtectionStore(context).read()
+        }
 
         val monitorEnabled = SafePreferences.boolean(
             context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE),
             ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
-        val state = ProtectionStore(context).update { current ->
+        val update = ProtectionStore(context).updatePersisted { current ->
             when {
                 current.mode == ProtectionMode.ALARM_TRIGGERED -> current
                 !monitorEnabled -> ProtectionState(
@@ -286,6 +293,15 @@ object PowerTransitionCoordinator {
                 else -> ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
             }
         }
+        if (!update.persisted) {
+            LocalTamperHistory.record(
+                context, "power_connected_state_persist_failed",
+                "Connected baseline was saved, but protection state did not commit; scheduler was left unchanged"
+            )
+            return update.state
+        }
+
+        val state = update.state
         if (state.mode != ProtectionMode.ALARM_TRIGGERED) {
             AlarmScheduler.cancel(context)
             if (monitorEnabled) notifyMonitorStateChanged(context)
