@@ -65,6 +65,18 @@ class TrustedBluetoothRegistryEncryptionTest {
     }
 
     @Test
+    fun wrongTypedRegistryPayloadFailsClosedAndIsRetained() {
+        prefs.edit().clear().putBoolean(TrustedBluetoothRegistry.KEY_DEVICES, true).commit()
+        try {
+            assertTrue(TrustedBluetoothRegistry.read(prefs).isEmpty())
+            assertTrue("Corrupt trust data must remain available for diagnosis", prefs.contains(TrustedBluetoothRegistry.KEY_DEVICES))
+            assertTrue(prefs.getBoolean(TrustedBluetoothRegistry.KEY_DEVICES, false))
+        } finally {
+            prefs.edit().clear().commit()
+        }
+    }
+
+    @Test
     fun legacySingleDeviceFieldsMigrateAndAreRemoved() {
         prefs.edit().clear().commit()
         val address = "AA:BB:CC:DD:EE:03"
