@@ -158,7 +158,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                 )
             }.onFailure {
                 LocalTamperHistory.record(this, "latched_alarm_restore_failed", it.javaClass.simpleName + ": " + it.message)
-                AlarmRecoveryNotice.show(this, "The latched alarm needs the app opened to resume playback")
+                AlarmRecoveryCoordinator.onStartFailure(
+                    this, "The latched alarm needs the app opened to resume playback"
+                )
             }
             stopSelf()
             return START_NOT_STICKY
