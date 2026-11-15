@@ -49,7 +49,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private val bluetoothSeparationReceiver = object : BroadcastReceiver() {
         @Suppress("DEPRECATION", "MissingPermission")
         override fun onReceive(context: Context, intent: Intent) {
-            if (!prefs.getBoolean(KEY_BT_ALERT_ENABLED, false)) return
+            if (!SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false)) return
             if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 LocalTamperHistory.record(context, "bluetooth_permission_missing", "Trusted Bluetooth disconnect monitoring paused; grant Bluetooth Connect permission")
                 return
@@ -66,7 +66,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                 BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
                     val hadConnectionBaseline = TrustedBluetoothRegistry.markConnected(prefs, address, false)
                     if (A2DisconnectPolicy.shouldStartGracePeriod(
-                            alertEnabled = prefs.getBoolean(KEY_BT_ALERT_ENABLED, false),
+                            alertEnabled = SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false),
                             trusted = TrustedBluetoothRegistry.isTrusted(prefs, address),
                             hadConnectionBaseline = hadConnectionBaseline,
                             protectionMode = ProtectionStore(context).read().mode
@@ -86,7 +86,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                             )
                             val stillDisconnected = !TrustedBluetoothRegistry.isBaselineConnected(prefs, address)
                             if (A2DisconnectPolicy.shouldTriggerAlarm(
-                                    alertEnabled = prefs.getBoolean(KEY_BT_ALERT_ENABLED, false),
+                                    alertEnabled = SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false),
                                     trusted = stillTrusted,
                                     pendingDisconnectCurrent = pendingDisconnectCurrent,
                                     stillDisconnected = stillDisconnected,
@@ -163,7 +163,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             stopSelf()
             return START_NOT_STICKY
         }
-        val enabled = prefs.getBoolean(KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        val enabled = SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         if (!ProtectionMonitorPolicy.shouldRun(enabled, state.mode)) {
             stopSelf()
             return START_NOT_STICKY
@@ -221,7 +221,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     }
 
     private fun registerBluetoothSeparationReceiver() {
-        if (bluetoothReceiverRegistered || !prefs.getBoolean(KEY_BT_ALERT_ENABLED, false)) return
+        if (bluetoothReceiverRegistered || !SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false)) return
         if (Build.VERSION.SDK_INT >= 31 &&
             checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED
         ) {
@@ -374,7 +374,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
 
     private fun syncMotionSensor() {
         val mode = ProtectionStore(this).read().mode
-        val motionEnabled = prefs.getBoolean(KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED)
+        val motionEnabled = SafePreferences.boolean(prefs, KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED)
         if (!ProtectionMonitorPolicy.shouldMonitorMotion(motionEnabled, mode)) {
             unregisterMotionSensor()
             return
@@ -398,7 +398,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
 
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type != Sensor.TYPE_ACCELEROMETER) return
-        val motionEnabled = prefs.getBoolean(KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED)
+        val motionEnabled = SafePreferences.boolean(prefs, KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED)
         val mode = ProtectionStore(this).read().mode
         if (!ProtectionMonitorPolicy.shouldMonitorMotion(motionEnabled, mode)) {
             unregisterMotionSensor()
@@ -416,7 +416,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         val y = values[1] - gravity[1]
         val z = values[2] - gravity[2]
         val sensitivity = MotionSensitivity.fromStored(
-            getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_SENSITIVITY, MotionSensitivity.MEDIUM.name)
+            SafePreferences.string(
+            getSharedPreferences(PREFS, Context.MODE_PRIVATE), KEY_SENSITIVITY, MotionSensitivity.MEDIUM.name
+        ) ?: MotionSensitivity.MEDIUM.name
         )
         if (MotionDetection.exceedsThreshold(x, y, z, sensitivity)) {
             samplesAboveThreshold++
@@ -447,7 +449,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     }
 
     private fun handleBatteryChanged(intent: Intent) {
-        if (!prefs.getBoolean(KEY_BATTERY_ALERT_ENABLED, false)) return
+        if (!SafePreferences.boolean(prefs, KEY_BATTERY_ALERT_ENABLED, false)) return
         val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
         if (!plugged) {
             // A new charge session gets its own one-shot threshold alert.
@@ -459,10 +461,10 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
         if (level < 0 || scale <= 0) return
         val percent = (level * 100f / scale).toInt()
-        val previous = prefs.getInt(KEY_LAST_BATTERY_LEVEL, -1)
-        val threshold = prefs.getInt(KEY_BATTERY_THRESHOLD, 80).coerceIn(50, 100)
+        val previous = SafePreferences.int(prefs, KEY_LAST_BATTERY_LEVEL, -1)
+        val threshold = SafePreferences.int(prefs, KEY_BATTERY_THRESHOLD, 80).coerceIn(50, 100)
         if (previous >= 0 && previous < threshold && percent >= threshold &&
-            !prefs.getBoolean(KEY_BATTERY_ALERT_FIRED, false)
+            !SafePreferences.boolean(prefs, KEY_BATTERY_ALERT_FIRED, false)
         ) {
             prefs.edit().putBoolean(KEY_BATTERY_ALERT_FIRED, true).putInt(KEY_LAST_BATTERY_LEVEL, percent).apply()
             LocalTamperHistory.record(this, "battery_threshold_reached", "Battery crossed configured threshold: ${threshold}%")
