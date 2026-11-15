@@ -129,6 +129,27 @@ class AndroidCompatibilitySmokeTest {
     }
 
     @Test
+    fun ownerAuthenticationSelectionUsesActualDeviceCapabilities() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val strongBiometricAvailable = androidx.biometric.BiometricManager.from(context)
+            .canAuthenticate(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
+            androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS
+        val deviceCredentialAvailable = context.getSystemService(android.app.KeyguardManager::class.java)
+            .isDeviceSecure
+
+        val selected = OwnerAuthenticationPolicy.select(
+            strongBiometricAvailable = strongBiometricAvailable,
+            deviceCredentialAvailable = deviceCredentialAvailable
+        )
+        val expected = when {
+            strongBiometricAvailable -> OwnerAuthenticationMethod.BIOMETRIC
+            deviceCredentialAvailable -> OwnerAuthenticationMethod.DEVICE_CREDENTIAL
+            else -> OwnerAuthenticationMethod.UNAVAILABLE
+        }
+        assertEquals("Authentication must follow the methods configured on this Android device", expected, selected)
+    }
+
+    @Test
     fun alarmDeadlineSchedulingHasACompatibleFallback() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val nowWall = System.currentTimeMillis()
