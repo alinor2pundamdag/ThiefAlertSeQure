@@ -44,12 +44,24 @@ object AlarmRecoveryCoordinator {
 
     /** Called only after startForeground() succeeds for the latched alarm. */
     fun onServiceStarted(context: Context) {
+        clearRecoveryState(context)
+        LocalTamperHistory.record(context, "alarm_recovery_completed", "Foreground alarm service successfully resumed")
+    }
+
+    fun onAlarmDisarmed(context: Context) {
+        clearRecoveryState(context)
+    }
+
+    private fun clearRecoveryState(context: Context) {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (!prefs.edit().remove(KEY_RETRIES).commit()) {
-            LocalTamperHistory.record(context, "alarm_recovery_counter_clear_failed", "Alarm resumed but retry counter could not be cleared")
+            LocalTamperHistory.record(context, "alarm_recovery_counter_clear_failed", "Recovery counter could not be cleared")
         }
-        AlarmScheduler.cancel(context)
-        AlarmRecoveryNotice.cancel(context)
-        LocalTamperHistory.record(context, "alarm_recovery_completed", "Foreground alarm service successfully resumed")
+        runCatching { AlarmScheduler.cancel(context) }.onFailure {
+            LocalTamperHistory.record(context, "alarm_recovery_alarm_cancel_failed", it.javaClass.simpleName + ": " + it.message)
+        }
+        runCatching { AlarmRecoveryNotice.cancel(context) }.onFailure {
+            LocalTamperHistory.record(context, "alarm_recovery_notice_cancel_failed", it.javaClass.simpleName + ": " + it.message)
+        }
     }
 }
