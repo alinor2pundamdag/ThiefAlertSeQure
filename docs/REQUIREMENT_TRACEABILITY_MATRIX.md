@@ -10,11 +10,11 @@
 | Area | Evidence at baseline | Status / limitation |
 |---|---|---|
 | Branch / PR | PR #2 remains open and draft; managed-policy safety implementation is on the current feature branch | Not merged |
-| CI | v1.1.3 run `43004454206` passed unit tests, Android lint, asset validation, version extraction, APK assembly, package/version verification, debug signer verification and artifact upload on head `4dc3a7a553e7da43265cbd2feaa4c3e5ae64d294`. Subsequent commits, including the alarm recovery-notice fallback fix, require a successful CI run on the exact current PR head. Check PR #2 / GitHub Actions for the live run; do not merge on an earlier-head success. | Prior v1.1.3 head CI-verified; latest head pending |
-| Unit tests | `:app:testDebugUnitTest` in workflow | Unit tests execute in CI |
-| Lint | `:app:lintDebug` in workflow | CI-verified |
+| CI | Historical v1.1.3 run `43004454206` passed its configured checks on its exact historical head. Audit candidate run `43677315234` passed build, JVM tests, lint, assets and APK verification but its emulator/ADB matrix failed. First FIXALL run `43716318725` passed build/lint/unit checks; API 26/28/30/32 emulator jobs then failed in the diagnostics shell before Gradle instrumentation because a shell variable did not persist between commands. The workflow now calls `.github/scripts/run-android-instrumentation.sh` as one process. | Historical checks are not current-head certification; final FIXALL branch CI rerun pending |
+| Unit tests | `:app:testDebugUnitTest` in workflow; new tests cover unknown charger extras, unknown boot identity, bounded alarm retry policy, and owner-proof freshness | New tests added; exact final-head run pending |
+| Lint | `:app:lintRelease` in workflow | First FIXALL batch passed lint; final-head run pending |
 | APK | v1.1.3 artifact ID `13846979259` from run `43004454206`; versionCode 5 / versionName 1.1.3; package `com.thiefalertsequre.app.v113test`; filename `ThiefAlertSeQure-v1.1.3-debug-test.apk`. | Verified side-by-side debug test APK; not production-signed; permanent signing secrets are configured; signed production artifact remains pending |
-| Instrumentation / emulator matrix | No `app/src/androidTest` suite or emulator matrix exists in the inspected tree | Not implemented |
+| Instrumentation / emulator matrix | `app/src/androidTest` now contains screen/manifest smoke, encrypted Bluetooth registry, corrupt-preference, and protection-store commit-result tests. CI matrix is API 26, 28, 30, 32, 34, 35 and 36. | Implemented; latest emulator runs failed before test execution because diagnostics shell variables were split across processes. The workflow now invokes one checked-in Bash script; exact-head rerun pending. |
 | Physical OEM acceptance | Owner-reported HONOR 200 Pro PASS for all 11 scenarios on 11 Nov 2026: automatic arming, charger countdown, reconnect cancellation, alarm persistence, authentication protection, volume restoration, flashlight independence, camera conflict, background operation, reboot recovery, lock-screen presentation. Device Owner enrollment/rollback separately reported PASS on a test device. | Owner-reported evidence; not independently reproduced. Exact Android/MagicOS build not supplied. Android 17 audio and additional platform edge cases remain pending. Force-stop resilience is not guaranteed. |
 | Universal claim | Android/OEM policies differ and ordinary apps cannot defeat privileged system controls | Never claim universal guarantee |
 
@@ -102,7 +102,7 @@
 ### Automated
 - Unit tests for state transitions, stale event rejection, monotonic deadlines, reboot identity, authentication throttling, compatibility-family mapping, alarm volume restoration, corrupted storage, and failed persistence writes.
 - Android instrumentation tests for runtime receiver registration, foreground-service start restrictions, exact-alarm permission changes, notification permission/channel behavior, keyguard dismissal, Device Admin lock behavior, audio routing, and process recreation.
-- Emulator matrix: API 23–37 (all API levels in the configured matrix) (at minimum, representative API levels plus boundary versions).
+- Emulator matrix: API 26–36 (configured representative supported API levels) (at minimum, representative API levels plus boundary versions).
 - Static checks: lint, manifest/permission audit (confirm no CAMERA permission and optional camera/flash hardware features), dependency audit, packaged asset integrity, APK package/version/signer verification.
 - Alarm flashlight unit checks for ALARM_TRIGGERED-only gating and slow pulse cadence; physical test must confirm LED pulses with audio and turns off after successful authentication.
 
