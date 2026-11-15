@@ -2,6 +2,7 @@ package com.thiefalertsequre.app
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 
 /** Single authority for charger transitions; snapshots alone never start countdowns. */
 object PowerTransitionCoordinator {
@@ -27,6 +28,21 @@ object PowerTransitionCoordinator {
     private fun longPref(prefs: android.content.SharedPreferences, key: String, default: Long) =
         runCatching { prefs.getLong(key, default) }.getOrDefault(default)
 
+    private fun persistBaseline(
+        context: Context,
+        editor: SharedPreferences.Editor,
+        operation: String
+    ): Boolean {
+        val saved = runCatching { editor.commit() }.getOrDefault(false)
+        if (!saved) {
+            LocalTamperHistory.record(
+                context, "power_baseline_persist_failed",
+                "$operation could not be durably saved; no dependent state transition was accepted"
+            )
+        }
+        return saved
+    }
+
     internal fun acceptsPowerConnectedEvent(liveConnected: Boolean?): Boolean = liveConnected == true
 
     fun initializeBaseline(context: Context, forceBootReconciliation: Boolean = false) = synchronized(lock) {
@@ -47,13 +63,19 @@ object PowerTransitionCoordinator {
         if (!baselineKnown) {
             val store = ProtectionStore(context)
             if (store.read().mode == ProtectionMode.COUNTDOWN) {
-                store.update { current ->
+                val update = store.updatePersisted { current ->
                     if (current.mode == ProtectionMode.COUNTDOWN) {
                         ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
                     } else current
                 }
+                // Cancel the unverifiable legacy alarm even if storage is failing;
+                // the next initialization retries the state migration.
                 AlarmScheduler.cancel(context)
-                LocalTamperHistory.record(context, "legacy_countdown_discarded", "Unverifiable pre-transition countdown discarded during migration")
+                if (update.persisted) {
+                    LocalTamperHistory.record(context, "legacy_countdown_discarded", "Unverifiable pre-transition countdown discarded during migration")
+                } else {
+                    LocalTamperHistory.record(context, "legacy_countdown_migration_failed", "Unverifiable countdown remains stored; scheduler canceled and migration will retry")
+                }
             }
         }
 
@@ -61,12 +83,16 @@ object PowerTransitionCoordinator {
         if (newBoot && connected == null) {
             // A previous-boot CONNECTED baseline must never authorize an unplug
             // candidate after reboot when the new boot's live state is unknown.
-            prefs.edit()
-                .putBoolean(CONNECTED, false)
-                .putBoolean(KNOWN, true)
-                .putInt(BASELINE_BOOT_COUNT, currentBoot)
-                .putLong(GENERATION, longPref(prefs, GENERATION, 0L) + 1L)
-                .commit()
+            if (!persistBaseline(
+                    context,
+                    prefs.edit()
+                        .putBoolean(CONNECTED, false)
+                        .putBoolean(KNOWN, true)
+                        .putInt(BASELINE_BOOT_COUNT, currentBoot)
+                        .putLong(GENERATION, longPref(prefs, GENERATION, 0L) + 1L),
+                    "Unknown post-boot charger baseline"
+                )
+            ) return
             LocalTamperHistory.record(
                 context, "power_baseline_unknown_after_boot",
                 "Previous-boot charger baseline invalidated; waiting for current-boot power confirmation"
@@ -78,12 +104,16 @@ object PowerTransitionCoordinator {
         // During an established boot, a disconnected snapshot must never erase
         // CONNECTED before ACTION_POWER_DISCONNECTED is consumed by the receiver.
         if (!baselineKnown || newBoot) {
-            prefs.edit()
-                .putBoolean(CONNECTED, connected)
-                .putBoolean(KNOWN, true)
-                .putInt(BASELINE_BOOT_COUNT, currentBoot)
-                .putLong(GENERATION, longPref(prefs, GENERATION, 0L) + 1L)
-                .commit()
+            if (!persistBaseline(
+                    context,
+                    prefs.edit()
+                        .putBoolean(CONNECTED, connected)
+                        .putBoolean(KNOWN, true)
+                        .putInt(BASELINE_BOOT_COUNT, currentBoot)
+                        .putLong(GENERATION, longPref(prefs, GENERATION, 0L) + 1L),
+                    "Initial or post-boot charger baseline"
+                )
+            ) return
             LocalTamperHistory.record(
                 context,
                 if (newBoot) "power_baseline_reinitialized_after_boot" else "power_baseline_initialized",
@@ -116,32 +146,48 @@ object PowerTransitionCoordinator {
             // Preserve an already-valid countdown; clearing KNOWN would make
             // first-run migration discard it on the monitor's next startup.
             if (ProtectionStore(context).read().mode != ProtectionMode.COUNTDOWN) {
-                prefs.edit()
-                    .putBoolean(KNOWN, false)
-                    .putBoolean(CONNECTED, false)
-                    .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
-                    .putLong(GENERATION, generation)
-                    .commit()
+                if (!persistBaseline(
+                        context,
+                        prefs.edit()
+                            .putBoolean(KNOWN, false)
+                            .putBoolean(CONNECTED, false)
+                            .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
+                            .putLong(GENERATION, generation),
+                        "Unknown charger baseline reset"
+                    )
+                ) return@synchronized
             } else {
-                prefs.edit().putLong(GENERATION, generation).commit()
+                if (!persistBaseline(
+                        context, prefs.edit().putLong(GENERATION, generation),
+                        "Countdown generation invalidation"
+                    )
+                ) return@synchronized
             }
             LocalTamperHistory.record(context, "power_baseline_unknown", "$reason; no new transition accepted until a reliable power state is available")
             return@synchronized
         }
-        prefs.edit()
-            .putBoolean(KNOWN, true)
-            .putBoolean(CONNECTED, connected)
-            .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
-            .putLong(GENERATION, generation)
-            .commit()
+        if (!persistBaseline(
+                context,
+                prefs.edit()
+                    .putBoolean(KNOWN, true)
+                    .putBoolean(CONNECTED, connected)
+                    .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
+                    .putLong(GENERATION, generation),
+                "Owner-requested charger baseline reset"
+            )
+        ) return@synchronized
         if (connected) {
             confirmConnectedAndArmLocked(context, reason)
         } else {
-            val disarmed = ProtectionStore(context).update { current ->
+            val update = ProtectionStore(context).updatePersisted { current ->
                 if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
                 else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
             }
-            if (disarmed.mode != ProtectionMode.ALARM_TRIGGERED) {
+            if (!update.persisted) {
+                LocalTamperHistory.record(context, "protection_state_persist_failed", "Owner-requested disarm could not be committed")
+                return@synchronized
+            }
+            if (update.state.mode != ProtectionMode.ALARM_TRIGGERED) {
                 AlarmScheduler.cancel(context)
                 notifyMonitorStateChanged(context)
             }
@@ -163,19 +209,31 @@ object PowerTransitionCoordinator {
         if (longPref(prefs, GENERATION, -1L) != expectedGeneration ||
             booleanPref(prefs, CONNECTED, true)
         ) return
-        prefs.edit()
-            .putBoolean(CONNECTED, true)
-            .putLong(GENERATION, expectedGeneration + 1L)
-            .commit()
+        if (!persistBaseline(
+                context,
+                prefs.edit()
+                    .putBoolean(CONNECTED, true)
+                    .putLong(GENERATION, expectedGeneration + 1L),
+                "Restoring connected baseline after an unconfirmed unplug"
+            )
+        ) {
+            LocalTamperHistory.record(context, "pending_disconnect_retained", "Baseline restore failed; persisted OS event remains available for retry")
+        }
     }
 
     private fun clearPendingDisconnectLocked(context: Context) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(PENDING_DISCONNECT, false)
             .remove(PENDING_EVENT_EPOCH)
             .remove(PENDING_EVENT_ELAPSED)
             .remove(PENDING_EVENT_BOOT)
             .commit()
+        if (!saved) {
+            LocalTamperHistory.record(
+                context, "pending_disconnect_clear_failed",
+                "Pending OS disconnect marker could not be cleared; live-state validation remains required on retry"
+            )
+        }
     }
 
     private fun notifyMonitorStateChanged(context: Context) {
@@ -186,17 +244,13 @@ object PowerTransitionCoordinator {
 
     fun onPowerConnected(context: Context): ProtectionState {
         val appContext = context.applicationContext
-        // A newer OS connect event invalidates any pending disconnect retry immediately,
-        // even if its first battery snapshots are stale. The event cannot arm protection
-        // until live connected-state confirmation succeeds below.
-        synchronized(lock) {
-            clearPendingDisconnectLocked(appContext)
+        // Capture the current generation, but do not clear a pending unplug until
+        // live power confirms reconnect. A stale ACTION_POWER_CONNECTED broadcast
+        // must not erase a real pending disconnect retry.
+        val eventGeneration = synchronized(lock) {
             val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            prefs.edit().putLong(GENERATION, longPref(prefs, GENERATION, 0L) + 1L).commit()
+            longPref(prefs, GENERATION, 0L)
         }
-        // Keep a five-read window so one or two stale snapshots after the OS
-        // broadcast do not reject a real reconnect. Three consecutive positives
-        // are enough; 100 ms spacing bounds normal confirmation to about 400 ms.
         var consecutiveConnected = 0
         var lastObserved: Boolean? = null
         repeat(5) { index ->
@@ -205,16 +259,35 @@ object PowerTransitionCoordinator {
             consecutiveConnected = if (observed == true) consecutiveConnected + 1 else 0
             if (index < 4) Thread.sleep(100L)
         }
-        if (consecutiveConnected < 3 || ExternalPowerState.readConnected(appContext) != true) {
+        val finalConnected = ExternalPowerState.readConnected(appContext)
+        if (consecutiveConnected < 3 || !PowerTransitionRecoveryPolicy.acceptsConnectedEvent(
+                finalConnected, eventGeneration,
+                synchronized(lock) {
+                    val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    longPref(prefs, GENERATION, 0L)
+                }
+            )
+        ) {
             LocalTamperHistory.record(
                 appContext, "power_connected_unconfirmed",
-                "Connect event did not produce three consecutive connected samples; final=$lastObserved"
+                "Connect event did not produce three consecutive connected samples or was superseded; final=$lastObserved"
             )
             return ProtectionStore(appContext).read()
         }
         return synchronized(lock) {
-            clearPendingDisconnectLocked(appContext)
-            confirmConnectedAndArmLocked(appContext, "Power-connected event confirmed by five reads including three consecutive live-state samples")
+            val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val currentGeneration = longPref(prefs, GENERATION, 0L)
+            if (!PowerTransitionRecoveryPolicy.acceptsConnectedEvent(
+                    finalConnected, eventGeneration, currentGeneration
+                )
+            ) {
+                LocalTamperHistory.record(appContext, "stale_power_connect_rejected", "A newer power event superseded this reconnect candidate")
+                return@synchronized ProtectionStore(appContext).read()
+            }
+            confirmConnectedAndArmLocked(
+                appContext,
+                "Power-connected event confirmed by five reads including three consecutive live-state samples"
+            )
         }
     }
 
@@ -227,11 +300,15 @@ object PowerTransitionCoordinator {
     fun retryPendingDisconnect(context: Context): ProtectionState {
         val appContext = context.applicationContext
         val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (!PowerTransitionRecoveryPolicy.shouldRetry(
-                booleanPref(prefs, PENDING_DISCONNECT, false),
-                ExternalPowerState.readConnected(appContext)
-            )
-        ) return ProtectionStore(appContext).read()
+        val pending = booleanPref(prefs, PENDING_DISCONNECT, false)
+        val liveConnected = ExternalPowerState.readConnected(appContext)
+        if (pending && liveConnected == true) {
+            LocalTamperHistory.record(appContext, "charger_unplug_retry_cancelled", "A later battery snapshot confirms external power reconnected")
+            return onPowerConnected(appContext)
+        }
+        if (!PowerTransitionRecoveryPolicy.shouldRetry(pending, liveConnected)) {
+            return ProtectionStore(appContext).read()
+        }
         val epoch = runCatching { prefs.getLong(PENDING_EVENT_EPOCH, 0L) }.getOrDefault(0L)
         val elapsed = runCatching { prefs.getLong(PENDING_EVENT_ELAPSED, 0L) }.getOrDefault(0L)
         val boot = runCatching { prefs.getInt(PENDING_EVENT_BOOT, -1) }.getOrDefault(-1)
@@ -339,7 +416,7 @@ object PowerTransitionCoordinator {
                 return@synchronized null
             }
             val nextGeneration = longPref(prefs, GENERATION, 0L) + 1L
-            prefs.edit()
+            val candidateSaved = prefs.edit()
                 .putBoolean(CONNECTED, false)
                 .putLong(GENERATION, nextGeneration)
                 .putBoolean(PENDING_DISCONNECT, true)
@@ -347,6 +424,13 @@ object PowerTransitionCoordinator {
                 .putLong(PENDING_EVENT_ELAPSED, eventElapsedRealtimeMs)
                 .putInt(PENDING_EVENT_BOOT, eventBootCount)
                 .commit()
+            if (!candidateSaved) {
+                LocalTamperHistory.record(
+                    appContext, "power_candidate_persist_failed",
+                    "OS unplug event could not be durably recorded; countdown was not started"
+                )
+                return@synchronized null
+            }
             nextGeneration
         } ?: return ProtectionStore(appContext).read()
 
