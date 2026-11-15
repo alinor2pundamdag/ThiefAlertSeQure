@@ -6,7 +6,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ExternalPowerStateTest {
-    @Test fun noExternalPowerIsDisconnected() {
+    @Test fun explicitNoExternalPowerIsDisconnected() {
+        assertFalse(ExternalPowerState.isPluggedIn(0))
+    }
+
+    @Test fun missingPluggedExtraIsNotConvertedToDisconnected() {
+        // The Android reader returns null before calling isPluggedIn when
+        // EXTRA_PLUGGED is absent; this assertion documents explicit 0 only.
         assertFalse(ExternalPowerState.isPluggedIn(0))
     }
 
