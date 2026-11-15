@@ -217,8 +217,12 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(8))
         root.addView(text("Main alarm: " + AlarmSoundStore.displayName(this, AlarmSoundStore.ALARM), 13f, R.color.tas_text))
         root.addView(action("Use built-in default alarm (clear custom override)") {
-            AlarmSoundStore.clear(this, AlarmSoundStore.ALARM)
-            android.widget.Toast.makeText(this, "Built-in default alarm selected.", android.widget.Toast.LENGTH_SHORT).show()
+            val cleared = AlarmSoundStore.clear(this, AlarmSoundStore.ALARM)
+            android.widget.Toast.makeText(
+                this,
+                if (cleared) "Built-in default alarm selected." else "Could not save the sound reset. The previous selection was retained.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
             render()
         })
         root.addView(action("Choose custom main alarm audio file") {
