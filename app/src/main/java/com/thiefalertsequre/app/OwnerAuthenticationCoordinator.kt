@@ -9,11 +9,16 @@ import androidx.core.content.ContextCompat
  * One owner-authentication completion path for in-app prompts and Android lockscreen unlocks.
  * Android performs credential/biometric verification; no credential material enters this app.
  */
-object OwnerAuthenticationCoordinator {
-    fun complete(context: Context, source: String): ProtectionState? {
+internal object OwnerAuthenticationCoordinator {
+    fun complete(context: Context, proof: OwnerAuthenticationProof): ProtectionState? {
         val appContext = context.applicationContext
         val store = ProtectionStore(appContext)
         if (store.read().mode != ProtectionMode.ALARM_TRIGGERED) return null
+        val source = proof.source
+        if (!proof.isFresh(ProtectionClock.elapsedRealtime(), ProtectionClock.bootCount(appContext))) {
+            LocalTamperHistory.record(appContext, "owner_auth_proof_rejected", "Owner authentication proof was invalid, expired, or from another boot")
+            return null
+        }
 
         val authenticated = store.update {
             ProtectionEngine.authenticated(it, System.currentTimeMillis())
