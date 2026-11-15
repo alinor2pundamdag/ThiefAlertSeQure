@@ -138,7 +138,9 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             )
         }.onFailure {
             LocalTamperHistory.record(context, "alarm_fgs_launch_failed", it.javaClass.simpleName + ": " + it.message)
-            AlarmRecoveryNotice.show(context, "Android rejected the alarm foreground-service launch: $reason")
+            AlarmRecoveryCoordinator.onStartFailure(
+                context, "Android rejected the alarm foreground-service launch: $reason"
+            )
         }
     }
 }
