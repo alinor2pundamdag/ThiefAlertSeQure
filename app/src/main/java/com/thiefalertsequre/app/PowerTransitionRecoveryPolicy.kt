@@ -10,4 +10,11 @@ object PowerTransitionRecoveryPolicy {
         connectedBaseline: Boolean,
         pendingOsDisconnectRetry: Boolean
     ): Boolean = connectedBaseline || pendingOsDisconnectRetry
+
+    /** A connect event invalidates a disconnect candidate only after live confirmation and no newer event. */
+    fun acceptsConnectedEvent(
+        liveConnected: Boolean?,
+        eventGeneration: Long,
+        currentGeneration: Long
+    ): Boolean = liveConnected == true && eventGeneration == currentGeneration
 }
