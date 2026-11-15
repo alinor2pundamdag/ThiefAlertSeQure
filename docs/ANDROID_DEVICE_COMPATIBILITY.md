@@ -8,7 +8,7 @@
 
 # Android device and manufacturer compatibility
 
-**Scope:** Android 6.0 (API 23) through Android 17 (API 37), including Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO MIUI and HyperOS, OPPO ColorOS, realme UI, OnePlus OxygenOS, vivo Funtouch OS / OriginOS, Google Pixel, Motorola, ASUS, Sony Xperia, Nothing OS, Lenovo, TECNO, Infinix, ZTE / nubia, and other Android-derived builds.
+**Scope:** Android 8.0 (API 26) through Android 16 (API 36), including Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO MIUI and HyperOS, OPPO ColorOS, realme UI, OnePlus OxygenOS, vivo Funtouch OS / OriginOS, Google Pixel, Motorola, ASUS, Sony Xperia, Nothing OS, Lenovo, TECNO, Infinix, ZTE / nubia, and other Android-derived builds.
 
 **Important:** This is a compatibility strategy and source-level audit, not a certification of every handset. Actual behavior must be tested on physical devices and OS builds.
 
@@ -26,8 +26,8 @@
 
 | Android release | API | Relevant platform behavior | App handling |
 |---|---:|---|---|
-| Android 6.0 / 6.0.1 | 23 | Runtime permission model; Doze and App Standby; exact idle alarms available | Legacy Bluetooth permissions remain install-time; request runtime permissions only for features that actually need them; use `setExactAndAllowWhileIdle` for deadline alarms |
-| Android 7.0 / 7.1 | 24–25 | Doze on the go, background execution and notification behavior changes | Use foreground monitoring while enabled; runtime power/Bluetooth receivers; no notification-channel or POST_NOTIFICATIONS assumptions |
+| Android 6.0 / 6.0.1 | 23 | Unsupported by the approved minimum SDK | Not installable; minSdk 26 is preserved |
+| Android 7.0 / 7.1 | 24–25 | Unsupported by the approved minimum SDK | Not installable; minSdk 26 is preserved |
 |---|---:|---|---|
 | Android 8.0 / 8.1 | 26–27 | Background execution limits; notification channels; runtime restrictions on implicit broadcasts | Runtime-registered power-connected/disconnected receiver while the user-enabled foreground monitoring service is active; notification channels |
 | Android 9 | 28 | Additional background and standby restrictions | Keep monitoring user-visible through foreground service; show battery guidance |
@@ -42,13 +42,13 @@
 
 The app's updated build configuration is **minSdk 23, compileSdk 36, targetSdk 36**, using Android Gradle Plugin 8.9.1 and Gradle 8.11.1. This meets the current Google Play target-API requirement for new apps and updates (API 36). Android 17 (API 37) is supported as a runtime OS target, but the app does not yet target or compile against API 37. Android 17 target-37-only behavior changes must be re-audited before raising targetSdk to 37.
 
-## Bluetooth compatibility and setup (Android 6–17)
+## Bluetooth compatibility and setup (Android 8–16)
 
 The current A2 implementation uses an already-paired trusted device and Bluetooth ACL connection/disconnection events. It does not scan for nearby devices, advertise the phone, connect to a remote GATT service, or read location. Therefore it requests only Bluetooth Connect on Android 12+; it must not add Bluetooth Scan, Bluetooth Advertise, or location permission unless a separately approved feature genuinely needs them.
 
 | Android release | API | Bluetooth permission / behavior | ThiefAlertSeQure handling |
 |---|---:|---|---|
-| Android 6.0–7.1 | 23–25 | Legacy BLUETOOTH and BLUETOOTH_ADMIN install-time permissions; Doze and App Standby introduced | Runtime event receiver while the user-enabled monitor is active; no nearby-device scan; use exact idle alarm APIs for deadlines |
+| Android 6.0–7.1 | 23–25 | Unsupported by the approved minimum SDK | Not installable; minSdk 26 is preserved |
 | Android 8.0 | 26 | Legacy BLUETOOTH and BLUETOOTH_ADMIN install-time permissions | Runtime event receiver while the user-enabled foreground monitor is active; no nearby-device scan |
 | Android 8.1 | 27 | Same legacy permission model | Same as API 26 |
 | Android 9 | 28 | Legacy permissions; stronger battery/background management varies by OEM | Keep monitor user-visible; show OEM battery guidance |
@@ -177,7 +177,7 @@ Version-specific examples:
 - Exact alarms: API 31+ only; check `AlarmManager.canScheduleExactAlarms()` before scheduling.
 - Notifications: API 33+ runtime permission plus app/channel enabled checks.
 - Full-screen intents: API 34+ special access; check `NotificationManager.canUseFullScreenIntent()`.
-- Battery optimization exemption: API 23+; check `PowerManager.isIgnoringBatteryOptimizations()`. Android advises most apps not to request exemption unless the use case genuinely requires it.
+- Battery optimization exemption: API 26+; check `PowerManager.isIgnoringBatteryOptimizations()`. Android advises most apps not to request exemption unless the use case genuinely requires it.
 - Do Not Disturb: use the public priority-settings action, then Sound settings, then general Settings. The app does not silently change DND policy.
 - Device credential: use Android Keyguard; never collect the PIN, pattern, password, or biometric template.
 
@@ -279,14 +279,12 @@ Source-level OEM detection, manufacturer-specific guidance, public Settings fall
 
 ## Automated emulator smoke-test coverage
 
-The Android CI workflow now runs the instrumentation smoke suite on emulator API levels 26 through 37. The matrix checks that all internal screens can be created, required manifest permissions remain declared, and device-capability inspection does not crash across the supported API range.
+The Android CI workflow now runs the instrumentation smoke suite on emulator API levels 26 through 36. The matrix checks that all internal screens can be created, required manifest permissions remain declared, and device-capability inspection does not crash across the supported API range.
 
 This is framework-level compatibility evidence only. It does not certify OEM Settings screens, proprietary battery managers, real Bluetooth accessory callbacks, charger broadcasts on physical hardware, biometric sensors, torch hardware, force-stop behavior, or manufacturer-specific background process policies. Those remain physical-device acceptance tests and must be recorded per model and OS build.
 
 
 
-## Expanded minimum Android support
+## Minimum Android support invariant
 
-The app minimum was lowered from API 26 to API 23 after auditing the current AndroidX dependency baseline and the guarded platform calls. The emulator CI matrix now includes API 23, 24, and 25 in addition to API 26–37. This expands installation coverage to Android 6.0+ while retaining runtime checks for notification channels, foreground-service start APIs, exact-alarm special access, Bluetooth Connect, and newer platform capabilities.
-
-This change must pass lint and emulator instrumentation on API 23–25 before the expanded minimum is considered verified.
+The owner-approved minimum remains **minSdk 26 (Android 8.0)**. Do not lower it to API 23–25 without explicit approval and a separate compatibility review. The configured emulator matrix covers representative supported API levels 26, 28, 30, 32, 34, 35 and 36. A matrix configuration or successful emulator run does not certify physical OEM behavior.
