@@ -215,7 +215,7 @@ class BluetoothCenterActivity : FragmentActivity() {
 
     private fun toggleA2() {
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        if (prefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)) {
+        if (SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)) {
             prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).apply()
             TrustedBluetoothRegistry.clearBaselines(prefs)
             render()
@@ -240,7 +240,7 @@ class BluetoothCenterActivity : FragmentActivity() {
             showTrustedDevicePicker()
             return
         }
-        if (!prefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
+        if (!SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
             showResult("Protection monitor is disabled", "Enable the protection monitor from the main dashboard first. This Bluetooth alert uses the existing user-visible monitor and will not silently turn it back on.")
             return
         }
