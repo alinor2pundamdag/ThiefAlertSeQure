@@ -10,10 +10,16 @@ class ExternalPowerStateTest {
         assertFalse(ExternalPowerState.isPluggedIn(0))
     }
 
-    @Test fun missingPluggedExtraIsNotConvertedToDisconnected() {
-        // The Android reader returns null before calling isPluggedIn when
-        // EXTRA_PLUGGED is absent; this assertion documents explicit 0 only.
-        assertFalse(ExternalPowerState.isPluggedIn(0))
+    @Test fun missingPluggedExtraIsUnknown() {
+        assertTrue(ExternalPowerState.readPluggedValue(false, 0) == null)
+    }
+
+    @Test fun explicitDisconnectedValueIsFalse() {
+        assertFalse(ExternalPowerState.readPluggedValue(true, 0)!!)
+    }
+
+    @Test fun sentinelValueIsUnknownEvenWhenExtraFlagIsPresent() {
+        assertTrue(ExternalPowerState.readPluggedValue(true, Int.MIN_VALUE) == null)
     }
 
     @Test fun usbPowerIsConnected() {
