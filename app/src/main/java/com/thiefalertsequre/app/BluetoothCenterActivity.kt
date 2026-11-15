@@ -282,8 +282,14 @@ class BluetoothCenterActivity : FragmentActivity() {
             true
         }.getOrDefault(false)
         if (!baselinesCleared) {
-            prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).commit()
-            showResult("Could not enable A2", "The trusted-device baseline could not be reset. A2 was rolled back to OFF.")
+            val rolledBack = prefs.edit()
+                .putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+                .commit()
+            showResult(
+                "Could not enable A2",
+                "The trusted-device baseline could not be reset." +
+                    if (rolledBack) " A2 was rolled back to OFF." else " WARNING: the OFF rollback could not be saved; verify the setting before leaving this screen."
+            )
             render()
             return
         }
