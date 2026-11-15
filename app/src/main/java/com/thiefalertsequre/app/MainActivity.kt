@@ -403,8 +403,9 @@ class MainActivity : FragmentActivity() {
             return
         }
         autoAuthenticationRequested = true
-        val strongBiometricAvailable = BiometricManager.from(this)
-            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
+        val strongBiometricAvailable = keyguard.isDeviceSecure &&
+            BiometricManager.from(this)
+                .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
         when (OwnerAuthenticationPolicy.select(strongBiometricAvailable, keyguard.isDeviceSecure)) {
             OwnerAuthenticationMethod.BIOMETRIC -> authenticateBiometric()
             OwnerAuthenticationMethod.DEVICE_CREDENTIAL -> authenticateDeviceCredential()
@@ -805,9 +806,9 @@ class MainActivity : FragmentActivity() {
         details.text = listOf(stateMessage, readinessMessage, bootIdentityMessage, batteryOptimizationMessage, soundMessage, monitorMessage, attemptMessage, exactAlarmMessage, notificationMessage, screenLockMessage, fullScreenMessage, alarmChannelMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
 
         val alarmActive = state.mode == ProtectionMode.ALARM_TRIGGERED
-        val biometricAvailable = BiometricManager.from(this)
-            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
         val credentialAvailable = getSystemService(KeyguardManager::class.java).isDeviceSecure
+        val biometricAvailable = credentialAvailable && BiometricManager.from(this)
+            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
         biometricButton.isEnabled = alarmActive && biometricAvailable && !coolingDown
         credentialButton.isEnabled = alarmActive && credentialAvailable
         cancelButton.isEnabled = biometricPrompt != null
