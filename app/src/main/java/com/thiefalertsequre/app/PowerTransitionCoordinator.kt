@@ -224,7 +224,15 @@ object PowerTransitionCoordinator {
     }
 
     private fun clearPendingDisconnectLocked(context: Context, prefs: SharedPreferences) {
+        val generation = when (val stored = SafePreferences.readLong(prefs, GENERATION, 0L)) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> {
+                LocalTamperHistory.record(context, "power_pending_clear_generation_corrupt", "Pending disconnect retained because generation metadata is corrupt")
+                return
+            }
+        }
         val saved = prefs.edit()
+            .putLong(GENERATION, generation + 1L)
             .putBoolean(PENDING_DISCONNECT, false)
             .remove(PENDING_EPOCH_MS)
             .remove(PENDING_ELAPSED_MS)
@@ -518,8 +526,14 @@ object PowerTransitionCoordinator {
             if (current.mode == ProtectionMode.COUNTDOWN) {
                 // A process may have died after the state write but before the
                 // pending-event marker was cleared. Resume the existing deadline.
-                AlarmScheduler.schedule(context, current.deadlineEpochMs, current.deadlineElapsedRealtimeMs, current.bootCount)
-                clearPendingDisconnectLocked(context, prefs)
+                if (AlarmScheduler.schedule(
+                        context, current.deadlineEpochMs, current.deadlineElapsedRealtimeMs, current.bootCount
+                    )
+                ) {
+                    clearPendingDisconnectLocked(context, prefs)
+                } else {
+                    LocalTamperHistory.record(context, "charger_countdown_schedule_pending", "Existing countdown remains durable; pending unplug provenance retained for retry")
+                }
                 return@synchronized current
             }
             if (current.mode != ProtectionMode.ARMED) {
@@ -537,10 +551,16 @@ object PowerTransitionCoordinator {
                 ) else old
             }
             if (next.mode == ProtectionMode.COUNTDOWN) {
-                AlarmScheduler.schedule(context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
-                clearPendingDisconnectLocked(context, prefs)
-                LocalTamperHistory.record(context, "charger_countdown_started", "OS unplug event confirmed by stable live-state samples; recovered candidates retain their original event time")
-                notifyMonitorStateChanged(context)
+                if (AlarmScheduler.schedule(
+                        context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount
+                    )
+                ) {
+                    clearPendingDisconnectLocked(context, prefs)
+                    LocalTamperHistory.record(context, "charger_countdown_started", "OS unplug event confirmed by stable live-state samples; recovered candidates retain their original event time")
+                    notifyMonitorStateChanged(context)
+                } else {
+                    LocalTamperHistory.record(context, "charger_countdown_schedule_pending", "Countdown state is durable but alarm scheduling failed; pending unplug provenance retained for recovery")
+                }
             } else if (next.mode != ProtectionMode.ARMED) {
                 clearPendingDisconnectLocked(context, prefs)
             } else {
