@@ -1,9 +1,25 @@
 package com.thiefalertsequre.app
 
 import android.content.Context
+import android.content.SharedPreferences
 
-class ProtectionStore(context: Context) {
-    private val prefs = context.applicationContext.getSharedPreferences("protection_state_v1", Context.MODE_PRIVATE)
+class ProtectionStore private constructor(
+    private val prefs: SharedPreferences,
+    private val stateCommit: (SharedPreferences.Editor) -> Boolean
+) {
+    constructor(context: Context) : this(
+        context.applicationContext.getSharedPreferences("protection_state_v1", Context.MODE_PRIVATE),
+        { editor -> editor.commit() }
+    )
+
+    /** Injectable only for deterministic persistence-failure tests. */
+    internal constructor(
+        context: Context,
+        stateCommit: (SharedPreferences.Editor) -> Boolean
+    ) : this(
+        context.applicationContext.getSharedPreferences("protection_state_v1", Context.MODE_PRIVATE),
+        stateCommit
+    )
 
     fun read(): ProtectionState = synchronized(LOCK) { readUnlocked() }
 
@@ -92,13 +108,14 @@ class ProtectionStore(context: Context) {
         failClosed
     }
 
-    private fun writeUnlocked(state: ProtectionState): Boolean = prefs.edit()
-        .putString("mode", state.mode.name)
-        .putLong("deadline", state.deadlineEpochMs)
-        .putLong("changed", state.changedAtEpochMs)
-        .putLong("deadline_elapsed", state.deadlineElapsedRealtimeMs)
-        .putInt("boot_count", state.bootCount)
-        .commit()
+    private fun writeUnlocked(state: ProtectionState): Boolean = stateCommit(
+        prefs.edit()
+            .putString("mode", state.mode.name)
+            .putLong("deadline", state.deadlineEpochMs)
+            .putLong("changed", state.changedAtEpochMs)
+            .putLong("deadline_elapsed", state.deadlineElapsedRealtimeMs)
+            .putInt("boot_count", state.bootCount)
+    )
 
     private fun readThrottleUnlocked(
         nowEpochMs: Long,
