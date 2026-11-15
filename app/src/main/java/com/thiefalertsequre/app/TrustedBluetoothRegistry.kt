@@ -2,6 +2,7 @@ package com.thiefalertsequre.app
 
 import android.content.SharedPreferences
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.util.Base64
 
 data class TrustedBluetoothDevice(val address: String, val name: String)
@@ -59,6 +60,9 @@ object TrustedBluetoothRegistry {
             disableA2AndInvalidateBaselines(prefs)
             return null
         }
+        // Migrate per-device revision keys for every trusted accessory as soon as
+        // the encrypted registry is read, so MAC addresses are not left in key names.
+        decoded.forEach { deviceRevision(prefs, it.address) }
         // Legacy single-device fields are removed only after the new registry is readable.
         if (prefs.contains(ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS) ||
             prefs.contains(ProtectionMonitorService.KEY_BT_TRUSTED_NAME)
@@ -83,6 +87,7 @@ object TrustedBluetoothRegistry {
                 .putString(KEY_DEVICES, LocalPreferenceCipher.encrypt(KEY_DEVICES, encode(updated)))
                 .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, baselines.joinToString("\n")))
                 .putLong(deviceRevisionKey(address), deviceRevision(prefs, address) + 1L)
+                .remove(legacyDeviceRevisionKey(address))
                 .commit()
         }.getOrDefault(false)
     }
@@ -98,6 +103,7 @@ object TrustedBluetoothRegistry {
                 .putString(KEY_DEVICES, LocalPreferenceCipher.encrypt(KEY_DEVICES, encode(updated)))
                 .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, baselines.joinToString("\n")))
                 .putLong(deviceRevisionKey(address), deviceRevision(prefs, address) + 1L)
+                .remove(legacyDeviceRevisionKey(address))
             if (updated.isEmpty()) {
                 edit.putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
                     .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
@@ -117,10 +123,32 @@ object TrustedBluetoothRegistry {
         runCatching { prefs.getLong(KEY_REVISION, 0L) }.getOrDefault(0L)
 
     /** Per-address generation prevents unrelated registry edits from canceling another device's timer. */
-    fun deviceRevision(prefs: SharedPreferences, address: String): Long =
-        runCatching { prefs.getLong(deviceRevisionKey(address), 0L) }.getOrDefault(0L)
+    fun deviceRevision(prefs: SharedPreferences, address: String): Long {
+        val currentKey = deviceRevisionKey(address)
+        val current = runCatching { prefs.getLong(currentKey, 0L) }.getOrDefault(0L)
+        val legacyKey = legacyDeviceRevisionKey(address)
+        if (!prefs.contains(legacyKey)) return current
 
-    private fun deviceRevisionKey(address: String): String =
+        // Older builds exposed the Bluetooth MAC address in the preference key.
+        // Migrate its generation counter to a one-way SHA-256 key and remove the
+        // plaintext identifier in the same durable editor transaction.
+        val legacy = runCatching { prefs.getLong(legacyKey, 0L) }.getOrDefault(0L)
+        val migrated = maxOf(current, legacy)
+        val saved = runCatching {
+            prefs.edit().putLong(currentKey, migrated).remove(legacyKey).commit()
+        }.getOrDefault(false)
+        if (!saved) disableA2AndInvalidateBaselines(prefs)
+        return if (saved) migrated else current
+    }
+
+    private fun deviceRevisionKey(address: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(address.uppercase().toByteArray(StandardCharsets.UTF_8))
+        val fingerprint = digest.joinToString("") { byte -> "%02x".format(byte) }
+        return "trusted_bluetooth_device_revision_v1_hash_$fingerprint"
+    }
+
+    private fun legacyDeviceRevisionKey(address: String): String =
         "trusted_bluetooth_device_revision_v1_" + address.uppercase().replace(":", "_")
 
     fun isBaselineConnected(prefs: SharedPreferences, address: String): Boolean =
