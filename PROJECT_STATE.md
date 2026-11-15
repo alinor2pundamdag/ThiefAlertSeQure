@@ -25,14 +25,12 @@
 - Phase 1 implementation/documentation is complete on the current FIXALL branch head; see `docs/PHASE_1_ARCHITECTURE_MAP.md` for source-backed UI → runtime → persistence → Android-device ownership paths.
 - Corrected `AlarmDeadlineReceiver.kt`'s persisted-update lambda return label.
 - Corrected Bluetooth registry Base64 compatibility test fixtures to use actual tab/newline delimiters; the previous failure was a malformed test fixture, not a production decoder defect.
-- Exact-head workflow run `43726865154` on commit `43689a51f74fca1f699d905d434ce2dc71e02035`: build job PASS, including unit tests, navigation verification, Android lint, asset/config checks, debug APK assembly/metadata, minified release APK checks, and APK package/version/signer verification.
+- Exact-head workflow run `43727526607` on commit `bd67b8bbf43b576e4a19205952680f99cd20044a`: build job PASS, including unit tests, navigation verification, Android lint, asset/config checks, debug APK assembly/metadata, minified release APK checks, and APK package/version/signer verification.
 - The Android instrumentation matrix in that workflow is a separate later-phase verification gate; it is not being represented as passed by Phase 1.
 
 ## Verification status
 - Phase 1 build job passed on the exact branch head above.
-- Android instrumentation matrix is still running and is tracked separately for the later integration/testing phase.
-- Physical HONOR 200 Pro testing for changed v1.1.4 behavior remains pending.
-- Production-signed APK/update continuity remains pending.
+- The separate Android instrumentation matrix for run `43727526607` is queued/running and is tracked for the later integration/testing phase; it is not represented as passed.
 - Physical HONOR 200 Pro testing for changed v1.1.4 behavior remains pending.
 - Production-signed APK/update continuity remains pending.
 - This document does not assert release readiness.
