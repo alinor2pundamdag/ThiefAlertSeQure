@@ -1,6 +1,7 @@
 package com.thiefalertsequre.app
 
 import android.content.SharedPreferences
+import android.util.Log
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
@@ -16,6 +17,7 @@ object TrustedBluetoothRegistry {
     internal const val KEY_BASELINES = "trusted_bluetooth_baselines_v1"
     private const val KEY_REVISION = "trusted_bluetooth_registry_revision_v1"
     private const val DEVICE_REVISION_PREFIX = "trusted_bluetooth_device_revision_v1_"
+    private const val TAG = "TrustedBluetoothRegistry"
 
     fun read(prefs: SharedPreferences): List<TrustedBluetoothDevice> {
         val raw = when (val stored = SafePreferences.readString(prefs, KEY_DEVICES, null)) {
@@ -39,6 +41,7 @@ object TrustedBluetoothRegistry {
             else listOf(TrustedBluetoothDevice(legacyAddress, legacyName?.takeIf { it.isNotBlank() } ?: "Bluetooth accessory"))
         } else {
             runCatching { decode(readOrMigratePayload(prefs, KEY_DEVICES, raw)) }
+                .onFailure { Log.e(TAG, "Trusted-device payload is unreadable; encrypted source retained", it) }
                 .getOrElse { return emptyList() }
         }
 
@@ -186,7 +189,8 @@ object TrustedBluetoothRegistry {
         return runCatching {
             readOrMigratePayload(prefs, KEY_BASELINES, raw).lineSequence()
                 .filter { it.isNotBlank() }.toSet()
-        }.getOrElse { emptySet() }
+        }.onFailure { Log.e(TAG, "Bluetooth baseline payload is unreadable; encrypted source retained", it) }
+            .getOrElse { emptySet() }
     }
 
     private fun readOrMigratePayload(prefs: SharedPreferences, key: String, raw: String): String {
