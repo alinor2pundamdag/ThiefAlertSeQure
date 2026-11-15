@@ -76,8 +76,7 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     private fun scheduleAlarmRecovery(context: Context, reason: String) {
-        val exactScheduled = AlarmScheduler.scheduleImmediateRecovery(context)
-        if (!exactScheduled) AlarmRecoveryNotice.show(context, reason)
+        AlarmRecoveryCoordinator.onStartFailure(context, reason)
     }
 
     private fun startMonitorIfNeeded(context: Context, state: ProtectionState, source: String) {
@@ -87,7 +86,7 @@ class BootReceiver : BroadcastReceiver() {
             ContextCompat.startForegroundService(context, Intent(context, ProtectionMonitorService::class.java))
         }.onFailure {
             LocalTamperHistory.record(context, "${source}_monitor_start_failed", it.javaClass.simpleName + ": " + it.message)
-            AlarmRecoveryNotice.show(context, "Background charger monitoring could not start; open the app to restore it")
+            ProtectionMonitorRecoveryNotice.show(context, "Background charger monitoring could not start; open the app to restore it")
         }
     }
 
