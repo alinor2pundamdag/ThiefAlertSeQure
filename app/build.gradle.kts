@@ -3,8 +3,10 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val appVersionCode = 5
-val appVersionName = "1.1.3"
+val appVersionCode = 6
+val appVersionName = "1.1.4"
+
+val instrumentationTestBuild = providers.gradleProperty("instrumentationTestBuild").orNull == "true"
 
 val releaseSigningReady = listOf(
     "ANDROID_KEYSTORE_PATH",
@@ -18,7 +20,7 @@ android {
     compileSdk = 36
     defaultConfig {
         applicationId = "com.thiefalertsequre.app"
-        minSdk = 26
+        minSdk = 23
         targetSdk = 36
         // Increase this for every distributable update. Never reset it between releases.
         versionCode = appVersionCode
@@ -43,10 +45,21 @@ android {
 
         }
         getByName("release") {
-            isMinifyEnabled = false
+            // Harden only distributable builds; keep debug APKs readable for device diagnostics.
+            // The dedicated instrumentation build is unminified so test bytecode can inspect
+            // framework-facing app classes. The distributable release never sets this property.
+            isMinifyEnabled = !instrumentationTestBuild
+            isShrinkResources = !instrumentationTestBuild
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             // A release APK is signed only with the persistent owner-controlled key.
             if (releaseSigningReady) {
                 signingConfig = signingConfigs.getByName("release")
+            } else if (providers.gradleProperty("signReleaseForTests").orNull == "true") {
+                // CI-only minified instrumentation uses the local debug key; never publish this APK.
+                signingConfig = signingConfigs.getByName("debug")
             }
         }
     }
@@ -56,7 +69,10 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     androidResources { noCompress += "opus" }
-    testOptions { unitTests.isReturnDefaultValues = true }
+    testOptions {
+        testBuildType = "release"
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 
@@ -78,5 +94,8 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("com.google.android.material:material:1.12.0")
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:core-ktx:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit-ktx:1.2.1")
 }
 

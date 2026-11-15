@@ -30,7 +30,7 @@ class SettingsActivity : FragmentActivity() {
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private var soundSlot = AlarmSoundStore.ALARM
     private var previewPlayer: MediaPlayer? = null
-    private var pendingUpdateInstall: File? = null
+    private var pendingUpdateInstall: AppUpdateResult.Ready? = null
     private val pickSoundFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) validateAndSaveSound(uri, soundSlot, uri)
     }
@@ -396,17 +396,14 @@ class SettingsActivity : FragmentActivity() {
 
     private fun isSafeForAppUpdate(): Boolean {
         val state = ProtectionStore(this).read()
-        val monitoringEnabled = getSharedPreferences(
-            ProtectionMonitorService.PREFS, MODE_PRIVATE
-        ).getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
-        return state.mode == ProtectionMode.DISARMED && !monitoringEnabled
+        return AppUpdatePolicy.canUpdateWhileProtectionDisarmed(state.mode)
     }
 
     private fun checkForOfficialUpdate() {
         if (!isSafeForAppUpdate()) {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Disable protection before updating")
-                .setMessage("For safety, turn off background monitoring and make sure no countdown or alarm is active. Updating can restart the app process.")
+                .setMessage("For safety, protection must be DISARMED with no countdown or active alarm. If background monitoring was enabled, Android stops the old process during installation and the app attempts to restart the monitor after package replacement.")
                 .setPositiveButton("OK", null)
                 .showThemed(this)
             return
@@ -421,10 +418,10 @@ class SettingsActivity : FragmentActivity() {
                         .setTitle("Version \${result.versionName} is available")
                         .setMessage(
                             notes + "\n\nAndroid will ask you to confirm installation. " +
-                                "Because the package ID and official signing key match, this is an in-place update; your app data is retained."
+                                "Because the package ID and official signing key match, this is an in-place update; Android preserves app-private data. Any enabled background monitor is restored after package replacement."
                         )
                         .setNegativeButton("Later", null)
-                        .setPositiveButton("Install update") { _, _ -> beginUpdateInstall(result.apkFile) }
+                        .setPositiveButton("Install update") { _, _ -> beginUpdateInstall(result) }
                         .showThemed(this)
                 }
                 AppUpdateResult.UpToDate -> android.widget.Toast.makeText(
@@ -439,17 +436,18 @@ class SettingsActivity : FragmentActivity() {
         }
     }
 
-    private fun beginUpdateInstall(apkFile: File) {
+    private fun beginUpdateInstall(update: AppUpdateResult.Ready) {
+        val apkFile = update.apkFile
         if (!isSafeForAppUpdate()) {
-            android.widget.Toast.makeText(this, "Update paused: disable background monitoring and clear any countdown/alarm first.", android.widget.Toast.LENGTH_LONG).show()
+            android.widget.Toast.makeText(this, "Update paused: disarm protection and clear any countdown/alarm first.", android.widget.Toast.LENGTH_LONG).show()
             return
         }
-        if (!apkFile.isFile || apkFile.length() <= 0L) {
-            android.widget.Toast.makeText(this, "The verified update file is no longer available. Check again.", android.widget.Toast.LENGTH_LONG).show()
+        if (!apkFile.isFile || apkFile.length() <= 0L || !AppUpdateManager.isVerifiedCachedApk(this, update)) {
+            android.widget.Toast.makeText(this, "The verified official update changed or is no longer available. Check again.", android.widget.Toast.LENGTH_LONG).show()
             return
         }
         if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
-            pendingUpdateInstall = apkFile
+            pendingUpdateInstall = update
             MaterialAlertDialogBuilder(this)
                 .setTitle("Allow Android to install this update")
                 .setMessage(
@@ -468,17 +466,27 @@ class SettingsActivity : FragmentActivity() {
                 .showThemed(this)
             return
         }
-        launchAndroidInstaller(apkFile)
+        launchAndroidInstaller(update)
     }
 
-    private fun launchAndroidInstaller(apkFile: File) {
+    private fun launchAndroidInstaller(update: AppUpdateResult.Ready) {
+        if (!isSafeForAppUpdate() || !AppUpdateManager.isVerifiedCachedApk(this, update)) {
+            android.widget.Toast.makeText(this, "Update verification failed. No APK was handed to Android.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        val apkFile = update.apkFile
         runCatching {
             val apkUri = FileProvider.getUriForFile(this, "$packageName.updates", apkFile)
+            // codeql[java/android/arbitrary-apk-installation]
+            // This system-installer handoff receives only the private cached APK revalidated above
+            // for SHA-256, production package ID, higher versionCode and the pinned release signer.
             val installIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 putExtra(Intent.EXTRA_RETURN_RESULT, true)
             }
+            // codeql[java/android/arbitrary-apk-installation]
+            // OEM fallback to Android's system installer using the same verified private APK URI.
             val installerFallback = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -662,7 +670,7 @@ class SettingsActivity : FragmentActivity() {
         val device = AndroidDeviceCompatibility.deviceSummary(
             Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.VERSION.RELEASE, Build.VERSION.SDK_INT
         )
-        return "$device\n$alarm\n$notifications\n$batteryUnrestricted\nMinimum supported Android: 8.0 (API 26)"
+        return "$device\n$alarm\n$notifications\n$batteryUnrestricted\nMinimum supported Android: 6.0 (API 23)"
     }
 
 

@@ -31,4 +31,28 @@ class TrustedBluetoothRegistryTest {
         assertTrue(TrustedBluetoothRegistry.decode("").isEmpty())
         assertFalse(TrustedBluetoothRegistry.decode("not-valid").any())
     }
+
+    @Test fun base64RoundTripSupportsUnicodeAndEmptyNames() {
+        val input = listOf(
+            TrustedBluetoothDevice("AA:00", "HONOR Watch – 日本語"),
+            TrustedBluetoothDevice("BB:00", "")
+        )
+        val expected = listOf(
+            input[0],
+            TrustedBluetoothDevice("BB:00", "Bluetooth accessory")
+        )
+        assertEquals(expected, TrustedBluetoothRegistry.decode(TrustedBluetoothRegistry.encode(input)))
+    }
+
+    @Test fun base64DecoderRejectsInvalidPaddingAndCharacters() {
+        assertTrue(TrustedBluetoothRegistry.decode("AA:00\tA===").isEmpty())
+        assertTrue(TrustedBluetoothRegistry.decode("AA:00\t!!!!").isEmpty())
+    }
+
+    @Test fun base64DecoderPreservesPreviouslyStoredJavaBase64Values() {
+        assertEquals(
+            listOf(TrustedBluetoothDevice("AA:00", "Watch One")),
+            TrustedBluetoothRegistry.decode("AA:00\tV2F0Y2ggT25l")
+        )
+    }
 }

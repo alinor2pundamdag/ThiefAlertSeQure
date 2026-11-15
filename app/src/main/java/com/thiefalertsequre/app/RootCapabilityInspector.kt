@@ -32,18 +32,26 @@ object RootCapabilityInspector {
     }
 
     private val suPaths = listOf(
-        "/system/bin/su",
-        "/system/xbin/su",
-        "/sbin/su",
-        "/system/su",
-        "/system/bin/.ext/.su",
-        "/system/usr/we-need-root/su",
-        "/data/local/bin/su",
-        "/data/local/xbin/su",
-        "/data/adb/magisk",
-        "/sbin/.magisk",
-        "/debug_ramdisk/.magisk"
+        "/system/bin/su", "/system/xbin/su", "/sbin/su", "/system/su",
+        "/system/bin/.ext/.su", "/system/usr/we-need-root/su",
+        "/data/local/bin/su", "/data/local/xbin/su", "/data/adb/magisk",
+        "/sbin/.magisk", "/debug_ramdisk/.magisk", "/vendor/bin/su", "/su/bin/su"
     )
+
+    private val suExecutablePaths = listOf(
+        "/system/bin/su", "/system/xbin/su", "/sbin/su", "/system/su",
+        "/system/bin/.ext/.su", "/system/usr/we-need-root/su",
+        "/data/local/bin/su", "/data/local/xbin/su", "/vendor/bin/su", "/su/bin/su"
+    )
+
+    private fun findSuExecutable(): String? = suExecutablePaths.firstNotNullOfOrNull { path ->
+        runCatching {
+            val file = File(path)
+            if (RootExecutablePathPolicy.isSafeAbsoluteExecutable(path) && file.isFile && file.canExecute()) {
+                file.canonicalPath.takeIf(RootExecutablePathPolicy::isSafeAbsoluteExecutable)
+            } else null
+        }.getOrNull()
+    }
 
     fun inspectPassive(): Report {
         val indicators = buildList {
@@ -77,8 +85,12 @@ object RootCapabilityInspector {
      */
     fun verifyRootAuthorization(timeoutSeconds: Long = 8L): Report {
         val passive = inspectPassive()
+        val suExecutable = findSuExecutable() ?: return passive.copy(
+            status = RootStatus.SU_NOT_AVAILABLE,
+            detail = if (passive.mayBeRooted) "Root indicators exist, but no executable su binary was found at a verified absolute path." else "No executable su binary was found at a verified absolute path."
+        )
         val process = try {
-            ProcessBuilder("su", "-c", "id").redirectErrorStream(true).start()
+            ProcessBuilder(suExecutable, "-c", "id").redirectErrorStream(true).start()
         } catch (e: Exception) {
             return passive.copy(
                 status = RootStatus.SU_NOT_AVAILABLE,
@@ -87,8 +99,8 @@ object RootCapabilityInspector {
         }
 
         return try {
-            if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
-                process.destroyForcibly()
+            if (!waitForProcess(process, timeoutSeconds)) {
+                terminateProcess(process)
                 passive.copy(
                     status = RootStatus.ROOT_CHECK_TIMED_OUT,
                     detail = "The superuser request timed out or was not answered. No system changes were made."
@@ -109,7 +121,7 @@ object RootCapabilityInspector {
                 }
             }
         } catch (e: Exception) {
-            process.destroyForcibly()
+            terminateProcess(process)
             passive.copy(
                 status = RootStatus.ROOT_CHECK_ERROR,
                 detail = "Root authorization could not be verified: ${e.javaClass.simpleName}. No system changes were made."
@@ -122,8 +134,10 @@ object RootCapabilityInspector {
      * Never changes controller configuration, power, pairing, or system properties.
      */
     fun collectBluetoothDiagnostics(timeoutSeconds: Long = 8L): String {
+        val suExecutable = findSuExecutable()
+            ?: return "No executable su binary was found at a verified absolute path."
         val process = ProcessBuilder(
-            "su", "-c",
+            suExecutable, "-c",
             "dumpsys bluetooth_manager; echo '\\n--- Bluetooth system properties ---'; getprop | grep -i bluetooth; echo '\\n--- Bluetooth sysfs devices ---'; ls -la /sys/class/bluetooth 2>/dev/null"
         ).redirectErrorStream(true).start()
         val output = StringBuilder()
@@ -139,8 +153,8 @@ object RootCapabilityInspector {
             }
         }.apply { isDaemon = true; start() }
         return try {
-            if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
-                process.destroyForcibly()
+            if (!waitForProcess(process, timeoutSeconds)) {
+                terminateProcess(process)
                 reader.join(500L)
                 "Root Bluetooth diagnostics timed out. No system changes were made."
             } else {
@@ -150,8 +164,23 @@ object RootCapabilityInspector {
                 else "Diagnostics returned no readable Bluetooth system information."
             }
         } catch (e: Exception) {
-            process.destroyForcibly()
+            terminateProcess(process)
             "Diagnostics failed: ${e.javaClass.simpleName}"
         }
     }
+    private fun waitForProcess(process: Process, timeoutSeconds: Long): Boolean {
+        val waiter = Thread { runCatching { process.waitFor() } }.apply { isDaemon = true; start() }
+        waiter.join(TimeUnit.SECONDS.toMillis(timeoutSeconds))
+        if (waiter.isAlive) {
+            terminateProcess(process)
+            waiter.join(500L)
+            return false
+        }
+        return true
+    }
+
+    private fun terminateProcess(process: Process) {
+        runCatching { process.destroy() }
+    }
+
 }

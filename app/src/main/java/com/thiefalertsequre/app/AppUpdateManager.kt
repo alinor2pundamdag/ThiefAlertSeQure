@@ -19,7 +19,8 @@ sealed class AppUpdateResult {
         val apkFile: File,
         val versionName: String,
         val versionCode: Long,
-        val releaseNotes: String
+        val releaseNotes: String,
+        val sha256: String
     ) : AppUpdateResult()
 
     object UpToDate : AppUpdateResult()
@@ -36,9 +37,7 @@ sealed class AppUpdateResult {
 object AppUpdateManager {
     private const val RELEASE_API =
         "https://api.github.com/repos/alinor2pundamdag/ThiefAlertSeQure/releases/latest"
-    private const val EXPECTED_PACKAGE = "com.thiefalertsequre.app"
-    private const val EXPECTED_CERT_SHA256 =
-        "9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64"
+    private const val EXPECTED_PACKAGE = AppUpdatePolicy.EXPECTED_PACKAGE
     private const val MAX_APK_BYTES = 100L * 1024L * 1024L
     private val allowedHosts = setOf(
         "api.github.com",
@@ -61,19 +60,14 @@ object AppUpdateManager {
     }
 
     private fun resolveLatestUpdate(context: Context): AppUpdateResult {
+        AppUpdatePolicy.requireInstalledPackage(context.packageName)
         val protectionState = ProtectionStore(context).read()
-        val monitoringEnabled = context.getSharedPreferences(
-            ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
-        ).getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
-        require(protectionState.mode == ProtectionMode.DISARMED && !monitoringEnabled) {
-            "For safety, disable background monitoring and ensure no countdown or alarm is active before updating."
-        }
+        AppUpdatePolicy.requireSafeUpdateMode(protectionState.mode)
         require(installedSignerMatchesOfficialKey(context)) {
             "This installation does not use the official release signing key. A one-time migration is required before in-app updates can work."
         }
 
         val installed = context.packageManager.getPackageInfo(context.packageName, 0)
-        val installedVersionName = installed.versionName ?: "0"
         val installedVersionCode = versionCode(installed)
         val release = JSONObject(readHttpsText(RELEASE_API))
         require(!release.optBoolean("draft") && !release.optBoolean("prerelease")) {
@@ -85,10 +79,9 @@ object AppUpdateManager {
             "The latest release tag has an invalid version format."
         }
         val remoteVersionName = tag.removePrefix("v")
-        if (AppVersionComparator.compare(remoteVersionName, installedVersionName) <= 0) {
-            return AppUpdateResult.UpToDate
-        }
-
+        // versionCode is Android's authoritative update ordering. Do not return
+        // UpToDate merely because versionName is unchanged: hotfix releases may
+        // legitimately keep the same display version while increasing versionCode.
         val assets = release.optJSONArray("assets")
             ?: error("The GitHub release has no downloadable assets.")
         var apkName: String? = null
@@ -131,14 +124,21 @@ object AppUpdateManager {
             }
             val actualHash = sha256(temporaryFile)
             require(actualHash == expectedHash) { "The downloaded APK failed SHA-256 verification." }
-            verifyApk(context.packageManager, temporaryFile, remoteVersionName, installedVersionCode)
+            val candidateVersionCode = verifyApk(
+                context.packageManager, temporaryFile, remoteVersionName
+            )
+            if (!AppUpdatePolicy.isNewerVersionCode(installedVersionCode, candidateVersionCode)) {
+                return AppUpdateResult.UpToDate
+            }
+            AppUpdatePolicy.requireNewerVersionCode(installedVersionCode, candidateVersionCode)
             if (apkFile.exists()) apkFile.delete()
             check(temporaryFile.renameTo(apkFile)) { "Could not prepare the verified APK for installation." }
             return AppUpdateResult.Ready(
                 apkFile = apkFile,
                 versionName = remoteVersionName,
                 versionCode = readApkVersionCode(context, apkFile),
-                releaseNotes = release.optString("body").trim().take(1200)
+                releaseNotes = release.optString("body").trim().take(1200),
+                sha256 = actualHash
             )
         } finally {
             temporaryFile.delete()
@@ -169,7 +169,7 @@ object AppUpdateManager {
     private fun downloadHttps(address: String, destination: File, expectedSize: Long) {
         val connection = openHttps(address)
         try {
-            val contentLength = connection.contentLengthLong
+            val contentLength = connection.contentLength.toLong()
             require(contentLength <= 0L || contentLength == expectedSize) {
                 "The release APK size does not match GitHub release metadata."
             }
@@ -228,18 +228,14 @@ object AppUpdateManager {
         error("GitHub returned too many update redirects.")
     }
 
-    private fun verifyApk(packageManager: PackageManager, file: File, expectedVersionName: String, installedVersionCode: Long) {
+    private fun verifyApk(packageManager: PackageManager, file: File, expectedVersionName: String): Long {
         val archive = packageManager.getPackageArchiveInfo(file.absolutePath, signingFlags())
             ?: error("Android could not inspect the downloaded APK.")
-        require(archive.packageName == EXPECTED_PACKAGE) {
-            "The downloaded APK has the wrong application ID."
-        }
+        AppUpdatePolicy.requireCandidatePackage(EXPECTED_PACKAGE, archive.packageName)
         require(archive.versionName == expectedVersionName) {
             "The APK version does not match its GitHub release tag."
         }
-        require(versionCode(archive) > installedVersionCode) {
-            "The APK version code is not newer than the installed version."
-        }
+        val candidateVersionCode = versionCode(archive)
         val signatures = if (Build.VERSION.SDK_INT >= 28) {
             archive.signingInfo?.apkContentsSigners
         } else {
@@ -251,10 +247,29 @@ object AppUpdateManager {
             MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
                 .joinToString("") { byte -> "%02x".format(byte) }
         }
-        require(signerDigests.size == 1 && signerDigests.single() == EXPECTED_CERT_SHA256) {
+        require(AppUpdatePolicy.hasOfficialSigner(signerDigests)) {
             "The APK is not signed with the pinned official ThiefAlertSeQure release key."
         }
+        return candidateVersionCode
     }
+
+    /** Revalidates the private cached artifact immediately before Android Package Installer receives it. */
+    fun isVerifiedCachedApk(context: Context, update: AppUpdateResult.Ready): Boolean = runCatching {
+        AppUpdatePolicy.requireInstalledPackage(context.packageName)
+        AppUpdatePolicy.requireSafeUpdateMode(ProtectionStore(context).read().mode)
+        require(installedSignerMatchesOfficialKey(context))
+        val expectedDirectory = File(context.cacheDir, "updates").canonicalFile
+        val candidateFile = update.apkFile.canonicalFile
+        require(candidateFile.parentFile == expectedDirectory)
+        require(candidateFile.name == "ThiefAlertSeQure-v${update.versionName}-release.apk")
+        require(candidateFile.isFile && candidateFile.length() in 1..MAX_APK_BYTES)
+        require(sha256(candidateFile) == update.sha256)
+        val installed = context.packageManager.getPackageInfo(context.packageName, 0)
+        val installedCode = versionCode(installed)
+        val candidateCode = verifyApk(context.packageManager, candidateFile, update.versionName)
+        require(candidateCode == update.versionCode)
+        AppUpdatePolicy.isNewerVersionCode(installedCode, candidateCode)
+    }.getOrDefault(false)
 
     private fun installedSignerMatchesOfficialKey(context: Context): Boolean {
         val packageManager = context.packageManager
@@ -270,7 +285,7 @@ object AppUpdateManager {
             MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
                 .joinToString("") { byte -> "%02x".format(byte) }
         }
-        return digests.size == 1 && digests.single() == EXPECTED_CERT_SHA256
+        return AppUpdatePolicy.hasOfficialSigner(digests)
     }
 
     private fun signingFlags(): Int =

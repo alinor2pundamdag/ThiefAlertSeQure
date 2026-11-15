@@ -87,7 +87,7 @@ Strong face authentication is available only if Android reports the enrolled fac
 ## Release gates
 1. Latest GitHub Actions unit tests pass.
 2. Latest debug APK assembles.
-3. Install on physical Android 8–17 devices where available; prioritize API 26, 31–36, and Android 17 audio hardening.
+3. Install on physical Android 6–17 devices where available; prioritize API 23, 26, 31–37, and Android 17 audio hardening.
 4. Verify selected audio URI survives reboot, decodes, previews and loops; verify vibration fallback on missing/corrupt audio.
 5. Verify foreground monitor, motion sensitivity, battery threshold crossing and stop action on physical devices.
 6. Verify icon and label before and after installation.

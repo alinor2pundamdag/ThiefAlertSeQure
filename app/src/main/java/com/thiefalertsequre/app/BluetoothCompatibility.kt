@@ -57,6 +57,9 @@ object BluetoothCompatibility {
     }
 
     fun androidRelease(api: Int): String = when (api) {
+        23 -> "Android 6.0"
+        24 -> "Android 7.0"
+        25 -> "Android 7.1"
         26 -> "Android 8.0"
         27 -> "Android 8.1"
         28 -> "Android 9"
@@ -75,10 +78,11 @@ object BluetoothCompatibility {
     fun permissionGuide(api: Int): String = if (api >= 31) {
         "Android 12–17: allow Nearby devices / Bluetooth Connect only when selecting or using your paired trusted device. This app does not need Bluetooth Scan, Bluetooth Advertise, or location permission for its current paired-device separation alert."
     } else {
-        "Android 8–11: Bluetooth permissions are granted through the install-time legacy permission model. The current paired-device alert does not request location permission or perform nearby-device scanning."
+        "Android 6–11: Bluetooth permissions are granted through the install-time legacy permission model. The current paired-device alert does not request location permission or perform nearby-device scanning."
     }
 
     fun versionGuide(api: Int): String = when {
+        api <= 25 -> "Android 6.0–7.1 (API 23–25): use legacy BLUETOOTH / BLUETOOTH_ADMIN install-time permissions. Runtime permission prompts apply only to dangerous permissions required by the selected feature. Use the user-visible monitor service and exact idle alarms for protection deadlines."
         api <= 27 -> "Android 8.0–8.1 (API 26–27): use legacy BLUETOOTH / BLUETOOTH_ADMIN permissions. Background monitoring must run through the user-visible foreground service; implicit broadcasts are registered at runtime."
         api == 28 -> "Android 9 (API 28): legacy Bluetooth permissions remain in use. Review battery optimization and keep the user-visible monitoring service enabled."
         api == 29 -> "Android 10 (API 29): legacy Bluetooth permissions remain in use. Background activity launches are restricted; do not depend on opening screens from a background event."
