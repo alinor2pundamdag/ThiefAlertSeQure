@@ -72,7 +72,7 @@ flowchart TD
 ## Build and test chain
 
 1. `settings.gradle.kts` and root `build.gradle.kts` define project/plugin configuration.
-2. `gradle/libs.versions.toml` owns version catalog entries; `gradle/wrapper/gradle-wrapper.properties` pins the Gradle distribution.
+2. There is no `gradle/libs.versions.toml` version catalog in the current tree; dependency/plugin versions are declared in `app/build.gradle.kts` and root `build.gradle.kts`. `gradle/wrapper/gradle-wrapper.properties` pins the Gradle distribution.
 3. `app/build.gradle.kts` defines Android SDK levels, application identity, variants, dependencies, and Java/Kotlin target.
 4. `app/src/main/AndroidManifest.xml` declares app components, exported boundaries, permissions, foreground-service types, and FileProvider.
 5. `app/src/main/java` contains runtime UI, domain/policy, persistence, receivers and services.
