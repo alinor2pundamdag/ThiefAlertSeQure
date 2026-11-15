@@ -211,7 +211,7 @@ object PowerTransitionCoordinator {
             .commit()
     }
 
-    private fun clearPendingDisconnectLocked(prefs: SharedPreferences) {
+    private fun clearPendingDisconnectLocked(context: Context, prefs: SharedPreferences) {
         prefs.edit()
             .putBoolean(PENDING_DISCONNECT, false)
             .remove(PENDING_EPOCH_MS)
@@ -400,7 +400,7 @@ object PowerTransitionCoordinator {
             if (generation != SafePreferences.long(prefs, GENERATION, -2L) ||
                 SafePreferences.boolean(prefs, CONNECTED, true)
             ) {
-                clearPendingDisconnectLocked(prefs)
+                clearPendingDisconnectLocked(context, prefs)
                 return@synchronized null
             }
 
@@ -500,11 +500,11 @@ object PowerTransitionCoordinator {
                 // A process may have died after the state write but before the
                 // pending-event marker was cleared. Resume the existing deadline.
                 AlarmScheduler.schedule(context, current.deadlineEpochMs, current.deadlineElapsedRealtimeMs, current.bootCount)
-                clearPendingDisconnectLocked(prefs)
+                clearPendingDisconnectLocked(context, prefs)
                 return@synchronized current
             }
             if (current.mode != ProtectionMode.ARMED) {
-                clearPendingDisconnectLocked(prefs)
+                clearPendingDisconnectLocked(context, prefs)
                 LocalTamperHistory.record(context, "charger_unplug_ignored", "Confirmed unplug while protection was not armed")
                 return@synchronized current
             }
@@ -519,11 +519,11 @@ object PowerTransitionCoordinator {
             }
             if (next.mode == ProtectionMode.COUNTDOWN) {
                 AlarmScheduler.schedule(context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
-                clearPendingDisconnectLocked(prefs)
+                clearPendingDisconnectLocked(context, prefs)
                 LocalTamperHistory.record(context, "charger_countdown_started", "OS unplug event confirmed by stable live-state samples; recovered candidates retain their original event time")
                 notifyMonitorStateChanged(context)
             } else if (next.mode != ProtectionMode.ARMED) {
-                clearPendingDisconnectLocked(prefs)
+                clearPendingDisconnectLocked(context, prefs)
             } else {
                 LocalTamperHistory.record(context, "charger_countdown_persist_pending", "Protection state write did not commit; durable unplug provenance retained for recovery")
             }
