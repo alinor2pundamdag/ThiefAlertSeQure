@@ -57,8 +57,26 @@ object AlarmScheduler {
     }
 
     /** Schedules a bounded retry for an already-latched alarm recovery attempt. */
-    fun scheduleRecoveryRetry(context: Context, delayMs: Long): Boolean =
-        scheduleRecovery(context, delayMs) { }
+    fun scheduleRecoveryRetry(context: Context, delayMs: Long): Boolean {
+        val alarmManager = context.getSystemService(AlarmManager::class.java)
+        val exactAllowed = Build.VERSION.SDK_INT < 31 || runCatching {
+            alarmManager.canScheduleExactAlarms()
+        }.getOrDefault(false)
+        if (!exactAllowed) {
+            LocalTamperHistory.record(
+                context, "alarm_recovery_exact_access_missing",
+                "Automatic foreground-service retry was not scheduled because exact-alarm access is unavailable"
+            )
+            return false
+        }
+        val token = "recovery"
+        val triggerAt = System.currentTimeMillis() + delayMs.coerceAtLeast(250L)
+        return replaceTokenAndSchedule(context, token) {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent(context, token)
+            )
+        }
+    }
 
     private fun scheduleRecovery(
         context: Context,
