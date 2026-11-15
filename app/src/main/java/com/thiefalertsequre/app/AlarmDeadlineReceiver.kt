@@ -116,9 +116,14 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         }
 
         when (updated.mode) {
-            ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(
-                context, updated.deadlineEpochMs, updated.deadlineElapsedRealtimeMs, updated.bootCount
-            )
+            ProtectionMode.COUNTDOWN -> {
+                if (!AlarmScheduler.schedule(
+                        context, updated.deadlineEpochMs, updated.deadlineElapsedRealtimeMs, updated.bootCount
+                    )
+                ) {
+                    AlarmScheduler.scheduleRetry(context, 1_000L)
+                }
+            }
             ProtectionMode.ALARM_TRIGGERED -> if (transitionedToAlarm) {
                 AlarmScheduler.cancel(context)
                 context.stopService(Intent(context, ProtectionMonitorService::class.java))
