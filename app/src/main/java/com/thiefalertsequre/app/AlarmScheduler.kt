@@ -57,10 +57,8 @@ object AlarmScheduler {
     }
 
     /** Schedules a bounded retry for an already-latched alarm recovery attempt. */
-    fun scheduleRecoveryRetry(context: Context, delayMs: Long): Boolean {
-        var exactScheduled = false
-        return scheduleRecovery(context, delayMs) { exactScheduled = it }
-    }
+    fun scheduleRecoveryRetry(context: Context, delayMs: Long): Boolean =
+        scheduleRecovery(context, delayMs) { }
 
     private fun scheduleRecovery(
         context: Context,
@@ -115,11 +113,16 @@ object AlarmScheduler {
     fun cancel(context: Context) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        SafePreferences.string(prefs, KEY_LAST_TOKEN, null)?.let {
-            alarmManager.cancel(pendingIntent(context, it))
-        }
-        if (!prefs.edit().remove(KEY_LAST_TOKEN).commit()) {
-            LocalTamperHistory.record(context, "deadline_token_clear_failed", "Scheduled alarm token could not be removed from preferences")
+        when (val stored = SafePreferences.readString(prefs, KEY_LAST_TOKEN, null)) {
+            is PreferenceRead.Value -> {
+                stored.value?.let { alarmManager.cancel(pendingIntent(context, it)) }
+                if (!prefs.edit().remove(KEY_LAST_TOKEN).commit()) {
+                    LocalTamperHistory.record(context, "deadline_token_clear_failed", "Scheduled alarm token could not be removed from preferences")
+                }
+            }
+            is PreferenceRead.Corrupt -> LocalTamperHistory.record(
+                context, "deadline_token_corrupt", "Malformed alarm token retained; pending alarm could not be identified safely"
+            )
         }
         alarmManager.cancel(
             PendingIntent.getBroadcast(
@@ -140,7 +143,13 @@ object AlarmScheduler {
         schedule: () -> Unit
     ): Boolean {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val previous = SafePreferences.string(prefs, KEY_LAST_TOKEN, null)
+        val previous = when (val stored = SafePreferences.readString(prefs, KEY_LAST_TOKEN, null)) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> {
+                LocalTamperHistory.record(context, "deadline_token_corrupt", "Malformed alarm token retained; new schedule rejected safely")
+                return false
+            }
+        }
         if (!prefs.edit().putString(KEY_LAST_TOKEN, token).commit()) {
             LocalTamperHistory.record(context, "deadline_token_persist_failed", "Alarm token was not saved; previous alarm retained")
             return false
