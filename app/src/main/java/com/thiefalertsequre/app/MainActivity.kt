@@ -409,11 +409,11 @@ class MainActivity : FragmentActivity() {
             OwnerAuthenticationMethod.BIOMETRIC -> authenticateBiometric()
             OwnerAuthenticationMethod.DEVICE_CREDENTIAL -> authenticateDeviceCredential()
             OwnerAuthenticationMethod.UNAVAILABLE -> {
-            // Do not latch the one-shot prompt guard when the owner has not yet
-            // configured a secure credential. Re-check automatically on resume.
-            autoAuthenticationRequested = false
-            details.text = "No secure device credential is configured. Set a PIN, pattern or password in Android settings to enable owner verification."
-            render()
+                // Do not latch the one-shot prompt guard when the owner has not yet
+                // configured a secure credential. Re-check automatically on resume.
+                autoAuthenticationRequested = false
+                details.text = "No secure device credential is configured. Set a PIN, pattern or password in Android settings to enable owner verification."
+                render()
             }
         }
     }
