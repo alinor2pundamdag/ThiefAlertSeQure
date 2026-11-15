@@ -107,8 +107,9 @@ internal object AlarmFlashSettings {
     const val OFF_DURATION_MS = 700L
 
     fun isEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getBoolean(KEY_ENABLED, true)
+        SafePreferences.boolean(
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE), KEY_ENABLED, true
+        )
 
     fun shouldRun(mode: ProtectionMode): Boolean = mode == ProtectionMode.ALARM_TRIGGERED
 
