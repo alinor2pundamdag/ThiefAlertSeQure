@@ -50,15 +50,18 @@ object AlarmVolumeController {
         if (storedOriginal == null || storedOriginal < 0) {
             // No trustworthy original volume remains. Remove the malformed value
             // so the next alarm episode can take a fresh snapshot.
-            prefs.edit().remove(KEY_ORIGINAL).commit()
-            return false
+            val cleared = prefs.edit().remove(KEY_ORIGINAL).commit()
+            return false && cleared
         }
         val original = storedOriginal.coerceIn(0, audio.getStreamMaxVolume(AudioManager.STREAM_ALARM))
         val restored = runCatching {
             audio.setStreamVolume(AudioManager.STREAM_ALARM, original, 0)
             true
         }.getOrDefault(false)
-        if (restored) prefs.edit().remove(KEY_ORIGINAL).commit()
-        return restored
+        if (!restored) return false
+        // A successful volume change is not a complete restore until the saved
+        // snapshot is durably cleared. Otherwise the next alarm could reuse a
+        // stale pre-alarm volume from this episode.
+        return prefs.edit().remove(KEY_ORIGINAL).commit()
     }
 }
