@@ -99,7 +99,7 @@ Managed lockdown is a separate, opt-in mode. It is enabled only if DevicePolicyM
 
 ## 7. Privacy and least privilege
 
-- No Internet permission or network stack is needed.
+- The protection, charger, Bluetooth, and alarm paths do not require network access. The app declares INTERNET only for the optional owner-initiated GitHub release checker; protection state and local identifiers are never uploaded.
 - No cloud/backend/analytics/ad SDK.
 - Do not collect device passwords, patterns or PINs.
 - No unnecessary contacts, location, camera, microphone, SMS or storage permissions.
