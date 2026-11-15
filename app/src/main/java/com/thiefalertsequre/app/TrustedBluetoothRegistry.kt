@@ -68,26 +68,29 @@ object TrustedBluetoothRegistry {
     }
 
     fun add(prefs: SharedPreferences, address: String, name: String): Boolean {
-        if (address.isBlank()) return false
-        val current = read(prefs).filterNot { it.address.equals(address, ignoreCase = true) }
-        val currentRevision = deviceRevision(prefs, address)
-        val baselines = baselineAddresses(prefs).filterNot { it.equals(address, ignoreCase = true) }
-        val updated = (current + TrustedBluetoothDevice(address, name.ifBlank { "Bluetooth accessory" }))
+        if (!isValidAddress(address)) return false
+        val normalizedAddress = address.trim().uppercase()
+        val current = read(prefs).filterNot { it.address.equals(normalizedAddress, ignoreCase = true) }
+        val currentRevision = deviceRevision(prefs, normalizedAddress)
+        val baselines = baselineAddresses(prefs).filterNot { it.equals(normalizedAddress, ignoreCase = true) }
+        val updated = (current + TrustedBluetoothDevice(normalizedAddress, name.ifBlank { "Bluetooth accessory" }))
             .sortedBy { it.name.lowercase() }
         return prefs.edit()
             .putString(KEY_DEVICES, LocalPreferenceCipher.encrypt(KEY_DEVICES, encode(updated)))
             .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, baselines.joinToString("\n")))
-            .putLong(deviceRevisionKey(address), currentRevision + 1L)
+            .putLong(deviceRevisionKey(normalizedAddress), currentRevision + 1L)
             .commit()
     }
 
     /** Removes only the app's trust relationship. Android pairing is never modified. */
     fun remove(prefs: SharedPreferences, address: String): Boolean {
+        if (!isValidAddress(address)) return false
+        val normalizedAddress = address.trim().uppercase()
         val current = read(prefs)
-        val updated = current.filterNot { it.address.equals(address, ignoreCase = true) }
+        val updated = current.filterNot { it.address.equals(normalizedAddress, ignoreCase = true) }
         if (updated.size == current.size) return false
-        val currentRevision = deviceRevision(prefs, address)
-        val baselines = baselineAddresses(prefs).filterNot { it.equals(address, ignoreCase = true) }
+        val currentRevision = deviceRevision(prefs, normalizedAddress)
+        val baselines = baselineAddresses(prefs).filterNot { it.equals(normalizedAddress, ignoreCase = true) }
         val edit = prefs.edit()
             .putString(KEY_DEVICES, LocalPreferenceCipher.encrypt(KEY_DEVICES, encode(updated)))
             .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, baselines.joinToString("\n")))
@@ -102,7 +105,7 @@ object TrustedBluetoothRegistry {
     }
 
     fun isTrusted(prefs: SharedPreferences, address: String): Boolean =
-        read(prefs).any { it.address.equals(address, ignoreCase = true) }
+        isValidAddress(address) && read(prefs).any { it.address.equals(address.trim(), ignoreCase = true) }
 
     fun revision(prefs: SharedPreferences): Long =
         when (val stored = SafePreferences.readLong(prefs, KEY_REVISION, 0L)) {
@@ -160,13 +163,15 @@ object TrustedBluetoothRegistry {
     }
 
     fun isBaselineConnected(prefs: SharedPreferences, address: String): Boolean =
-        baselineAddresses(prefs).any { it.equals(address, ignoreCase = true) }
+        isValidAddress(address) && baselineAddresses(prefs).any { it.equals(address.trim(), ignoreCase = true) }
 
     fun markConnected(prefs: SharedPreferences, address: String, connected: Boolean): Boolean {
+        if (!isValidAddress(address)) return false
+        val normalizedAddress = address.trim().uppercase()
         val old = baselineAddresses(prefs)
-        val hadBaseline = old.any { it.equals(address, ignoreCase = true) }
-        val updated = old.filterNot { it.equals(address, ignoreCase = true) }.toMutableSet()
-        if (connected && isTrusted(prefs, address)) updated.add(address)
+        val hadBaseline = old.any { it.equals(normalizedAddress, ignoreCase = true) }
+        val updated = old.filterNot { it.equals(normalizedAddress, ignoreCase = true) }.toMutableSet()
+        if (connected && isTrusted(prefs, normalizedAddress)) updated.add(normalizedAddress)
         val committed = prefs.edit()
             .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, updated.joinToString("\n")))
             .commit()
@@ -199,6 +204,9 @@ object TrustedBluetoothRegistry {
         check(prefs.edit().putString(key, encrypted).commit()) { "Could not securely migrate legacy trusted Bluetooth data." }
         return raw
     }
+
+    internal fun isValidAddress(address: String): Boolean =
+        Regex("(?i)^[0-9a-f]{2}(:[0-9a-f]{2}){5}$").matches(address.trim())
 
     private fun sha256(value: String): String =
         MessageDigest.getInstance("SHA-256").digest(value.toByteArray(StandardCharsets.UTF_8))
@@ -253,14 +261,13 @@ object TrustedBluetoothRegistry {
             "${device.address}\t$name"
         }
 
-    internal fun decode(raw: String): List<TrustedBluetoothDevice> = raw.lineSequence()
-        .mapNotNull { line ->
+    internal fun decode(raw: String): List<TrustedBluetoothDevice> =
+        raw.lineSequence().filter { it.isNotBlank() }.map { line ->
             val split = line.split('\t', limit = 2)
-            if (split.size != 2 || split[0].isBlank()) null else runCatching {
-                val name = String(decodeBase64(split[1]), StandardCharsets.UTF_8)
-                TrustedBluetoothDevice(split[0], name.ifBlank { "Bluetooth accessory" })
-            }.getOrNull()
-        }
-        .distinctBy { it.address.lowercase() }
-        .toList()
+            require(split.size == 2 && isValidAddress(split[0])) {
+                "Trusted Bluetooth registry contains an invalid device entry."
+            }
+            val name = String(decodeBase64(split[1]), StandardCharsets.UTF_8)
+            TrustedBluetoothDevice(split[0].trim().uppercase(), name.ifBlank { "Bluetooth accessory" })
+        }.distinctBy { it.address.lowercase() }.toList()
 }
