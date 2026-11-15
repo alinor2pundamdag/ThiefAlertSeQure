@@ -28,7 +28,15 @@ class PowerTransitionRecoveryPolicyTest {
         assertFalse(PowerTransitionRecoveryPolicy.isSameBoot(12, -1, 50_000L, 51_000L))
     }
 
-    @Test fun unknownBootCountCanUseMonotonicClockWhenItHasNotReset() {
-        assertTrue(PowerTransitionRecoveryPolicy.isSameBoot(-1, -1, 50_000L, 51_000L))
+    @Test fun unknownBootCountsCannotProveSameBootFromElapsedTimeAlone() {
+        assertFalse(PowerTransitionRecoveryPolicy.isSameBoot(-1, -1, 50_000L, 51_000L))
+    }
+
+    @Test fun missingCandidateBootIdentityCannotProveSameBoot() {
+        assertFalse(PowerTransitionRecoveryPolicy.isSameBoot(-1, 12, 50_000L, 51_000L))
+    }
+
+    @Test fun missingCurrentBootIdentityCannotProveSameBoot() {
+        assertFalse(PowerTransitionRecoveryPolicy.isSameBoot(12, -1, 50_000L, 51_000L))
     }
 }
