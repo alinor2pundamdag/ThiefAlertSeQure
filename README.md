@@ -224,7 +224,7 @@ A successful CI build confirms that the configured automated checks and APK asse
 | [Requirement Traceability Matrix](docs/REQUIREMENT_TRACEABILITY_MATRIX.md) | Requirement IDs mapped to owner files, tests, CI evidence, device validation, and release gates. |
 | [Device Owner Mode](docs/DEVICE_OWNER_MODE.md) | Managed-device requirements, capabilities, and rollback. |
 | [Android Settings & Alarm Hardening](docs/ANDROID_SETTINGS_AND_ALARM_HARDENING.md) | System settings and reliability guidance. |
-| [Android Device Compatibility](docs/ANDROID_DEVICE_COMPATIBILITY.md) | API 23–37 behavior, OEM-specific setup, fallback navigation, and device test matrix. |
+| [Android Device Compatibility](docs/ANDROID_DEVICE_COMPATIBILITY.md) | API 26–36 behavior, OEM-specific setup, fallback navigation, and device test matrix. |
 
 ## ⚠️ Honest security and reliability boundaries
 
