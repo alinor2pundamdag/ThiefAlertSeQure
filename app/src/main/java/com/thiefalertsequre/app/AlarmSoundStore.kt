@@ -59,10 +59,13 @@ object AlarmSoundStore {
         require(slot == ALARM || slot == ALERT)
         var newlyGranted = false
         return runCatching {
+            val alreadyGranted = context.contentResolver.persistedUriPermissions.any {
+                it.uri == permissionUri && it.isReadPermission
+            }
             context.contentResolver.takePersistableUriPermission(
                 permissionUri, Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
-            newlyGranted = true
+            newlyGranted = !alreadyGranted
             val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val oldGrant = when (val stored = SafePreferences.readString(prefs, "grant_uri_$slot", null)) {
                 is PreferenceRead.Value -> stored.value
