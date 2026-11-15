@@ -22,8 +22,18 @@ object TrustedBluetoothRegistry {
             is PreferenceRead.Value -> stored.value
             is PreferenceRead.Corrupt -> return emptyList()
         }
-        val legacyAddress = SafePreferences.string(prefs, ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null)
-        val legacyName = SafePreferences.string(prefs, ProtectionMonitorService.KEY_BT_TRUSTED_NAME, null)
+        val legacyAddress = when (val stored = SafePreferences.readString(
+            prefs, ProtectionMonitorService.KEY_BT_TRUSTED_ADDRESS, null
+        )) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> return emptyList()
+        }
+        val legacyName = when (val stored = SafePreferences.readString(
+            prefs, ProtectionMonitorService.KEY_BT_TRUSTED_NAME, null
+        )) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> return emptyList()
+        }
         val devices = if (raw == null) {
             if (legacyAddress.isNullOrBlank()) emptyList()
             else listOf(TrustedBluetoothDevice(legacyAddress, legacyName?.takeIf { it.isNotBlank() } ?: "Bluetooth accessory"))
