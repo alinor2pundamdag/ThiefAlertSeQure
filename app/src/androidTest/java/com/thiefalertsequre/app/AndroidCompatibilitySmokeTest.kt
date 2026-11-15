@@ -131,11 +131,12 @@ class AndroidCompatibilitySmokeTest {
     @Test
     fun ownerAuthenticationSelectionUsesActualDeviceCapabilities() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val strongBiometricAvailable = androidx.biometric.BiometricManager.from(context)
-            .canAuthenticate(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
-            androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS
         val deviceCredentialAvailable = context.getSystemService(android.app.KeyguardManager::class.java)
             .isDeviceSecure
+        val strongBiometricAvailable = deviceCredentialAvailable &&
+            androidx.biometric.BiometricManager.from(context)
+                .canAuthenticate(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
+                androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS
 
         val selected = OwnerAuthenticationPolicy.select(
             strongBiometricAvailable = strongBiometricAvailable,
