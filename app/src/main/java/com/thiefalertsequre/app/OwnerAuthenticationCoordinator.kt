@@ -44,8 +44,8 @@ object OwnerAuthenticationCoordinator {
         val monitorPrefs = appContext.getSharedPreferences(
             ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
         )
-        val monitorEnabled = monitorPrefs.getBoolean(
-            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        val monitorEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
         val next = if (monitorEnabled) {
             PowerTransitionCoordinator.resetBaselineToCurrentPower(
