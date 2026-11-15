@@ -372,6 +372,7 @@ jobs:
           profile: pixel_2
           emulator-boot-timeout: 900
           disable-animations: true
+          disable-spellchecker: true
           script: bash .github/scripts/run-android-instrumentation.sh
 
       - name: Upload Android instrumentation diagnostics
