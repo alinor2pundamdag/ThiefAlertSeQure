@@ -22,49 +22,77 @@ object AlarmScheduler {
         if (deadlineEpochMs <= 0L) return
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val token = deadlineToken(deadlineEpochMs, deadlineElapsedRealtimeMs, deadlineBootCount)
-        val operation = pendingIntent(context, token)
-        rememberToken(context, token)
         val currentBootCount = ProtectionClock.bootCount(context)
         val hasMonotonicDeadline = deadlineElapsedRealtimeMs > 0L
         val sameBoot = hasMonotonicDeadline && deadlineBootCount >= 0 &&
             currentBootCount >= 0 && currentBootCount == deadlineBootCount
         val needsBootReconciliation = hasMonotonicDeadline && !sameBoot
         val clockType = if (sameBoot) AlarmManager.ELAPSED_REALTIME_WAKEUP else AlarmManager.RTC_WAKEUP
-        // Never schedule an old monotonic deadline against wall time when boot
-        // identity is unknown/different; wake only to revalidate and rebase it.
         val triggerAt = when {
             sameBoot -> deadlineElapsedRealtimeMs
             needsBootReconciliation -> System.currentTimeMillis() + BOOT_RECONCILIATION_RETRY_MS
             else -> deadlineEpochMs
         }
-        val exactAllowed = Build.VERSION.SDK_INT < 31 || alarmManager.canScheduleExactAlarms()
-        if (exactAllowed) {
-            try {
-                alarmManager.setExactAndAllowWhileIdle(clockType, triggerAt, operation)
-                return
-            } catch (_: SecurityException) {
-                // Permission can be revoked between the capability check and scheduling.
+        val scheduled = replaceTokenAndSchedule(context, token) {
+            val exactAllowed = Build.VERSION.SDK_INT < 31 || alarmManager.canScheduleExactAlarms()
+            if (exactAllowed) {
+                try {
+                    alarmManager.setExactAndAllowWhileIdle(clockType, triggerAt, pendingIntent(context, token))
+                } catch (_: SecurityException) {
+                    alarmManager.setAndAllowWhileIdle(clockType, triggerAt, pendingIntent(context, token))
+                }
+            } else {
+                alarmManager.setAndAllowWhileIdle(clockType, triggerAt, pendingIntent(context, token))
             }
         }
-        alarmManager.setAndAllowWhileIdle(clockType, triggerAt, operation)
+        if (!scheduled) {
+            LocalTamperHistory.record(context, "deadline_schedule_failed", "Alarm deadline could not be durably recorded and scheduled")
+        }
     }
 
     fun scheduleImmediateRecovery(context: Context): Boolean {
+        var exactScheduled = true
+        val scheduled = scheduleRecovery(context, 250L) { exactScheduled = it }
+        return scheduled && exactScheduled
+    }
+
+    /** Schedules a bounded retry for an already-latched alarm recovery attempt. */
+    fun scheduleRecoveryRetry(context: Context, delayMs: Long): Boolean {
+        var exactScheduled = false
+        return scheduleRecovery(context, delayMs) { exactScheduled = it }
+    }
+
+    private fun scheduleRecovery(
+        context: Context,
+        delayMs: Long,
+        onExactResult: (Boolean) -> Unit
+    ): Boolean {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val token = "recovery"
-        val operation = pendingIntent(context, token)
-        rememberToken(context, token)
-        if (Build.VERSION.SDK_INT >= 31 && !alarmManager.canScheduleExactAlarms()) {
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 1_000L, operation)
-            return false
+        var exact = Build.VERSION.SDK_INT < 31 || runCatching {
+            alarmManager.canScheduleExactAlarms()
+        }.getOrDefault(false)
+        val scheduled = replaceTokenAndSchedule(context, token) {
+            val triggerAt = System.currentTimeMillis() + delayMs.coerceAtLeast(250L)
+            if (exact) {
+                try {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent(context, token)
+                    )
+                } catch (_: SecurityException) {
+                    exact = false
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent(context, token)
+                    )
+                }
+            } else {
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent(context, token)
+                )
+            }
         }
-        return try {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 250L, operation)
-            true
-        } catch (_: SecurityException) {
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 1_000L, operation)
-            false
-        }
+        onExactResult(exact)
+        return scheduled
     }
 
     fun scheduleRetry(context: Context, delayMs: Long) {
@@ -72,21 +100,27 @@ object AlarmScheduler {
         if (state.mode != ProtectionMode.COUNTDOWN || state.deadlineEpochMs <= 0L) return
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val token = deadlineToken(state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
-        val operation = pendingIntent(context, token)
-        rememberToken(context, token)
-        alarmManager.setAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            System.currentTimeMillis() + delayMs.coerceAtLeast(250L),
-            operation
-        )
+        val scheduled = replaceTokenAndSchedule(context, token) {
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                System.currentTimeMillis() + delayMs.coerceAtLeast(250L),
+                pendingIntent(context, token)
+            )
+        }
+        if (!scheduled) {
+            LocalTamperHistory.record(context, "deadline_retry_schedule_failed", "Could not persist or schedule the countdown retry")
+        }
     }
 
     fun cancel(context: Context) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        SafePreferences.string(prefs, KEY_LAST_TOKEN, null)?.let { alarmManager.cancel(pendingIntent(context, it)) }
-        prefs.edit().remove(KEY_LAST_TOKEN).commit()
-        // Cancel the pre-tokenized PendingIntent used by older app versions.
+        SafePreferences.string(prefs, KEY_LAST_TOKEN, null)?.let {
+            alarmManager.cancel(pendingIntent(context, it))
+        }
+        if (!prefs.edit().remove(KEY_LAST_TOKEN).commit()) {
+            LocalTamperHistory.record(context, "deadline_token_clear_failed", "Scheduled alarm token could not be removed from preferences")
+        }
         alarmManager.cancel(
             PendingIntent.getBroadcast(
                 context, REQUEST_CODE,
@@ -96,14 +130,36 @@ object AlarmScheduler {
         )
     }
 
-    private fun rememberToken(context: Context, token: String) {
-        val alarmManager = context.getSystemService(AlarmManager::class.java)
+    /**
+     * Persist the new token before scheduling; cancel the previous PendingIntent
+     * only after the new alarm is accepted. On failure, restore the prior token.
+     */
+    private inline fun replaceTokenAndSchedule(
+        context: Context,
+        token: String,
+        schedule: () -> Unit
+    ): Boolean {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val previous = SafePreferences.string(prefs, KEY_LAST_TOKEN, null)
-        if (previous != null && previous != token) {
-            alarmManager.cancel(pendingIntent(context, previous))
+        if (!prefs.edit().putString(KEY_LAST_TOKEN, token).commit()) {
+            LocalTamperHistory.record(context, "deadline_token_persist_failed", "Alarm token was not saved; previous alarm retained")
+            return false
         }
-        prefs.edit().putString(KEY_LAST_TOKEN, token).commit()
+        return try {
+            schedule()
+            if (previous != null && previous != token) {
+                context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context, previous))
+            }
+            true
+        } catch (error: Exception) {
+            val restore = prefs.edit()
+            if (previous == null) restore.remove(KEY_LAST_TOKEN) else restore.putString(KEY_LAST_TOKEN, previous)
+            if (!restore.commit()) {
+                LocalTamperHistory.record(context, "deadline_token_restore_failed", "Failed scheduling left the alarm token in an uncertain state")
+            }
+            LocalTamperHistory.record(context, "deadline_alarm_schedule_failed", error.javaClass.simpleName + ": " + error.message)
+            false
+        }
     }
 
     private fun deadlineToken(epochMs: Long, elapsedRealtimeMs: Long, bootCount: Int): String =
