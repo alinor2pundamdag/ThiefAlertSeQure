@@ -18,8 +18,8 @@ object AlarmScheduler {
         deadlineEpochMs: Long,
         deadlineElapsedRealtimeMs: Long = 0L,
         deadlineBootCount: Int = -1
-    ) {
-        if (deadlineEpochMs <= 0L) return
+    ): Boolean {
+        if (deadlineEpochMs <= 0L) return false
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val token = deadlineToken(deadlineEpochMs, deadlineElapsedRealtimeMs, deadlineBootCount)
         val currentBootCount = ProtectionClock.bootCount(context)
@@ -48,6 +48,7 @@ object AlarmScheduler {
         if (!scheduled) {
             LocalTamperHistory.record(context, "deadline_schedule_failed", "Alarm deadline could not be durably recorded and scheduled")
         }
+        return scheduled
     }
 
     fun scheduleImmediateRecovery(context: Context): Boolean {
