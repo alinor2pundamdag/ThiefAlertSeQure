@@ -2,6 +2,11 @@ package com.thiefalertsequre.app
 
 import android.content.Context
 
+data class ProtectionStoreUpdateResult(
+    val state: ProtectionState,
+    val persisted: Boolean
+)
+
 class ProtectionStore(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences("protection_state_v1", Context.MODE_PRIVATE)
 
@@ -9,11 +14,17 @@ class ProtectionStore(context: Context) {
 
     fun write(state: ProtectionState): Boolean = synchronized(LOCK) { writeUnlocked(state) }
 
-    fun update(transform: (ProtectionState) -> ProtectionState): ProtectionState = synchronized(LOCK) {
-        val current = readUnlocked()
-        val next = transform(current)
-        if (writeUnlocked(next)) next else current
-    }
+    fun update(transform: (ProtectionState) -> ProtectionState): ProtectionState =
+        updatePersisted(transform).state
+
+    /** Returns the actual commit result so callers do not cancel alarms on an unpersisted transition. */
+    fun updatePersisted(transform: (ProtectionState) -> ProtectionState): ProtectionStoreUpdateResult =
+        synchronized(LOCK) {
+            val current = readUnlocked()
+            val next = transform(current)
+            val persisted = writeUnlocked(next)
+            ProtectionStoreUpdateResult(if (persisted) next else current, persisted)
+        }
 
     fun readAuthenticationThrottle(
         nowEpochMs: Long,
