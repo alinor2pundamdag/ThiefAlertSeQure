@@ -61,9 +61,11 @@ internal object OwnerAuthenticationCrypto {
             .setDigests(KeyProperties.DIGEST_SHA256)
             .setUserAuthenticationRequired(true)
         if (Build.VERSION.SDK_INT >= 30) {
+            // This key is used only for biometric authentication. Device PIN,
+            // pattern and password verification uses Android Keyguard separately.
             builder.setUserAuthenticationParameters(
                 0,
-                KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL
+                KeyProperties.AUTH_BIOMETRIC_STRONG
             )
         }
         generator.init(builder.build())
