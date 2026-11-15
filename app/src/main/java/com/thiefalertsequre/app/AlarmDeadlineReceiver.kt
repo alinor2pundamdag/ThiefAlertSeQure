@@ -48,10 +48,11 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             return
         }
 
-        val monitorEnabled = context.getSharedPreferences(
+        val monitorPrefs = context.getSharedPreferences(
             ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
-        ).getBoolean(
-            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
+        val monitorEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
         if (!monitorEnabled && state.mode != ProtectionMode.ALARM_TRIGGERED) {
             ProtectionStore(context).update { current ->
