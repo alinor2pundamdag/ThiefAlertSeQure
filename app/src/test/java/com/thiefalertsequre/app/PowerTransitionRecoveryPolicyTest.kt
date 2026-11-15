@@ -20,4 +20,10 @@ class PowerTransitionRecoveryPolicyTest {
     @Test fun connectedPowerNeverRetriesPendingDisconnect() {
         assertFalse(PowerTransitionRecoveryPolicy.shouldRetry(true, true))
     }
+
+    @Test fun pendingDisconnectRetryCanReuseItsPersistedEventAfterStateCommitFailure() {
+        assertTrue(PowerTransitionRecoveryPolicy.canAcceptDisconnectCandidate(false, true))
+        assertTrue(PowerTransitionRecoveryPolicy.canAcceptDisconnectCandidate(true, false))
+        assertFalse(PowerTransitionRecoveryPolicy.canAcceptDisconnectCandidate(false, false))
+    }
 }
