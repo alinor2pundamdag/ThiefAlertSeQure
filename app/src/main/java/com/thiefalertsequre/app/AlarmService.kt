@@ -216,9 +216,10 @@ class AlarmService : Service() {
             this, 42, openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val dashboardEnabled = getSharedPreferences(
-            MainActivity.ALARM_DISPLAY_PREFS, MODE_PRIVATE
-        ).getBoolean(MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
+        val dashboardPrefs = getSharedPreferences(MainActivity.ALARM_DISPLAY_PREFS, MODE_PRIVATE)
+        val dashboardEnabled = SafePreferences.boolean(
+            dashboardPrefs, MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false
+        )
         val fullScreenAccessGranted = Build.VERSION.SDK_INT < 34 ||
             getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
         val builder = NotificationCompat.Builder(this, channelId)
@@ -252,7 +253,7 @@ class AlarmService : Service() {
             val admin = ComponentName(this, ThiefAlertAdminReceiver::class.java)
             val lockPrefs = getSharedPreferences("alarm_service_lock_v1", MODE_PRIVATE)
             val previouslyRequested = runCatching {
-                lockPrefs.getLong(KEY_LOCK_REQUESTED_FOR_ALARM_AT, 0L)
+                SafePreferences.long(lockPrefs, KEY_LOCK_REQUESTED_FOR_ALARM_AT, 0L)
             }.getOrDefault(0L)
             if (alarmStartedAtEpochMs > 0L && previouslyRequested == alarmStartedAtEpochMs) {
                 // Service starts may repeat during one alarm episode. Do not re-lock
