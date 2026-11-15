@@ -89,13 +89,13 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         val boot = ProtectionClock.bootCount(context)
         var transitionedToAlarm = false
         var callbackStillCurrent = false
-        val updated = ProtectionStore(context).update { current ->
+        val update = ProtectionStore(context).updatePersisted { current ->
             // Revalidate the token under the same store lock as the transition.
             // A newer countdown or reconnect may have replaced it during sampling.
             if (!ProtectionEngine.isCurrentDeadline(
                     current, tokenDeadline, tokenElapsed, tokenBoot
                 )
-            ) return@update current
+            ) return@updatePersisted current
 
             callbackStillCurrent = true
             val next = ProtectionEngine.reconcileCountdown(current, connected, now, elapsed, boot)
@@ -103,6 +103,15 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
                 next.mode == ProtectionMode.ALARM_TRIGGERED
             next
         }
+        if (!update.persisted) {
+            LocalTamperHistory.record(
+                context, "protection_state_persist_failed",
+                "Countdown deadline was validated but the resulting state could not be durably committed; retry retained"
+            )
+            AlarmScheduler.scheduleRetry(context, 1_000L)
+            return
+        }
+        val updated = update.state
         if (!callbackStillCurrent) {
             LocalTamperHistory.record(context, "stale_deadline_rejected", "Countdown changed while deadline callback was validating")
             return
