@@ -33,7 +33,10 @@ object LocalTamperHistory {
         run {
             val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val stored = SafePreferences.readString(prefs, KEY_EVENTS, "")
-            val value = (stored as? PreferenceRead.Value)?.value.orEmpty()
+            val value = when (stored) {
+                is PreferenceRead.Value -> stored.value.orEmpty()
+                is PreferenceRead.Corrupt -> ""
+            }
             value.split('\n').filter { it.isNotBlank() }
                 .takeLast(limit.coerceIn(1, MAX_EVENTS)).reversed()
         }
