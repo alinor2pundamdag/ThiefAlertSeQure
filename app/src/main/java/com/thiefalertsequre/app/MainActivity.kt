@@ -403,18 +403,18 @@ class MainActivity : FragmentActivity() {
             return
         }
         autoAuthenticationRequested = true
-        val strongBiometric = BiometricManager.from(this)
+        val strongBiometricAvailable = BiometricManager.from(this)
             .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
-        if ((Build.VERSION.SDK_INT >= 30 && keyguard.isDeviceSecure) || strongBiometric) {
-            authenticateBiometric()
-        } else if (keyguard.isDeviceSecure) {
-            authenticateDeviceCredential()
-        } else {
+        when (OwnerAuthenticationPolicy.select(strongBiometricAvailable, keyguard.isDeviceSecure)) {
+            OwnerAuthenticationMethod.BIOMETRIC -> authenticateBiometric()
+            OwnerAuthenticationMethod.DEVICE_CREDENTIAL -> authenticateDeviceCredential()
+            OwnerAuthenticationMethod.UNAVAILABLE -> {
             // Do not latch the one-shot prompt guard when the owner has not yet
             // configured a secure credential. Re-check automatically on resume.
             autoAuthenticationRequested = false
             details.text = "No secure device credential is configured. Set a PIN, pattern or password in Android settings to enable owner verification."
             render()
+            }
         }
     }
 
@@ -836,11 +836,7 @@ class MainActivity : FragmentActivity() {
         }
         val manager = BiometricManager.from(this)
         val keyguard = getSystemService(KeyguardManager::class.java)
-        val allowedAuthenticators = if (Build.VERSION.SDK_INT >= 30 && keyguard.isDeviceSecure) {
-            BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
-        } else {
-            BiometricManager.Authenticators.BIOMETRIC_STRONG
-        }
+        val allowedAuthenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG
         if (manager.canAuthenticate(allowedAuthenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
             if (keyguard.isDeviceSecure) authenticateDeviceCredential()
             else {
@@ -870,12 +866,6 @@ class MainActivity : FragmentActivity() {
                     }
                     if (verifiedBiometricProof != null) {
                         completeOwnerAuthentication(verifiedBiometricProof)
-                    } else if (Build.VERSION.SDK_INT >= 30 &&
-                        result.authenticationType == BiometricPrompt.AUTHENTICATION_RESULT_TYPE_DEVICE_CREDENTIAL
-                    ) {
-                        OwnerAuthenticationProof.fromBiometricPromptCredentialResult(
-                            this@MainActivity, result.authenticationType
-                        )?.let(::completeOwnerAuthentication)
                     } else {
                         autoAuthenticationRequested = false
                         details.text = "Android authentication did not complete the protected Keystore operation. The alarm remains active."
@@ -941,11 +931,11 @@ class MainActivity : FragmentActivity() {
         biometricPrompt = prompt
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Verify ThiefAlertSeQure owner")
-            .setSubtitle("Authenticate with your device biometric or screen-lock credential")
+            .setSubtitle("Use your enrolled fingerprint or supported strong biometric")
             .setAllowedAuthenticators(allowedAuthenticators)
-        if ((allowedAuthenticators and BiometricManager.Authenticators.DEVICE_CREDENTIAL) == 0) {
-            promptInfo.setNegativeButtonText(if (keyguard.isDeviceSecure) "Use device PIN or password" else "Cancel")
-        }
+            .setNegativeButtonText(
+                if (keyguard.isDeviceSecure) "Use device PIN, pattern or password" else "Cancel"
+            )
         prompt.authenticate(promptInfo.build(), preparedAuthentication.cryptoObject)
         render()
     }
