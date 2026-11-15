@@ -84,7 +84,7 @@ object AlarmScheduler {
     fun cancel(context: Context) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        prefs.getString(KEY_LAST_TOKEN, null)?.let { alarmManager.cancel(pendingIntent(context, it)) }
+        SafePreferences.string(prefs, KEY_LAST_TOKEN, null)?.let { alarmManager.cancel(pendingIntent(context, it)) }
         prefs.edit().remove(KEY_LAST_TOKEN).commit()
         // Cancel the pre-tokenized PendingIntent used by older app versions.
         alarmManager.cancel(
@@ -99,7 +99,7 @@ object AlarmScheduler {
     private fun rememberToken(context: Context, token: String) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val previous = prefs.getString(KEY_LAST_TOKEN, null)
+        val previous = SafePreferences.string(prefs, KEY_LAST_TOKEN, null)
         if (previous != null && previous != token) {
             alarmManager.cancel(pendingIntent(context, previous))
         }
