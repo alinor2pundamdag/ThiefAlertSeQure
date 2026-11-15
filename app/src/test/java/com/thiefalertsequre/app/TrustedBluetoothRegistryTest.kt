@@ -34,12 +34,12 @@ class TrustedBluetoothRegistryTest {
 
     @Test fun base64RoundTripSupportsUnicodeAndEmptyNames() {
         val input = listOf(
-            TrustedBluetoothDevice("AA:00", "HONOR Watch – 日本語"),
-            TrustedBluetoothDevice("BB:00", "")
+            TrustedBluetoothDevice("AA:BB:CC:DD:EE:11", "HONOR Watch – 日本語"),
+            TrustedBluetoothDevice("AA:BB:CC:DD:EE:12", "")
         )
         val expected = listOf(
             input[0],
-            TrustedBluetoothDevice("BB:00", "Bluetooth accessory")
+            TrustedBluetoothDevice("AA:BB:CC:DD:EE:12", "Bluetooth accessory")
         )
         assertEquals(expected, TrustedBluetoothRegistry.decode(TrustedBluetoothRegistry.encode(input)))
     }
@@ -51,7 +51,7 @@ class TrustedBluetoothRegistryTest {
 
     @Test fun base64DecoderPreservesPreviouslyStoredJavaBase64Values() {
         assertEquals(
-            listOf(TrustedBluetoothDevice("AA:00", "Watch One")),
+            listOf(TrustedBluetoothDevice("AA:BB:CC:DD:EE:15", "Watch One")),
             TrustedBluetoothRegistry.decode("AA:00\tV2F0Y2ggT25l")
         )
     }
