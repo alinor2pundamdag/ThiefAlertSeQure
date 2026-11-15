@@ -129,9 +129,9 @@ class BluetoothCenterActivity : FragmentActivity() {
     private fun addTrustedDeviceSection() {
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
         val devices = TrustedBluetoothRegistry.read(prefs)
-        val enabled = prefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+        val enabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
         val baselineCount = devices.count { TrustedBluetoothRegistry.isBaselineConnected(prefs, it.address) }
-        val monitorEnabled = prefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        val monitorEnabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         val monitorRunning = runCatching {
             getSystemService(ActivityManager::class.java).getRunningServices(100)
                 .any { it.service.className == ProtectionMonitorService::class.java.name }
