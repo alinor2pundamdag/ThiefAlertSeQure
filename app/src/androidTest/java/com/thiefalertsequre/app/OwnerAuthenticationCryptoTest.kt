@@ -1,8 +1,11 @@
 package com.thiefalertsequre.app
 
+import androidx.biometric.BiometricManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.fail
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -10,6 +13,18 @@ import org.junit.runner.RunWith
 class OwnerAuthenticationCryptoTest {
     @Test
     fun createsPromptCryptoObjectWithoutUsingKeyBeforeAuthentication() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val strongBiometricStatus = BiometricManager.from(context)
+            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+
+        // A per-use biometric-bound Keystore key cannot be provisioned on an
+        // emulator/device with no enrolled strong biometric. Device-credential
+        // fallback is tested through the separate verified-proof path.
+        assumeTrue(
+            "Requires enrolled BIOMETRIC_STRONG hardware; no biometric enrollment is available",
+            strongBiometricStatus == BiometricManager.BIOMETRIC_SUCCESS
+        )
+
         val prepared = OwnerAuthenticationCrypto.createCryptoObject()
         val mac = prepared.cryptoObject.mac
         assertNotNull("Biometric prompt must receive a Keystore-backed MAC", mac)

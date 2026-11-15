@@ -22,16 +22,19 @@
 - Corrected README, privacy, protection-rules, traceability, and Android compatibility documentation.
 
 ## Phase 1 — Compilation and architecture
-- Phase 1 implementation/documentation is complete on the current FIXALL branch head; see `docs/PHASE_1_ARCHITECTURE_MAP.md` for source-backed UI → runtime → persistence → Android-device ownership paths.
+- Architecture ownership and the UI → runtime → persistence → Android boundary map are documented in `docs/PHASE_1_ARCHITECTURE_MAP.md`.
 - Corrected `AlarmDeadlineReceiver.kt`'s persisted-update lambda return label.
 - Corrected Bluetooth registry Base64 compatibility test fixtures to use actual tab/newline delimiters; the previous failure was a malformed test fixture, not a production decoder defect.
-- Exact-head workflow run `43727526607` on commit `bd67b8bbf43b576e4a19205952680f99cd20044a`: build job PASS, including unit tests, navigation verification, Android lint, asset/config checks, debug APK assembly/metadata, minified release APK checks, and APK package/version/signer verification.
-- The Android instrumentation matrix in that workflow is a separate later-phase verification gate; it is not being represented as passed by Phase 1.
+- The previous exact-head build job on `b487f84b96fb29a6a1eb45f64b0b5a50c8d20dd3` passed compilation, unit tests, navigation verification, lint, asset/config checks, APK assembly, and package/version/signer checks.
+- Follow-up instrumentation investigation found real test failures on API 26 and 28: missing `alarm_channel` readiness item and a biometric Keystore test that assumed an enrolled strong biometric. API 30 failed separately because its emulator stayed offline and was reported as API level 1.
+- Corrective source/test changes are being committed on this branch. Exact-head CI rerun is required before Phase 1 can be accepted.
 
 ## Verification status
-- Phase 1 build job passed on the exact branch head above.
-- The separate Android instrumentation matrix for run `43727526607` is queued/running and is tracked for the later integration/testing phase; it is not represented as passed.
-- Physical HONOR 200 Pro testing for changed v1.1.4 behavior remains pending.
+- Build job: PASS on the previous exact head; the new corrective head must be re-run.
+- Instrumentation API 26/28: FAIL on the previous head; source/test causes identified and corrective changes prepared.
+- Instrumentation API 30: infrastructure failure (ADB offline / invalid API-level detection); retry required after corrective commit.
+- Instrumentation API 32/34/35/36: not yet all confirmed successful; check the final run's complete job matrix.
+- Physical HONOR 200 Pro testing for changed v1.1.4 behavior remains pending and is not inferred from emulator results.
 - Production-signed APK/update continuity remains pending.
 - This document does not assert release readiness.
 

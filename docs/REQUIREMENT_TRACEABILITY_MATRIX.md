@@ -1,22 +1,19 @@
-# Requirement Traceability Matrix — ThiefAlertSeQure
-
-> Previous verified application baseline: `1.1.2` / versionCode `4`, with exact-head CI run [42479548944](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/42479548944). Current feature branch contains v`1.1.3` / versionCode `5`, synchronized alarm flashlight and acknowledgement-only onboarding. CI run [43004454206](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43004454206) passed on head `4dc3a7a553e7da43265cbd2feaa4c3e5ae64d294`; a newer documentation/release-workflow head is undergoing CI.
-> Verified v1.1.3 test APK: artifact `ThiefAlertSeQure-debug-apk`, artifact ID `13846979259`, run `43004454206`. Package `com.thiefalertsequre.app.v113test`, versionCode `5`, versionName `1.1.3`; APK file `ThiefAlertSeQure-v1.1.3-debug-test.apk`. This is a side-by-side development/test APK, not a production update. The four permanent release-signing secrets are configured; no signed production APK or official release has been created yet.
+> Current FIXALL candidate: v`1.1.4` / versionCode `6`, package `com.thiefalertsequre.app`; side-by-side debug test variant is `com.thiefalertsequre.app.v114test`. Production identity and signing configuration are protected invariants. No production release is authorized by this verification work.
 > Contract: [Universal Maximum Protection Specification](UNIVERSAL_MAXIMUM_PROTECTION_SPEC.md).
-> Status labels: **Implemented** means source code exists; **Unit-covered** means a named local test exists; **CI-verified** means the exact baseline commit passed GitHub Actions; **Device-unverified** means no physical-device evidence is recorded for that case. These labels are deliberately not interchangeable.
+> Status labels: **Implemented** means source code exists; **Unit-covered** means a named local test exists; **CI-verified** means the exact baseline commit passed the named GitHub Actions job; **Device-unverified** means no independently verified physical-device evidence is recorded. These labels are deliberately not interchangeable.
 
 ## 1. Verification snapshot
 
-| Area | Evidence at baseline | Status / limitation |
+| Area | Current evidence | Status / limitation |
 |---|---|---|
-| Branch / PR | PR #2 remains open and draft; managed-policy safety implementation is on the current feature branch | Not merged |
-| CI | Exact FIXALL head `43689a51f74fca1f699d905d434ce2dc71e02035`, workflow run `43726865154`: build job passed unit tests, navigation verification, lint, asset/config validation, debug APK assembly/metadata, minified release APK checks, and APK package/version/signer verification. The separate Android instrumentation matrix was still running when this snapshot was recorded. | Phase 1 build gate PASS; instrumentation gate tracked separately for later testing phase |
-| Unit tests | `:app:testDebugUnitTest` in workflow; new tests cover unknown charger extras, unknown boot identity, bounded alarm retry policy, and owner-proof freshness | New tests added; exact final-head run pending |
-| Lint | `:app:lintDebug` in workflow | Earlier candidate lint passed; exact FIXALL head pending |
-| APK | v1.1.3 artifact ID `13846979259` from run `43004454206`; versionCode 5 / versionName 1.1.3; package `com.thiefalertsequre.app.v113test`; filename `ThiefAlertSeQure-v1.1.3-debug-test.apk`. | Verified side-by-side debug test APK; not production-signed; permanent signing secrets are configured; signed production artifact remains pending |
-| Instrumentation / emulator matrix | `app/src/androidTest` now contains screen/manifest smoke, encrypted Bluetooth registry, corrupt-preference, and protection-store commit-result tests. CI matrix is API 26, 28, 30, 32, 34, 35 and 36. | Implemented; earlier emulator runs failed before test execution because diagnostics shell variables were split across processes. The workflow now invokes one checked-in Bash script; exact-head rerun pending. |
-| Physical OEM acceptance | Owner-reported HONOR 200 Pro PASS for all 11 scenarios on 11 Nov 2026: automatic arming, charger countdown, reconnect cancellation, alarm persistence, authentication protection, volume restoration, flashlight independence, camera conflict, background operation, reboot recovery, lock-screen presentation. Device Owner enrollment/rollback separately reported PASS on a test device. | Owner-reported evidence; not independently reproduced. Exact Android/MagicOS build not supplied. Android 17 audio and additional platform edge cases remain pending. Force-stop resilience is not guaranteed. |
-| Universal claim | Android/OEM policies differ and ordinary apps cannot defeat privileged system controls | Never claim universal guarantee |
+| Branch / identity | `dev/fixall-data-integrity`; production branch `main` remains untouched; package `com.thiefalertsequre.app`; minSdk 26, compile/target SDK 36; Java/Kotlin 17; versionCode 6 / versionName 1.1.4 | Source-verified; recheck exact-head CI metadata |
+| Previous exact-head build | Commit `b487f84b96fb29a6a1eb45f64b0b5a50c8d20dd3`, run [43728223602](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43728223602), build job passed unit tests, navigation checks, lint, asset/config validation, APK assembly and metadata/signer checks | PASS for that build job only; does not certify instrumentation |
+| Instrumentation API 26 / 28 | Both jobs exposed two failures: setup snapshot omitted `alarm_channel`; biometric Keystore test attempted per-use key creation without an enrolled strong biometric | FAIL on previous head; corrective changes made in current follow-up |
+| Instrumentation API 30 | Emulator remained ADB-offline; Gradle later detected emulator API level 1 and could not install the test APK | Infrastructure failure; retry needed |
+| Instrumentation API 32 / 34 / 35 / 36 | Must be checked from the complete final-head workflow run; no pass is inferred from queued/running state | Pending final-head evidence |
+| Architecture / event ownership | Source-backed map covers charger, countdown/alarm, authentication, Bluetooth, boot, settings, theme, history and updater paths | Documented; hardware/OEM behavior remains device-dependent |
+| Physical-device acceptance | Prior owner-reported HONOR 200 Pro scenarios are not independently reproduced by this CI review | Physical-device verification pending |
+| Release boundary | No merge, tag, production APK publication or official release in this work | Not authorized |
 
 ## 2. Core protection requirements
 
