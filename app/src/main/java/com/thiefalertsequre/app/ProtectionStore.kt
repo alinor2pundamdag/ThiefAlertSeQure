@@ -9,11 +9,26 @@ class ProtectionStore(context: Context) {
 
     fun write(state: ProtectionState): Boolean = synchronized(LOCK) { writeUnlocked(state) }
 
-    fun update(transform: (ProtectionState) -> ProtectionState): ProtectionState = synchronized(LOCK) {
+    /**
+     * Persist a state transition and expose whether the durable commit succeeded.
+     * Callers that schedule alarms or report a transition must not treat an
+     * in-memory fallback as a committed state.
+     */
+    fun updatePersisted(
+        transform: (ProtectionState) -> ProtectionState
+    ): ProtectionStoreUpdateResult = synchronized(LOCK) {
         val current = readUnlocked()
         val next = transform(current)
-        if (writeUnlocked(next)) next else current
+        val persisted = writeUnlocked(next)
+        ProtectionStoreUpdateResult(
+            state = if (persisted) next else current,
+            persisted = persisted
+        )
     }
+
+    /** Backward-compatible state-only API; critical callers should use updatePersisted. */
+    fun update(transform: (ProtectionState) -> ProtectionState): ProtectionState =
+        updatePersisted(transform).state
 
     fun readAuthenticationThrottle(
         nowEpochMs: Long,
@@ -119,3 +134,10 @@ class ProtectionStore(context: Context) {
         private const val KEY_AUTH_BOOT_COUNT = "auth_cooldown_boot_count"
     }
 }
+
+
+/** Result of a state transition, including the durability of its SharedPreferences commit. */
+data class ProtectionStoreUpdateResult(
+    val state: ProtectionState,
+    val persisted: Boolean
+)
