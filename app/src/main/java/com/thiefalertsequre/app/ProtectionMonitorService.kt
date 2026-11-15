@@ -174,10 +174,12 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             startForeground(NOTIFICATION_ID, buildNotification())
             isRunning = true
             prefs.edit().putBoolean(KEY_RUNNING, true).apply()
+            ProtectionMonitorRecoveryNotice.cancel(this)
         } catch (error: Exception) {
             LocalTamperHistory.record(this, "monitor_fgs_start_failed", error.javaClass.simpleName + ": " + error.message)
             isRunning = false
             prefs.edit().putBoolean(KEY_RUNNING, false).apply()
+            ProtectionMonitorRecoveryNotice.show(this, "Android refused to start the protection monitor foreground service")
             stopSelf()
             return START_NOT_STICKY
         }
@@ -535,12 +537,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             )
         }.onFailure {
             LocalTamperHistory.record(this, "monitor_alarm_service_start_failed", it.javaClass.simpleName + ": " + it.message)
-            if (!AlarmScheduler.scheduleImmediateRecovery(this)) {
-                AlarmRecoveryNotice.show(
-                    this,
-                    "Android deferred background alarm playback; open the app to resume the latched alarm"
-                )
-            }
+            AlarmRecoveryCoordinator.onStartFailure(
+                this, "Android deferred background alarm playback; the latched alarm remains active"
+            )
         }
         stopSelf()
     }
