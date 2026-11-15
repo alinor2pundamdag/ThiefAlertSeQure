@@ -25,7 +25,7 @@ class TrustedBluetoothRegistryTest {
         val valid = TrustedBluetoothRegistry.encode(
             listOf(TrustedBluetoothDevice("AA:BB:CC:DD:EE:10", "Watch"))
         )
-        assertTrue(runCatching { TrustedBluetoothRegistry.decode("bad-entry\\n$valid") }.isFailure)
+        assertTrue(runCatching { TrustedBluetoothRegistry.decode("bad-entry\n$valid") }.isFailure)
     }
 
     @Test fun emptyRegistryRemainsEmptyAndMalformedRegistryIsRejected() {
@@ -47,17 +47,17 @@ class TrustedBluetoothRegistryTest {
 
     @Test fun base64DecoderRejectsInvalidPaddingAndCharacters() {
         assertTrue(runCatching {
-            TrustedBluetoothRegistry.decode("AA:BB:CC:DD:EE:13\\tA===")
+            TrustedBluetoothRegistry.decode("AA:BB:CC:DD:EE:13\tA===")
         }.isFailure)
         assertTrue(runCatching {
-            TrustedBluetoothRegistry.decode("AA:BB:CC:DD:EE:14\\t!!!!")
+            TrustedBluetoothRegistry.decode("AA:BB:CC:DD:EE:14\t!!!!")
         }.isFailure)
     }
 
     @Test fun base64DecoderPreservesPreviouslyStoredJavaBase64Values() {
         assertEquals(
             listOf(TrustedBluetoothDevice("AA:BB:CC:DD:EE:15", "Watch One")),
-            TrustedBluetoothRegistry.decode("AA:BB:CC:DD:EE:15\\tV2F0Y2ggT25l")
+            TrustedBluetoothRegistry.decode("AA:BB:CC:DD:EE:15\tV2F0Y2ggT25l")
         )
     }
 }
