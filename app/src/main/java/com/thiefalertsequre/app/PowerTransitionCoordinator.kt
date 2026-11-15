@@ -46,13 +46,17 @@ object PowerTransitionCoordinator {
         if (!baselineKnown) {
             val store = ProtectionStore(context)
             if (store.read().mode == ProtectionMode.COUNTDOWN) {
-                store.update { current ->
+                val migration = store.updatePersisted { current ->
                     if (current.mode == ProtectionMode.COUNTDOWN) {
                         ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
                     } else current
                 }
-                AlarmScheduler.cancel(context)
-                LocalTamperHistory.record(context, "legacy_countdown_discarded", "Unverifiable pre-transition countdown discarded during migration")
+                if (migration.persisted) {
+                    AlarmScheduler.cancel(context)
+                    LocalTamperHistory.record(context, "legacy_countdown_discarded", "Unverifiable pre-transition countdown discarded during migration")
+                } else {
+                    LocalTamperHistory.record(context, "legacy_countdown_migration_failed", "Legacy countdown state was not changed because persistence failed")
+                }
             }
         }
 
@@ -60,7 +64,7 @@ object PowerTransitionCoordinator {
         if (newBoot && connected == null) {
             // A previous-boot CONNECTED baseline must never authorize an unplug
             // candidate after reboot when the new boot's live state is unknown.
-            prefs.edit()
+            val saved = prefs.edit()
                 .putBoolean(CONNECTED, false)
                 .putBoolean(KNOWN, true)
                 .putInt(BASELINE_BOOT_COUNT, currentBoot)
@@ -72,7 +76,8 @@ object PowerTransitionCoordinator {
                 .remove(PENDING_GENERATION)
                 .commit()
             LocalTamperHistory.record(
-                context, "power_baseline_unknown_after_boot",
+                context,
+                if (saved) "power_baseline_unknown_after_boot" else "power_baseline_unknown_persist_failed",
                 "Previous-boot charger baseline invalidated; waiting for current-boot power confirmation"
             )
             return
@@ -82,7 +87,7 @@ object PowerTransitionCoordinator {
         // During an established boot, a disconnected snapshot must never erase
         // CONNECTED before ACTION_POWER_DISCONNECTED is consumed by the receiver.
         if (!baselineKnown || newBoot) {
-            prefs.edit()
+            val saved = prefs.edit()
                 .putBoolean(CONNECTED, connected)
                 .putBoolean(KNOWN, true)
                 .putInt(BASELINE_BOOT_COUNT, currentBoot)
@@ -93,6 +98,10 @@ object PowerTransitionCoordinator {
                 .remove(PENDING_BOOT_COUNT)
                 .remove(PENDING_GENERATION)
                 .commit()
+            if (!saved) {
+                LocalTamperHistory.record(context, "power_baseline_initialize_failed", "Initial charger baseline was not persisted; no connected state was accepted")
+                return
+            }
             LocalTamperHistory.record(
                 context,
                 if (newBoot) "power_baseline_reinitialized_after_boot" else "power_baseline_initialized",
@@ -200,7 +209,7 @@ object PowerTransitionCoordinator {
         if (SafePreferences.long(prefs, GENERATION, -1L) != expectedGeneration ||
             SafePreferences.boolean(prefs, CONNECTED, true)
         ) return
-        prefs.edit()
+        val saved = prefs.edit()
             .putBoolean(CONNECTED, true)
             .putLong(GENERATION, expectedGeneration + 1L)
             .putBoolean(PENDING_DISCONNECT, false)
@@ -209,16 +218,22 @@ object PowerTransitionCoordinator {
             .remove(PENDING_BOOT_COUNT)
             .remove(PENDING_GENERATION)
             .commit()
+        if (!saved) {
+            LocalTamperHistory.record(context, "power_candidate_restore_failed", "Could not restore the prior connected baseline; pending event retained for live-state revalidation")
+        }
     }
 
     private fun clearPendingDisconnectLocked(context: Context, prefs: SharedPreferences) {
-        prefs.edit()
+        val saved = prefs.edit()
             .putBoolean(PENDING_DISCONNECT, false)
             .remove(PENDING_EPOCH_MS)
             .remove(PENDING_ELAPSED_MS)
             .remove(PENDING_BOOT_COUNT)
             .remove(PENDING_GENERATION)
             .commit()
+        if (!saved) {
+            LocalTamperHistory.record(context, "power_pending_clear_failed", "Pending disconnect marker could not be cleared; it remains subject to generation and live-state validation")
+        }
     }
 
     private fun isPendingCandidateCurrent(
