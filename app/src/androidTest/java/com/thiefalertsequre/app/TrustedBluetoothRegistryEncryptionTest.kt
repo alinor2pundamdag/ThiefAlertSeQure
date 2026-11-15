@@ -89,6 +89,20 @@ class TrustedBluetoothRegistryEncryptionTest {
     }
 
     @Test
+    fun invalidMacAddressesAreRejectedAtRegistryBoundaries() {
+        prefs.edit().clear().commit()
+        assertFalse(TrustedBluetoothRegistry.add(prefs, "not-a-mac", "Invalid"))
+        assertFalse(TrustedBluetoothRegistry.remove(prefs, "not-a-mac"))
+        var rejected = false
+        try {
+            TrustedBluetoothRegistry.decode("not-a-mac\\tSW52YWxpZA==")
+        } catch (_: IllegalArgumentException) {
+            rejected = true
+        }
+        assertTrue("Malformed persisted addresses must fail closed", rejected)
+    }
+
+    @Test
     fun legacySingleDeviceFieldsMigrateAndAreRemoved() {
         prefs.edit().clear().commit()
         val address = "AA:BB:CC:DD:EE:03"
