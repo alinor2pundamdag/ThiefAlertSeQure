@@ -120,65 +120,75 @@ object PowerTransitionCoordinator {
     /** Establish a fresh non-transition baseline when the owner re-enables monitoring. */
     fun resetBaselineToCurrentPower(context: Context, reason: String) = synchronized(lock) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val store = ProtectionStore(context)
+        val currentState = store.read()
+        if (currentState.mode == ProtectionMode.ALARM_TRIGGERED) {
+            LocalTamperHistory.record(context, "power_baseline_reset_rejected", "$reason; active alarm remains latched")
+            return@synchronized
+        }
+
         val connected = ExternalPowerState.readConnected(context)
         val generation = SafePreferences.long(prefs, GENERATION, 0L) + 1L
         if (connected == null) {
             // Preserve an already-valid countdown; clearing KNOWN would make
             // first-run migration discard it on the monitor's next startup.
-            if (ProtectionStore(context).read().mode != ProtectionMode.COUNTDOWN) {
-                prefs.edit()
-                    .putBoolean(KNOWN, false)
+            val edit = prefs.edit()
+            if (currentState.mode != ProtectionMode.COUNTDOWN) {
+                edit.putBoolean(KNOWN, false)
                     .putBoolean(CONNECTED, false)
                     .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
-                    .putLong(GENERATION, generation)
-                    .putBoolean(PENDING_DISCONNECT, false)
-                    .remove(PENDING_EPOCH_MS)
-                    .remove(PENDING_ELAPSED_MS)
-                    .remove(PENDING_BOOT_COUNT)
-                    .remove(PENDING_GENERATION)
-                    .commit()
-            } else {
-                prefs.edit()
-                    .putLong(GENERATION, generation)
-                    .putBoolean(PENDING_DISCONNECT, false)
-                    .remove(PENDING_EPOCH_MS)
-                    .remove(PENDING_ELAPSED_MS)
-                    .remove(PENDING_BOOT_COUNT)
-                    .remove(PENDING_GENERATION)
-                    .commit()
             }
-            LocalTamperHistory.record(context, "power_baseline_unknown", "$reason; no new transition accepted until a reliable power state is available")
+            val saved = edit.putLong(GENERATION, generation)
+                .putBoolean(PENDING_DISCONNECT, false)
+                .remove(PENDING_EPOCH_MS)
+                .remove(PENDING_ELAPSED_MS)
+                .remove(PENDING_BOOT_COUNT)
+                .remove(PENDING_GENERATION)
+                .commit()
+            if (!saved) {
+                LocalTamperHistory.record(context, "power_baseline_unknown_persist_failed", "$reason; prior baseline retained because unknown state could not be persisted")
+            } else {
+                LocalTamperHistory.record(context, "power_baseline_unknown", "$reason; no new transition accepted until a reliable power state is available")
+            }
             return@synchronized
         }
-        prefs.edit()
-            .putBoolean(KNOWN, true)
-            .putBoolean(CONNECTED, connected)
-            .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
-            .putLong(GENERATION, generation)
-            .putBoolean(PENDING_DISCONNECT, false)
-            .remove(PENDING_EPOCH_MS)
-            .remove(PENDING_ELAPSED_MS)
-            .remove(PENDING_BOOT_COUNT)
-            .remove(PENDING_GENERATION)
-            .commit()
-        if (connected) {
-            confirmConnectedAndArmLocked(context, reason)
-        } else {
-            val disarmed = ProtectionStore(context).update { current ->
+
+        if (!connected) {
+            // Disarm durably before changing the baseline. A failed state commit
+            // must never leave an ARMED state paired with a disconnected baseline.
+            val disarm = store.updatePersisted { current ->
                 if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
                 else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
             }
-            if (disarmed.mode != ProtectionMode.ALARM_TRIGGERED) {
-                AlarmScheduler.cancel(context)
-                notifyMonitorStateChanged(context)
+            if (!disarm.persisted || disarm.state.mode == ProtectionMode.ALARM_TRIGGERED) {
+                LocalTamperHistory.record(context, "power_baseline_reset_state_failed", "$reason; protection state was not durably disarmed")
+                return@synchronized
             }
+            val baselineSaved = prefs.edit()
+                .putBoolean(KNOWN, true)
+                .putBoolean(CONNECTED, false)
+                .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
+                .putLong(GENERATION, generation)
+                .putBoolean(PENDING_DISCONNECT, false)
+                .remove(PENDING_EPOCH_MS)
+                .remove(PENDING_ELAPSED_MS)
+                .remove(PENDING_BOOT_COUNT)
+                .remove(PENDING_GENERATION)
+                .commit()
+            if (!baselineSaved) {
+                LocalTamperHistory.record(context, "power_baseline_reset_persist_failed", "$reason; protection is safely DISARMED but baseline cleanup needs recovery")
+            }
+            AlarmScheduler.cancel(context)
+            notifyMonitorStateChanged(context)
             LocalTamperHistory.record(
                 context, "power_baseline_reset",
                 "$reason; disconnected state recorded without creating a countdown; protection remains DISARMED until a new connect event"
             )
+            return@synchronized
         }
-    }
 
+        confirmConnectedAndArmLocked(context, reason)
+    }
 
     /**
      * An unplug candidate is not authoritative until stable physical-state
