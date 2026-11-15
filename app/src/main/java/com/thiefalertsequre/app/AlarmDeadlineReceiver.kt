@@ -17,7 +17,13 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
                     context, "deadline_receiver_error",
                     error.javaClass.simpleName + ": " + error.message
                 )
-                AlarmScheduler.scheduleRetry(context, 1_000L)
+                if (ProtectionStore(context).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                    AlarmRecoveryCoordinator.onStartFailure(
+                        context, "Deadline receiver failed while the alarm was latched"
+                    )
+                } else {
+                    AlarmScheduler.scheduleRetry(context, 1_000L)
+                }
             } finally {
                 pending.finish()
             }
