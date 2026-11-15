@@ -103,6 +103,9 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     private fun monitorEnabled(context: Context): Boolean =
-        context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
-            .getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        SafePreferences.boolean(
+            context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE),
+            ProtectionMonitorService.KEY_ENABLED,
+            ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
 }
