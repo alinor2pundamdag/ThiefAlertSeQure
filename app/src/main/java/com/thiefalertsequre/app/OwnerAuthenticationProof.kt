@@ -22,26 +22,9 @@ internal class OwnerAuthenticationProof private constructor(
             SOURCE_DEVICE_CREDENTIAL -> biometricMacProof == null
             else -> false
         }
-
-internal object OwnerAuthenticationProofPolicy {
-    const val MAX_AGE_MS = 30_000L
-
-    fun isFresh(
-        issuedElapsedRealtimeMs: Long,
-        nowElapsedRealtimeMs: Long,
-        issuedBootCount: Int,
-        currentBootCount: Int
-    ): Boolean {
-        if (issuedElapsedRealtimeMs <= 0L || nowElapsedRealtimeMs < issuedElapsedRealtimeMs) return false
-        if (nowElapsedRealtimeMs - issuedElapsedRealtimeMs > MAX_AGE_MS) return false
-        if (issuedBootCount >= 0 && currentBootCount >= 0 && issuedBootCount != currentBootCount) return false
-        return true
-    }
-}
     }
 
     companion object {
-        private const val MAX_AGE_MS = OwnerAuthenticationProofPolicy.MAX_AGE_MS
         private const val SOURCE_BIOMETRIC = "biometric_keystore"
         private const val SOURCE_DEVICE_CREDENTIAL = "android_device_credential"
 
@@ -62,5 +45,21 @@ internal object OwnerAuthenticationProofPolicy {
                 ProtectionClock.bootCount(context),
                 null
             )
+    }
+}
+
+internal object OwnerAuthenticationProofPolicy {
+    const val MAX_AGE_MS = 30_000L
+
+    fun isFresh(
+        issuedElapsedRealtimeMs: Long,
+        nowElapsedRealtimeMs: Long,
+        issuedBootCount: Int,
+        currentBootCount: Int
+    ): Boolean {
+        if (issuedElapsedRealtimeMs <= 0L || nowElapsedRealtimeMs < issuedElapsedRealtimeMs) return false
+        if (nowElapsedRealtimeMs - issuedElapsedRealtimeMs > MAX_AGE_MS) return false
+        if (issuedBootCount >= 0 && currentBootCount >= 0 && issuedBootCount != currentBootCount) return false
+        return true
     }
 }
