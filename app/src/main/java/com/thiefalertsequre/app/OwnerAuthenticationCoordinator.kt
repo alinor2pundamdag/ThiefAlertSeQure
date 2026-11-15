@@ -22,9 +22,6 @@ object OwnerAuthenticationCoordinator {
 
         AlarmRecoveryCoordinator.onAlarmDisarmed(appContext)
         store.resetAuthenticationFailures()
-        runCatching { AlarmScheduler.cancel(appContext) }.onFailure {
-            LocalTamperHistory.record(appContext, "deadline_cancel_after_auth_failed", it.javaClass.simpleName + ": " + it.message)
-        }
         appContext.stopService(Intent(appContext, AlarmService::class.java))
         val volumeRestored = runCatching {
             AlarmVolumeController.restore(
