@@ -21,10 +21,18 @@
 - Updated CI branch filters to include `dev/**` and `work/**`.
 - Corrected README, privacy, protection-rules, traceability, and Android compatibility documentation.
 
+## Phase 1 — Compilation and architecture
+- Phase 1 implementation/documentation is complete on the current FIXALL branch head; see `docs/PHASE_1_ARCHITECTURE_MAP.md` for source-backed UI → runtime → persistence → Android-device ownership paths.
+- Corrected `AlarmDeadlineReceiver.kt`'s persisted-update lambda return label.
+- Corrected Bluetooth registry Base64 compatibility test fixtures to use actual tab/newline delimiters; the previous failure was a malformed test fixture, not a production decoder defect.
+- Exact-head workflow run `43726865154` on commit `43689a51f74fca1f699d905d434ce2dc71e02035`: build job PASS, including unit tests, navigation verification, Android lint, asset/config checks, debug APK assembly/metadata, minified release APK checks, and APK package/version/signer verification.
+- The Android instrumentation matrix in that workflow is a separate later-phase verification gate; it is not being represented as passed by Phase 1.
+
 ## Verification status
-- Earlier historical build/unit/lint checks passed on earlier commits only; they do not certify this branch head.
-- An earlier instrumentation workflow failed in diagnostics setup because shell variables were not shared between separate shell steps. A same-process diagnostic script is now committed; rerun pending.
-- Current branch head must pass build, unit tests, lint, and the complete configured emulator instrumentation matrix before CI is marked PASS.
+- Phase 1 build job passed on the exact branch head above.
+- Android instrumentation matrix is still running and is tracked separately for the later integration/testing phase.
+- Physical HONOR 200 Pro testing for changed v1.1.4 behavior remains pending.
+- Production-signed APK/update continuity remains pending.
 - Physical HONOR 200 Pro testing for changed v1.1.4 behavior remains pending.
 - Production-signed APK/update continuity remains pending.
 - This document does not assert release readiness.
