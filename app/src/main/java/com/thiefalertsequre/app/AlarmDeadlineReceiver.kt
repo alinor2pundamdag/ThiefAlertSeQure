@@ -102,7 +102,7 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             if (!ProtectionEngine.isCurrentDeadline(
                     current, tokenDeadline, tokenElapsed, tokenBoot
                 )
-            ) return@update current
+            ) return@updatePersisted current
 
             callbackStillCurrent = true
             val next = ProtectionEngine.reconcileCountdown(current, connected, now, elapsed, boot)
