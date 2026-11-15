@@ -24,6 +24,7 @@ The app stores only the operational information needed to provide its functions:
 - The previous alarm-stream volume while an alarm is active, so it can be restored after successful disarm.
 - A bounded local protection event history (up to 100 entries), which the owner can review or export as CSV.
 - Monitor preferences such as enablement, motion sensitivity and optional battery-alert threshold.
+- Trusted Bluetooth accessory names and MAC addresses selected by the owner, plus the per-device connection-baseline and revision data used by A2. The registry payload and baselines are encrypted locally with an Android Keystore-backed AES-GCM key; identifiers are not uploaded.
 - The owner's local preference for enabling or disabling the alarm flashlight.
 - URI references and Android read-access grants for owner-selected alarm and secondary-alert audio. The app stores references/permissions, not a second copy of the selected audio file.
 
@@ -39,7 +40,8 @@ Depending on Android version and the user's choices, the app may use:
 
 - Boot-completed and charger-connected/disconnected broadcasts to recover protection state and detect charging changes.
 - Alarm scheduling; precise alarm access is a special Android setting on supported versions.
-- Notifications and a foreground media-playback service while an alarm is active.
+- Notifications and foreground services while protection monitoring or an alarm is active.
+- Bluetooth Connect permission on Android 12+ when the owner selects already-paired trusted accessories for A2. The app does not scan, advertise, or request location permission for this workflow.
 - Alarm-stream volume control to temporarily raise the alarm volume and restore the previous level after successful disarm.
 - Android CameraManager torch control, enabled by default, to pulse a compatible device LED only while the alarm is latched. This API does not request CAMERA permission, open the camera for capture, or collect images/video. Flash hardware is optional and may be unavailable or temporarily busy.
 - Android's Storage Access Framework document/folder picker to read audio files explicitly selected by the owner and to write an event-history CSV only when the owner chooses an export destination.
@@ -50,7 +52,7 @@ Android settings, manufacturer power-management behavior, notification controls,
 
 ## 5. Sharing and third parties
 
-The app contains no configured analytics, advertising SDK, app backend, or cloud storage. The update check sends a request to GitHub for public release metadata and, only when an update is available, downloads the APK and checksum. It does not upload protection state, event history, selected audio, credentials, device identifiers, or other personal data. GitHub receives ordinary network request metadata, such as the request IP address, under GitHub's own privacy terms. No update check runs until the owner initiates it. Android itself provides the credential, biometric, notification, alarm, and device-management services.
+The app contains no configured analytics, advertising SDK, app backend, or cloud storage. The update check sends a request to GitHub for public release metadata and, only when an update is available, downloads the APK and checksum. It does not upload protection state, event history, selected audio, trusted Bluetooth names or MAC addresses, credentials, or other personal data. GitHub receives ordinary network request metadata, such as the request IP address, under GitHub's own privacy terms. No update check runs until the owner initiates it. Android itself provides the credential, biometric, notification, alarm, and device-management services.
 
 ## 6. Retention and deletion
 
