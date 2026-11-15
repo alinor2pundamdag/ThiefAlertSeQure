@@ -32,7 +32,7 @@ capture_android_diagnostics() {
 
   mkdir -p "$diagnostics_dir/tombstones"
   if adb root > "$diagnostics_dir/adb-root.txt" 2>&1; then
-    adb wait-for-device >/dev/null 2>&1
+    timeout 15s adb wait-for-device >/dev/null 2>&1
     adb pull /data/tombstones "$diagnostics_dir/tombstones" \
       > "$diagnostics_dir/tombstone-pull.txt" 2>&1
   fi
