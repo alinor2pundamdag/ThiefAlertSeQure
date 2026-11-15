@@ -102,19 +102,31 @@ object TrustedBluetoothRegistry {
         read(prefs).any { it.address.equals(address, ignoreCase = true) }
 
     fun revision(prefs: SharedPreferences): Long =
-        SafePreferences.long(prefs, KEY_REVISION, 0L)
+        when (val stored = SafePreferences.readLong(prefs, KEY_REVISION, 0L)) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> Long.MIN_VALUE
+        }
 
     /** Per-address generation prevents unrelated registry edits from canceling another device's timer. */
     fun deviceRevision(prefs: SharedPreferences, address: String): Long {
         val key = deviceRevisionKey(address)
-        if (prefs.contains(key)) return SafePreferences.long(prefs, key, Long.MIN_VALUE)
+        if (prefs.contains(key)) {
+            return when (val stored = SafePreferences.readLong(prefs, key, 0L)) {
+                is PreferenceRead.Value -> stored.value
+                is PreferenceRead.Corrupt -> Long.MIN_VALUE
+            }
+        }
         val legacyKey = legacyDeviceRevisionKey(address)
         if (!prefs.contains(legacyKey)) return 0L
-        val previous = SafePreferences.long(prefs, legacyKey, Long.MIN_VALUE)
-        check(prefs.edit().putLong(key, previous).remove(legacyKey).commit()) {
-            "Could not securely migrate a trusted-device revision."
+        return when (val stored = SafePreferences.readLong(prefs, legacyKey, 0L)) {
+            is PreferenceRead.Value -> {
+                check(prefs.edit().putLong(key, stored.value).remove(legacyKey).commit()) {
+                    "Could not securely migrate a trusted-device revision."
+                }
+                stored.value
+            }
+            is PreferenceRead.Corrupt -> Long.MIN_VALUE // keep malformed source for diagnosis
         }
-        return previous
     }
 
     private fun deviceRevisionKey(address: String): String =
