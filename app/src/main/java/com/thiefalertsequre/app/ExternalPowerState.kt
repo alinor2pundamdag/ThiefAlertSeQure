@@ -15,7 +15,9 @@ object ExternalPowerState {
     fun readConnected(context: Context): Boolean? {
         val batteryStatus = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
             ?: return null
-        val plugged = batteryStatus.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
+        if (!batteryStatus.hasExtra(BatteryManager.EXTRA_PLUGGED)) return null
+        val plugged = batteryStatus.getIntExtra(BatteryManager.EXTRA_PLUGGED, Int.MIN_VALUE)
+        if (plugged == Int.MIN_VALUE) return null
         return isPluggedIn(plugged)
     }
 
