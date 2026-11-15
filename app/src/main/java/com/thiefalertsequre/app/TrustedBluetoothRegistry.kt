@@ -38,7 +38,13 @@ object TrustedBluetoothRegistry {
         }
         val devices = if (raw == null) {
             if (legacyAddress.isNullOrBlank()) emptyList()
-            else listOf(TrustedBluetoothDevice(legacyAddress, legacyName?.takeIf { it.isNotBlank() } ?: "Bluetooth accessory"))
+            else if (!isValidAddress(legacyAddress)) {
+                Log.e(TAG, "Legacy trusted-device address is malformed; source retained")
+                return emptyList()
+            } else listOf(TrustedBluetoothDevice(
+                legacyAddress.trim().uppercase(),
+                legacyName?.takeIf { it.isNotBlank() } ?: "Bluetooth accessory"
+            ))
         } else {
             runCatching { decode(readOrMigratePayload(prefs, KEY_DEVICES, raw)) }
                 .onFailure { Log.e(TAG, "Trusted-device payload is unreadable; encrypted source retained", it) }
@@ -255,10 +261,11 @@ object TrustedBluetoothRegistry {
     }
 
     internal fun encode(devices: List<TrustedBluetoothDevice>): String = devices
+        .onEach { require(isValidAddress(it.address)) { "Trusted Bluetooth device address is invalid." } }
         .distinctBy { it.address.lowercase() }
         .joinToString("\n") { device ->
             val name = encodeBase64(device.name.toByteArray(StandardCharsets.UTF_8))
-            "${device.address}\t$name"
+            "${device.address.trim().uppercase()}\t$name"
         }
 
     internal fun decode(raw: String): List<TrustedBluetoothDevice> =
