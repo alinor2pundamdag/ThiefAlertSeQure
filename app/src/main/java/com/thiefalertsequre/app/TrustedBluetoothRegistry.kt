@@ -92,9 +92,16 @@ object TrustedBluetoothRegistry {
     fun add(prefs: SharedPreferences, address: String, name: String): Boolean {
         if (!isValidAddress(address)) return false
         val normalizedAddress = address.trim().uppercase()
-        val current = read(prefs).filterNot { it.address.equals(normalizedAddress, ignoreCase = true) }
+        val current = when (val stored = readStrict(prefs)) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> return false
+        }.filterNot { it.address.equals(normalizedAddress, ignoreCase = true) }
         val currentRevision = deviceRevision(prefs, normalizedAddress)
-        val baselines = baselineAddresses(prefs).filterNot { it.equals(normalizedAddress, ignoreCase = true) }
+        if (currentRevision == Long.MIN_VALUE) return false
+        val baselines = when (val stored = readBaselineAddresses(prefs)) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> return false
+        }.filterNot { it.equals(normalizedAddress, ignoreCase = true) }
         val updated = (current + TrustedBluetoothDevice(normalizedAddress, name.ifBlank { "Bluetooth accessory" }))
             .sortedBy { it.name.lowercase() }
         return prefs.edit()
@@ -108,11 +115,18 @@ object TrustedBluetoothRegistry {
     fun remove(prefs: SharedPreferences, address: String): Boolean {
         if (!isValidAddress(address)) return false
         val normalizedAddress = address.trim().uppercase()
-        val current = read(prefs)
+        val current = when (val stored = readStrict(prefs)) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> return false
+        }
         val updated = current.filterNot { it.address.equals(normalizedAddress, ignoreCase = true) }
         if (updated.size == current.size) return false
         val currentRevision = deviceRevision(prefs, normalizedAddress)
-        val baselines = baselineAddresses(prefs).filterNot { it.equals(normalizedAddress, ignoreCase = true) }
+        if (currentRevision == Long.MIN_VALUE) return false
+        val baselines = when (val stored = readBaselineAddresses(prefs)) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> return false
+        }.filterNot { it.equals(normalizedAddress, ignoreCase = true) }
         val edit = prefs.edit()
             .putString(KEY_DEVICES, LocalPreferenceCipher.encrypt(KEY_DEVICES, encode(updated)))
             .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, baselines.joinToString("\n")))
@@ -127,7 +141,10 @@ object TrustedBluetoothRegistry {
     }
 
     fun isTrusted(prefs: SharedPreferences, address: String): Boolean =
-        isValidAddress(address) && read(prefs).any { it.address.equals(address.trim(), ignoreCase = true) }
+        isValidAddress(address) && when (val stored = readStrict(prefs)) {
+            is PreferenceRead.Value -> stored.value.any { it.address.equals(address.trim(), ignoreCase = true) }
+            is PreferenceRead.Corrupt -> false
+        }
 
     fun revision(prefs: SharedPreferences): Long =
         when (val stored = SafePreferences.readLong(prefs, KEY_REVISION, 0L)) {
@@ -190,7 +207,10 @@ object TrustedBluetoothRegistry {
     fun markConnected(prefs: SharedPreferences, address: String, connected: Boolean): Boolean {
         if (!isValidAddress(address)) return false
         val normalizedAddress = address.trim().uppercase()
-        val old = baselineAddresses(prefs)
+        val old = when (val stored = readBaselineAddresses(prefs)) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> return false
+        }
         val hadBaseline = old.any { it.equals(normalizedAddress, ignoreCase = true) }
         val updated = old.filterNot { it.equals(normalizedAddress, ignoreCase = true) }.toMutableSet()
         if (connected && isTrusted(prefs, normalizedAddress)) updated.add(normalizedAddress)
@@ -201,23 +221,39 @@ object TrustedBluetoothRegistry {
     }
 
     fun clearBaselines(prefs: SharedPreferences) {
+        when (val baseline = readBaselineAddresses(prefs)) {
+            is PreferenceRead.Value -> Unit
+            is PreferenceRead.Corrupt -> throw IllegalStateException("Corrupt Bluetooth baselines retained; refusing to overwrite them.")
+        }
+        val nextRevision = when (val stored = SafePreferences.readLong(prefs, KEY_REVISION, 0L)) {
+            is PreferenceRead.Value -> stored.value + 1L
+            is PreferenceRead.Corrupt -> throw IllegalStateException("Corrupt Bluetooth revision retained; refusing to overwrite it.")
+        }
         check(prefs.edit()
             .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, ""))
             .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
-            .putLong(KEY_REVISION, revision(prefs) + 1L)
+            .putLong(KEY_REVISION, nextRevision)
             .commit()) { "Could not securely clear trusted Bluetooth baselines." }
     }
 
-    private fun baselineAddresses(prefs: SharedPreferences): Set<String> {
+    private fun baselineAddresses(prefs: SharedPreferences): Set<String> =
+        when (val stored = readBaselineAddresses(prefs)) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> emptySet()
+        }
+
+    private fun readBaselineAddresses(prefs: SharedPreferences): PreferenceRead<Set<String>> {
         val raw = when (val stored = SafePreferences.readString(prefs, KEY_BASELINES, null)) {
             is PreferenceRead.Value -> stored.value
-            is PreferenceRead.Corrupt -> return emptySet()
-        } ?: return emptySet()
+            is PreferenceRead.Corrupt -> return PreferenceRead.Corrupt(KEY_BASELINES)
+        } ?: return PreferenceRead.Value(emptySet())
         return runCatching {
-            readOrMigratePayload(prefs, KEY_BASELINES, raw).lineSequence()
-                .filter { it.isNotBlank() }.toSet()
+            val decoded = readOrMigratePayload(prefs, KEY_BASELINES, raw)
+                .lineSequence().filter { it.isNotBlank() }.toSet()
+            require(decoded.all(::isValidAddress)) { "Bluetooth baseline contains an invalid address." }
+            PreferenceRead.Value(decoded)
         }.onFailure { Log.e(TAG, "Bluetooth baseline payload is unreadable; encrypted source retained", it) }
-            .getOrElse { emptySet() }
+            .getOrElse { PreferenceRead.Corrupt(KEY_BASELINES) }
     }
 
     private fun readOrMigratePayload(prefs: SharedPreferences, key: String, raw: String): String {
