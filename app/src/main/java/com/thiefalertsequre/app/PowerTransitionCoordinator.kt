@@ -251,19 +251,26 @@ object PowerTransitionCoordinator {
     private fun confirmConnectedAndArmLocked(context: Context, reason: String): ProtectionState {
         clearPendingDisconnectLocked(context)
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        prefs.edit()
+        val baselineSaved = prefs.edit()
             .putBoolean(CONNECTED, true)
             .putBoolean(KNOWN, true)
             .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
             .putLong(GENERATION, longPref(prefs, GENERATION, 0L) + 1L)
             .commit()
+        if (!baselineSaved) {
+            LocalTamperHistory.record(
+                context, "power_baseline_persist_failed",
+                "Connected state was observed but its transition baseline could not be durably saved"
+            )
+            return ProtectionStore(context).read()
+        }
 
         val monitorEnabled = context.getSharedPreferences(
             ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
         ).getBoolean(
             ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
-        val state = ProtectionStore(context).update { current ->
+        val update = ProtectionStore(context).updatePersisted { current ->
             when {
                 current.mode == ProtectionMode.ALARM_TRIGGERED -> current
                 !monitorEnabled -> ProtectionState(
@@ -273,12 +280,19 @@ object PowerTransitionCoordinator {
                 else -> ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
             }
         }
-        if (state.mode != ProtectionMode.ALARM_TRIGGERED) {
+        if (!update.persisted) {
+            LocalTamperHistory.record(
+                context, "protection_state_persist_failed",
+                "Connected transition was confirmed but the protection state commit failed; existing alarm deadline was retained"
+            )
+            return update.state
+        }
+        if (update.state.mode != ProtectionMode.ALARM_TRIGGERED) {
             AlarmScheduler.cancel(context)
             if (monitorEnabled) notifyMonitorStateChanged(context)
         }
         LocalTamperHistory.record(context, "charger_connected_confirmed", reason)
-        return state
+        return update.state
     }
 
     /**
@@ -395,18 +409,28 @@ object PowerTransitionCoordinator {
                 return@synchronized current
             }
 
-            val next = store.update { old ->
+            val update = store.updatePersisted { old ->
                 if (old.mode == ProtectionMode.ARMED) ProtectionEngine.chargerDisconnected(
                     old, eventEpochMs, eventElapsedRealtimeMs, eventBootCount
                 ) else old
             }
+            if (!update.persisted) {
+                // Keep the confirmed OS unplug retry marker. The monitor's next
+                // battery snapshot can retry this transition instead of silently
+                // losing the only event that starts the countdown.
+                LocalTamperHistory.record(
+                    appContext, "protection_state_persist_failed",
+                    "Confirmed unplug could not persist COUNTDOWN; pending disconnect was retained for retry"
+                )
+                return@synchronized update.state
+            }
             clearPendingDisconnectLocked(appContext)
-            if (next.mode == ProtectionMode.COUNTDOWN) {
-                AlarmScheduler.schedule(appContext, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
+            if (update.state.mode == ProtectionMode.COUNTDOWN) {
+                AlarmScheduler.schedule(appContext, update.state.deadlineEpochMs, update.state.deadlineElapsedRealtimeMs, update.state.bootCount)
                 LocalTamperHistory.record(appContext, "charger_countdown_started", "OS unplug event confirmed by five reads, including three consecutive disconnected samples, and a final live-state read")
                 notifyMonitorStateChanged(appContext)
             }
-            next
+            update.state
         }
     }
 }
