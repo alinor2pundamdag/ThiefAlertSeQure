@@ -16,13 +16,19 @@ class OwnerAuthenticationCryptoTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val strongBiometricStatus = BiometricManager.from(context)
             .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+        val secureLockConfigured = context.getSystemService(android.app.KeyguardManager::class.java)
+            .isDeviceSecure
 
-        // A per-use biometric-bound Keystore key cannot be provisioned on an
-        // emulator/device with no enrolled strong biometric. Device-credential
-        // fallback is tested through the separate verified-proof path.
+        // Keystore cannot create an authentication-bound key unless both a secure
+        // screen lock and an enrolled strong biometric exist on this test device.
+        // Devices without either capability still exercise the credential-policy tests.
         assumeTrue(
-            "Requires enrolled BIOMETRIC_STRONG hardware; no biometric enrollment is available",
+            "Requires an enrolled strong biometric; BiometricManager status=$strongBiometricStatus",
             strongBiometricStatus == BiometricManager.BIOMETRIC_SUCCESS
+        )
+        assumeTrue(
+            "Requires a secure PIN, pattern or password before creating an auth-bound key",
+            secureLockConfigured
         )
 
         val prepared = OwnerAuthenticationCrypto.createCryptoObject()
