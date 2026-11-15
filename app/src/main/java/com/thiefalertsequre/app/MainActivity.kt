@@ -865,12 +865,17 @@ class MainActivity : FragmentActivity() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     biometricPrompt = null
                     val proof = OwnerAuthenticationCrypto.consume(result, preparedAuthentication)
-                    if (proof != null) {
-                        completeOwnerAuthentication(cryptoProof = proof)
+                    val verifiedBiometricProof = proof?.let {
+                        OwnerAuthenticationProof.fromBiometricKeystoreProof(this@MainActivity, it)
+                    }
+                    if (verifiedBiometricProof != null) {
+                        completeOwnerAuthentication(verifiedBiometricProof)
                     } else if (Build.VERSION.SDK_INT >= 30 &&
                         result.authenticationType == BiometricPrompt.AUTHENTICATION_RESULT_TYPE_DEVICE_CREDENTIAL
                     ) {
-                        completeOwnerAuthentication(deviceCredentialVerified = true)
+                        completeOwnerAuthentication(
+                            OwnerAuthenticationProof.fromAndroidDeviceCredentialResult(this@MainActivity)
+                        )
                     } else {
                         autoAuthenticationRequested = false
                         details.text = "Android authentication did not complete the protected Keystore operation. The alarm remains active."
@@ -984,7 +989,9 @@ class MainActivity : FragmentActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_DEVICE_CREDENTIAL) {
-            if (resultCode == RESULT_OK) completeOwnerAuthentication(deviceCredentialVerified = true)
+            if (resultCode == RESULT_OK) {
+                completeOwnerAuthentication(OwnerAuthenticationProof.fromAndroidDeviceCredentialResult(this))
+            }
             else {
                 autoAuthenticationRequested = false
                 details.text = "Device authentication dismissed or unsuccessful. The alarm remains active; owner verification will be presented again."
@@ -993,16 +1000,8 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    private fun completeOwnerAuthentication(
-        cryptoProof: ByteArray? = null,
-        deviceCredentialVerified: Boolean = false
-    ) {
-        val validBiometricProof = cryptoProof?.size == 32
-        if (validBiometricProof == deviceCredentialVerified || (!validBiometricProof && !deviceCredentialVerified)) {
-            LocalTamperHistory.record(this, "owner_auth_proof_rejected", "Owner authentication did not provide a valid system or Keystore proof")
-            return
-        }
-        val next = OwnerAuthenticationCoordinator.complete(this, "in_app_authentication")
+    private fun completeOwnerAuthentication(proof: OwnerAuthenticationProof) {
+        val next = OwnerAuthenticationCoordinator.complete(this, proof)
         if (next != null) {
             autoAuthenticationRequested = false
             details.text = if (next.mode == ProtectionMode.ARMED) {
