@@ -71,6 +71,8 @@ class TrustedBluetoothRegistryEncryptionTest {
             assertTrue(TrustedBluetoothRegistry.read(prefs).isEmpty())
             assertTrue("Corrupt trust data must remain available for diagnosis", prefs.contains(TrustedBluetoothRegistry.KEY_DEVICES))
             assertTrue(prefs.getBoolean(TrustedBluetoothRegistry.KEY_DEVICES, false))
+            assertFalse("Mutations must stop when the registry is corrupt", TrustedBluetoothRegistry.add(prefs, "AA:BB:CC:DD:EE:10", "Must not overwrite"))
+            assertTrue(prefs.getBoolean(TrustedBluetoothRegistry.KEY_DEVICES, false))
         } finally {
             prefs.edit().clear().commit()
         }
@@ -83,6 +85,24 @@ class TrustedBluetoothRegistryEncryptionTest {
         try {
             assertTrue(TrustedBluetoothRegistry.read(prefs).isEmpty())
             assertEquals(malformed, prefs.getString(TrustedBluetoothRegistry.KEY_DEVICES, null))
+        } finally {
+            prefs.edit().clear().commit()
+        }
+    }
+
+    @Test
+    fun corruptEncryptedBaselinesPreventRegistryMutationAndAreRetained() {
+        val malformed = "tas-aesgcm:v1:not-valid-base64"
+        prefs.edit().clear()
+            .putString(TrustedBluetoothRegistry.KEY_DEVICES, LocalPreferenceCipher.encrypt(
+                TrustedBluetoothRegistry.KEY_DEVICES,
+                TrustedBluetoothRegistry.encode(listOf(TrustedBluetoothDevice("AA:BB:CC:DD:EE:11", "Watch")))
+            ))
+            .putString(TrustedBluetoothRegistry.KEY_BASELINES, malformed)
+            .commit()
+        try {
+            assertFalse(TrustedBluetoothRegistry.add(prefs, "AA:BB:CC:DD:EE:12", "Second"))
+            assertEquals(malformed, prefs.getString(TrustedBluetoothRegistry.KEY_BASELINES, null))
         } finally {
             prefs.edit().clear().commit()
         }
