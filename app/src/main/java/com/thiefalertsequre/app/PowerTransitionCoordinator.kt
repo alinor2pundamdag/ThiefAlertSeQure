@@ -325,11 +325,16 @@ object PowerTransitionCoordinator {
             // Do not reject on the first live snapshot: some devices update
             // ACTION_BATTERY_CHANGED just after ACTION_POWER_DISCONNECTED.
             // Five reads with three consecutive negatives plus a final live read are authoritative.
-            if (!booleanPref(prefs, CONNECTED, false)) {
+            val connectedBaseline = booleanPref(prefs, CONNECTED, false)
+            val pendingRetry = booleanPref(prefs, PENDING_DISCONNECT, false)
+            if (!PowerTransitionRecoveryPolicy.canAcceptDisconnectCandidate(
+                    connectedBaseline, pendingRetry
+                )
+            ) {
                 clearPendingDisconnectLocked(appContext)
                 LocalTamperHistory.record(
                     appContext, "charger_unplug_rejected",
-                    "No previously confirmed connected baseline; disconnected snapshots never create transitions"
+                    "No connected baseline or previously persisted OS disconnect retry; snapshots alone never create transitions"
                 )
                 return@synchronized null
             }
