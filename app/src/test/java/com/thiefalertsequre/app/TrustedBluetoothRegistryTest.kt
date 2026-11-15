@@ -1,7 +1,6 @@
 package com.thiefalertsequre.app
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -22,14 +21,16 @@ class TrustedBluetoothRegistryTest {
         assertEquals(1, TrustedBluetoothRegistry.decode(TrustedBluetoothRegistry.encode(input)).size)
     }
 
-    @Test fun malformedEntriesAreIgnoredWithoutDiscardingValidEntries() {
-        val valid = TrustedBluetoothRegistry.encode(listOf(TrustedBluetoothDevice("AA:BB", "Watch")))
-        assertEquals(listOf(TrustedBluetoothDevice("AA:BB", "Watch")), TrustedBluetoothRegistry.decode("bad-entry\n$valid"))
+    @Test fun malformedEntriesRejectTheWholeRegistryWithoutPartialTrust() {
+        val valid = TrustedBluetoothRegistry.encode(
+            listOf(TrustedBluetoothDevice("AA:BB:CC:DD:EE:10", "Watch"))
+        )
+        assertTrue(runCatching { TrustedBluetoothRegistry.decode("bad-entry\\n$valid") }.isFailure)
     }
 
-    @Test fun emptyRegistryRemainsEmpty() {
+    @Test fun emptyRegistryRemainsEmptyAndMalformedRegistryIsRejected() {
         assertTrue(TrustedBluetoothRegistry.decode("").isEmpty())
-        assertFalse(TrustedBluetoothRegistry.decode("not-valid").any())
+        assertTrue(runCatching { TrustedBluetoothRegistry.decode("not-valid") }.isFailure)
     }
 
     @Test fun base64RoundTripSupportsUnicodeAndEmptyNames() {
@@ -45,14 +46,18 @@ class TrustedBluetoothRegistryTest {
     }
 
     @Test fun base64DecoderRejectsInvalidPaddingAndCharacters() {
-        assertTrue(TrustedBluetoothRegistry.decode("AA:00\tA===").isEmpty())
-        assertTrue(TrustedBluetoothRegistry.decode("AA:00\t!!!!").isEmpty())
+        assertTrue(runCatching {
+            TrustedBluetoothRegistry.decode("AA:BB:CC:DD:EE:13\\tA===")
+        }.isFailure)
+        assertTrue(runCatching {
+            TrustedBluetoothRegistry.decode("AA:BB:CC:DD:EE:14\\t!!!!")
+        }.isFailure)
     }
 
     @Test fun base64DecoderPreservesPreviouslyStoredJavaBase64Values() {
         assertEquals(
             listOf(TrustedBluetoothDevice("AA:BB:CC:DD:EE:15", "Watch One")),
-            TrustedBluetoothRegistry.decode("AA:00\tV2F0Y2ggT25l")
+            TrustedBluetoothRegistry.decode("AA:BB:CC:DD:EE:15\\tV2F0Y2ggT25l")
         )
     }
 }
