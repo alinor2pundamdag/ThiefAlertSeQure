@@ -78,6 +78,9 @@ jobs:
       - name: Verify safe preference read boundaries
         run: python3 scripts/verify_preferences.py
 
+      - name: Verify Android manifest and protection invariants
+        run: python3 scripts/verify_manifest_contract.py
+
       - name: Android lint
         run: |
           if ! ./gradlew :app:lintDebug --no-daemon --stacktrace; then
