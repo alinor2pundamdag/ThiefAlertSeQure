@@ -11,6 +11,11 @@ forbidden_gradle = (
     "androidTestImplementation",
     "assembleAndroidTest",
     "compileReleaseAndroidTest",
+    "compileDebugAndroidTest",
+    "assembleDebugAndroidTest",
+    "connectedAndroidTest",
+    "connectedDebugAndroidTest",
+    "connectedReleaseAndroidTest",
     "signReleaseForTests",
 )
 for token in forbidden_gradle:
@@ -33,6 +38,11 @@ for workflow in workflows:
         "am instrument",
         "assembleReleaseAndroidTest",
         "compileReleaseAndroidTest",
+        "compileDebugAndroidTest",
+        "assembleDebugAndroidTest",
+        "connectedAndroidTest",
+        "connectedDebugAndroidTest",
+        "connectedReleaseAndroidTest",
         "run-android-instrumentation.sh",
         "verify-in-place-upgrade.sh",
     )
