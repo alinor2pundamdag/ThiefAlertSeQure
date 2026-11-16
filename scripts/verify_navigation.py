@@ -98,6 +98,14 @@ if not accessibility_helper.is_file() or "ViewCompat.setAccessibilityHeading" no
     errors.append("PageAccessibility.kt must use AndroidX ViewCompat accessibility heading semantics")
 
 settings_activity = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
+resume_block = re.search(r"override fun onResume\\(\\).*?override fun onPause\\(", settings_activity, re.S)
+pause_block = re.search(r"override fun onPause\\(\\).*?override fun onDestroy\\(", settings_activity, re.S)
+if not resume_block or "render()" not in resume_block.group(0):
+    errors.append("SettingsActivity must refresh Android permission/readiness state after returning from Settings")
+if not pause_block or "stopPreview()" not in pause_block.group(0):
+    errors.append("SettingsActivity must stop audio preview when it leaves the foreground")
+if "lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)" not in settings_activity or "candidate?.release()" not in settings_activity:
+    errors.append("SettingsActivity must release a preview player that finishes preparing after the Activity is paused or destroyed")
 if "startActivity(installIntent)" in settings_activity:
     errors.append("Package installer launch must use guarded Android Settings/activity fallback")
 if "startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" in settings_activity:
