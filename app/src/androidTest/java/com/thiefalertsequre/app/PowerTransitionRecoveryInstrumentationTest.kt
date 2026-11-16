@@ -36,6 +36,21 @@ class PowerTransitionRecoveryInstrumentationTest {
     @Before
     fun preserveExistingProtectionStateAndIsolateMonitor() {
         appContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val initialProtectionState = ProtectionStore(appContext).read()
+        val initialAlarmToken = SafePreferences.readString(
+            appContext.getSharedPreferences("alarm_scheduler_v1", Context.MODE_PRIVATE),
+            "last_token",
+            null
+        )
+        val hasExistingAlarm = when (initialAlarmToken) {
+            is PreferenceRead.Value -> initialAlarmToken.value != null
+            is PreferenceRead.Corrupt -> true
+        }
+        assumeTrue(
+            "Do not run recovery instrumentation while a real countdown or latched alarm is active",
+            initialProtectionState.mode != ProtectionMode.COUNTDOWN &&
+                initialProtectionState.mode != ProtectionMode.ALARM_TRIGGERED && !hasExistingAlarm
+        )
         val monitorPrefs = appContext.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
         monitorSnapshot = SharedPreferencesSnapshot(appContext, ProtectionMonitorService.PREFS)
         transitionSnapshot = SharedPreferencesSnapshot(appContext, "charger_transition_v2")

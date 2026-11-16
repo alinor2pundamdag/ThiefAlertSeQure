@@ -30,7 +30,23 @@ internal object A2DisconnectScheduler {
             )
     }
 
-    fun schedule(context: Context, pending: Pending): Boolean {
+    fun schedule(context: Context, pending: Pending): Boolean =
+        scheduleInternal(context, pending, ProtectionMonitorService.PREFS, null)
+
+    /** Isolated preference and PendingIntent namespace for non-destructive instrumentation. */
+    internal fun scheduleIsolated(
+        context: Context,
+        pending: Pending,
+        preferencesName: String,
+        namespace: String
+    ): Boolean = scheduleInternal(context, pending, preferencesName, namespace)
+
+    private fun scheduleInternal(
+        context: Context,
+        pending: Pending,
+        preferencesName: String,
+        namespace: String?
+    ): Boolean {
         if (!TrustedBluetoothRegistry.isValidAddress(pending.address) ||
             pending.eventEpochMs <= 0L || pending.eventElapsedRealtimeMs <= 0L ||
             pending.eventElapsedRealtimeMs > android.os.SystemClock.elapsedRealtime() ||
@@ -39,7 +55,7 @@ internal object A2DisconnectScheduler {
             LocalTamperHistory.record(context, "a2_deadline_metadata_rejected", "Invalid trusted-device deadline metadata was rejected")
             return false
         }
-        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
         val records = read(prefs) ?: run {
             LocalTamperHistory.record(context, "a2_deadline_store_unreadable", "Existing encrypted A2 deadlines are unreadable; source retained")
             return false
@@ -51,7 +67,7 @@ internal object A2DisconnectScheduler {
         }
         return runCatching {
             val manager = context.getSystemService(AlarmManager::class.java)
-            val operation = pendingIntent(context, pending.address)
+            val operation = pendingIntent(context, pending.address, namespace)
             val deadline = pending.deadlineElapsedRealtimeMs.coerceAtLeast(android.os.SystemClock.elapsedRealtime())
             val exactAllowed = Build.VERSION.SDK_INT < 31 || manager.canScheduleExactAlarms()
             if (!exactAllowed) {
@@ -88,8 +104,25 @@ internal object A2DisconnectScheduler {
         return pending
     }
 
-    fun cancel(context: Context, address: String, expectedEventElapsedMs: Long? = null): Boolean {
-        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+    fun cancel(context: Context, address: String, expectedEventElapsedMs: Long? = null): Boolean =
+        cancelInternal(context, address, expectedEventElapsedMs, ProtectionMonitorService.PREFS, null)
+
+    internal fun cancelIsolated(
+        context: Context,
+        address: String,
+        expectedEventElapsedMs: Long?,
+        preferencesName: String,
+        namespace: String
+    ): Boolean = cancelInternal(context, address, expectedEventElapsedMs, preferencesName, namespace)
+
+    private fun cancelInternal(
+        context: Context,
+        address: String,
+        expectedEventElapsedMs: Long?,
+        preferencesName: String,
+        namespace: String?
+    ): Boolean {
+        val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
         val records = read(prefs) ?: run {
             LocalTamperHistory.record(context, "a2_deadline_cancel_store_unreadable", "A2 deadline cancellation could not read the encrypted schedule; source retained")
             return false
@@ -98,7 +131,7 @@ internal object A2DisconnectScheduler {
         if (matching == null || (expectedEventElapsedMs != null &&
                 matching.eventElapsedRealtimeMs != expectedEventElapsedMs)
         ) return true
-        context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context, address))
+        context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context, address, namespace))
         val removed = write(prefs, records.filterNot { it.address.equals(address, true) })
         if (!removed) {
             LocalTamperHistory.record(context, "a2_deadline_cancel_persist_failed", "Reconnect cancellation removed the AlarmManager callback but could not commit the updated encrypted deadline list")
@@ -106,14 +139,27 @@ internal object A2DisconnectScheduler {
         return removed
     }
 
-    fun clearAll(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+    fun clearAll(context: Context): Boolean =
+        clearAllInternal(context, ProtectionMonitorService.PREFS, null)
+
+    internal fun clearAllIsolated(
+        context: Context,
+        preferencesName: String,
+        namespace: String
+    ): Boolean = clearAllInternal(context, preferencesName, namespace)
+
+    private fun clearAllInternal(
+        context: Context,
+        preferencesName: String,
+        namespace: String?
+    ): Boolean {
+        val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
         val records = read(prefs) ?: run {
             LocalTamperHistory.record(context, "a2_pending_clear_store_unreadable", "A2 deadline cleanup could not read the encrypted schedule; source retained")
             return false
         }
         val manager = context.getSystemService(AlarmManager::class.java)
-        records.forEach { manager.cancel(pendingIntent(context, it.address)) }
+        records.forEach { manager.cancel(pendingIntent(context, it.address, namespace)) }
         val cleared = prefs.edit().remove(KEY_PENDING).commit()
         if (!cleared) {
             LocalTamperHistory.record(context, "a2_pending_clear_failed", "Pending trusted-device deadlines could not be cleared")
@@ -169,14 +215,16 @@ internal object A2DisconnectScheduler {
         .digest(address.trim().uppercase().toByteArray(StandardCharsets.UTF_8))
         .joinToString("") { "%02x".format(it) }
 
-    private fun pendingIntent(context: Context, address: String): PendingIntent {
+    private fun pendingIntent(context: Context, address: String, namespace: String? = null): PendingIntent {
         val token = tokenFor(address)
+        val uri = if (namespace == null) URI_PREFIX + token
+        else URI_PREFIX + "test/" + Uri.encode(namespace) + "/" + token
         return PendingIntent.getBroadcast(
             context,
             REQUEST_BASE + (token.take(7).toLong(16) % 1_000_000L).toInt(),
             Intent(context, AlarmDeadlineReceiver::class.java)
                 .setAction(ACTION)
-                .setData(Uri.parse(URI_PREFIX + token)),
+                .setData(Uri.parse(uri)),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }

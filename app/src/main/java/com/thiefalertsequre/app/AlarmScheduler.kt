@@ -18,6 +18,29 @@ object AlarmScheduler {
         deadlineEpochMs: Long,
         deadlineElapsedRealtimeMs: Long = 0L,
         deadlineBootCount: Int = -1
+    ): Boolean = scheduleInternal(
+        context, deadlineEpochMs, deadlineElapsedRealtimeMs, deadlineBootCount, PREFS, null
+    )
+
+    /** Isolated scheduler namespace for instrumentation; never touches the owner's alarm token. */
+    internal fun scheduleIsolated(
+        context: Context,
+        deadlineEpochMs: Long,
+        deadlineElapsedRealtimeMs: Long,
+        deadlineBootCount: Int,
+        preferencesName: String,
+        namespace: String
+    ): Boolean = scheduleInternal(
+        context, deadlineEpochMs, deadlineElapsedRealtimeMs, deadlineBootCount, preferencesName, namespace
+    )
+
+    private fun scheduleInternal(
+        context: Context,
+        deadlineEpochMs: Long,
+        deadlineElapsedRealtimeMs: Long,
+        deadlineBootCount: Int,
+        preferencesName: String,
+        namespace: String?
     ): Boolean {
         if (deadlineEpochMs <= 0L) return false
         val alarmManager = context.getSystemService(AlarmManager::class.java)
@@ -33,11 +56,11 @@ object AlarmScheduler {
             needsBootReconciliation -> System.currentTimeMillis() + BOOT_RECONCILIATION_RETRY_MS
             else -> deadlineEpochMs
         }
-        val scheduled = replaceTokenAndSchedule(context, token) {
+        val scheduled = replaceTokenAndScheduleInternal(context, token, preferencesName, namespace) {
             val exactAllowed = Build.VERSION.SDK_INT < 31 || alarmManager.canScheduleExactAlarms()
             if (exactAllowed) {
                 try {
-                    alarmManager.setExactAndAllowWhileIdle(clockType, triggerAt, pendingIntent(context, token))
+                    alarmManager.setExactAndAllowWhileIdle(clockType, triggerAt, pendingIntent(context, token, namespace))
                 } catch (_: SecurityException) {
                     alarmManager.setAndAllowWhileIdle(clockType, triggerAt, pendingIntent(context, token))
                 }
@@ -129,12 +152,22 @@ object AlarmScheduler {
         }
     }
 
-    fun cancel(context: Context) {
+    fun cancel(context: Context) = cancelInternal(context, PREFS, null, includeLegacy = true)
+
+    internal fun cancelIsolated(context: Context, preferencesName: String, namespace: String) =
+        cancelInternal(context, preferencesName, namespace, includeLegacy = false)
+
+    private fun cancelInternal(
+        context: Context,
+        preferencesName: String,
+        namespace: String?,
+        includeLegacy: Boolean
+    ) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
         when (val stored = SafePreferences.readString(prefs, KEY_LAST_TOKEN, null)) {
             is PreferenceRead.Value -> {
-                stored.value?.let { alarmManager.cancel(pendingIntent(context, it)) }
+                stored.value?.let { alarmManager.cancel(pendingIntent(context, it, namespace)) }
                 if (!prefs.edit().remove(KEY_LAST_TOKEN).commit()) {
                     LocalTamperHistory.record(context, "deadline_token_clear_failed", "Scheduled alarm token could not be removed from preferences")
                 }
@@ -143,13 +176,15 @@ object AlarmScheduler {
                 context, "deadline_token_corrupt", "Malformed alarm token retained; pending alarm could not be identified safely"
             )
         }
-        alarmManager.cancel(
-            PendingIntent.getBroadcast(
-                context, REQUEST_CODE,
-                Intent(context, AlarmDeadlineReceiver::class.java).setAction("com.thiefalertsequre.DEADLINE"),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        if (includeLegacy) {
+            alarmManager.cancel(
+                PendingIntent.getBroadcast(
+                    context, REQUEST_CODE,
+                    Intent(context, AlarmDeadlineReceiver::class.java).setAction("com.thiefalertsequre.DEADLINE"),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
             )
-        )
+        }
     }
 
     /**
@@ -160,8 +195,24 @@ object AlarmScheduler {
         context: Context,
         token: String,
         schedule: () -> Unit
+    ): Boolean = replaceTokenAndScheduleInternal(context, token, PREFS, null, schedule)
+
+    internal fun replaceTokenAndScheduleIsolated(
+        context: Context,
+        token: String,
+        preferencesName: String,
+        namespace: String,
+        schedule: () -> Unit
+    ): Boolean = replaceTokenAndScheduleInternal(context, token, preferencesName, namespace, schedule)
+
+    private fun replaceTokenAndScheduleInternal(
+        context: Context,
+        token: String,
+        preferencesName: String,
+        namespace: String?,
+        schedule: () -> Unit
     ): Boolean {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
         val previous = when (val stored = SafePreferences.readString(prefs, KEY_LAST_TOKEN, null)) {
             is PreferenceRead.Value -> stored.value
             is PreferenceRead.Corrupt -> {
@@ -176,7 +227,7 @@ object AlarmScheduler {
         return try {
             schedule()
             if (previous != null && previous != token) {
-                context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context, previous))
+                context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context, previous, namespace))
             }
             true
         } catch (error: Exception) {
@@ -193,13 +244,16 @@ object AlarmScheduler {
     private fun deadlineToken(epochMs: Long, elapsedRealtimeMs: Long, bootCount: Int): String =
         "deadline:$epochMs:$elapsedRealtimeMs:$bootCount"
 
-    private fun pendingIntent(context: Context, token: String): PendingIntent =
-        PendingIntent.getBroadcast(
+    private fun pendingIntent(context: Context, token: String, namespace: String? = null): PendingIntent {
+        val uri = if (namespace == null) "thiefalertsequre://alarm/$token"
+        else "thiefalertsequre://alarm-test/" + Uri.encode(namespace) + "/" + token
+        return PendingIntent.getBroadcast(
             context,
             REQUEST_CODE,
             Intent(context, AlarmDeadlineReceiver::class.java)
                 .setAction("com.thiefalertsequre.DEADLINE")
-                .setData(Uri.parse("thiefalertsequre://alarm/$token")),
+                .setData(Uri.parse(uri)),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+    }
 }

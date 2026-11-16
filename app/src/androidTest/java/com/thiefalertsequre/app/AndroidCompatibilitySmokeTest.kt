@@ -5,12 +5,17 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.test.core.app.ActivityScenario
+import androidx.core.content.ContextCompat
+import android.content.Context
+import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -24,6 +29,45 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class AndroidCompatibilitySmokeTest {
+    private lateinit var appContext: Context
+    private lateinit var monitorSnapshot: SharedPreferencesSnapshot
+    private lateinit var historySnapshot: SharedPreferencesSnapshot
+    private var monitorWasRunning = false
+    private var monitorWasEnabled = false
+    private var notificationsWereGranted = false
+
+    @Before
+    fun preserveOwnerSettingsAndServiceState() {
+        appContext = InstrumentationRegistry.getInstrumentation().targetContext
+        monitorSnapshot = SharedPreferencesSnapshot(appContext, ProtectionMonitorService.PREFS)
+        historySnapshot = SharedPreferencesSnapshot(appContext, "local_tamper_history_v1")
+        val monitorPrefs = appContext.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        monitorWasEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
+        monitorWasRunning = ProtectionMonitorService.isRunning
+        notificationsWereGranted = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(appContext, android.Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+
+    @After
+    fun restoreOwnerSettingsAndServiceState() {
+        historySnapshot.restore()
+        monitorSnapshot.restore()
+        if (Build.VERSION.SDK_INT >= 33 && !notificationsWereGranted) {
+            runShell("pm revoke ${appContext.packageName} android.permission.POST_NOTIFICATIONS")
+        }
+        if (monitorWasRunning && monitorWasEnabled) {
+            runCatching {
+                ContextCompat.startForegroundService(
+                    appContext, Intent(appContext, ProtectionMonitorService::class.java)
+                )
+            }
+        } else {
+            appContext.stopService(Intent(appContext, ProtectionMonitorService::class.java))
+        }
+    }
 
     @Test
     fun everyInternalScreenCanBeCreatedAndDestroyed() {
@@ -151,22 +195,6 @@ class AndroidCompatibilitySmokeTest {
     }
 
     @Test
-    fun alarmDeadlineSchedulingHasACompatibleFallback() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val nowWall = System.currentTimeMillis()
-        val nowElapsed = android.os.SystemClock.elapsedRealtime()
-        val bootCount = ProtectionClock.bootCount(context)
-
-        AlarmScheduler.schedule(
-            context,
-            nowWall + 60_000L,
-            nowElapsed + 60_000L,
-            bootCount
-        )
-        AlarmScheduler.cancel(context)
-    }
-
-    @Test
     fun manufacturerSettingsFallbacksAreConstructible() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val families = listOf(
@@ -207,13 +235,14 @@ class AndroidCompatibilitySmokeTest {
     }
 
     private fun grantNotificationPermissionForTest() {
-        if (Build.VERSION.SDK_INT >= 33) {
-            val context = InstrumentationRegistry.getInstrumentation().targetContext
-            val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(
-                "pm grant ${context.packageName} android.permission.POST_NOTIFICATIONS"
-            )
-            android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).bufferedReader().use { it.readText() }
+        if (Build.VERSION.SDK_INT >= 33 && !notificationsWereGranted) {
+            runShell("pm grant ${appContext.packageName} android.permission.POST_NOTIFICATIONS")
         }
+    }
+
+    private fun runShell(command: String) {
+        val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
+        android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).bufferedReader().use { it.readText() }
     }
 
     private fun <T : Activity> launch(activityClass: Class<T>) {
