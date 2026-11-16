@@ -74,6 +74,9 @@ if "Monitor runtime:" not in bluetooth_activity or "Monitoring runs only while A
     errors.append("Bluetooth center must distinguish enabled preference from confirmed runtime")
 if "AndroidDeviceCompatibility.appInfoIntent(packageName)" not in device_activity:
     errors.append("DeviceIntelligenceActivity must provide a fallback for app Settings navigation")
+for screen, source in (("BluetoothCenterActivity.kt", bluetooth_activity), ("DeviceIntelligenceActivity.kt", device_activity)):
+    if "lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)" not in source:
+        errors.append(screen + " must not show asynchronous diagnostics while paused")
 
 # Permission/capability screens must refresh their live snapshot after returning from Android Settings.
 for screen in (
