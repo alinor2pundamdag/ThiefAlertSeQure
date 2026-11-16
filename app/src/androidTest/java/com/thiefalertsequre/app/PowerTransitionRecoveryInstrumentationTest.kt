@@ -3,7 +3,6 @@ package com.thiefalertsequre.app
 import android.app.Instrumentation
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
-import androidx.core.content.ContextCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
@@ -25,7 +24,6 @@ class PowerTransitionRecoveryInstrumentationTest {
         val previousMonitorEnabled = SafePreferences.boolean(
             monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
-        val monitorWasRunning = ProtectionMonitorService.isRunning
         val transitionPrefs = context.getSharedPreferences("charger_transition_v2", 0)
         val statePrefs = context.getSharedPreferences("protection_state_v1", 0)
         val corruptionPrefs = context.getSharedPreferences("protection_state_corrupt_backup_v1", 0)
@@ -61,13 +59,6 @@ class PowerTransitionRecoveryInstrumentationTest {
             corruptionPrefs.edit().clear().commit()
             monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, previousMonitorEnabled).commit()
             runShell(instrumentation, "dumpsys battery reset")
-            if (monitorWasRunning && previousMonitorEnabled) {
-                runCatching {
-                    ContextCompat.startForegroundService(
-                        context, Intent(context, ProtectionMonitorService::class.java)
-                    )
-                }
-            }
         }
     }
 
@@ -81,6 +72,8 @@ class PowerTransitionRecoveryInstrumentationTest {
         val previousMonitorEnabled = monitorPrefs.getBoolean(
             ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
+        context.stopService(Intent(context, ProtectionMonitorService::class.java))
+        instrumentation.waitForIdleSync()
         val transitionPrefs = context.getSharedPreferences("charger_transition_v2", 0)
         val store = ProtectionStore(context)
 
