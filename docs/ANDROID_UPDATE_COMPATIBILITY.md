@@ -8,8 +8,8 @@
 - Official signing certificate SHA-256: `9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64`
 - Preserve the original owner-controlled production keystore, private key, alias and credentials. Never regenerate or replace them to make CI pass.
 - v1.1.3 baseline: versionCode 5, versionName 1.1.3, minSdk 26.
-- v1.1.4 candidate on the compatibility branch: versionCode 6, versionName 1.1.4, minSdk 23.
-- Do not raise minSdk above 23 in a future release without an explicit compatibility decision.
+- v1.1.4 development candidate: versionCode 6, versionName 1.1.4, minSdk 26. The isolated debug test variant uses versionName `1.1.4-test` and the same versionCode 6.
+- Preserve the owner-approved minSdk 26 invariant; do not lower it or raise it without an explicit compatibility decision.
 - Every subsequent official release must have a strictly higher versionCode.
 
 ## Mandatory release gates
