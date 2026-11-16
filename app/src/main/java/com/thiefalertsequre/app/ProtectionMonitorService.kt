@@ -52,6 +52,8 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             // Anchor the grace deadline to broadcast receipt, not the time spent
             // validating encrypted trust state and protection guards.
             val eventUptimeMs = android.os.SystemClock.uptimeMillis()
+            val eventElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime()
+            val eventEpochMs = System.currentTimeMillis()
             if (!SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false)) return
             if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 LocalTamperHistory.record(context, "bluetooth_permission_missing", "Trusted Bluetooth disconnect monitoring paused; grant Bluetooth Connect permission")
@@ -64,6 +66,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                 BluetoothDevice.ACTION_ACL_CONNECTED -> {
                     TrustedBluetoothRegistry.markConnected(prefs, address, true)
                     pendingBluetoothRunnables.remove(address)?.let(handler::removeCallbacks)
+                    A2DisconnectScheduler.cancel(context, address)
                     LocalTamperHistory.record(context, "trusted_bluetooth_connected", "A registered trusted Bluetooth device connected")
                 }
                 BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
@@ -113,6 +116,20 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                             }
                         }
                         pendingBluetoothRunnables[address] = runnable
+                        val durableScheduled = A2DisconnectScheduler.schedule(
+                            this@ProtectionMonitorService,
+                            A2DisconnectScheduler.Pending(
+                                address = address,
+                                eventEpochMs = eventEpochMs,
+                                eventElapsedRealtimeMs = eventElapsedRealtimeMs,
+                                bootCount = ProtectionClock.bootCount(this@ProtectionMonitorService),
+                                monitorRevision = monitorRevision,
+                                deviceRevision = deviceRevision
+                            )
+                        )
+                        if (!durableScheduled) {
+                            LocalTamperHistory.record(context, "a2_durable_deadline_unavailable", "Using the in-process grace timer because the durable A2 deadline could not be scheduled")
+                        }
                         handler.postAtTime(
                             runnable,
                             A2DisconnectPolicy.graceDeadlineUptimeMs(eventUptimeMs, BLUETOOTH_DISCONNECT_GRACE_MS)
@@ -153,6 +170,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                 else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
             }
             if (disabledState.mode != ProtectionMode.ALARM_TRIGGERED) AlarmScheduler.cancel(this)
+            A2DisconnectScheduler.clearAll(this)
             PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Protection monitor disabled by owner")
             stopSelf()
             return START_NOT_STICKY
@@ -247,6 +265,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         bluetoothReceiverRegistered = true
         // A service restart cannot prove the trusted accessory is currently connected.
         // Require a fresh ACL_CONNECTED event before treating a later disconnect as theft.
+        // A service restart cannot prove accessory connectivity. Cancel pending
+        // A2 deadlines and require fresh ACL_CONNECTED baselines to avoid false alarms.
+        A2DisconnectScheduler.clearAll(this)
         TrustedBluetoothRegistry.clearBaselines(prefs)
         LocalTamperHistory.record(this, "trusted_bluetooth_receiver_registered", "Trusted Bluetooth separation monitoring active; reconnect registered accessories to establish fresh baselines")
     }
@@ -627,6 +648,6 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         const val ACTION_REFRESH = "com.thiefalertsequre.REFRESH_MONITOR"
         private const val MOTION_COOLDOWN_MS = 5_000L
         private const val POWER_RETRY_MS = 1_000L
-        private const val BLUETOOTH_DISCONNECT_GRACE_MS = 8_000L
+        const val BLUETOOTH_DISCONNECT_GRACE_MS = 8_000L
     }
 }
