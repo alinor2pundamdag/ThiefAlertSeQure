@@ -3,8 +3,22 @@ package com.thiefalertsequre.app
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 class AndroidDeviceCompatibilityTest {
+    @Test fun manufacturerDetectionIsIndependentOfTheDeviceLocale() {
+        val previous = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.forLanguageTag("tr-TR"))
+            assertEquals(AndroidDeviceCompatibility.Family.XIAOMI, AndroidDeviceCompatibility.family("XIAOMI", "REDMI"))
+            assertEquals(AndroidDeviceCompatibility.Family.TRANSSION, AndroidDeviceCompatibility.family("INFINIX", "INFINIX"))
+            assertEquals(AndroidDeviceCompatibility.Family.GOOGLE_PIXEL, AndroidDeviceCompatibility.family("GOOGLE", "PIXEL"))
+            assertEquals("Huawei / EMUI", AndroidDeviceCompatibility.familyLabel("HUAWEI", "HUAWEI"))
+        } finally {
+            Locale.setDefault(previous)
+        }
+    }
+
     @Test fun recognizesSamsungFromManufacturerOrBrand() {
         assertEquals(AndroidDeviceCompatibility.Family.SAMSUNG, AndroidDeviceCompatibility.family("samsung", "SM"))
         assertEquals(AndroidDeviceCompatibility.Family.SAMSUNG, AndroidDeviceCompatibility.family("unknown", "Samsung"))

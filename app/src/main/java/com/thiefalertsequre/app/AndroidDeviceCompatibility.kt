@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
+import java.util.Locale
 import android.view.View
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -24,7 +25,7 @@ object AndroidDeviceCompatibility {
     }
 
     fun family(manufacturer: String, brand: String): Family {
-        val value = "${manufacturer.lowercase()} ${brand.lowercase()}"
+        val value = "${manufacturer.lowercase(Locale.ROOT)} ${brand.lowercase(Locale.ROOT)}"
         return when {
             "samsung" in value -> Family.SAMSUNG
             "honor" in value || "huawei" in value -> Family.HONOR_HUAWEI
@@ -45,7 +46,7 @@ object AndroidDeviceCompatibility {
 
     fun familyLabel(manufacturer: String, brand: String): String = when (family(manufacturer, brand)) {
         Family.SAMSUNG -> "Samsung One UI"
-        Family.HONOR_HUAWEI -> if ("huawei" in manufacturer.lowercase() + brand.lowercase()) "Huawei / EMUI" else "HONOR / MagicOS"
+        Family.HONOR_HUAWEI -> if ("huawei" in manufacturer.lowercase(Locale.ROOT) + brand.lowercase(Locale.ROOT)) "Huawei / EMUI" else "HONOR / MagicOS"
         Family.XIAOMI -> "Xiaomi / Redmi / POCO (MIUI / HyperOS)"
         Family.OPPO_REALME_ONEPLUS -> "OPPO / realme / OnePlus"
         Family.VIVO_IQOO -> "vivo / iQOO"
