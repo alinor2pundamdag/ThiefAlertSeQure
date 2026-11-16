@@ -4,7 +4,7 @@
 
 ## 1. Verification snapshot
 
-**Latest verified candidate:** `5620a059eb699ffe6360be6778bdf6e7261dac41` on `work/phase-0-12-coding`. Run #1390 passed the complete non-instrumentation build job, including JVM unit tests, Android instrumentation-source compilation (no execution), navigation/preferences/manifest/state contract checks, lint, asset and release-workflow checks, distributable APK assembly, minified APK metadata, and package/version/signer verification. The emulator instrumentation matrix was intentionally skipped. This is code-level CI evidence, not certification that every phase or every hardware-dependent requirement is complete.
+**Latest verified coding candidate:** `367e3fd163a7f1cac04d24a08c05e19120d43650` on `work/phase-0-12-coding`. Run [#1395](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43865303650) passed the complete non-instrumentation build job, including JVM unit tests, Android instrumentation-source compilation (no execution), navigation/preferences/manifest/state contract checks, lint, asset and release-workflow checks, distributable APK assembly, minified APK metadata, and package/version/signer verification. The preceding #1394 compile failure (`UpgradeDataPreservationTest.kt` missing local history snapshot) was fixed in commit `367e3fd`; #1395 confirms the corrected instrumentation sources compile. Emulator instrumentation execution remains intentionally deferred until coding phases 0–12 are complete. This is code-level CI evidence, not certification of hardware-dependent behavior.
 
 | Area | Current evidence | Status / limitation |
 |---|---|---|
