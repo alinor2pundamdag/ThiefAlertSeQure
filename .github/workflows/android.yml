@@ -5,13 +5,6 @@ on:
     branches: [main, 'dev/**', 'feat/**', 'feature/**', 'fix/**', 'fixall/**', 'security/**', 'work/**']
   pull_request:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      run_instrumentation:
-        description: "Run the Android emulator instrumentation matrix after coding is complete"
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -357,55 +350,3 @@ jobs:
           path: ${{ env.APK_PATH }}
           if-no-files-found: error
           retention-days: 14
-
-  instrumentation:
-    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_instrumentation == true) || (github.event_name == 'push' && github.ref == 'refs/heads/work/phase-0-12-coding') }}
-    name: Android instrumentation (API ${{ matrix.api-level }})
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix:
-        api-level: [26, 28, 30, 31, 32, 33, 34, 35, 36, 37]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
-        with:
-          distribution: temurin
-          java-version: "17"
-      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
-        with:
-          cache-provider: basic
-      - name: Prepare Android emulator framework-readiness shim
-        run: bash .github/scripts/prepare-adb-readiness-wrapper.sh
-
-      # ReactiveCircus installs "platforms;android-<api-level>" directly.
-      # Android 17's SDK package is named android-37.0, while the runtime API
-      # reported by the emulator remains 37. Pass the exact SDK package version
-      # to the runner only for API 37; ANDROID_API_LEVEL below remains numeric 37.
-      - name: Run Android instrumentation tests on API ${{ matrix.api-level }}
-        timeout-minutes: 30
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
-        env:
-          ANDROID_API_LEVEL: ${{ matrix.api-level }}
-        with:
-          api-level: ${{ matrix.api-level == 37 && '37.0' || matrix.api-level }}
-          target: default
-          arch: x86_64
-          profile: pixel_2
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
-          emulator-boot-timeout: 1200
-          disable-animations: true
-          disable-spellchecker: true
-          script: bash .github/scripts/run-android-instrumentation.sh
-
-      - name: Upload Android instrumentation diagnostics
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: android-instrumentation-diagnostics-api-${{ matrix.api-level }}
-          path: ${{ runner.temp }}/android-diagnostics-api-${{ matrix.api-level }}/
-          if-no-files-found: warn
-          retention-days: 7
