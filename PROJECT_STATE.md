@@ -88,3 +88,33 @@ The bullets below include earlier work on predecessor branches; they are project
 - Do not run or compile Android instrumentation tests, do not run emulator matrices, and do not perform physical-device testing.
 - Software verification is limited to JVM unit tests, static/source-contract checks, lint, build/APK metadata and package/signing-contract checks, and CodeQL on the exact working-branch head.
 - Preserve the existing no-merge/no-tag/no-publication/no-production-release boundary unless the owner separately approves it.
+
+
+## Owner-approved code-only execution override and audit progress — 2026-11-17
+
+This section supersedes earlier historical next-action notes where they conflict with the current owner instruction.
+
+- Finish all repository/code/GitHub tasks that can be completed without a physical device.
+- Physical-device testing, emulator testing, and instrumentation compilation/execution are explicitly excluded and are not completion blockers.
+- Do not merge/rebase into `main`, tag, publish APKs, or release without separate owner approval.
+- Draft PR #7 is open for exact-head review/CI: https://github.com/alinor2pundamdag/ThiefAlertSeQure/pull/7. It remains draft and unmerged.
+- Current branch HEAD at the time of this audit note: `80c8c52be927db24a31a7c08d699998ffb72d559`.
+
+### Confirmed code finding fixed
+
+- Finding: `OwnerAuthenticationProofPolicy.isFresh` previously accepted a proof when exactly one of the issued/current boot identities was known. A missing current boot identity prevented proving that the ephemeral credential proof belonged to the current boot.
+- Fix: reject asymmetric known/unknown boot-identity states; continue to allow the bounded elapsed-time check when both identities are unavailable; continue to reject mismatched known identities and expired/reset elapsed clocks.
+- Source commit: `e17f482264eba0d027b92499010be3b72c6d0086` (`OwnerAuthenticationProof.kt`).
+- Regression tests: `80c8c52be927db24a31a7c08d699998ffb72d559` adds tests for known-to-unknown, unknown-to-known, and both-unknown boot identity states in `OwnerAuthenticationProofPolicyTest.kt`.
+- Verification status: code and test changes are committed on the working branch; exact-head JVM/CI execution is still pending and must not be claimed as passed.
+
+### Source audit coverage in this resumed session
+
+Reviewed source paths include `ProtectionStore.kt`, `ProtectionEngine.kt`, `PowerTransitionCoordinator.kt`, `PowerTransitionReceiver.kt`, `PowerTransitionSamplingPolicy.kt`, `PowerTransitionRecoveryPolicy.kt`, `AlarmScheduler.kt`, `AlarmDeadlineReceiver.kt`, `AlarmRecoveryCoordinator.kt`, `BootReceiver.kt`, `ProtectionMonitorService.kt`, `A2DisconnectScheduler.kt`, `A2BluetoothAclReceiver.kt`, `TrustedBluetoothRegistry.kt`, `LocalPreferenceCipher.kt`, `OwnerAuthenticationProof.kt`, `OwnerAuthenticationCoordinator.kt`, and `OwnerAuthenticationCrypto.kt`. This is a documented review slice, not a claim that every repository file has been audited.
+
+### Current blockers to software completion
+
+- Continue the remaining source and cross-component review; fix only confirmed defects and add JVM regression tests.
+- Obtain Android build/unit/static/lint/APK checks and CodeQL evidence for the latest PR head. Connector status currently does not expose a confirmed run result for that head.
+- Resolve the branch divergence only within the existing no-merge/no-rebase approval boundary; do not alter `main`.
+- Reconcile all completion documentation to this code-only scope and the latest exact commit.
