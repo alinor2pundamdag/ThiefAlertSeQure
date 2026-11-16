@@ -40,27 +40,45 @@ if [[ -z "$serial" ]]; then
     exec "$REAL_ADB" "$@"
 fi
 
+retry_adb() {
+    local attempt
+    for attempt in {1..12}; do
+        if "$REAL_ADB" "$@"; then
+            return 0
+        fi
+        echo "Transient ADB/service failure (attempt $attempt/12): $*" >&2
+        "$REAL_ADB" reconnect offline >/dev/null 2>&1 || true
+        sleep 3
+    done
+    echo "ADB command did not recover after 12 attempts: $*" >&2
+    return 1
+}
+
 case "$*" in
     *"shell input keyevent 82"*)
-        # sys.boot_completed may be 1 before InputManager publishes its service.
-        for attempt in {1..45}; do
-            if "$REAL_ADB" -s "$serial" shell service check input >/dev/null 2>&1; then
-                exec "$REAL_ADB" "$@"
+        # sys.boot_completed can precede InputManager readiness on cold API 30+ images.
+        for attempt in {1..90}; do
+            if "$REAL_ADB" -s "$serial" shell service check input 2>&1 | grep -q "found"; then
+                retry_adb "$@"
+                exit $?
             fi
+            "$REAL_ADB" reconnect offline >/dev/null 2>&1 || true
             sleep 2
         done
-        echo "Android input service did not become ready within 90 seconds" >&2
+        echo "Android input service did not become ready within 180 seconds" >&2
         exit 1
         ;;
     *"shell settings put"*)
-        # Wait for SettingsProvider before the runner disables animations.
-        for attempt in {1..45}; do
+        # SettingsProvider may restart briefly after a slow emulator boot.
+        for attempt in {1..90}; do
             if "$REAL_ADB" -s "$serial" shell settings get global window_animation_scale >/dev/null 2>&1; then
-                exec "$REAL_ADB" "$@"
+                retry_adb "$@"
+                exit $?
             fi
+            "$REAL_ADB" reconnect offline >/dev/null 2>&1 || true
             sleep 2
         done
-        echo "Android settings provider did not become ready within 90 seconds" >&2
+        echo "Android settings provider did not become ready within 180 seconds" >&2
         exit 1
         ;;
 esac

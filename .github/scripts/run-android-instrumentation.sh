@@ -5,34 +5,45 @@ api_level="${ANDROID_API_LEVEL:-unknown}"
 diagnostics_dir="${RUNNER_TEMP:-/tmp}/android-diagnostics-api-${api_level}"
 mkdir -p "$diagnostics_dir"
 
-# The emulator action can report boot completion while the ADB transport is
-# briefly offline. Wait for an online device and verify its real API level
-# before Gradle/DDMLib attempts APK installation (which otherwise reports API 1).
+# Wait for a stable ADB transport AND Android framework services. A boot-complete
+# property alone is insufficient: PackageManager can still be unavailable, causing
+# DDMLib to fail APK installation with "Can't find service: package".
 if [[ "$api_level" =~ ^[0-9]+$ ]]; then
   device_ready=false
-  for attempt in {1..90}; do
+  stable_checks=0
+  for attempt in {1..180}; do
     adb_state="$(adb get-state 2>/dev/null || true)"
     if [[ "$adb_state" == "device" ]]; then
       boot_completed="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
       actual_api="$(adb shell getprop ro.build.version.sdk 2>/dev/null | tr -d '\r' || true)"
-      if [[ "$boot_completed" == "1" && "$actual_api" == "$api_level" ]]; then
-        device_ready=true
-        break
+      package_service="$(adb shell service check package 2>&1 || true)"
+      package_path="$(adb shell cmd package path android 2>/dev/null | head -n 1 | tr -d '\r' || true)"
+      if [[ "$boot_completed" == "1" && "$actual_api" == "$api_level" \
+            && "$package_service" == *"found"* && "$package_path" == package:* ]]; then
+        stable_checks=$((stable_checks + 1))
+        if [[ "$stable_checks" -ge 3 ]]; then
+          device_ready=true
+          break
+        fi
+      else
+        stable_checks=0
       fi
     else
+      stable_checks=0
       adb reconnect offline >/dev/null 2>&1 || true
     fi
     sleep 2
   done
   if [[ "$device_ready" != "true" ]]; then
-    echo "::error::Emulator did not become stably online at expected API $api_level."
+    echo "::error::Emulator did not expose a stable PackageManager at expected API $api_level."
     adb devices -l || true
-    adb shell getprop ro.build.version.sdk || true
+    adb shell getprop sys.boot_completed || true
+    adb shell service check package || true
+    adb shell cmd package path android || true
     exit 1
   fi
-  echo "Verified online emulator at API $api_level before instrumentation."
+  echo "Verified stable ADB transport, PackageManager, and API $api_level before instrumentation."
 fi
-
 
 capture_android_diagnostics() {
   local test_exit_code=$?

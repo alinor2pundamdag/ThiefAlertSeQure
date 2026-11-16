@@ -342,10 +342,10 @@ jobs:
     name: Android instrumentation (API ${{ matrix.api-level }})
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     strategy:
       fail-fast: false
-      max-parallel: 3
+      max-parallel: 2
       matrix:
         api-level: [26, 28, 30, 32, 34, 35, 36]
     steps:
@@ -361,7 +361,7 @@ jobs:
         run: bash .github/scripts/prepare-adb-readiness-wrapper.sh
 
       - name: Run Android instrumentation tests on API ${{ matrix.api-level }}
-        timeout-minutes: 20
+        timeout-minutes: 30
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         env:
           ANDROID_API_LEVEL: ${{ matrix.api-level }}
@@ -370,7 +370,7 @@ jobs:
           target: default
           arch: x86_64
           profile: pixel_2
-          emulator-boot-timeout: 900
+          emulator-boot-timeout: 1200
           disable-animations: true
           disable-spellchecker: true
           script: bash .github/scripts/run-android-instrumentation.sh
