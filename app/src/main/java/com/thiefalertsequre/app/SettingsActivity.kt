@@ -258,7 +258,11 @@ class SettingsActivity : FragmentActivity() {
         val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         root.addView(action(if (monitorEnabled) "Disable background monitoring" else "Enable background monitoring") {
             val enabled = !SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
-            monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).apply()
+            if (!monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).commit()) {
+                android.widget.Toast.makeText(this, "Android did not confirm the monitoring setting. No service or protection state was changed.", android.widget.Toast.LENGTH_LONG).show()
+                render()
+                return@action
+            }
             val state = ProtectionStore(this).read()
             if (enabled && state.mode != ProtectionMode.ALARM_TRIGGERED) {
                 PowerTransitionCoordinator.resetBaselineToCurrentPower(
@@ -315,11 +319,15 @@ class SettingsActivity : FragmentActivity() {
         val batteryAlertEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_BATTERY_ALERT_ENABLED, false)
         root.addView(action("Battery threshold alert: ${if (batteryAlertEnabled) "ON" else "OFF"}") {
             val enabled = !batteryAlertEnabled
-            monitorPrefs.edit()
+            val batteryAlertEdit = monitorPrefs.edit()
                 .putBoolean(ProtectionMonitorService.KEY_BATTERY_ALERT_ENABLED, enabled)
-                .apply()
+            if (enabled) batteryAlertEdit.putBoolean(ProtectionMonitorService.KEY_ENABLED, true)
+            if (!batteryAlertEdit.commit()) {
+                android.widget.Toast.makeText(this, "Android did not confirm the battery-alert setting. No service state was changed.", android.widget.Toast.LENGTH_LONG).show()
+                render()
+                return@action
+            }
             if (enabled) {
-                monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).apply()
                 if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED) {
                     PowerTransitionCoordinator.resetBaselineToCurrentPower(
                         this, "Battery threshold alert enabled background monitoring"
