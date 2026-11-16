@@ -4,11 +4,11 @@ Status: source-level UX/UI implementation and CI audit passed on the current FIX
 
 ## Verified baseline
 - Branch: `work/phase-0-12-coding`
-- Latest code-level verified HEAD: `367e3fd163a7f1cac04d24a08c05e19120d43650`
-- GitHub Actions run [#1395](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43865303650) completed successfully on that exact commit.
+- Latest code-level verified HEAD: `1141b10db19afc9ffa085b549adfd61ae0c39629`
+- GitHub Actions run [#1410](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43872054032) completed successfully on that exact commit.
 - Unit tests, instrumentation-source compilation (without execution), internal navigation/dialog checks, Android lint, asset/workflow validation, APK assembly, package/version/signer checks passed.
-- The successful run produced the `ThiefAlertSeQure-debug-apk` artifact (ID `13931562732`). Verified APK: `com.thiefalertsequre.app.v114test`, versionCode `6`, versionName `1.1.4-test`, minSdk `26`; debug certificate SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`. APK SHA-256: `1523e03947550a5d06768a991222750a2fd16e824931dd17d39ae29469dd2a4c`. This debug signer is not the production signer.
-- Emulator instrumentation execution is deferred until coding phases 0–12 are closed. No new physical-device test is claimed by this audit.
+- The successful run produced the `ThiefAlertSeQure-debug-apk` artifact (ID `14227919043`, archive SHA-256 `adcd4b859aed51eef6d65195cac56c5e481cb55f8cb1f66fb2796a8bec6cce23`). Verified APK: `com.thiefalertsequre.app.v114test`, versionCode `6`, versionName `1.1.4-test`, minSdk `26`; debug certificate SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`. APK SHA-256: `1523e03947550a5d06768a991222750a2fd16e824931dd17d39ae29469dd2a4c`. This debug signer is not the production signer.
+- The full API 26–37 emulator instrumentation matrix is enabled on the coding branch; this audit does not claim physical-device acceptance. No new physical-device test is claimed by this audit.
 
 ## Implemented interaction contracts
 - Theme selection remains a local preview until Apply; Cancel does not persist the selection.
