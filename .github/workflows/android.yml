@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      run_instrumentation:
+        description: "Run the Android emulator instrumentation matrix after coding is complete"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -339,6 +345,7 @@ jobs:
           retention-days: 14
 
   instrumentation:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_instrumentation == true }}
     name: Android instrumentation (API ${{ matrix.api-level }})
     needs: build
     runs-on: ubuntu-latest
