@@ -400,7 +400,7 @@ The app must not use covert persistence, exploit APIs, root, hidden accessibilit
 - Managed-mode policy decision logic (pure logic separated from Android calls where practical).
 - Compatibility family selection and fallback guidance.
 
-**Layer B — Android integration / instrumentation tests**
+**Layer B — Android platform contracts (source verification only; instrumentation execution and compilation are excluded by owner direction)**
 - Manifest declarations and receiver/service exported flags.
 - AlarmManager scheduling/cancellation and permission-race behavior.
 - Service start/idempotency/stop lifecycle.
@@ -408,14 +408,15 @@ The app must not use covert persistence, exploit APIs, root, hidden accessibilit
 - Audio resource decode/fallback and volume restoration.
 - Keyguard and DevicePolicyManager behavior where testable.
 
-**Layer C — Emulator / OS matrix**
-- Minimum supported API 26 baseline where emulator image is available.
+**Layer C — Physical Android OS / OEM acceptance (real devices only)**
+- API 26 minimum-supported baseline.
 - API 31/32 exact-alarm behavior.
 - API 33 notification permission.
-- API 34 full-screen-intent behavior.
-- API 35 boot FGS restrictions.
+- API 34 full-screen-intent and foreground-service behavior.
+- API 35 boot foreground-service restrictions.
 - API 36 edge-to-edge and target behavior.
-- API 37 background-audio hardening before/when supported image is available.
+- API 37 Android 17 background-audio hardening.
+- Record actual device model, OS/API, OEM build, permissions, app commit and observed evidence. Do not use emulator results as a substitute.
 
 **Layer D — Physical OEM acceptance**
 - At least one device per OEM family before advertising that family as physically validated.
