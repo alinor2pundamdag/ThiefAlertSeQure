@@ -43,6 +43,9 @@ internal object A2DisconnectScheduler {
             val operation = pendingIntent(context, pending.address)
             val deadline = pending.deadlineElapsedRealtimeMs.coerceAtLeast(android.os.SystemClock.elapsedRealtime())
             val exactAllowed = Build.VERSION.SDK_INT < 31 || manager.canScheduleExactAlarms()
+            if (!exactAllowed) {
+                LocalTamperHistory.record(context, "a2_exact_alarm_access_missing", "Using the inexact idle-aware A2 deadline fallback; Android may delay delivery")
+            }
             if (exactAllowed) {
                 try {
                     manager.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, operation)
@@ -55,6 +58,7 @@ internal object A2DisconnectScheduler {
             true
         }.getOrElse {
             LocalTamperHistory.record(context, "a2_deadline_schedule_failed", it.javaClass.simpleName + ": " + it.message)
+            runCatching { cancel(context, pending.address, pending.eventElapsedRealtimeMs) }
             false
         }
     }

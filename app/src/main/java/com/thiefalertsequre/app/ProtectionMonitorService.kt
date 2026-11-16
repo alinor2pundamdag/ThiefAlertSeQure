@@ -56,6 +56,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             val eventEpochMs = System.currentTimeMillis()
             if (!SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false)) return
             if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                A2BluetoothReceiverController.sync(context)
                 LocalTamperHistory.record(context, "bluetooth_permission_missing", "Trusted Bluetooth disconnect monitoring paused; grant Bluetooth Connect permission")
                 return
             }
@@ -171,6 +172,8 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             }
             if (disabledState.mode != ProtectionMode.ALARM_TRIGGERED) AlarmScheduler.cancel(this)
             A2DisconnectScheduler.clearAll(this)
+            runCatching { TrustedBluetoothRegistry.clearBaselines(prefs) }
+            A2BluetoothReceiverController.sync(this)
             PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Protection monitor disabled by owner")
             stopSelf()
             return START_NOT_STICKY
@@ -250,10 +253,15 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     }
 
     private fun registerBluetoothSeparationReceiver() {
-        if (bluetoothReceiverRegistered || !SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false)) return
+        if (bluetoothReceiverRegistered) return
+        if (!SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false)) {
+            A2BluetoothReceiverController.sync(this)
+            return
+        }
         if (Build.VERSION.SDK_INT >= 31 &&
             checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED
         ) {
+            A2BluetoothReceiverController.sync(this)
             LocalTamperHistory.record(this, "bluetooth_permission_missing", "Trusted Bluetooth separation alert cannot monitor without Bluetooth Connect permission")
             return
         }
@@ -263,13 +271,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
         ContextCompat.registerReceiver(this, bluetoothSeparationReceiver, filter, ContextCompat.RECEIVER_EXPORTED)
         bluetoothReceiverRegistered = true
-        // A service restart cannot prove the trusted accessory is currently connected.
-        // Require a fresh ACL_CONNECTED event before treating a later disconnect as theft.
-        // A service restart cannot prove accessory connectivity. Cancel pending
-        // A2 deadlines and require fresh ACL_CONNECTED baselines to avoid false alarms.
-        A2DisconnectScheduler.clearAll(this)
-        TrustedBluetoothRegistry.clearBaselines(prefs)
-        LocalTamperHistory.record(this, "trusted_bluetooth_receiver_registered", "Trusted Bluetooth separation monitoring active; reconnect registered accessories to establish fresh baselines")
+        isBluetoothReceiverRegistered = true
+        A2BluetoothReceiverController.sync(this)
+        LocalTamperHistory.record(this, "trusted_bluetooth_receiver_registered", "Trusted Bluetooth separation monitoring active; manifest receiver covers process-death ACL events")
     }
 
     private fun reconcileStablePowerState() {
@@ -615,6 +619,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         powerReceiverRegistered = false
         pendingBluetoothRunnables.values.forEach(handler::removeCallbacks)
         pendingBluetoothRunnables.clear()
+        isBluetoothReceiverRegistered = false
         if (bluetoothReceiverRegistered) runCatching { unregisterReceiver(bluetoothSeparationReceiver) }
         bluetoothReceiverRegistered = false
         releaseAlertPlayer()
@@ -629,6 +634,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     companion object {
         @Volatile var isRunning: Boolean = false
             private set
+        @Volatile var isBluetoothReceiverRegistered: Boolean = false
         const val PREFS = "protection_monitor_v1"
         const val KEY_ENABLED = "monitor_enabled"
         const val KEY_RUNNING = "monitor_running"

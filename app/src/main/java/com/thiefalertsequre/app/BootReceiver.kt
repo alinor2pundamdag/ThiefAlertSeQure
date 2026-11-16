@@ -12,7 +12,13 @@ class BootReceiver : BroadcastReceiver() {
         // BOOT_COMPLETED is authoritative even on devices where Settings.Global.BOOT_COUNT
         // is unreadable. Invalidate the previous boot's charger baseline before processing
         // any later power event; package-update and exact-alarm callbacks preserve it.
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) A2DisconnectScheduler.clearAll(context)
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+            A2DisconnectScheduler.clearAll(context)
+            val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+            runCatching { TrustedBluetoothRegistry.clearBaselines(monitorPrefs) }
+                .onFailure { LocalTamperHistory.record(context, "a2_boot_baseline_reset_failed", it.javaClass.simpleName + ": " + it.message) }
+            A2BluetoothReceiverController.sync(context)
+        }
         PowerTransitionCoordinator.initializeBaseline(
             context,
             forceBootReconciliation = intent.action == Intent.ACTION_BOOT_COMPLETED
@@ -93,6 +99,10 @@ class BootReceiver : BroadcastReceiver() {
 
     private fun enforceMonitorOptOut(context: Context): ProtectionState {
         if (monitorEnabled(context)) return ProtectionStore(context).read()
+        A2DisconnectScheduler.clearAll(context)
+        val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        runCatching { TrustedBluetoothRegistry.clearBaselines(monitorPrefs) }
+        A2BluetoothReceiverController.sync(context)
         // Preserve the previous opt-out contract even when Android's sticky
         // battery snapshot is temporarily unavailable.
         ProtectionStore(context).update { current ->

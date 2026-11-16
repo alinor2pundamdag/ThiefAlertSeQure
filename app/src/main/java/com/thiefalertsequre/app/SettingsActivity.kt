@@ -281,6 +281,9 @@ class SettingsActivity : FragmentActivity() {
                     else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
                 }
                 if (disabledState.mode != ProtectionMode.ALARM_TRIGGERED) AlarmScheduler.cancel(this)
+                A2DisconnectScheduler.clearAll(this)
+                runCatching { TrustedBluetoothRegistry.clearBaselines(monitorPrefs) }
+                A2BluetoothReceiverController.sync(this)
                 stopService(Intent(this, ProtectionMonitorService::class.java))
             } else {
                 android.widget.Toast.makeText(this, "Monitoring will resume after owner authentication.", android.widget.Toast.LENGTH_LONG).show()

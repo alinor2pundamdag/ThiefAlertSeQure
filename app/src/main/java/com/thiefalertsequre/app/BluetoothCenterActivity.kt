@@ -144,7 +144,7 @@ class BluetoothCenterActivity : FragmentActivity() {
             "Monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled by owner"}",
             "Monitor runtime: ${if (monitorRunning) "Running" else "Not confirmed running"}",
             "Protection state: $protectionMode",
-            "Monitoring runs only while A2 is ON and the protection monitor service is running. Each registered accessory needs a fresh connection baseline; disconnect starts an 8-second grace period, and reconnecting that accessory cancels its pending alert.",
+            "Monitoring runs only while A2 and the protection monitor are enabled. The foreground service handles live ACL events; a manifest receiver covers ACL connect/disconnect events while its process is absent. Each registered accessory needs a fresh connection baseline; disconnect starts an 8-second grace period, and reconnect cancels its pending alert. Exact-alarm access improves the process-death deadline; without it Android uses an inexact fallback that may be delayed in Doze.",
             "Unregistering removes only this app's trust. Android pairing remains unchanged."
         ))
         root.addView(button("Add trusted paired device") { requestTrustedDevicePicker() }, matchWrap())
@@ -168,6 +168,8 @@ class BluetoothCenterActivity : FragmentActivity() {
                     TrustedBluetoothRegistry.remove(prefs, device.address)
                 }.getOrDefault(false)
                 if (removed) {
+                    A2DisconnectScheduler.cancel(this, device.address)
+                    A2BluetoothReceiverController.sync(this)
                     showResult("Accessory unregistered", "${device.name} is no longer trusted by A2. Android pairing was not changed.")
                 } else {
                     showResult("Unregister failed", "The trust record was not confirmed as removed. The existing record has been left unchanged where possible.")
@@ -234,11 +236,13 @@ class BluetoothCenterActivity : FragmentActivity() {
                 showResult("Could not disable A2", "Android did not confirm the preference change. The previous setting is retained.")
                 return
             }
+            A2DisconnectScheduler.clearAll(this)
             val baselinesCleared = runCatching {
                 TrustedBluetoothRegistry.clearBaselines(prefs)
                 true
             }.getOrDefault(false)
-            if (!baselinesCleared) {
+            A2BluetoothReceiverController.sync(this)
+            if (!baselinesCleared)
                 showResult("A2 disabled; cleanup needs attention", "The OFF setting was saved, but the connection baseline could not be cleared. The stored data was retained.")
             } else {
                 showResult("A2 disabled", "Trusted-device separation alerts are now off.")
@@ -293,6 +297,13 @@ class BluetoothCenterActivity : FragmentActivity() {
             render()
             return
         }
+        if (!A2BluetoothReceiverController.sync(this)) {
+            val rolledBack = prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).commit()
+            A2BluetoothReceiverController.sync(this)
+            showResult("Could not enable A2", if (rolledBack) "The background Bluetooth receiver could not be enabled; A2 was rolled back to OFF." else "The Bluetooth receiver could not be enabled and the OFF rollback was not confirmed.")
+            render()
+            return
+        }
         val started = runCatching {
             ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
             true
@@ -305,6 +316,7 @@ class BluetoothCenterActivity : FragmentActivity() {
                 "${it.javaClass.simpleName}: ${it.message ?: "Android blocked the foreground service."}" +
                     if (rolledBack) "\nA2 was rolled back to OFF." else "\nWARNING: the OFF rollback could not be saved."
             )
+            A2BluetoothReceiverController.sync(this)
             false
         }
         if (started) {
