@@ -62,10 +62,10 @@ object AlarmScheduler {
                 try {
                     alarmManager.setExactAndAllowWhileIdle(clockType, triggerAt, pendingIntent(context, token, namespace))
                 } catch (_: SecurityException) {
-                    alarmManager.setAndAllowWhileIdle(clockType, triggerAt, pendingIntent(context, token))
+                    alarmManager.setAndAllowWhileIdle(clockType, triggerAt, pendingIntent(context, token, namespace))
                 }
             } else {
-                alarmManager.setAndAllowWhileIdle(clockType, triggerAt, pendingIntent(context, token))
+                alarmManager.setAndAllowWhileIdle(clockType, triggerAt, pendingIntent(context, token, namespace))
             }
         }
         if (!scheduled) {
