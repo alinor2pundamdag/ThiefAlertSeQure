@@ -10,6 +10,8 @@
 
 ## FIXALL work completed so far
 
+The authoritative phase sequencing and acceptance ledger is [docs/PHASE_0_12_EXECUTION_CHECKLIST.md](docs/PHASE_0_12_EXECUTION_CHECKLIST.md). Read it first whenever resuming interrupted work.
+
 The bullets below include earlier work on predecessor branches; they are project history, not a claim that all Phases 0–12 are complete on the current branch.
 - Created a dedicated safety/work branch from the reviewed development candidate.
 - Restored the approved minSdk 26 invariant in the build candidate and aligned compatibility documentation.
@@ -42,10 +44,10 @@ The bullets below include earlier work on predecessor branches; they are project
 - Verification: final build/lint/unit/instrumentation matrix must pass on the final branch head. Physical-device testing is explicitly separate and is not a blocker for finishing Phase Two software work.
 - Phase Two is not complete until final CI, documentation consistency, and branch review are verified. Do not claim production release readiness from emulator CI alone.
 
-## Current verification status (2026-11-16)
-- Current coding branch: `work/phase-0-12-coding`.
-- Current exact head: `2bfd0a489599e06268be7f16eb5f8f44c9005977`.
-- GitHub Actions run [#1386](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43854356458): build job PASS, including unit tests, static contracts, lint, APK assembly, and APK identity/signature checks; instrumentation job intentionally SKIPPED.
+## Last verified coding-head status (2026-11-16)
+- Current coding branch at the time of verification: `work/phase-0-12-coding`.
+- Last verified head: `fd0c88a4e198ea880b29306d8315c72943437b8e`.
+- GitHub Actions run [#1388](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43857823229): build job PASS, including unit tests, instrumentation-source compilation (without execution), navigation/preferences/manifest/state checks, lint, APK assembly, and APK identity/signature checks; instrumentation job intentionally SKIPPED.
 - The earlier run #1270 instrumentation results below are historical evidence for its older commit only, not current-head verification.
 - Coding phases 0–12 are not yet certified complete. Instrumentation execution remains deferred until all coding work and code-level verification are complete.
 
