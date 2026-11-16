@@ -45,7 +45,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         root.addView(space(18))
         root.addView(label("DEVICE CAPABILITY CENTER", 11f, R.color.tas_primary, true), matchWrap())
         root.addView(space(6))
-        root.addView(label("Device Intelligence", 29f, R.color.tas_text, true), matchWrap())
+        root.addView(label("Device Intelligence", 29f, R.color.tas_text, true).markAsPageHeading(), matchWrap())
         root.addView(space(8))
         root.addView(label("A local profile of this phone's hardware, Android platform, resources, sensors, and protection-related system readiness. Refresh anytime; nothing is uploaded.", 14f, R.color.tas_muted, false), matchWrap())
         root.addView(space(16))

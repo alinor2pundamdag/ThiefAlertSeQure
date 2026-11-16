@@ -60,7 +60,7 @@ class SettingsActivity : FragmentActivity() {
         scroll.addView(root)
         root.addView(text("CONTROL CENTER", 11f, R.color.tas_primary, true))
         root.addView(space(8))
-        root.addView(text("Settings", 32f, R.color.tas_text, true))
+        root.addView(text("Settings", 32f, R.color.tas_text, true).markAsPageHeading())
         root.addView(space(8))
         root.addView(text("Manage Android permissions and reliability settings. Android remains in control of system-level access.", 14f, R.color.tas_muted))
         root.addView(space(10))

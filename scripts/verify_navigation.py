@@ -85,6 +85,18 @@ for screen in (
     if "override fun onResume" not in source or "ThemeRuntime.apply" not in source:
         errors.append(screen + " must reapply the persisted/preview theme when returning to the screen")
 
+# Every user-facing page exposes its primary title as an accessibility heading.
+for screen in (
+    "MainActivity.kt", "SettingsActivity.kt", "BluetoothCenterActivity.kt",
+    "DeviceIntelligenceActivity.kt", "ThemeActivity.kt", "SetupStatusActivity.kt"
+):
+    source = (APP / screen).read_text(encoding="utf-8")
+    if ".markAsPageHeading()" not in source:
+        errors.append(screen + " must mark its primary page title for accessibility navigation")
+accessibility_helper = APP / "PageAccessibility.kt"
+if not accessibility_helper.is_file() or "ViewCompat.setAccessibilityHeading" not in accessibility_helper.read_text(encoding="utf-8"):
+    errors.append("PageAccessibility.kt must use AndroidX ViewCompat accessibility heading semantics")
+
 settings_activity = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
 if "startActivity(installIntent)" in settings_activity:
     errors.append("Package installer launch must use guarded Android Settings/activity fallback")

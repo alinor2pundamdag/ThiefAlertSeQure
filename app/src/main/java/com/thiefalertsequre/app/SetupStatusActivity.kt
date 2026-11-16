@@ -54,7 +54,7 @@ class SetupStatusActivity : FragmentActivity() {
             text = "Protection readiness"
             textSize = 27f
             setTextColor(palette.text)
-        })
+        }.markAsPageHeading())
         root.addView(TextView(this).apply {
             text = "Fresh Android checks. Stored preferences alone never prove that a service is running."
             textSize = 13f

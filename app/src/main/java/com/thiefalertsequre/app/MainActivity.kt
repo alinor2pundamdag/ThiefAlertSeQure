@@ -93,7 +93,7 @@ class MainActivity : FragmentActivity() {
         }
         root.addView(icon, LinearLayout.LayoutParams(dp(84), dp(84)))
         root.addView(space(22))
-        root.addView(label("YOUR DEVICE.\nYOUR CONTROL.", 30f, getColor(R.color.tas_text), true), matchWrap())
+        root.addView(label("YOUR DEVICE.\nYOUR CONTROL.", 30f, getColor(R.color.tas_text), true).markAsPageHeading(), matchWrap())
         root.addView(space(10))
         root.addView(label("PRIVACY NOTICE & LOCAL PROTECTION", 11f, getColor(R.color.tas_primary), true), matchWrap())
         root.addView(space(18))
@@ -172,7 +172,7 @@ class MainActivity : FragmentActivity() {
         root.addView(brandRow, matchWrap())
         root.addView(space(8))
 
-        root.addView(label("Protection that stays\non this device.", 30f, getColor(R.color.tas_text), true), matchWrap())
+        root.addView(label("Protection that stays\non this device.", 30f, getColor(R.color.tas_text), true).markAsPageHeading(), matchWrap())
         root.addView(space(8))
         root.addView(label("LOCAL SECURITY  •  NO ACCOUNT  •  NO BACKEND", 10f, getColor(R.color.tas_muted), true), matchWrap())
         root.addView(space(24))

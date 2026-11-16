@@ -92,7 +92,7 @@ class ThemeActivity : FragmentActivity() {
             setOnClickListener { finish() }
         }, params())
         root.addView(text("APPEARANCE", 11f, p.primary, true), params(14))
-        root.addView(text("Choose your theme", 28f, p.text, true), params(5))
+        root.addView(text("Choose your theme", 28f, p.text, true).markAsPageHeading(), params(5))
         root.addView(text(
             "Preview the dashboard, settings, setup status and dialogs. Apply saves locally; Cancel keeps your current theme.",
             13f, p.muted

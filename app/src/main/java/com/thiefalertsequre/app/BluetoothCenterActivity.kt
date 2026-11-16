@@ -50,7 +50,7 @@ class BluetoothCenterActivity : FragmentActivity() {
         root.addView(space(18))
         root.addView(label("DEVICE CAPABILITY CENTER", 11f, R.color.tas_primary, true), matchWrap())
         root.addView(space(6))
-        root.addView(label("Bluetooth", 30f, R.color.tas_text, true), matchWrap())
+        root.addView(label("Bluetooth", 30f, R.color.tas_text, true).markAsPageHeading(), matchWrap())
         root.addView(space(8))
         root.addView(label("Local controller inspection, Android API availability, peer requirements, and app implementation status. Opening this page does not scan, pair, stream, or modify anything.", 14f, R.color.tas_muted, false), matchWrap())
         root.addView(space(16))
