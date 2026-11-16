@@ -63,7 +63,7 @@ internal object A2DisconnectScheduler {
             LocalTamperHistory.record(context, "a2_deadline_store_unreadable", "Existing encrypted A2 deadlines are unreadable; source retained")
             return false
         }
-        val updated = records.filterNot { it.address.equals(pending.address, true) } + pending
+        val updated = mergePending(records, pending)
         if (!write(prefs, updated)) {
             LocalTamperHistory.record(context, "a2_deadline_persist_failed", "Encrypted A2 disconnect deadline could not be committed")
             return false
@@ -171,6 +171,10 @@ internal object A2DisconnectScheduler {
         }
         return cleared
     }
+
+    /** Replace only this accessory's timer while preserving every other device's record. */
+    internal fun mergePending(records: List<Pending>, pending: Pending): List<Pending> =
+        records.filterNot { it.address.equals(pending.address, ignoreCase = true) } + pending
 
     private fun read(prefs: android.content.SharedPreferences): List<Pending>? {
         val raw = when (val value = SafePreferences.readString(prefs, KEY_PENDING, null)) {
