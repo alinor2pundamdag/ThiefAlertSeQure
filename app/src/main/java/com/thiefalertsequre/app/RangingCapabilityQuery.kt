@@ -1,8 +1,6 @@
 package com.thiefalertsequre.app
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.ranging.RangingCapabilities
 import android.ranging.RangingManager
 import androidx.annotation.RequiresApi
@@ -14,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 @RequiresApi(36)
 internal class RangingCapabilityQuery(
-    private val context: Context,
+    context: Context,
     private val onResult: (String) -> Unit
 ) {
     private val manager = context.getSystemService(RangingManager::class.java)
@@ -23,10 +21,6 @@ internal class RangingCapabilityQuery(
     private val resultDelivered = AtomicBoolean(false)
 
     fun start(): Boolean {
-        if (context.checkSelfPermission(Manifest.permission.RANGING) != PackageManager.PERMISSION_GRANTED) {
-            onResult("Ranging permission is not granted. No capability query was performed.")
-            return false
-        }
         val rangingManager = manager
         if (rangingManager == null) {
             onResult("Android exposes no RangingManager service on this device.")

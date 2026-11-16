@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static privacy boundary for the optional Android 16+ ranging capability query."""
+"""Static privacy boundary for the optional Android 16+ local ranging capability query."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,23 +11,23 @@ kotlin_sources = list((ROOT / "app/src/main").rglob("*.kt"))
 all_kotlin = "\n".join(path.read_text(encoding="utf-8") for path in kotlin_sources)
 
 required = {
-    "manifest declares the optional RANGING permission": 'android.permission.RANGING' in manifest,
-    "RANGING is requested through an explicit permission launcher": "ActivityResultContracts.RequestPermission()" in activity and "rangingPermissionLauncher.launch(Manifest.permission.RANGING)" in activity,
-    "permission request is behind the owner confirmation dialog": '.setPositiveButton("Continue")' in activity,
-    "capability query uses the availability callback": "registerCapabilitiesCallback" in query and "unregisterCapabilitiesCallback" in query,
-    "privacy policy discloses the optional RANGING permission": "Android RANGING permission" in privacy,
+    "owner explicitly starts the capability check from Device Intelligence": 'button("Check Android ranging capabilities (optional)") { requestRangingCapabilityCheck() }' in activity,
+    "capability query registers and unregisters only the availability callback": "registerCapabilitiesCallback" in query and "unregisterCapabilitiesCallback" in query,
+    "privacy policy states no RANGING permission is requested for local capability inspection": "No Android RANGING permission is requested" in privacy,
 }
 for description, passed in required.items():
     if not passed:
         raise SystemExit(f"Ranging privacy contract failed: {description}")
 
+if "android.permission.RANGING" in manifest or "Manifest.permission.RANGING" in all_kotlin:
+    raise SystemExit("Local capability inspection must not declare or request the dangerous RANGING permission.")
 for forbidden in ("android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_BACKGROUND_LOCATION"):
     if forbidden in manifest:
-        raise SystemExit(f"Ranging capability check must not add location permission: {forbidden}")
+        raise SystemExit(f"Ranging capability inspection must not add location permission: {forbidden}")
 for forbidden in ("Manifest.permission.ACCESS_FINE_LOCATION", "Manifest.permission.ACCESS_COARSE_LOCATION", "Manifest.permission.ACCESS_BACKGROUND_LOCATION"):
     if forbidden in all_kotlin:
-        raise SystemExit(f"Ranging capability check must not request location permission: {forbidden}")
+        raise SystemExit(f"Ranging capability inspection must not request location permission: {forbidden}")
 if "createRangingSession(" in all_kotlin:
     raise SystemExit("Ranging capability inspection must not start a peer ranging session.")
 
-print("Verified: RANGING is opt-in after owner disclosure; only local capability availability is queried; no location permission or ranging session is used.")
+print("Verified: owner-initiated local availability callback only; no RANGING permission, no location permission, and no ranging session.")
