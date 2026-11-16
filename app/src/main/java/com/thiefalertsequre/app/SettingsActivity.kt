@@ -529,6 +529,7 @@ class SettingsActivity : FragmentActivity() {
             }
             val saved = validation.isSuccess && AlarmSoundStore.save(this, slot, uri, permissionUri)
             runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
                 val message = when {
                     saved -> "Audio validated and saved: " + AlarmSoundStore.displayName(this, slot)
                     validation.isFailure -> "Audio could not be decoded: " + (validation.exceptionOrNull()?.message ?: "unsupported file")
@@ -562,6 +563,7 @@ class SettingsActivity : FragmentActivity() {
             }
             DocumentFile.fromTreeUri(this, treeUri)?.let { walk(it, 0) }
             runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
                 if (matches.isEmpty()) {
                     android.widget.Toast.makeText(this, "No supported audio files found in the selected folder.", android.widget.Toast.LENGTH_LONG).show()
                     return@runOnUiThread
@@ -620,6 +622,10 @@ class SettingsActivity : FragmentActivity() {
                 }
             }.getOrNull()
             runOnUiThread {
+                if (isFinishing || isDestroyed) {
+                    runCatching { candidate?.release() }
+                    return@runOnUiThread
+                }
                 if (candidate == null) {
                     android.widget.Toast.makeText(this, "Preview failed. The file may have moved or become inaccessible.", android.widget.Toast.LENGTH_LONG).show()
                 } else {
