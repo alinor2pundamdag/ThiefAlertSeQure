@@ -489,16 +489,16 @@ class SettingsActivity : FragmentActivity() {
             // This handoff is restricted to the app-private cache and revalidated immediately
             // above for SHA-256, production package ID, higher versionCode and the pinned signer.
 
-            // codeql[java/android/arbitrary-apk-installation]
             val installIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+                // codeql[java/android/arbitrary-apk-installation]
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 putExtra(Intent.EXTRA_RETURN_RESULT, true)
             }
             // OEM fallback uses the same app-private, checksum/package/version/signer-verified APK.
 
-            // codeql[java/android/arbitrary-apk-installation]
             val installerFallback = Intent(Intent.ACTION_VIEW).apply {
+                // codeql[java/android/arbitrary-apk-installation]
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
