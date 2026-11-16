@@ -120,7 +120,7 @@ A final alarm recovery-path review found that `ProtectionMonitorService.startThe
 No failure details were supplied. These results clear the reported HONOR 200 Pro functional test gate for the listed scenarios. They do not establish Android 17 compatibility, all Android/OEM versions, Play policy approval, Device Owner behavior on every build, or production signing/update migration.
 
 ## Remaining verification
-1. Last recorded successful CI run: **PASS** (run 43004454206 on head `4dc3a7a553e7da43265cbd2feaa4c3e5ae64d294`). Subsequent branch commits require a successful run on the exact current PR head before merge. The live head and run status are maintained in PR #2 and GitHub Actions; this document does not freeze a transient run ID.
+1. Latest code-level CI evidence before the documentation refresh: **PASS** (run [#1395](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43865303650) on head `367e3fd163a7f1cac04d24a08c05e19120d43650`). It passed unit tests, instrumentation-source compilation, static contracts, lint, APK packaging and package/version/signer verification. Instrumentation execution was intentionally skipped. Every later source or documentation commit requires a fresh exact-head run before it can be treated as verified.
 2. Android 8 through Android 17 compatibility paths: still pending where devices are unavailable; Android 17 background-audio hardening remains specifically unverified.
 3. Target HONOR 200 Pro: the 11 scenarios above are owner-reported **PASS**; capture exact Android/MagicOS build and date-stamped evidence if available.
 4. Opus decoding/loop and volume restoration: volume restoration is reported **PASS**; separate decoder-failure/vibration fallback test remains pending.
