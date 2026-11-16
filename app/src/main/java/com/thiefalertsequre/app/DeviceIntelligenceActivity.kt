@@ -188,7 +188,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             else -> "Not granted — A2 cannot monitor trusted-device separation until granted"
         }
         val rangingSummary = if (Build.VERSION.SDK_INT >= 36) {
-            "Optional owner-initiated API 36 capability query available; local availability only, with no RANGING permission, peer discovery, or ranging session"
+            "optional owner-initiated API 36 capability query available; local availability only, with no RANGING permission, peer discovery, or ranging session"
         } else {
             "Not available on this Android version"
         }
