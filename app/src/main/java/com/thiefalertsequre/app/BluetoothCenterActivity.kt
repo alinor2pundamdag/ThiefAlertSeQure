@@ -140,6 +140,11 @@ class BluetoothCenterActivity : FragmentActivity() {
         }
         val enabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
         val baselineCount = devices.count { TrustedBluetoothRegistry.isBaselineConnected(prefs, it.address) }
+        val baselineSummary = if (registryReadable) {
+            "Connection baselines confirmed: $baselineCount / ${devices.size}"
+        } else {
+            "Connection baselines: UNKNOWN"
+        }
         val monitorEnabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         val monitorRunning = runCatching {
             getSystemService(ActivityManager::class.java).getRunningServices(100)
@@ -147,7 +152,11 @@ class BluetoothCenterActivity : FragmentActivity() {
         }.getOrDefault(false)
         val protectionMode = ProtectionStore(this).read().mode
         addCard("TRUSTED ACCESSORY SEPARATION ALERT (A2)", listOf(
-            "Feature: ${if (enabled) "ON" else "OFF"}",
+            "Feature: ${when {
+                !registryReadable && enabled -> "UNAVAILABLE — saved trust data unreadable"
+                enabled -> "ON"
+                else -> "OFF"
+            }}",
             "Stored trusted-device data: ${if (registryReadable) "Readable" else "UNREADABLE — original data retained"}",
             "Registered trusted accessories: ${devices.size}",
             baselineSummary,
