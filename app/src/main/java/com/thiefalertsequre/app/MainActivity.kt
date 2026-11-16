@@ -484,8 +484,7 @@ class MainActivity : FragmentActivity() {
         val state = when {
             !monitorEnabled && current.mode != ProtectionMode.ALARM_TRIGGERED ->
                 store.update { old ->
-                    if (old.mode == ProtectionMode.ALARM_TRIGGERED) old
-                    else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+                    ProtectionEngine.disableMonitoring(old, System.currentTimeMillis())
                 }
             monitorEnabled && current.mode != ProtectionMode.ALARM_TRIGGERED &&
                 ExternalPowerState.readConnected(this) == true ->
