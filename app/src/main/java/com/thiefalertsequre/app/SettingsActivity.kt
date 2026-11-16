@@ -647,6 +647,11 @@ class SettingsActivity : FragmentActivity() {
         previewPlayer = null
     }
 
+    override fun onPause() {
+        stopPreview()
+        super.onPause()
+    }
+
     override fun onDestroy() {
         stopPreview()
         ioExecutor.shutdown()
