@@ -10,7 +10,7 @@ This document is the persistent acceptance contract for ThiefAlertSeQure Android
 - Official release signing-certificate SHA-256:
   `9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64`.
 - Debug/instrumentation APKs use a separate `com.thiefalertsequre.app.v114test` application ID. They must never replace the production installation or be published as an update.
-- Current compatibility candidate: minSdk 23, targetSdk 36, compileSdk 36. Lowering minSdk from the v1.1.3 baseline of 26 does not change the production application ID or block an update on devices already running API 26+.
+- Current compatibility candidate: minSdk 26, targetSdk 36, compileSdk 36. API 26 (Android 8.0) remains the approved minimum; do not lower it without explicit owner approval.
 
 Every official update must:
 1. Keep the exact production application ID and compatible signing identity.
