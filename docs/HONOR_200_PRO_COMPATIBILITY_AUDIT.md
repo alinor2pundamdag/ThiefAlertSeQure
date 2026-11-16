@@ -55,3 +55,35 @@ Record the exact HONOR model, Android version, MagicOS version/build number, app
 ## Release decision
 
 Do not mark HONOR 200 Pro compatibility as passed until the physical matrix is completed on the owner's actual firmware. Android instrumentation validates framework contracts, not MagicOS background scheduling, vendor battery manager behavior, charger hardware, Bluetooth radio behavior, or alarm audibility.
+
+## Evidence capture and safe recovery procedure
+
+Before each physical scenario, record:
+- Exact model, Android version/API, MagicOS version/build fingerprint, app package/version, tested commit SHA, date and local time.
+- Monitor enabled/running state, notification permission/channel state, exact-alarm access, battery optimization setting, Bluetooth permission and A2 enabled state.
+- Scenario ID, starting protection state, action timestamps, expected result, observed result, and pass/fail.
+
+For reproducible logs, connect ADB before the test and capture:
+```sh
+adb logcat -c
+adb logcat -v threadtime > thiefalertsequre-device-test-log.txt
+```
+Stop the log capture after the scenario. Also capture non-secret platform snapshots when a failure occurs:
+```sh
+adb shell dumpsys alarm > thiefalertsequre-alarms.txt
+adb shell dumpsys activity services > thiefalertsequre-services.txt
+adb shell dumpsys package com.thiefalertsequre.app > thiefalertsequre-package.txt
+```
+Review and redact personal identifiers or unrelated app data before sharing logs.
+
+After each alarm scenario:
+1. Complete the app-launched Android owner credential or BIOMETRIC_STRONG prompt; never use ordinary phone unlock as an alarm-clear test.
+2. Confirm the persisted protection state is DISARMED or ARMED according to the connected-charger baseline, and confirm the alarm notification/audio/torch stop.
+3. Confirm the original alarm-stream volume is restored; record any restore warning before proceeding.
+4. Confirm only the test deadline is cancelled and the owner's pre-existing monitor preference/service state is restored.
+5. Restore test-only A2 registrations/settings. Removing app trust must not unpair the Android accessory.
+6. Do not clear app data, uninstall the production package, factory-reset the phone, or leave Device Owner Lock Task enabled as a test cleanup shortcut.
+
+If a scenario fails, preserve the app state and logs, record the exact timestamp and commit, and stop repeating destructive steps until the cause is understood. For managed-mode tests, use the app's explicit rollback action and verify that Home, Overview, notifications, system information, global actions and Keyguard are available before ending the test.
+
+This section is a prepared test procedure only. It does not claim that any new physical-device scenario has been executed.
