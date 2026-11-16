@@ -15,8 +15,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.os.StatFs
-import android.ranging.RangingCapabilities
-import android.ranging.RangingManager
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -37,8 +35,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     private lateinit var rootStatusView: TextView
     private val rootCheckExecutor = Executors.newSingleThreadExecutor()
     private var rangingStatus: String? = null
-    private var rangingManager: RangingManager? = null
-    private var rangingCapabilitiesCallback: RangingManager.RangingCapabilitiesCallback? = null
+    private var rangingQuery: RangingCapabilityQuery? = null
     private val rangingPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) queryRangingCapabilities()
         else {
@@ -289,61 +286,22 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             render()
             return
         }
-        val manager = runCatching { getSystemService(RangingManager::class.java) }.getOrNull()
-        if (manager == null) {
-            rangingStatus = "Android exposes no RangingManager service on this device."
-            render()
-            return
-        }
         clearRangingCallback()
-        val callback = object : RangingManager.RangingCapabilitiesCallback {
-            override fun onRangingCapabilities(capabilities: RangingCapabilities) {
-                val availability = capabilities.technologyAvailability
-                val lines = listOf(
-                    RangingManager.BLE_CS to "Bluetooth Channel Sounding",
-                    RangingManager.BLE_RSSI to "Bluetooth RSSI ranging",
-                    RangingManager.UWB to "Ultra-wideband",
-                    RangingManager.WIFI_NAN_RTT to "Wi-Fi NAN RTT"
-                ).map { (technology, name) ->
-                    "$name: ${RangingCapabilityStatus.label(availability[technology])}"
-                }.toMutableList()
-                capabilities.csCapabilities?.let { cs ->
-                    lines += "BLE CS security levels: ${cs.supportedSecurityLevels.sorted().joinToString()}"
-                }
-                lines += "Capability discovery only. No peer discovery, ranging session, distance measurement, or location access was performed."
-                runOnUiThread {
-                    if (!isFinishing && !isDestroyed) {
-                        rangingStatus = lines.joinToString("\n")
-                        if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) render()
-                    }
-                    clearRangingCallback()
-                }
+        val query = RangingCapabilityQuery(this) { result ->
+            rangingStatus = result
+            if (!isFinishing && !isDestroyed && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                render()
             }
         }
-        rangingManager = manager
-        rangingCapabilitiesCallback = callback
+        rangingQuery = query
         rangingStatus = "Querying local ranging capabilities…"
         render()
-        runCatching {
-            manager.registerCapabilitiesCallback(mainExecutor, callback)
-        }.onFailure { error ->
-            clearRangingCallback()
-            rangingStatus = when (error) {
-                is SecurityException -> "Android denied the capability query. Confirm the Ranging permission in app settings."
-                else -> "Capability query failed safely: ${error.javaClass.simpleName}"
-            }
-            render()
-        }
+        query.start()
     }
 
     private fun clearRangingCallback() {
-        val manager = rangingManager
-        val callback = rangingCapabilitiesCallback
-        if (manager != null && callback != null) {
-            runCatching { manager.unregisterCapabilitiesCallback(callback) }
-        }
-        rangingManager = null
-        rangingCapabilitiesCallback = null
+        rangingQuery?.stop()
+        rangingQuery = null
     }
 
     override fun onStop() {
