@@ -130,6 +130,7 @@ if (
     or "putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).commit()" not in settings_activity
     or "batteryAlertEdit.commit()" not in settings_activity
     or ".setAction(ProtectionMonitorService.ACTION_STOP)" not in settings_activity
+    or "putExtra(ProtectionMonitorService.EXTRA_STOP_PREFERENCE_COMMITTED, true)" not in settings_activity
     or "stopService(Intent(this, ProtectionMonitorService::class.java))" in settings_activity
 ):
     errors.append("Critical monitor settings must be durably committed and shutdown must use the service-owned retry path")
