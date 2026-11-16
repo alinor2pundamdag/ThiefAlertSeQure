@@ -46,10 +46,17 @@ object SetupStatusSnapshot {
   val enabled=SafePreferences.boolean(prefs,ProtectionMonitorService.KEY_ENABLED,ProtectionMonitorPolicy.DEFAULT_ENABLED)
   val running=runCatching{c.getSystemService(ActivityManager::class.java).getRunningServices(100).any{it.service.className==ProtectionMonitorService::class.java.name}}.getOrDefault(false)
   x+=when{!enabled->SetupItem("monitor","Protection monitor",SetupState.NEUTRAL,"Monitor is disabled by owner.");running->SetupItem("monitor","Protection monitor",SetupState.VERIFIED,"Android process list confirms the service is running.");else->SetupItem("monitor","Protection monitor",SetupState.UNKNOWN,"Enabled preference exists, but running service is not confirmed.")}
-  val a2=a2Enabled
-  val trustedDevices=TrustedBluetoothRegistry.read(prefs)
-  val baselineCount=trustedDevices.count{TrustedBluetoothRegistry.isBaselineConnected(prefs,it.address)}
-  x+=A2SetupStatusPolicy.evaluate(a2,trustedDevices.size,perm,adapter,enabled,running,baselineCount)
+  when (val registry=TrustedBluetoothRegistry.readResult(prefs)) {
+   is PreferenceRead.Value -> {
+    val trustedDevices=registry.value
+    val baselineCount=trustedDevices.count{TrustedBluetoothRegistry.isBaselineConnected(prefs,it.address)}
+    x+=A2SetupStatusPolicy.evaluate(a2Enabled,trustedDevices.size,perm,adapter,enabled,running,baselineCount)
+   }
+   is PreferenceRead.Corrupt -> x+=SetupItem(
+    "a2_registry","Trusted Bluetooth registry",SetupState.UNKNOWN,
+    "Encrypted trusted-device data could not be read. The original source is preserved; do not clear app data. A2 cannot be enabled safely until recovery."
+   )
+  }
   return SetupSnapshot(x)
  }
  fun action(c:Context,id:String):Intent?=when(id){

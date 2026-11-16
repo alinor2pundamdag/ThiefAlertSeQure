@@ -20,10 +20,13 @@ object TrustedBluetoothRegistry {
     private const val TAG = "TrustedBluetoothRegistry"
 
     fun read(prefs: SharedPreferences): List<TrustedBluetoothDevice> =
-        when (val result = readStrict(prefs)) {
+        when (val result = readResult(prefs)) {
             is PreferenceRead.Value -> result.value
             is PreferenceRead.Corrupt -> emptyList()
         }
+
+    internal fun readResult(prefs: SharedPreferences): PreferenceRead<List<TrustedBluetoothDevice>> =
+        readStrict(prefs)
 
     private fun readStrict(prefs: SharedPreferences): PreferenceRead<List<TrustedBluetoothDevice>> {
         val raw = when (val stored = SafePreferences.readString(prefs, KEY_DEVICES, null)) {

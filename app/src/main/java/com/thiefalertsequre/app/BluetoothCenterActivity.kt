@@ -132,7 +132,9 @@ class BluetoothCenterActivity : FragmentActivity() {
 
     private fun addTrustedDeviceSection() {
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        val devices = TrustedBluetoothRegistry.read(prefs)
+        val registryRead = TrustedBluetoothRegistry.readResult(prefs)
+        val registryReadable = registryRead is PreferenceRead.Value
+        val devices = (registryRead as? PreferenceRead.Value)?.value.orEmpty()
         val enabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
         val baselineCount = devices.count { TrustedBluetoothRegistry.isBaselineConnected(prefs, it.address) }
         val monitorEnabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
@@ -143,21 +145,27 @@ class BluetoothCenterActivity : FragmentActivity() {
         val protectionMode = ProtectionStore(this).read().mode
         addCard("TRUSTED ACCESSORY SEPARATION ALERT (A2)", listOf(
             "Feature: ${if (enabled) "ON" else "OFF"}",
+            "Stored trusted-device data: ${if (registryReadable) "Readable" else "UNREADABLE — original data retained"}",
             "Registered trusted accessories: ${devices.size}",
             "Connection baselines confirmed: $baselineCount / ${devices.size}",
             "Monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled by owner"}",
             "Monitor runtime: ${if (monitorRunning) "Running" else "Not confirmed running"}",
             "Protection state: $protectionMode",
             "Monitoring runs only while A2 is ON and the protection monitor setting is enabled. The foreground service handles live ACL events; a manifest receiver covers ACL connect/disconnect events while its process is absent. Each registered accessory needs a fresh connection baseline; disconnect starts an 8-second grace period, and reconnect cancels its pending alert. Exact-alarm access improves the process-death deadline; without it Android uses an inexact fallback that may be delayed in Doze.",
-            "Unregistering removes only this app's trust. Android pairing remains unchanged."
-        ))
-        root.addView(button("Add trusted paired device") { requestTrustedDevicePicker() }, matchWrap())
+            "Unregistering removes only this app's trust. Android pairing remains unchanged.",
+            if (registryReadable) "" else "The encrypted trusted-device registry could not be read. Do not clear app data or re-register devices; resolve the storage/key issue first. A2 cannot be enabled safely."
+        ).filter { it.isNotBlank() })
+        root.addView(button("Add trusted paired device") { requestTrustedDevicePicker() }.apply {
+            isEnabled = registryReadable
+        }, matchWrap())
         devices.forEach { device ->
             root.addView(space(6))
             root.addView(button("Unregister: ${device.name}") { confirmUnregister(device) }, matchWrap())
         }
         root.addView(space(7))
-        root.addView(button(if (enabled) "Disable trusted-device separation alert" else "Enable trusted-device separation alert") { toggleA2() }, matchWrap())
+        root.addView(button(if (enabled) "Disable trusted-device separation alert" else "Enable trusted-device separation alert") { toggleA2() }.apply {
+            isEnabled = registryReadable || enabled
+        }, matchWrap())
         root.addView(space(14))
     }
 
@@ -264,9 +272,15 @@ class BluetoothCenterActivity : FragmentActivity() {
             render()
             return
         }
-        if (TrustedBluetoothRegistry.read(prefs).isEmpty()) {
-            requestTrustedDevicePicker()
-            return
+        when (val registry = TrustedBluetoothRegistry.readResult(prefs)) {
+            is PreferenceRead.Corrupt -> {
+                showResult("Trusted-device data unavailable", "The encrypted registry could not be read. Its source was preserved. Do not clear app data; A2 remains OFF until the stored data can be recovered.")
+                return
+            }
+            is PreferenceRead.Value -> if (registry.value.isEmpty()) {
+                requestTrustedDevicePicker()
+                return
+            }
         }
         if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
             enableAfterPermission = true
@@ -279,9 +293,15 @@ class BluetoothCenterActivity : FragmentActivity() {
     private fun enableA2() {
         enableAfterPermission = false
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        if (TrustedBluetoothRegistry.read(prefs).isEmpty()) {
-            showTrustedDevicePicker()
-            return
+        when (val registry = TrustedBluetoothRegistry.readResult(prefs)) {
+            is PreferenceRead.Corrupt -> {
+                showResult("Trusted-device data unavailable", "The encrypted registry could not be read. Its source was preserved. Do not clear app data; A2 remains OFF until the stored data can be recovered.")
+                return
+            }
+            is PreferenceRead.Value -> if (registry.value.isEmpty()) {
+                showTrustedDevicePicker()
+                return
+            }
         }
         if (!SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
             showResult("Protection monitor is disabled", "Enable the protection monitor from the main dashboard first. This Bluetooth alert uses the existing user-visible monitor and will not silently turn it back on.")
