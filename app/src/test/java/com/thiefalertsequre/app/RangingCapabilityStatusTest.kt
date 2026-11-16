@@ -22,5 +22,7 @@ class RangingCapabilityStatusTest {
         assertEquals("Bluetooth RSSI ranging", RangingCapabilityStatus.technologyLabel(RangingManager.BLE_RSSI))
         assertEquals("Ultra-wideband", RangingCapabilityStatus.technologyLabel(RangingManager.UWB))
         assertEquals("Wi-Fi NAN RTT", RangingCapabilityStatus.technologyLabel(RangingManager.WIFI_NAN_RTT))
+        assertEquals("Wi-Fi STA RTT (Android 16 QPR+)", RangingCapabilityStatus.technologyLabel(4))
+        assertEquals("Wi-Fi Proximity Detection (Android 17+)", RangingCapabilityStatus.technologyLabel(5))
     }
 }

@@ -20,6 +20,8 @@ internal object RangingCapabilityStatus {
         RangingManager.BLE_RSSI -> "Bluetooth RSSI ranging"
         RangingManager.UWB -> "Ultra-wideband"
         RangingManager.WIFI_NAN_RTT -> "Wi-Fi NAN RTT"
+        4 -> "Wi-Fi STA RTT (Android 16 QPR+)"
+        5 -> "Wi-Fi Proximity Detection (Android 17+)"
         else -> "Unknown ranging technology ($technology)"
     }
 }
