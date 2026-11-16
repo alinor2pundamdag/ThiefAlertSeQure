@@ -6,7 +6,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.After
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -14,6 +16,17 @@ import org.junit.runner.RunWith
 class AlarmSoundStoreCorruptionTest {
     private val context by lazy { InstrumentationRegistry.getInstrumentation().targetContext }
     private val prefs by lazy { context.getSharedPreferences("user_alarm_sounds_v1", Context.MODE_PRIVATE) }
+    private lateinit var originalPreferences: SharedPreferencesSnapshot
+
+    @Before
+    fun preserveSelectedAlarmSounds() {
+        originalPreferences = SharedPreferencesSnapshot(context, "user_alarm_sounds_v1")
+    }
+
+    @After
+    fun restoreSelectedAlarmSounds() {
+        originalPreferences.restore()
+    }
 
     @Test fun malformedSoundUriTypeDoesNotCrashAndDoesNotEraseSource() {
         prefs.edit().clear().putInt("uri_alarm", 42).commit()
