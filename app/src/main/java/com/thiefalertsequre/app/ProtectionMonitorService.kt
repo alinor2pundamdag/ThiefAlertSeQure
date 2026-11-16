@@ -104,10 +104,13 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                                 val now = System.currentTimeMillis()
                                 var transitioned = false
                                 val update = ProtectionStore(this@ProtectionMonitorService).updatePersisted { current ->
-                                    if (current.mode != ProtectionMode.ARMED) current else {
+                                    val next = ProtectionEngine.triggerFromArmed(
+                                        current, now, ProtectionClock.bootCount(this@ProtectionMonitorService)
+                                    )
+                                    if (current.mode == ProtectionMode.ARMED && next.mode == ProtectionMode.ALARM_TRIGGERED) {
                                         transitioned = true
-                                        ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, now, 0L, ProtectionClock.bootCount(this@ProtectionMonitorService))
                                     }
+                                    next
                                 }
                                 val next = update.state
                                 if (transitioned && update.persisted && next.mode == ProtectionMode.ALARM_TRIGGERED) {
@@ -182,8 +185,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                 ProtectionStoreUpdateResult(current, true)
             } else {
                 store.updatePersisted {
-                    if (it.mode == ProtectionMode.ALARM_TRIGGERED) it
-                    else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+                    ProtectionEngine.disableMonitoring(it, System.currentTimeMillis())
                 }
             }
             if (!update.persisted) {
@@ -517,10 +519,13 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         val now = System.currentTimeMillis()
         var transitionedByThisCall = false
         val next = ProtectionStore(this).update { old ->
-            if (old.mode == ProtectionMode.ARMED) {
+            val next = ProtectionEngine.triggerFromArmed(
+                old, now, ProtectionClock.bootCount(this)
+            )
+            if (old.mode == ProtectionMode.ARMED && next.mode == ProtectionMode.ALARM_TRIGGERED) {
                 transitionedByThisCall = true
-                ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, now, 0L, ProtectionClock.bootCount(this))
-            } else old
+            }
+            next
         }
         if (transitionedByThisCall && next.mode == ProtectionMode.ALARM_TRIGGERED) {
             LocalTamperHistory.record(this, "motion_alarm_triggered", "Motion threshold exceeded; sensitivity=${sensitivity.name}")
