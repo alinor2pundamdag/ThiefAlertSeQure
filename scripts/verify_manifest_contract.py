@@ -40,6 +40,15 @@ required_permissions = {
 for permission in sorted(required_permissions - permissions):
     errors.append("Required permission missing: " + permission)
 
+features = {
+    item.get(ANDROID + "name"): item
+    for item in manifest.findall("uses-feature")
+}
+for feature in ("android.hardware.bluetooth", "android.hardware.bluetooth_le"):
+    declaration = features.get(feature)
+    if declaration is None or declaration.get(ANDROID + "required") != "false":
+        errors.append(feature + " must remain optional so Bluetooth-less devices can install")
+
 for permission in (
     "android.permission.CAMERA",
     "android.permission.ACCESS_FINE_LOCATION",
