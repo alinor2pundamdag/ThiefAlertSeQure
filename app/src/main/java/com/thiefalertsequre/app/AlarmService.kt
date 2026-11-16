@@ -115,7 +115,9 @@ class AlarmService : Service() {
     private fun startAlarmAudio(soundUri: Uri, usingDefault: Boolean, defaultUri: Uri) {
         val audio = getSystemService(AudioManager::class.java)
         audioManager = audio
-        AlarmVolumeController.raiseToMaximum(this, audio)
+        if (!AlarmVolumeController.raiseToMaximum(this, audio)) {
+            LocalTamperHistory.record(this, "alarm_volume_raise_unconfirmed", "Alarm audio startup continued, but maximum alarm-stream volume was not confirmed")
+        }
         val attributes = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_ALARM)
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
@@ -305,7 +307,18 @@ class AlarmService : Service() {
         audioFocusRequest = null
         audioManager = null
         if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED) {
-            runCatching { AlarmVolumeController.restore(this, getSystemService(AudioManager::class.java)) }
+            val restored = runCatching {
+                AlarmVolumeController.restore(this, getSystemService(AudioManager::class.java))
+            }.getOrElse { error ->
+                LocalTamperHistory.record(
+                    this, "alarm_volume_restore_exception",
+                    error.javaClass.simpleName + ": " + error.message
+                )
+                false
+            }
+            if (!restored) {
+                LocalTamperHistory.record(this, "alarm_volume_restore_unconfirmed", "Alarm service stopped without confirming full alarm-volume restoration and snapshot cleanup")
+            }
         }
     }
 

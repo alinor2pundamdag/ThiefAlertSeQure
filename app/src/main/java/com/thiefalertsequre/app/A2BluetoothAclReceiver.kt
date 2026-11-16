@@ -44,6 +44,10 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
     @Suppress("DEPRECATION", "MissingPermission")
     override fun onReceive(context: Context, intent: Intent) {
         if (ProtectionMonitorService.isBluetoothReceiverRegistered) return
+        // Capture at broadcast receipt, before async scheduling or trust-store I/O.
+        val eventEpochMs = System.currentTimeMillis()
+        val eventElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime()
+        val eventBootCount = ProtectionClock.bootCount(context)
         val pendingResult = goAsync()
         Thread {
             try {
@@ -80,12 +84,11 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
                                 protectionMode = ProtectionStore(app).read().mode
                             )
                         ) {
-                            val eventElapsed = android.os.SystemClock.elapsedRealtime()
                             val pending = A2DisconnectScheduler.Pending(
                                 address = address,
-                                eventEpochMs = System.currentTimeMillis(),
-                                eventElapsedRealtimeMs = eventElapsed,
-                                bootCount = ProtectionClock.bootCount(app),
+                                eventEpochMs = eventEpochMs,
+                                eventElapsedRealtimeMs = eventElapsedRealtimeMs,
+                                bootCount = eventBootCount,
                                 monitorRevision = TrustedBluetoothRegistry.revision(prefs),
                                 deviceRevision = TrustedBluetoothRegistry.deviceRevision(prefs, address)
                             )

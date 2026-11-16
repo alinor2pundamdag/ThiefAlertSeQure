@@ -15,8 +15,10 @@ class A2DisconnectPolicyTest {
     }
 
     @Test fun sameBootRequiresMatchingKnownBootCounts() {
-        assertTrue(A2DisconnectPolicy.isSameBoot(4, 4, 12_000L, 1_000L))
+        assertTrue(A2DisconnectPolicy.isSameBoot(4, 4, 12_000L, 13_000L))
         assertFalse(A2DisconnectPolicy.isSameBoot(4, 5, 12_000L, 13_000L))
+        assertFalse("A future-dated event must not pass same-boot validation",
+            A2DisconnectPolicy.isSameBoot(4, 4, 13_000L, 12_000L))
     }
 
     @Test fun elapsedRealtimeDetectsRebootWhenBootCountUnavailable() {
@@ -42,6 +44,11 @@ class A2DisconnectPolicyTest {
     }
     @Test fun unchangedDeviceTimerSurvivesUnrelatedRegistryChanges() {
         assertTrue(A2DisconnectPolicy.isPendingDisconnectCurrent(7L, 7L, 3L, 3L))
+    }
+    @Test fun corruptRevisionSentinelsCannotValidatePendingDisconnect() {
+        assertFalse(A2DisconnectPolicy.isPendingDisconnectCurrent(Long.MIN_VALUE, Long.MIN_VALUE, 3L, 3L))
+        assertFalse(A2DisconnectPolicy.isPendingDisconnectCurrent(7L, 7L, Long.MIN_VALUE, Long.MIN_VALUE))
+        assertFalse(A2DisconnectPolicy.isPendingDisconnectCurrent(-1L, -1L, 3L, 3L))
     }
     @Test fun targetDeviceReregistrationInvalidatesItsOldTimer() {
         assertFalse(A2DisconnectPolicy.isPendingDisconnectCurrent(7L, 7L, 3L, 4L))

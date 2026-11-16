@@ -32,12 +32,22 @@ internal object A2DisconnectScheduler {
 
     fun schedule(context: Context, pending: Pending): Boolean {
         if (!TrustedBluetoothRegistry.isValidAddress(pending.address) ||
-            pending.eventEpochMs <= 0L || pending.eventElapsedRealtimeMs < 0L
-        ) return false
+            pending.eventEpochMs <= 0L || pending.eventElapsedRealtimeMs <= 0L ||
+            pending.bootCount < -1 || pending.monitorRevision < 0L || pending.deviceRevision < 0L
+        ) {
+            LocalTamperHistory.record(context, "a2_deadline_metadata_rejected", "Invalid trusted-device deadline metadata was rejected")
+            return false
+        }
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
-        val records = read(prefs) ?: return false
+        val records = read(prefs) ?: run {
+            LocalTamperHistory.record(context, "a2_deadline_store_unreadable", "Existing encrypted A2 deadlines are unreadable; source retained")
+            return false
+        }
         val updated = records.filterNot { it.address.equals(pending.address, true) } + pending
-        if (!write(prefs, updated)) return false
+        if (!write(prefs, updated)) {
+            LocalTamperHistory.record(context, "a2_deadline_persist_failed", "Encrypted A2 disconnect deadline could not be committed")
+            return false
+        }
         return runCatching {
             val manager = context.getSystemService(AlarmManager::class.java)
             val operation = pendingIntent(context, pending.address)
@@ -70,23 +80,35 @@ internal object A2DisconnectScheduler {
 
     fun cancel(context: Context, address: String, expectedEventElapsedMs: Long? = null): Boolean {
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
-        val records = read(prefs) ?: return false
+        val records = read(prefs) ?: run {
+            LocalTamperHistory.record(context, "a2_deadline_cancel_store_unreadable", "A2 deadline cancellation could not read the encrypted schedule; source retained")
+            return false
+        }
         val matching = records.firstOrNull { it.address.equals(address, true) }
         if (matching == null || (expectedEventElapsedMs != null &&
                 matching.eventElapsedRealtimeMs != expectedEventElapsedMs)
         ) return true
         context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context, address))
-        return write(prefs, records.filterNot { it.address.equals(address, true) })
+        val removed = write(prefs, records.filterNot { it.address.equals(address, true) })
+        if (!removed) {
+            LocalTamperHistory.record(context, "a2_deadline_cancel_persist_failed", "Reconnect cancellation removed the AlarmManager callback but could not commit the updated encrypted deadline list")
+        }
+        return removed
     }
 
-    fun clearAll(context: Context) {
+    fun clearAll(context: Context): Boolean {
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
-        val records = read(prefs) ?: return
+        val records = read(prefs) ?: run {
+            LocalTamperHistory.record(context, "a2_pending_clear_store_unreadable", "A2 deadline cleanup could not read the encrypted schedule; source retained")
+            return false
+        }
         val manager = context.getSystemService(AlarmManager::class.java)
         records.forEach { manager.cancel(pendingIntent(context, it.address)) }
-        if (!prefs.edit().remove(KEY_PENDING).commit()) {
+        val cleared = prefs.edit().remove(KEY_PENDING).commit()
+        if (!cleared) {
             LocalTamperHistory.record(context, "a2_pending_clear_failed", "Pending trusted-device deadlines could not be cleared")
         }
+        return cleared
     }
 
     private fun read(prefs: android.content.SharedPreferences): List<Pending>? {
@@ -101,11 +123,23 @@ internal object A2DisconnectScheduler {
                 check(prefs.edit().putString(KEY_PENDING, LocalPreferenceCipher.encrypt(KEY_PENDING, raw)).commit())
                 raw
             }
-            decoded.lineSequence().filter { it.isNotBlank() }.map { line ->
+            val records = decoded.lineSequence().filter { it.isNotBlank() }.map { line ->
                 val fields = line.split('|')
                 require(fields.size == 6 && TrustedBluetoothRegistry.isValidAddress(fields[0]))
-                Pending(fields[0], fields[1].toLong(), fields[2].toLong(), fields[3].toInt(), fields[4].toLong(), fields[5].toLong())
+                val record = Pending(
+                    fields[0], fields[1].toLong(), fields[2].toLong(),
+                    fields[3].toInt(), fields[4].toLong(), fields[5].toLong()
+                )
+                require(
+                    record.eventEpochMs > 0L && record.eventElapsedRealtimeMs > 0L &&
+                        record.bootCount >= -1 && record.monitorRevision >= 0L && record.deviceRevision >= 0L
+                ) { "A2 deadline record contains invalid time or revision metadata." }
+                record
             }.toList()
+            require(records.map { it.address.uppercase() }.distinct().size == records.size) {
+                "A2 deadline store contains duplicate accessory records."
+            }
+            records
         }.onFailure {
             android.util.Log.e("A2DisconnectScheduler", "Encrypted A2 deadline data is unreadable; source retained", it)
         }.getOrNull()

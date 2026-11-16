@@ -16,10 +16,13 @@ object A2DisconnectPolicy {
         eventElapsedRealtimeMs: Long,
         currentElapsedRealtimeMs: Long
     ): Boolean {
+        // elapsedRealtime must move forward within the same boot. Boot count
+        // alone must not legitimize a corrupt or future-dated persisted event.
+        if (eventElapsedRealtimeMs <= 0L || currentElapsedRealtimeMs < eventElapsedRealtimeMs) return false
         if (storedBootCount >= 0 || currentBootCount >= 0) {
             return storedBootCount >= 0 && currentBootCount >= 0 && storedBootCount == currentBootCount
         }
-        return eventElapsedRealtimeMs >= 0L && currentElapsedRealtimeMs >= eventElapsedRealtimeMs
+        return true
     }
 
     fun shouldStartGracePeriod(
@@ -35,7 +38,9 @@ object A2DisconnectPolicy {
         currentMonitorRevision: Long,
         capturedDeviceRevision: Long,
         currentDeviceRevision: Long
-    ): Boolean = capturedMonitorRevision == currentMonitorRevision &&
+    ): Boolean = capturedMonitorRevision >= 0L && currentMonitorRevision >= 0L &&
+        capturedDeviceRevision >= 0L && currentDeviceRevision >= 0L &&
+        capturedMonitorRevision == currentMonitorRevision &&
         capturedDeviceRevision == currentDeviceRevision
 
     fun shouldTriggerAlarm(
