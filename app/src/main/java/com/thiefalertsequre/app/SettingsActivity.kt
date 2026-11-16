@@ -622,7 +622,9 @@ class SettingsActivity : FragmentActivity() {
                 }
             }.getOrNull()
             runOnUiThread {
-                if (isFinishing || isDestroyed) {
+                if (isFinishing || isDestroyed ||
+                    !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                ) {
                     runCatching { candidate?.release() }
                     return@runOnUiThread
                 }
