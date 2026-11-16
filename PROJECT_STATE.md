@@ -46,10 +46,10 @@ The bullets below include earlier work on predecessor branches; they are project
 
 ## Last verified coding-head status (2026-11-16)
 - Current coding branch at the time of verification: `work/phase-0-12-coding`.
-- Last verified head: `fd0c88a4e198ea880b29306d8315c72943437b8e`.
-- GitHub Actions run [#1388](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43857823229): build job PASS, including unit tests, instrumentation-source compilation (without execution), navigation/preferences/manifest/state checks, lint, APK assembly, and APK identity/signature checks; instrumentation job intentionally SKIPPED.
+- Last verified head: `5620a059eb699ffe6360be6778bdf6e7261dac41`.
+- GitHub Actions run [#1390](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43860715012): build job PASS, including JVM unit tests, Android instrumentation-source compilation (without execution), navigation/preferences/manifest/state checks, lint, asset/release-workflow checks, APK assembly, minified APK metadata, and package/version/signer checks; instrumentation job intentionally SKIPPED.
 - The earlier run #1270 instrumentation results below are historical evidence for its older commit only, not current-head verification.
-- Coding phases 0–12 are not yet certified complete. Instrumentation execution remains deferred until all coding work and code-level verification are complete.
+- Coding phases 0–12 are not yet certified complete. Remaining work includes the final all-source and requirement-by-requirement audit, closing any uncovered gaps, updating traceability, and a final exact-head CI run. Instrumentation execution remains deferred until all coding work and code-level verification are complete.
 
 ## Historical verification status
 - Source-head run #1270: PASS for the build job and all seven Android instrumentation jobs.
