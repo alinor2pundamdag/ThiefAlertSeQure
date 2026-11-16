@@ -138,3 +138,10 @@ No failure details were supplied. These results clear the reported HONOR 200 Pro
 - `AlarmService` does not treat `ACTION_USER_PRESENT`, `isDeviceSecure`, or an unlocked keyguard as authentication. After the phone is unlocked, the owner must open the app/notification and complete the explicit Android credential or strong-biometric prompt.
 - The system credential and biometric remain entirely Android-managed. The app receives only the successful result from its explicit authentication activity/prompt and never accesses credential material.
 - These changes were included in the owner-reported 11 November 2026 HONOR 200 Pro physical test set; lock-screen presentation and authentication protection were reported PASS. CI still cannot independently verify OEM keyguard behavior.
+
+
+## 17 November 2026 — continuation security checks
+
+- The `java/android/arbitrary-apk-installation` CodeQL finding was traced to the explicit Android Package Installer handoff. The updater verifies the app-private cached APK's SHA-256, production package ID, increasing versionCode and pinned release signer before the system installer is opened. The in-source suppression is placed at the exact `setDataAndType` sink, not at the Intent constructor. The PR CodeQL gate passed after this correction; the full Java/Kotlin and Actions analysis jobs also completed successfully.
+- Manual signed release preflight is restricted to `main` only, consistent with the release policy. Manual preflight never publishes a release.
+- Current task excludes emulator, instrumentation and physical-device testing. Non-instrumentation JVM/static/lint/build/APK checks are the required software verification.

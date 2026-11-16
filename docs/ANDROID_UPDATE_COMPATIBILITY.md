@@ -23,6 +23,10 @@
 7. Keep the updater explicit and owner-confirmed; never bypass Android Package Installer.
 8. Never publish an unsigned or debug-signed APK as an official update.
 
+
+
+**Current owner scope (17 November 2026):** The `adb install -r` marker scenario above is retained as a separate future release-install acceptance check. It is **not executed** during the current Phase 0–12 software task. No emulator, instrumentation compilation/execution, or physical-device testing is authorized for this task; this item is not a blocker for code/repository completion.
+
 ## Data preservation
 
 Android's in-place package update preserves app-private data when package identity, signing identity and version ordering are accepted by Package Installer. The app must not clear or migrate user data destructively during an ordinary update. `android:allowBackup="false"` does not disable normal in-place update data preservation.

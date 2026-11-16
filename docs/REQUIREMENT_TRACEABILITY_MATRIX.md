@@ -197,3 +197,8 @@ Physical-device tests, emulator tests, and instrumentation compilation/execution
 - JVM tests added in `app/src/test/java/com/thiefalertsequre/app/A2DisconnectSchedulerMergeTest.kt`.
 - Source commits: `5cf2da0b7c1f134e9a1fcdfd4b913a2561aa85c3`, `679f22ac7c2721af15e298a851fdbbfbf8c4b31e`; test commit: `f5bf25576de8a903699a989924a515ea506401a6`.
 - Exact-head CI remains pending; this is not yet CI-verified.
+
+
+## 2026-11-17 continuation snapshot
+
+The CodeQL gate passed after the APK-installer suppression comments were moved to the exact flagged sink lines in `SettingsActivity.kt`. The underlying updater still verifies its private-cache APK by SHA-256, production package ID, increasing versionCode and pinned release certificate. The release workflow's manual signed preflight allowlist is restricted to `main` only. Android JVM/static/lint/APK verification is rerun on the final follow-up branch HEAD; do not reuse a prior commit's result as exact-head evidence. Physical-device, emulator and instrumentation testing remain outside the owner-authorized task scope.

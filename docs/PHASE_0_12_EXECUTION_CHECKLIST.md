@@ -113,3 +113,13 @@ This snapshot records the latest code-bearing source commit and the final docume
 - Source commits: `5cf2da0b7c1f134e9a1fcdfd4b913a2561aa85c3` and `679f22ac7c2721af15e298a851fdbbfbf8c4b31e`.
 - JVM regression tests: `f5bf25576de8a903699a989924a515ea506401a6` adds coverage that updating one accessory preserves another accessory's deadline and address matching is case-insensitive.
 - Exact-head JVM/CI execution is pending; no instrumentation or emulator execution is involved.
+
+
+## 2026-11-17 continuation record — code/GitHub scope
+
+- Owner-authorized completion scope remains repository/code and GitHub work only. No emulator, instrumentation compilation/execution, or physical-device testing is run or required for this task.
+- Confirmed and fixed the CodeQL APK-installer alert annotation placement in `SettingsActivity.kt`: suppression comments now sit immediately before the exact `setDataAndType` sinks. The updater's app-private cache, SHA-256, production package, versionCode and pinned signer checks remain intact.
+- The CodeQL PR gate passed after the sink-level annotation correction; Java/Kotlin and Actions analysis jobs were observed completing successfully on that code-bearing head.
+- Hardened `.github/workflows/release.yml`: manual signed preflight is allowed only from `refs/heads/main`, matching the main-branch release policy. `workflow_dispatch` remains non-publishing.
+- The Android build/unit/lint/APK workflow is being rerun for the follow-up commit; report it as complete only after the exact final branch HEAD has green results.
+- Branch readiness remains held: draft PR #7, 516 commits ahead / 1 behind `main` at the pre-follow-up snapshot, 131 changed paths and zero deletions. Do not merge, rebase, tag, publish or release without separate owner approval.

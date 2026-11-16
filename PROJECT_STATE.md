@@ -127,3 +127,11 @@ Reviewed source paths include `ProtectionStore.kt`, `ProtectionEngine.kt`, `Powe
 - Source commits: `5cf2da0b7c1f134e9a1fcdfd4b913a2561aa85c3` and `679f22ac7c2721af15e298a851fdbbfbf8c4b31e`.
 - JVM regression tests: `f5bf25576de8a903699a989924a515ea506401a6` covers preserving another accessory's pending deadline and case-insensitive replacement.
 - Verification status: committed only; exact-head JVM/CI execution remains pending.
+
+
+### 2026-11-17 continuation — latest confirmed actions
+
+- Fixed the CodeQL suppression location for the official APK installer handoff in `SettingsActivity.kt`. The installer is still reachable only after private-cache, SHA-256, production package, version and pinned-signer validation. The CodeQL PR gate and both CodeQL analysis jobs passed on the corrected code-bearing head.
+- Restricted manual signed preflight in `.github/workflows/release.yml` to `main` only; this closes the extra compatibility-branch path and matches the documented release boundary. No preflight or release was triggered.
+- Final Android CI must be checked against the post-hardening branch HEAD before marking the software phases complete. The current scope excludes all emulator, instrumentation and physical-device testing.
+- PR #7 remains draft/open. Branch integration is held because the working branch is one commit behind `main` and contains a separate `PROJECT_STATE.md` history; no merge or rebase was performed.
