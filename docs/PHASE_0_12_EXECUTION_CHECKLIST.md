@@ -1,9 +1,9 @@
-# FIXALL Phase 0–12 Execution Checklist
+# FIXALL Phase 0–9 Coding Execution Checklist
 
 **Project:** ThiefAlertSeQure Solo  
 **Working branch:** `work/phase-0-12-coding`  
 **Production branch:** `main` — protected; no merge or release without separate owner approval  
-**Sequencing rule:** Complete all coding and non-physical-device implementation work for Phases 0–12 first. Only then execute Android instrumentation. Physical-device acceptance remains a separate final activity.
+**Sequencing rule:** Complete coding and non-instrumentation verification for Phases 0–9. Per owner direction, do not run Android instrumentation; physical-device acceptance is outside this coding task.
 
 This ledger is the persistent source of truth for resuming interrupted work. A phase is not complete merely because source files exist or a general CI build is green. Each phase must satisfy its implementation, cross-file integration, automated coverage, documentation, and exact-head verification requirements.
 
@@ -31,21 +31,17 @@ This ledger is the persistent source of truth for resuming interrupted work. A p
 | **7 — Background services and lifecycle** | Foreground-service start/stop, notification channels, boot/package-replacement recovery, process recreation and Android-version restrictions | Manifest/static review; compile service/recovery/upgrade test sources | Coding and test-source complete; manifest checks PASS; upgrade regression has explicit seed/verify/cleanup modes and is skipped in the generic suite |
 | **8 — UI and accessibility** | Preserve all screens, navigation, themes, status/readiness flows, edge-to-edge insets and accessibility semantics | Static navigation/theme/heading checks; compile UI-facing tests where present | Coding and test-source complete; navigation/dialog/accessibility source checks PASS; visual runtime coverage included in API matrix |
 | **9 — Automated testing and CI** | Maintain unit, static, manifest, preference, ownership, lint, asset, APK identity and instrumentation coverage | Require exact-head green CI and successful Android instrumentation-source compilation; execute the complete emulator matrix after coding closes | Code-level PASS: run #1410 on `1141b10db19afc9ffa085b549adfd61ae0c39629`; CodeQL #14 PASS. API 26, 28, 30, 31, 32, 33, 34, 35, 36 and 37 matrix enabled for the next push |
-| **10 — Documentation, privacy and assets** | Align README, feature matrix, traceability, privacy, compatibility, master specification and packaged assets with actual source | Search for stale branch/SDK/test claims; validate assets and release workflow configuration | Coding documentation audit complete; corrected minSdk 26 contract, API 37 notes, branch snapshots, traceability, UX/security audit and device evidence/recovery procedure |
-| **11 — Branch integration and release-candidate preparation** | Review the complete diff, preserve all additions/modifications, keep production branch isolated, prepare reviewable candidate | Compare against predecessor, verify no unintended deletions, exact-head CI and commit/PR review | Branch review complete; working branch remains isolated from `main`; current comparison to `main` is 438 ahead / 1 behind (diverged). No merge, tag, APK publication or release |
-| **12 — Physical-device acceptance preparation** | Prepare reproducible test cases, device/OS matrix, expected results, logs and rollback/recovery procedure | Finish software work and instrumentation first; keep owner-reported results distinct from independently verified results | Preparation complete: HONOR 200 Pro scenarios, evidence capture, ADB diagnostics and safe recovery procedure documented; physical execution remains separate and is not claimed by emulator CI |
 
 ## Mandatory order of execution
 
-1. Finish the remaining source audits, fixes, test-source additions, test isolation, documentation, and integration review across Phases 0–12.
-2. Compile every Android instrumentation test source and fix all compilation failures without running the tests.
-3. Run the complete non-instrumentation CI on the final coding commit; require all build, unit, static, lint, asset, and APK verification steps to pass.
-4. Coding phases 0–12 are complete at source/test/documentation level. Run the complete Android emulator matrix on API 26, 28, 30, 31, 32, 33, 34, 35, 36 and 37; fix actual app/test failures and rerun until every required API job is green.
+1. Finish remaining source audits, fixes, test isolation, documentation, and integration review across Phases 0–9.
+2. Run non-instrumentation verification on the final coding commit: unit tests, static/source-contract checks, lint, release build, APK metadata and signer checks.
+3. Do not execute Android instrumentation or emulator test matrices. Instrumentation test sources may be compiled only if needed to catch source-level compilation errors; this does not authorize test execution.
+4. Verify the exact final branch head, review the complete diff, and preserve the production boundary. Do not merge to `main`, tag, publish, or release without separate owner authorization.
 5. Keep physical-device acceptance separate and report it only with real device evidence.
-6. Do not merge to `main`, create a production tag, publish an APK, or release without separate owner authorization.
 
 ## Resume protocol
 
-When work is interrupted, first read this checklist, `PROJECT_STATE.md`, the current branch head, and the latest workflow run. Resume from the latest committed branch head. Do not restart completed work, discard prior decisions, change the scope, run instrumentation early, or ask the owner to repeat requirements already recorded here.
+When work is interrupted, first read this checklist, `PROJECT_STATE.md`, the current branch head, and the latest workflow run. Resume from the latest committed branch head. Do not restart completed work, discard prior decisions, change the scope, run instrumentation, or ask the owner to repeat requirements already recorded here.
 
-**Completion reporting rule:** Report a phase complete only after its acceptance criteria are satisfied on the exact current branch head. Clearly distinguish source implementation, unit/static verification, instrumentation execution, and physical-device acceptance.
+**Completion reporting rule:** Report a phase complete only after its acceptance criteria are satisfied on the exact current branch head. Clearly distinguish source implementation, unit/static verification, and physical-device acceptance; instrumentation execution is explicitly excluded.
