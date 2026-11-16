@@ -9,6 +9,19 @@ object A2DisconnectPolicy {
         else eventUptimeMs + gracePeriodMs
     }
 
+    /** Rejects stale timers after reboot, including OEMs where BOOT_COUNT is unreadable. */
+    fun isSameBoot(
+        storedBootCount: Int,
+        currentBootCount: Int,
+        eventElapsedRealtimeMs: Long,
+        currentElapsedRealtimeMs: Long
+    ): Boolean {
+        if (storedBootCount >= 0 || currentBootCount >= 0) {
+            return storedBootCount >= 0 && currentBootCount >= 0 && storedBootCount == currentBootCount
+        }
+        return eventElapsedRealtimeMs >= 0L && currentElapsedRealtimeMs >= eventElapsedRealtimeMs
+    }
+
     fun shouldStartGracePeriod(
         alertEnabled: Boolean,
         trusted: Boolean,

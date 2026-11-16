@@ -17,7 +17,12 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
                     context, "deadline_receiver_error",
                     error.javaClass.simpleName + ": " + error.message
                 )
-                if (ProtectionStore(context).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                if (callbackIntent.action == A2DisconnectScheduler.ACTION_DEADLINE) {
+                    val token = callbackIntent.data?.lastPathSegment
+                    if (token != null) A2DisconnectScheduler.find(context, token)?.let {
+                        A2DisconnectScheduler.schedule(context, it)
+                    }
+                } else if (ProtectionStore(context).read().mode == ProtectionMode.ALARM_TRIGGERED) {
                     AlarmRecoveryCoordinator.onStartFailure(
                         context, "Deadline receiver failed while the alarm was latched"
                     )

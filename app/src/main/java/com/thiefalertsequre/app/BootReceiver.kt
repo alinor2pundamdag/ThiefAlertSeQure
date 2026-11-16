@@ -12,6 +12,7 @@ class BootReceiver : BroadcastReceiver() {
         // BOOT_COMPLETED is authoritative even on devices where Settings.Global.BOOT_COUNT
         // is unreadable. Invalidate the previous boot's charger baseline before processing
         // any later power event; package-update and exact-alarm callbacks preserve it.
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) A2DisconnectScheduler.clearAll(context)
         PowerTransitionCoordinator.initializeBaseline(
             context,
             forceBootReconciliation = intent.action == Intent.ACTION_BOOT_COMPLETED

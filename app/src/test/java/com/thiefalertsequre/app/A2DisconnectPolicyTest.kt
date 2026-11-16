@@ -14,6 +14,17 @@ class A2DisconnectPolicyTest {
         assertEquals(Long.MAX_VALUE, A2DisconnectPolicy.graceDeadlineUptimeMs(Long.MAX_VALUE - 5L, 8L))
     }
 
+    @Test fun sameBootRequiresMatchingKnownBootCounts() {
+        assertTrue(A2DisconnectPolicy.isSameBoot(4, 4, 12_000L, 1_000L))
+        assertFalse(A2DisconnectPolicy.isSameBoot(4, 5, 12_000L, 13_000L))
+    }
+
+    @Test fun elapsedRealtimeDetectsRebootWhenBootCountUnavailable() {
+        assertTrue(A2DisconnectPolicy.isSameBoot(-1, -1, 12_000L, 13_000L))
+        assertFalse(A2DisconnectPolicy.isSameBoot(-1, -1, 12_000L, 500L))
+        assertFalse(A2DisconnectPolicy.isSameBoot(4, -1, 12_000L, 13_000L))
+    }
+
     @Test fun gracePeriodRequiresEnabledTrustedDeviceWithConfirmedBaselineWhileArmed() {
         assertTrue(A2DisconnectPolicy.shouldStartGracePeriod(true, true, true, ProtectionMode.ARMED))
     }
