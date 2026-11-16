@@ -242,7 +242,7 @@ class BluetoothCenterActivity : FragmentActivity() {
                 true
             }.getOrDefault(false)
             A2BluetoothReceiverController.sync(this)
-            if (!baselinesCleared)
+            if (!baselinesCleared) {
                 showResult("A2 disabled; cleanup needs attention", "The OFF setting was saved, but the connection baseline could not be cleared. The stored data was retained.")
             } else {
                 showResult("A2 disabled", "Trusted-device separation alerts are now off.")
