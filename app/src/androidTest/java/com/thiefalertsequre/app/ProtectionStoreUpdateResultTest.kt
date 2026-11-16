@@ -36,6 +36,29 @@ class ProtectionStoreUpdateResultTest {
     }
 
     @Test
+    fun failedPreferenceCommitDoesNotReportOrExposeAnUnpersistedTransition() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val prefs = context.getSharedPreferences("protection_state_v1", Context.MODE_PRIVATE)
+        val backup = context.getSharedPreferences("protection_state_corrupt_backup_v1", Context.MODE_PRIVATE)
+        assertTrue(prefs.edit().clear().commit())
+        assertTrue(backup.edit().clear().commit())
+        try {
+            val store = ProtectionStore(context) { false }
+            val result = store.updatePersisted {
+                ProtectionState(ProtectionMode.ARMED, 0L, System.currentTimeMillis(), 0L, -1)
+            }
+
+            assertFalse("A rejected SharedPreferences commit must not be reported as persisted", result.persisted)
+            assertEquals("The caller must receive the last durable state", ProtectionMode.DISARMED, result.state.mode)
+            assertEquals("A fresh store must still observe the last durable state", ProtectionMode.DISARMED, ProtectionStore(context).read().mode)
+            assertFalse("No mode may be written when commit fails", prefs.contains("mode"))
+        } finally {
+            prefs.edit().clear().commit()
+            backup.edit().clear().commit()
+        }
+    }
+
+    @Test
     fun corruptProtectionStateIsPreservedAndOrdinaryUpdatesCannotDisarmIt() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
