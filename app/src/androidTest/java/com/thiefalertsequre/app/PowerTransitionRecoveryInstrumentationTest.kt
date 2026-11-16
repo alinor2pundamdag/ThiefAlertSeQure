@@ -1,5 +1,6 @@
 package com.thiefalertsequre.app
 
+import android.content.Intent
 import android.app.Instrumentation
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
@@ -69,8 +70,8 @@ class PowerTransitionRecoveryInstrumentationTest {
         assumeTrue("This Android build does not expose a usable boot identity", bootCount >= 0)
 
         val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, 0)
-        val previousMonitorEnabled = monitorPrefs.getBoolean(
-            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        val previousMonitorEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
         context.stopService(Intent(context, ProtectionMonitorService::class.java))
         instrumentation.waitForIdleSync()
