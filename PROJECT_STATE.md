@@ -79,3 +79,12 @@ The bullets below include earlier work on predecessor branches; they are project
 - Do not erase corrupted user data automatically.
 - Do not claim a test passed unless the exact branch head and test job passed.
 - Keep all changes on this development branch until the owner explicitly approves integration.
+
+
+## Current owner scope clarification (2026-11-17)
+
+- The active task is limited to code/repository work and GitHub actions on the working branch.
+- Physical-device testing and physical acceptance are explicitly excluded from this task and are not completion blockers.
+- Do not run or compile Android instrumentation tests, do not run emulator matrices, and do not perform physical-device testing.
+- Software verification is limited to JVM unit tests, static/source-contract checks, lint, build/APK metadata and package/signing-contract checks, and CodeQL on the exact working-branch head.
+- Preserve the existing no-merge/no-tag/no-publication/no-production-release boundary unless the owner separately approves it.
