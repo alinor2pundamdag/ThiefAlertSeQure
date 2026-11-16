@@ -17,7 +17,7 @@ if [[ "$api_level" =~ ^[0-9]+$ ]]; then
       boot_completed="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
       actual_api="$(adb shell getprop ro.build.version.sdk 2>/dev/null | tr -d '\r' || true)"
       package_service="$(adb shell service check package 2>&1 || true)"
-      package_path="$(adb shell cmd package path android 2>/dev/null | head -n 1 | tr -d '\r' || true)"
+      package_path="$(adb shell pm path android 2>/dev/null | head -n 1 | tr -d '\r' || true)"
       if [[ "$boot_completed" == "1" && "$actual_api" == "$api_level" \
             && "$package_service" == *"found"* && "$package_path" == package:* ]]; then
         stable_checks=$((stable_checks + 1))
