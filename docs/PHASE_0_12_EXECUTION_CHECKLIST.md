@@ -93,3 +93,14 @@ This snapshot records the latest code-bearing source commit and the final docume
 - Latest exact-head Android/CodeQL CI evidence has not yet been returned by the available GitHub status queries. Do not report the new code/test change as CI-verified until exact-head runs are confirmed.
 - Source audit reviewed the core charger, alarm, A2, persistence, boot, foreground-service and authentication paths listed in `PROJECT_STATE.md`; remaining repository-wide review is still in progress.
 - Physical-device testing, emulator testing and instrumentation compilation/execution are explicitly out of scope and are not completion blockers.
+
+
+## Additional code fixes and verification boundary — 2026-11-17
+
+- Authentication proof freshness fix: `e17f482264eba0d027b92499010be3b72c6d0086` rejects a proof when only one of the issued/current boot identities is known.
+- JVM regression cases: `80c8c52be927db24a31a7c08d699998ffb72d559` adds known-to-unknown, unknown-to-known, and both-unknown boot identity coverage.
+- CI policy guard: `1e69aeb6b412ca52c9b79049e8be024cda8fb817` expands instrumentation/emulator wiring detection across all Gradle configuration files and all GitHub Actions workflow YAML files.
+- Traceability update: `a5b7e2d5431f4cc4d1169a17a8a249f020d16c11` records these changes and the current verification boundary.
+- Draft PR #7 is open and unmerged. The latest PR head has not returned confirmed exact-head CI evidence through the available status/run queries; prior green runs remain historical evidence for their own commits only.
+- Do not compile/run dormant `androidTest` sources. The only required test execution is JVM unit tests plus non-instrumentation build/static/lint/security workflows.
+- Full repository-wide source review and exact-head CI are still pending; no 100% completion claim is authorized until those are evidenced.
