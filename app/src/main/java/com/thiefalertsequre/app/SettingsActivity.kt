@@ -280,6 +280,9 @@ class SettingsActivity : FragmentActivity() {
                     startService(
                         Intent(this, ProtectionMonitorService::class.java)
                             .setAction(ProtectionMonitorService.ACTION_STOP)
+                            // The OFF preference was committed above; this lets the service
+                            // reject this request if a newer owner action re-enables monitoring.
+                            .putExtra(ProtectionMonitorService.EXTRA_STOP_PREFERENCE_COMMITTED, true)
                             .putExtra(ProtectionMonitorService.EXTRA_STOP_PREFERENCE_COMMITTED, true)
                     )
                 }.onFailure {
