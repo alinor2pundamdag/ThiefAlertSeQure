@@ -338,7 +338,12 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private fun syncDeadlineAlarm(state: ProtectionState) {
         when (state.mode) {
             ProtectionMode.COUNTDOWN -> {
-                AlarmScheduler.schedule(this, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
+                if (!AlarmScheduler.schedule(
+                        this, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount
+                    )
+                ) {
+                    AlarmScheduler.scheduleRetry(this, 1_000L)
+                }
                 scheduleCountdown(state)
             }
             ProtectionMode.ALARM_TRIGGERED -> {
