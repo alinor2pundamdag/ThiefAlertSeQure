@@ -28,14 +28,11 @@ class BluetoothCenterActivity : FragmentActivity() {
     private lateinit var root: LinearLayout
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private var enableAfterPermission = false
-    private var unregisterRangingCallback: (() -> Unit)? = null
+    private var stopRangingQuery: (() -> Unit)? = null
     private val connectPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             if (enableAfterPermission) enableA2() else showTrustedDevicePicker()
         } else render()
-    }
-    private val rangingPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted && Build.VERSION.SDK_INT >= 36) queryRangingCapabilities() else render()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); render() }
@@ -408,47 +405,24 @@ class BluetoothCenterActivity : FragmentActivity() {
     }
 
     private fun checkRangingPermission() {
-        if (Build.VERSION.SDK_INT >= 36) {
-            if (checkSelfPermission("android.permission.RANGING") != PackageManager.PERMISSION_GRANTED) rangingPermission.launch("android.permission.RANGING")
-            else queryRangingCapabilities()
+        if (Build.VERSION.SDK_INT < 36) {
+            showResult("Ranging unavailable", "The Android Ranging capability API requires Android 16 (API 36) or newer.")
+            return
         }
+        queryRangingCapabilities()
     }
 
     @androidx.annotation.RequiresApi(36)
     private fun queryRangingCapabilities() {
-        val manager = getSystemService(android.ranging.RangingManager::class.java)
-        if (manager == null) { showResult("Ranging service unavailable", "Android did not expose a RangingManager on this device."); return }
-        val callback = object : android.ranging.RangingManager.RangingCapabilitiesCallback {
-            override fun onRangingCapabilities(capabilities: android.ranging.RangingCapabilities) {
-                runCatching { manager.unregisterCapabilitiesCallback(this) }
-                unregisterRangingCallback = null
-                val availability = capabilities.technologyAvailability
-                fun status(id: Int): String = when (availability[id]) {
-                    android.ranging.RangingCapabilities.ENABLED -> "SUPPORTED AND ENABLED"
-                    android.ranging.RangingCapabilities.NOT_SUPPORTED -> "NOT SUPPORTED"
-                    android.ranging.RangingCapabilities.DISABLED_USER -> "DISABLED BY USER"
-                    android.ranging.RangingCapabilities.DISABLED_REGULATORY -> "DISABLED BY REGULATORY POLICY"
-                    android.ranging.RangingCapabilities.DISABLED_USER_RESTRICTIONS -> "DISABLED BY DEVICE POLICY"
-                    null -> "NOT REPORTED"
-                    else -> "UNKNOWN"
-                }
-                val result = buildString {
-                    append("Bluetooth Channel Sounding: ${status(android.ranging.RangingManager.BLE_CS)}\n\n")
-                    append("Bluetooth RSSI ranging: ${status(android.ranging.RangingManager.BLE_RSSI)}\n\n")
-                    append("UWB (not Bluetooth): ${status(android.ranging.RangingManager.UWB)}\n\n")
-                    append("Wi-Fi NAN RTT (not Bluetooth): ${status(android.ranging.RangingManager.WIFI_NAN_RTT)}")
-                    if (Build.VERSION.SDK_INT >= 37) append("\n\nWi-Fi Proximity Detection (not Bluetooth): ${status(5)}")
-                    append("\n\nThis is a local capability query only. A compatible peer and supported ranging session are still required; no distance or direction is measured.")
-                }
-                runOnUiThread { if (!isFinishing && !isDestroyed && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) showResult("Ranging capability results", result) }
+        val query = RangingCapabilityQuery(this) { result ->
+            if (!isFinishing && !isDestroyed &&
+                lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+            ) {
+                showResult("Ranging capability results", result)
             }
         }
-        unregisterRangingCallback = { runCatching { manager.unregisterCapabilitiesCallback(callback) }; Unit }
-        runCatching { manager.registerCapabilitiesCallback(mainExecutor, callback) }
-            .onFailure {
-                unregisterRangingCallback = null
-                showResult("Ranging check unavailable", "${it.javaClass.simpleName}: ${it.message ?: "No platform capability data."}")
-            }
+        stopRangingQuery = { query.stop() }
+        if (!query.start()) stopRangingQuery = null
     }
 
     private fun confirmRootDiagnostics() {
@@ -495,9 +469,15 @@ class BluetoothCenterActivity : FragmentActivity() {
     private fun space(height: Int) = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dp(height)) }
     private fun matchWrap() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+    override fun onStop() {
+        stopRangingQuery?.invoke()
+        stopRangingQuery = null
+        super.onStop()
+    }
+
     override fun onDestroy() {
-        unregisterRangingCallback?.invoke()
-        unregisterRangingCallback = null
+        stopRangingQuery?.invoke()
+        stopRangingQuery = null
         ioExecutor.shutdownNow()
         super.onDestroy()
     }
