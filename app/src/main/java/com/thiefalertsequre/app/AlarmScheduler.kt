@@ -156,7 +156,7 @@ object AlarmScheduler {
      * Persist the new token before scheduling; cancel the previous PendingIntent
      * only after the new alarm is accepted. On failure, restore the prior token.
      */
-    private inline fun replaceTokenAndSchedule(
+    internal fun replaceTokenAndSchedule(
         context: Context,
         token: String,
         schedule: () -> Unit
