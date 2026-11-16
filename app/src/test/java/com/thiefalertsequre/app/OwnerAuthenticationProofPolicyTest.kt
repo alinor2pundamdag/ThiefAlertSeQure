@@ -20,4 +20,16 @@ class OwnerAuthenticationProofPolicyTest {
     @Test fun rejectsKnownBootChange() {
         assertFalse(OwnerAuthenticationProofPolicy.isFresh(10_000L, 20_000L, 4, 5))
     }
+
+    @Test fun rejectsProofWhenKnownIssuedBootIdentityBecomesUnavailable() {
+        assertFalse(OwnerAuthenticationProofPolicy.isFresh(10_000L, 20_000L, 4, -1))
+    }
+
+    @Test fun rejectsProofWhenCurrentBootIdentityAppearsAfterUnknownIssueIdentity() {
+        assertFalse(OwnerAuthenticationProofPolicy.isFresh(10_000L, 20_000L, -1, 4))
+    }
+
+    @Test fun allowsFreshProofWhenBothBootIdentitiesAreUnavailable() {
+        assertTrue(OwnerAuthenticationProofPolicy.isFresh(10_000L, 20_000L, -1, -1))
+    }
 }
