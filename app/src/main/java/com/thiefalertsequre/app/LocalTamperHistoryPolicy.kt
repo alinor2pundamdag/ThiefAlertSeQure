@@ -11,7 +11,7 @@ internal object LocalTamperHistoryPolicy {
         event.filter { it.isLetterOrDigit() || it in "_- ." }.take(48)
 
     fun sanitizeDetail(detail: String): String =
-        detail.replace(Regex("[\\p{Cc}\\p{Zl}\\p{Zp}]"), " ").take(180)
+        detail.replace(Regex("[\\p{Cc}\\p{Zl}\\p{Zp}]"), " ").replace(Regex(" +"), " ").trim().take(180)
 
     fun append(existing: String, entry: String, maxEvents: Int = MAX_EVENTS): String {
         require(maxEvents > 0) { "maxEvents must be positive" }
