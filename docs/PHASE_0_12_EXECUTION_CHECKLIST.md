@@ -3,7 +3,7 @@
 **Project:** ThiefAlertSeQure Solo  
 **Working branch:** `work/phase-0-12-coding`  
 **Production branch:** `main` — untouched; no merge, tag, publication or release without separate owner approval  
-**Owner direction:** Complete all software coding in Phases 0–12. Do not run or compile Android instrumentation tests. Do not run emulator matrices. Phase 12's physical-device scenarios are prepared here and require real hardware to execute.
+**Owner direction:** Complete all repository/code/GitHub work in scope. Do not run or compile Android instrumentation tests, do not run emulator matrices, and do not perform physical-device testing. Physical-device acceptance is excluded from this software-completion task.
 
 This is the persistent source of truth for interrupted work. A phase is not complete merely because files exist or a generic build is green. Implementation, cross-file integration, failure handling, documentation and exact-head non-instrumentation verification must be satisfied. Physical-device results must never be inferred from CI.
 
@@ -16,7 +16,7 @@ This is the persistent source of truth for interrupted work. A phase is not comp
 - A latched alarm can be cleared only after fresh, successful owner Android device-credential confirmation or BIOMETRIC_STRONG authentication.
 - Protection remains local-first/offline. No cloud database, telemetry, advertising, scanning or unrelated features.
 - Do not silently delete corrupted data, alter production identity, merge, tag, publish APKs or release.
-- No instrumentation execution, instrumentation compilation, Android emulator runner, or emulator matrix in any workflow.
+- No instrumentation execution, instrumentation compilation, Android emulator runner, emulator matrix, or physical-device testing in this task.
 
 ## Phase acceptance ledger
 
@@ -34,7 +34,7 @@ This is the persistent source of truth for interrupted work. A phase is not comp
 | **9 — Automated tests and CI** | JVM tests, source-contract checks, manifest/preferences/ownership checks, lint, assets, release build and APK identity checks | **PASS —** code-bearing source commit `475c1fa` passed [Android run 43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535) and [CodeQL run 43950015623](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623); final documentation snapshot `ffe5fda` also passed [Android run 43951488247](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43951488247) and [CodeQL run 43951488080](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43951488080). Instrumentation compilation/execution and emulator matrices were not run by owner direction |
 | **10 — Documentation, Privacy & Assets** | Reconcile README, privacy policy, permissions, feature matrix, threat model, update/install docs, asset formats/integrity and user-facing capability claims | **PASS —** privacy/permission claims reconciled, optional ranging is disclosed accurately, README/API scope corrected, packaged icon/audio assets validated and static privacy guards pass |
 | **11 — Branch Integration & Release Candidate** | Review complete branch diff, branch ancestry, package/version/signer invariants, release workflow, secrets references, artifact identity, update path and release gates | **REVIEW PASS / INTEGRATION HELD —** 130 paths changed (90 added, 40 modified, none deleted). Main-only `PROJECT_STATE.md` commit creates a divergence to reconcile before integration. Exact-head debug APK and minified release metadata checks pass. Permanent signing-secret presence was not independently verified; no merge/tag/publication/release performed |
-| **12 — Physical Device Testing & Final Acceptance** | Prepare a reproducible physical-device matrix, evidence template, safe recovery/cleanup and known platform/OEM limitations; record model/build/app commit for each test | **PREPARATION PASS / PHYSICAL ACCEPTANCE NOT TESTED —** reproducible HONOR 200 Pro scenario matrix and evidence record are prepared; only real-device execution can close this phase |
+| **12 — Physical-device acceptance** | Physical-device execution and evidence collection | **OUT OF SCOPE —** owner explicitly excluded physical-device testing from this software/GitHub completion task; do not run it or hold code completion on it |
 
 ## Phase 10 — documentation, privacy and assets
 
@@ -53,9 +53,9 @@ This is the persistent source of truth for interrupted work. A phase is not comp
 - Do not merge, create tags, publish APKs or create a GitHub Release without separate explicit owner approval.
 - A green development/debug CI artifact is not a production-signed release.
 
-## Phase 12 — physical-device acceptance preparation
+## Phase 12 — excluded from this software task
 
-Use `docs/PHASE_12_DEVICE_ACCEPTANCE_RECORD.md`, `docs/HONOR_200_PRO_COMPATIBILITY_AUDIT.md`, `docs/ANDROID_DEVICE_COMPATIBILITY.md` and `docs/UX_UI_AUDIT.md`. Record exact device model, Android/API version, OEM OS/build fingerprint, app version, tested commit, date/time, settings, scenario ID, expected result, observed result and PASS/FAIL/NOT TESTED. Preserve logs and redact personal data. Do not uninstall, clear app data, factory-reset or bypass authenticated recovery as test cleanup.
+Physical-device acceptance records and OEM scenario documents remain historical/reference material only. Do not execute physical-device scenarios, collect device evidence, run emulator tests, or compile/run instrumentation tests. None of these activities is a blocker for the requested code/GitHub completion.
 
 ## Mandatory execution order
 
@@ -63,10 +63,9 @@ Use `docs/PHASE_12_DEVICE_ACCEPTANCE_RECORD.md`, `docs/HONOR_200_PRO_COMPATIBILI
 2. Complete Phase 10 documentation, privacy and asset consistency.
 3. Complete Phase 11 branch/release-candidate readiness without merging or publishing.
 4. Run exact-head non-instrumentation JVM unit tests, static/source-contract checks, lint, release build, APK metadata/package/signer checks and CodeQL.
-5. Keep Phase 12 physical execution separate; do not substitute instrumentation or emulator tests.
-6. Re-read this ledger, `PROJECT_STATE.md`, current branch HEAD and latest workflow results before reporting completion.
+5. Re-read this ledger, `PROJECT_STATE.md`, current branch HEAD and latest non-instrumentation workflow results before reporting completion.
 
-**Completion rule:** Report software coding completion separately from physical-device acceptance and production release. No phase is marked 100% accepted without its own evidence.
+**Completion rule:** Completion is measured only against repository/code/GitHub deliverables and non-instrumentation CI on the exact branch head. Physical-device testing is explicitly excluded and must not block this task. Merge, tag, publication and production release remain separate actions requiring owner approval.
 
 
 ## Latest code-bearing candidate verification snapshot — 2026-11-17
