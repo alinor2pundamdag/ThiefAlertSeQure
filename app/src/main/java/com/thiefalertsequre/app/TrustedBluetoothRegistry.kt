@@ -63,9 +63,19 @@ object TrustedBluetoothRegistry {
         val editor = prefs.edit()
         var changed = false
         if (raw == null && devices.isNotEmpty()) {
-            editor.putString(KEY_DEVICES, LocalPreferenceCipher.encrypt(KEY_DEVICES, encode(devices)))
+            val encryptedDevices = runCatching {
+                LocalPreferenceCipher.encrypt(KEY_DEVICES, encode(devices))
+            }.onFailure {
+                Log.e(TAG, "Legacy trusted-device encryption failed; plaintext source retained", it)
+            }.getOrElse { return PreferenceRead.Corrupt(KEY_DEVICES) }
+            editor.putString(KEY_DEVICES, encryptedDevices)
             if (!prefs.contains(KEY_BASELINES)) {
-                editor.putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, ""))
+                val encryptedBaselines = runCatching {
+                    LocalPreferenceCipher.encrypt(KEY_BASELINES, "")
+                }.onFailure {
+                    Log.e(TAG, "Legacy Bluetooth baseline encryption failed; source retained", it)
+                }.getOrElse { return PreferenceRead.Corrupt(KEY_BASELINES) }
+                editor.putString(KEY_BASELINES, encryptedBaselines)
             }
             changed = true
         }
@@ -104,11 +114,17 @@ object TrustedBluetoothRegistry {
         }.filterNot { it.equals(normalizedAddress, ignoreCase = true) }
         val updated = (current + TrustedBluetoothDevice(normalizedAddress, name.ifBlank { "Bluetooth accessory" }))
             .sortedBy { it.name.lowercase() }
-        return prefs.edit()
-            .putString(KEY_DEVICES, LocalPreferenceCipher.encrypt(KEY_DEVICES, encode(updated)))
-            .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, baselines.joinToString("\n")))
-            .putLong(deviceRevisionKey(normalizedAddress), currentRevision + 1L)
-            .commit()
+        return runCatching {
+            val encryptedDevices = LocalPreferenceCipher.encrypt(KEY_DEVICES, encode(updated))
+            val encryptedBaselines = LocalPreferenceCipher.encrypt(KEY_BASELINES, baselines.joinToString("\n"))
+            prefs.edit()
+                .putString(KEY_DEVICES, encryptedDevices)
+                .putString(KEY_BASELINES, encryptedBaselines)
+                .putLong(deviceRevisionKey(normalizedAddress), currentRevision + 1L)
+                .commit()
+        }.onFailure {
+            Log.e(TAG, "Could not encrypt or commit trusted-device registration; existing source retained", it)
+        }.getOrDefault(false)
     }
 
     /** Removes only the app's trust relationship. Android pairing is never modified. */
@@ -127,10 +143,16 @@ object TrustedBluetoothRegistry {
             is PreferenceRead.Value -> stored.value
             is PreferenceRead.Corrupt -> return false
         }.filterNot { it.equals(normalizedAddress, ignoreCase = true) }
-        val edit = prefs.edit()
-            .putString(KEY_DEVICES, LocalPreferenceCipher.encrypt(KEY_DEVICES, encode(updated)))
-            .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, baselines.joinToString("\n")))
-            .putLong(deviceRevisionKey(address), currentRevision + 1L)
+        val edit = runCatching {
+            val encryptedDevices = LocalPreferenceCipher.encrypt(KEY_DEVICES, encode(updated))
+            val encryptedBaselines = LocalPreferenceCipher.encrypt(KEY_BASELINES, baselines.joinToString("\n"))
+            prefs.edit()
+                .putString(KEY_DEVICES, encryptedDevices)
+                .putString(KEY_BASELINES, encryptedBaselines)
+                .putLong(deviceRevisionKey(address), currentRevision + 1L)
+        }.onFailure {
+            Log.e(TAG, "Could not encrypt trusted-device removal; existing source retained", it)
+        }.getOrElse { return false }
         if (updated.isEmpty()) {
             edit.putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
                 .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
@@ -165,10 +187,12 @@ object TrustedBluetoothRegistry {
         if (!prefs.contains(legacyKey)) return 0L
         return when (val stored = SafePreferences.readLong(prefs, legacyKey, 0L)) {
             is PreferenceRead.Value -> {
-                check(prefs.edit().putLong(key, stored.value).remove(legacyKey).commit()) {
-                    "Could not securely migrate a trusted-device revision."
-                }
-                stored.value
+                val migrated = runCatching {
+                    prefs.edit().putLong(key, stored.value).remove(legacyKey).commit()
+                }.onFailure {
+                    Log.e(TAG, "Could not migrate trusted-device revision; legacy source retained", it)
+                }.getOrDefault(false)
+                if (migrated) stored.value else Long.MIN_VALUE
             }
             is PreferenceRead.Corrupt -> Long.MIN_VALUE // keep malformed source for diagnosis
         }
@@ -214,9 +238,12 @@ object TrustedBluetoothRegistry {
         val hadBaseline = old.any { it.equals(normalizedAddress, ignoreCase = true) }
         val updated = old.filterNot { it.equals(normalizedAddress, ignoreCase = true) }.toMutableSet()
         if (connected && isTrusted(prefs, normalizedAddress)) updated.add(normalizedAddress)
-        val committed = prefs.edit()
-            .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, updated.joinToString("\n")))
-            .commit()
+        val committed = runCatching {
+            val encrypted = LocalPreferenceCipher.encrypt(KEY_BASELINES, updated.joinToString("\n"))
+            prefs.edit().putString(KEY_BASELINES, encrypted).commit()
+        }.onFailure {
+            Log.e(TAG, "Could not encrypt or commit Bluetooth connection baseline; existing source retained", it)
+        }.getOrDefault(false)
         return committed && hadBaseline
     }
 
