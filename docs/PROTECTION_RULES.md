@@ -45,6 +45,8 @@ No other event may clear ALARM_TRIGGERED.
 ## 3. Countdown integrity
 
 - Use elapsedRealtime plus boot count on the same boot. This clock is not affected by user wall-clock changes.
+- For ACTION_POWER_CONNECTED / ACTION_POWER_DISCONNECTED, confirm the live ACTION_BATTERY_CHANGED external-power snapshot with three consecutive matching reads, at 100 ms spacing, with a hard maximum of five reads. Stop immediately after the third consecutive match; unknown/opposite samples reset the sequence. This bounds normal sampling wait to about 200 ms in the stable case without weakening event validation.
+- Capture the OS event's epoch and elapsed-realtime timestamps before asynchronous queueing/debounce. The 10-second grace period is measured from the original disconnect event, not from the end of confirmation.
 - If reboot occurs during COUNTDOWN, BOOT_COMPLETED invalidates the prior charger baseline even if Android does not expose BOOT_COUNT. If connected, return to ARMED. If disconnected, restart a full 10-second grace period. If the first post-boot power sample is unknown, store a dedicated pending-reconciliation marker and retry; the first confirmed disconnected sample starts the full 10-second grace period, while a confirmed connected sample returns to ARMED. Never compare an old-boot monotonic deadline against wall-clock time.
 - Re-check the deadline inside AlarmDeadlineReceiver before changing state.
 - Prefer setExactAndAllowWhileIdle when Android permits it.

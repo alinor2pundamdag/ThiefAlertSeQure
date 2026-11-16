@@ -263,21 +263,25 @@ object PowerTransitionCoordinator {
 
     fun onPowerConnected(context: Context): ProtectionState {
         val appContext = context.applicationContext
-        // Keep a five-read window so one or two stale snapshots after the OS
-        // broadcast do not reject a real reconnect. Three consecutive positives
-        // are enough; 100 ms spacing bounds normal confirmation to about 400 ms.
-        var consecutiveConnected = 0
-        var lastObserved: Boolean? = null
-        repeat(5) { index ->
-            val observed = ExternalPowerState.readConnected(appContext)
-            lastObserved = observed
-            consecutiveConnected = if (observed == true) consecutiveConnected + 1 else 0
-            if (index < 4) Thread.sleep(100L)
+        // Stop as soon as three consecutive live samples confirm the event.
+        // The original OS event timestamp is captured by the receiver before this
+        // sampling window, so confirmation time never extends the 10-second grace.
+        val confirmation = try {
+            PowerTransitionSamplingPolicy.confirm(true) {
+                ExternalPowerState.readConnected(appContext)
+            }
+        } catch (interrupted: InterruptedException) {
+            Thread.currentThread().interrupt()
+            LocalTamperHistory.record(
+                appContext, "power_connected_confirmation_interrupted",
+                "Live-state confirmation was interrupted; the unconfirmed event was ignored"
+            )
+            return ProtectionStore(appContext).read()
         }
-        if (consecutiveConnected < 3 || ExternalPowerState.readConnected(appContext) != true) {
+        if (!confirmation.confirmed || ExternalPowerState.readConnected(appContext) != true) {
             LocalTamperHistory.record(
                 appContext, "power_connected_unconfirmed",
-                "Connect event did not produce three consecutive connected samples; final=$lastObserved"
+                "Connect event was not stable after " + confirmation.sampleCount + " samples; final=" + confirmation.lastObserved
             )
             return ProtectionStore(appContext).read()
         }
@@ -462,31 +466,27 @@ object PowerTransitionCoordinator {
         context: Context,
         candidate: DisconnectCandidate
     ): ProtectionState {
-        var consecutiveDisconnected = 0
-        var lastObserved: Boolean? = null
-        repeat(5) { index ->
-            val observed = ExternalPowerState.readConnected(context)
-            lastObserved = observed
-            consecutiveDisconnected = if (observed == false) consecutiveDisconnected + 1 else 0
-            if (index < 4) {
-                try {
-                    Thread.sleep(100L)
-                } catch (_: InterruptedException) {
-                    Thread.currentThread().interrupt()
-                    synchronized(lock) {
-                        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                        if (isPendingCandidateCurrent(prefs, candidate)) {
-                            restoreDisconnectCandidateLocked(context, candidate.generation)
-                        }
-                    }
-                    LocalTamperHistory.record(context, "charger_unplug_rejected", "Debounce sampling interrupted; pending event cleared safely")
-                    return ProtectionStore(context).read()
+        val confirmation = try {
+            PowerTransitionSamplingPolicy.confirm(false) {
+                ExternalPowerState.readConnected(context)
+            }
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            synchronized(lock) {
+                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                if (isPendingCandidateCurrent(prefs, candidate)) {
+                    restoreDisconnectCandidateLocked(context, candidate.generation)
                 }
             }
+            LocalTamperHistory.record(
+                context, "charger_unplug_rejected",
+                "Live-state confirmation was interrupted; pending event was safely cleared"
+            )
+            return ProtectionStore(context).read()
         }
 
-        if (consecutiveDisconnected < 3) {
-            if (lastObserved == true) {
+        if (!confirmation.confirmed) {
+            if (confirmation.lastObserved == true) {
                 confirmConnectedAndArm(context, "Final debounce sample confirms external power is connected")
             } else {
                 synchronized(lock) {
@@ -498,7 +498,7 @@ object PowerTransitionCoordinator {
             }
             LocalTamperHistory.record(
                 context, "charger_unplug_rejected",
-                "Five-read debounce did not produce three consecutive disconnected readings; final=$lastObserved"
+                "Disconnect did not stabilize after " + confirmation.sampleCount + " samples; final=" + confirmation.lastObserved
             )
             return ProtectionStore(context).read()
         }
