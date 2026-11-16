@@ -13,6 +13,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -56,7 +57,12 @@ class UpgradeDataPreservationTest {
             packageInfo.versionCode.toLong()
         }
 
-        when (InstrumentationRegistry.getArguments().getString("upgradePhase")) {
+        val upgradePhase = InstrumentationRegistry.getArguments().getString("upgradePhase")
+        assumeTrue(
+            "This regression is driven only by the explicit in-place upgrade workflow",
+            upgradePhase == "seed" || upgradePhase == "verify"
+        )
+        when (upgradePhase) {
             "seed" -> {
                 preserveOriginalState(context, preferences, monitorPrefs, backupPrefs, markerFile)
                 try {
@@ -119,9 +125,7 @@ class UpgradeDataPreservationTest {
                 }
             }
 
-            else -> throw IllegalArgumentException(
-                "Pass the explicit instrumentation argument -e upgradePhase seed or verify"
-            )
+            else -> error("Unreachable after the upgradePhase assumption")
         }
     }
 
