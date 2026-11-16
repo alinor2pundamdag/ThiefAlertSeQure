@@ -1,6 +1,7 @@
 package com.thiefalertsequre.app
 
 import android.app.Activity
+import android.media.AudioManager
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
@@ -16,6 +17,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.After
 import org.junit.Before
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -32,16 +34,30 @@ class AndroidCompatibilitySmokeTest {
     private lateinit var appContext: Context
     private lateinit var monitorSnapshot: SharedPreferencesSnapshot
     private lateinit var historySnapshot: SharedPreferencesSnapshot
+    private lateinit var stateSnapshot: SharedPreferencesSnapshot
+    private lateinit var corruptionSnapshot: SharedPreferencesSnapshot
+    private lateinit var transitionSnapshot: SharedPreferencesSnapshot
+    private lateinit var schedulerSnapshot: SharedPreferencesSnapshot
+    private lateinit var volumeSnapshot: SharedPreferencesSnapshot
     private var monitorWasRunning = false
     private var monitorWasEnabled = false
     private var notificationsWereGranted = false
+    private var safeToLaunchScreens = false
+    private var originalAlarmStreamVolume = 0
 
     @Before
     fun preserveOwnerSettingsAndServiceState() {
         appContext = InstrumentationRegistry.getInstrumentation().targetContext
         monitorSnapshot = SharedPreferencesSnapshot(appContext, ProtectionMonitorService.PREFS)
         historySnapshot = SharedPreferencesSnapshot(appContext, "local_tamper_history_v1")
+        stateSnapshot = SharedPreferencesSnapshot(appContext, "protection_state_v1")
+        corruptionSnapshot = SharedPreferencesSnapshot(appContext, "protection_state_corrupt_backup_v1")
+        transitionSnapshot = SharedPreferencesSnapshot(appContext, "charger_transition_v2")
+        schedulerSnapshot = SharedPreferencesSnapshot(appContext, "alarm_scheduler_v1")
+        volumeSnapshot = SharedPreferencesSnapshot(appContext, "alarm_volume_restore_v1")
         val monitorPrefs = appContext.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        val statePrefs = appContext.getSharedPreferences("protection_state_v1", Context.MODE_PRIVATE)
+        val schedulerPrefs = appContext.getSharedPreferences("alarm_scheduler_v1", Context.MODE_PRIVATE)
         monitorWasEnabled = SafePreferences.boolean(
             monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
@@ -49,28 +65,59 @@ class AndroidCompatibilitySmokeTest {
         notificationsWereGranted = Build.VERSION.SDK_INT < 33 ||
             ContextCompat.checkSelfPermission(appContext, android.Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
+        originalAlarmStreamVolume = appContext.getSystemService(AudioManager::class.java)
+            .getStreamVolume(AudioManager.STREAM_ALARM)
+
+        val mode = when (val stored = SafePreferences.readString(statePrefs, "mode", null)) {
+            is PreferenceRead.Value -> stored.value ?: ProtectionMode.DISARMED.name
+            is PreferenceRead.Corrupt -> "CORRUPT"
+        }
+        val alarmToken = SafePreferences.readString(schedulerPrefs, "last_token", null)
+        val noAlarmToken = alarmToken is PreferenceRead.Value && alarmToken.value == null
+        val a2Deadlines = SafePreferences.readString(
+            monitorPrefs, "trusted_bluetooth_pending_disconnects_v1", null
+        )
+        val noA2Deadlines = a2Deadlines is PreferenceRead.Value && a2Deadlines.value == null
+        safeToLaunchScreens = mode in setOf(ProtectionMode.DISARMED.name, ProtectionMode.ARMED.name) &&
+            noAlarmToken && noA2Deadlines &&
+            !AlarmScheduler.hasLegacyPendingIntent(appContext) &&
+            !ManagedProtectionController.isDeviceOwner(appContext)
     }
 
     @After
     fun restoreOwnerSettingsAndServiceState() {
-        historySnapshot.restore()
+        stateSnapshot.restore()
+        corruptionSnapshot.restore()
+        transitionSnapshot.restore()
+        schedulerSnapshot.restore()
+        volumeSnapshot.restore()
         monitorSnapshot.restore()
-        if (Build.VERSION.SDK_INT >= 33 && !notificationsWereGranted) {
-            runShell("pm revoke ${appContext.packageName} android.permission.POST_NOTIFICATIONS")
+        runCatching {
+            appContext.getSystemService(AudioManager::class.java)
+                .setStreamVolume(AudioManager.STREAM_ALARM, originalAlarmStreamVolume, 0)
         }
-        if (monitorWasRunning && monitorWasEnabled) {
+        if (monitorWasRunning && monitorWasEnabled && !ProtectionMonitorService.isRunning) {
             runCatching {
                 ContextCompat.startForegroundService(
                     appContext, Intent(appContext, ProtectionMonitorService::class.java)
                 )
             }
-        } else {
+        } else if (!monitorWasRunning) {
             appContext.stopService(Intent(appContext, ProtectionMonitorService::class.java))
         }
+        if (Build.VERSION.SDK_INT >= 33 && !notificationsWereGranted) {
+            runShell("pm revoke ${appContext.packageName} android.permission.POST_NOTIFICATIONS")
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        historySnapshot.restore()
     }
 
     @Test
     fun everyInternalScreenCanBeCreatedAndDestroyed() {
+        assumeTrue(
+            "Skip activity smoke launch while an alarm/countdown, scheduled deadline, pending A2 event, or Device Owner policy is active",
+            safeToLaunchScreens
+        )
         grantNotificationPermissionForTest()
         launch(MainActivity::class.java)
         launch(SettingsActivity::class.java)

@@ -152,6 +152,15 @@ object AlarmScheduler {
         }
     }
 
+    /** Detects only the pre-token legacy alarm so UI smoke tests can avoid cancelling it. */
+    internal fun hasLegacyPendingIntent(context: Context): Boolean =
+        PendingIntent.getBroadcast(
+            context,
+            REQUEST_CODE,
+            Intent(context, AlarmDeadlineReceiver::class.java).setAction("com.thiefalertsequre.DEADLINE"),
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        ) != null
+
     fun cancel(context: Context) = cancelInternal(context, PREFS, null, includeLegacy = true)
 
     internal fun cancelIsolated(context: Context, preferencesName: String, namespace: String) =

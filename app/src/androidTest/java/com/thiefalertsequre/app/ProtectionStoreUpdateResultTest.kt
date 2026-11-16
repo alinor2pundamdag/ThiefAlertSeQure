@@ -20,6 +20,7 @@ class ProtectionStoreUpdateResultTest {
     private var originalProtection: Map<String, *> = emptyMap<String, Any?>()
     private var originalCorruptBackup: Map<String, *> = emptyMap<String, Any?>()
     private var originalMonitor: Map<String, *> = emptyMap<String, Any?>()
+    private lateinit var historySnapshot: SharedPreferencesSnapshot
 
     @Before
     fun preserveExistingAppPreferences() {
@@ -27,6 +28,7 @@ class ProtectionStoreUpdateResultTest {
         originalProtection = preferences("protection_state_v1").all.toMap()
         originalCorruptBackup = preferences("protection_state_corrupt_backup_v1").all.toMap()
         originalMonitor = preferences(ProtectionMonitorService.PREFS).all.toMap()
+        historySnapshot = SharedPreferencesSnapshot(context, "local_tamper_history_v1")
     }
 
     @After
@@ -34,6 +36,8 @@ class ProtectionStoreUpdateResultTest {
         restore("protection_state_v1", originalProtection)
         restore("protection_state_corrupt_backup_v1", originalCorruptBackup)
         restore(ProtectionMonitorService.PREFS, originalMonitor)
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        historySnapshot.restore()
     }
 
     private fun preferences(name: String) =

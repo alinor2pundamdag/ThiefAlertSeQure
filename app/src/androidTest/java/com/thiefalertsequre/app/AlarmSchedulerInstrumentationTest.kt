@@ -17,10 +17,12 @@ class AlarmSchedulerInstrumentationTest {
     private val preferencesName = "alarm_scheduler_instrumentation_test"
     private val namespace = "alarm-scheduler-instrumentation"
     private lateinit var appContext: Context
+    private lateinit var historySnapshot: SharedPreferencesSnapshot
 
     @Before
     fun isolateAlarmTokenAndPendingIntentNamespace() {
         appContext = InstrumentationRegistry.getInstrumentation().targetContext
+        historySnapshot = SharedPreferencesSnapshot(appContext, "local_tamper_history_v1")
         AlarmScheduler.cancelIsolated(appContext, preferencesName, namespace)
     }
 
@@ -28,6 +30,7 @@ class AlarmSchedulerInstrumentationTest {
     fun removeOnlyTestAlarmAndPreferences() {
         AlarmScheduler.cancelIsolated(appContext, preferencesName, namespace)
         assertTrue(appContext.getSharedPreferences(preferencesName, Context.MODE_PRIVATE).edit().clear().commit())
+        historySnapshot.restore()
     }
 
     @Test

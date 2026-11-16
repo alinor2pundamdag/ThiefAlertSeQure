@@ -151,6 +151,10 @@ class UpgradeDataPreservationTest {
             backupPrefs.edit()
                 .putString(KEY_MONITOR_SNAPSHOT, encodePreferences(monitorPrefs))
                 .putString(KEY_UPGRADE_SNAPSHOT, encodePreferences(preferences))
+                .putString(
+                    KEY_HISTORY_SNAPSHOT,
+                    encodePreferences(context.getSharedPreferences("local_tamper_history_v1", Context.MODE_PRIVATE))
+                )
                 .putBoolean(KEY_MARKER_EXISTED, markerExisted)
                 .putString(KEY_MARKER_CONTENTS, markerContents)
                 .putBoolean(KEY_MONITOR_WAS_RUNNING, monitorWasRunning)
@@ -191,6 +195,12 @@ class UpgradeDataPreservationTest {
         } else {
             context.stopService(monitorIntent)
         }
+        // Package-replacement recovery can append events; restore the owner's
+        // original bounded history after the test monitor state has been settled.
+        restorePreferences(
+            context.getSharedPreferences("local_tamper_history_v1", Context.MODE_PRIVATE),
+            historySnapshot
+        )
     }
 
     private fun encodePreferences(preferences: SharedPreferences): String {
@@ -245,6 +255,7 @@ class UpgradeDataPreservationTest {
     private companion object {
         const val KEY_MONITOR_SNAPSHOT = "monitor_snapshot"
         const val KEY_UPGRADE_SNAPSHOT = "upgrade_snapshot"
+        const val KEY_HISTORY_SNAPSHOT = "history_snapshot"
         const val KEY_MARKER_EXISTED = "marker_existed"
         const val KEY_MARKER_CONTENTS = "marker_contents"
         const val KEY_MONITOR_WAS_RUNNING = "monitor_was_running"
