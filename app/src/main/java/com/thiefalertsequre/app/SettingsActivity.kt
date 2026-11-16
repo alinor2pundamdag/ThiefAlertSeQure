@@ -273,8 +273,7 @@ class SettingsActivity : FragmentActivity() {
                 // Explicit owner opt-out stops pending charger countdowns too,
                 // but never clears a latched alarm without authentication.
                 val disabledState = ProtectionStore(this).update { current ->
-                    if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
-                    else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+                    ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
                 }
                 if (disabledState.mode != ProtectionMode.ALARM_TRIGGERED) AlarmScheduler.cancel(this)
                 A2DisconnectScheduler.clearAll(this)
