@@ -995,6 +995,9 @@ class MainActivity : FragmentActivity() {
         val next = OwnerAuthenticationCoordinator.complete(this, proof)
         if (next != null) {
             autoAuthenticationRequested = false
+            // The monitor is intentionally stopped while the alarm is latched.
+            // Reconcile it immediately after the authenticated transition succeeds.
+            syncProtectionMonitor(next)
             details.text = if (next.mode == ProtectionMode.ARMED) {
                 "Owner authenticated. Alarm stopped. Protection re-armed because the charger is connected."
             } else {
