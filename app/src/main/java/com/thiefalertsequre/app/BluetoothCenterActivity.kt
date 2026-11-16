@@ -134,7 +134,10 @@ class BluetoothCenterActivity : FragmentActivity() {
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
         val registryRead = TrustedBluetoothRegistry.readResult(prefs)
         val registryReadable = registryRead is PreferenceRead.Value
-        val devices = (registryRead as? PreferenceRead.Value)?.value.orEmpty()
+        val devices = when (registryRead) {
+            is PreferenceRead.Value -> registryRead.value
+            is PreferenceRead.Corrupt -> emptyList()
+        }
         val enabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
         val baselineCount = devices.count { TrustedBluetoothRegistry.isBaselineConnected(prefs, it.address) }
         val monitorEnabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
