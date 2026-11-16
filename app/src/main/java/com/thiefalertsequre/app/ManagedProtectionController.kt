@@ -202,15 +202,30 @@ object ManagedProtectionController {
     }
 
     private fun validateSnapshot(prefs: android.content.SharedPreferences) {
-        check(prefs.getInt(KEY_VERSION, -1) == SNAPSHOT_VERSION) {
+        fun <T> readRequired(label: String, getter: () -> T): T = try {
+            getter()
+        } catch (error: ClassCastException) {
+            throw IllegalStateException(
+                "Managed-policy rollback $label has an invalid stored type. Refusing to change device policies.",
+                error
+            )
+        }
+
+        check(readRequired("version") { prefs.getInt(KEY_VERSION, -1) } == SNAPSHOT_VERSION) {
             "Managed-policy rollback data is invalid. Refusing to apply lockdown over an unreadable recovery snapshot."
         }
-        check(prefs.getStringSet(KEY_PACKAGES, null) != null) {
+        check(readRequired("package list") { prefs.getStringSet(KEY_PACKAGES, null) } != null) {
             "Managed-policy rollback package list is missing. Refusing to change device policies."
         }
-        check(prefs.contains(KEY_FEATURES) &&
+        check(prefs.contains(KEY_FEATURES) && prefs.contains(KEY_RECOVERY_PENDING) &&
             restrictions.all { prefs.contains("local_restriction:$it") && prefs.contains("global_restriction:$it") }) {
             "Managed-policy rollback data is incomplete. Refusing to change device policies."
+        }
+        readRequired("lock-task features") { prefs.getInt(KEY_FEATURES, 0) }
+        readRequired("recovery state") { prefs.getBoolean(KEY_RECOVERY_PENDING, false) }
+        restrictions.forEach { key ->
+            readRequired("local restriction '$key'") { prefs.getBoolean("local_restriction:$key", false) }
+            readRequired("global restriction '$key'") { prefs.getBoolean("global_restriction:$key", false) }
         }
     }
 
