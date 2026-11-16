@@ -33,7 +33,7 @@ This is the persistent source of truth for interrupted work. A phase is not comp
 | **8 — UI and accessibility** | Preserve screens, navigation, themes, readiness flows, edge-to-edge insets and accessibility semantics | **CODING/CI PASS —** navigation, themed dialogs, theme and accessibility source checks pass; TalkBack/display perception remains device-unverified |
 | **9 — Automated tests and CI** | JVM tests, source-contract checks, manifest/preferences/ownership checks, lint, assets, release build and APK identity checks | **PASS on exact head `475c1fa` —** [Android run 43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535) and [CodeQL run 43950015623](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623) both succeeded. Instrumentation compilation/execution and emulator matrices were not run by owner direction |
 | **10 — Documentation, Privacy & Assets** | Reconcile README, privacy policy, permissions, feature matrix, threat model, update/install docs, asset formats/integrity and user-facing capability claims | **PASS —** privacy/permission claims reconciled, optional ranging is disclosed accurately, README/API scope corrected, packaged icon/audio assets validated and static privacy guards pass |
-| **11 — Branch Integration & Release Candidate** | Review complete branch diff, branch ancestry, package/version/signer invariants, release workflow, secrets references, artifact identity, update path and release gates | **REVIEW PASS / INTEGRATION HELD —** 495 ahead, 1 behind; 129 paths changed (89 added, 40 modified, none deleted). Main-only `PROJECT_STATE.md` commit creates a divergence to reconcile before integration. Exact-head debug APK and minified release metadata checks pass. Permanent signing-secret presence was not independently verified; no merge/tag/publication/release performed |
+| **11 — Branch Integration & Release Candidate** | Review complete branch diff, branch ancestry, package/version/signer invariants, release workflow, secrets references, artifact identity, update path and release gates | **REVIEW PASS / INTEGRATION HELD —** 130 paths changed (90 added, 40 modified, none deleted). Main-only `PROJECT_STATE.md` commit creates a divergence to reconcile before integration. Exact-head debug APK and minified release metadata checks pass. Permanent signing-secret presence was not independently verified; no merge/tag/publication/release performed |
 | **12 — Physical Device Testing & Final Acceptance** | Prepare a reproducible physical-device matrix, evidence template, safe recovery/cleanup and known platform/OEM limitations; record model/build/app commit for each test | **PREPARATION PASS / PHYSICAL ACCEPTANCE NOT TESTED —** reproducible HONOR 200 Pro scenario matrix and evidence record are prepared; only real-device execution can close this phase |
 
 ## Phase 10 — documentation, privacy and assets
@@ -69,17 +69,17 @@ Use `docs/PHASE_12_DEVICE_ACCEPTANCE_RECORD.md`, `docs/HONOR_200_PRO_COMPATIBILI
 **Completion rule:** Report software coding completion separately from physical-device acceptance and production release. No phase is marked 100% accepted without its own evidence.
 
 
-## Exact-head verification snapshot — 2026-11-17
+## Latest code-bearing candidate verification snapshot — 2026-11-17
 
 - Branch: `work/phase-0-12-coding`
-- Commit: `475c1fa00b8c30c1280f77053d83eb91c0db7f64`
+- Code-bearing source commit: `475c1fa00b8c30c1280f77053d83eb91c0db7f64`
 - Android workflow: [run 43950015535 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535)
 - CodeQL: [run 43950015623 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623)
 - JVM test source files: 29; unit-test step passed.
 - Instrumentation: no instrumentation task, compilation or execution; no emulator matrix.
 - Development artifact: `ThiefAlertSeQure-debug-apk`, ID `14266362844`, 6,615,813 bytes; package `com.thiefalertsequre.app.v114test`, version `1.1.4-test`, code 6, minSdk 26; APK SHA-256 `034d3cc076ca06ea3265bd468e42de8247352d3f8cf1f1882f7b4620971c641e`; CI debug signer SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`.
 - Minified release build: package `com.thiefalertsequre.app`, version `1.1.4`, code 6; build and metadata checks passed, but this CI output was unsigned because permanent release signing was not configured. It is not a production release.
-- Branch comparison: 495 ahead / 1 behind; 129 changed paths, 89 added, 40 modified, 0 deleted. The main-only commit adds `PROJECT_STATE.md`; do not merge/rebase without separate approval.
+- Branch comparison: 130 changed paths, 90 added, 40 modified, 0 deleted. The main-only commit adds `PROJECT_STATE.md`; do not merge/rebase without separate approval.
 - Physical acceptance on HONOR 200 Pro: **NOT TESTED**.
 
-This snapshot applies only to the exact commit above. Any subsequent commit requires a fresh exact-head Android and CodeQL verification.
+This snapshot records the latest code-bearing source commit. The subsequent Phase 10–12 follow-up commits in this documentation pass are documentation-only; no app source, Gradle, manifest, or workflow code changed. The final branch head is still checked by the current exact-head Android and CodeQL workflows.

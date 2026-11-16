@@ -160,7 +160,7 @@ Read the complete [Privacy Policy](docs/PRIVACY_POLICY.md).
 
 - **Interface:** Material-based dark UI with a scrollable layout, readable text sizing, and large touch targets.
 
-See the full [Android Device Compatibility Matrix](docs/ANDROID_DEVICE_COMPATIBILITY.md) for API 26–36 behavior, OEM background controls, system-setting fallbacks, limitations, official manufacturer references, and physical-device acceptance tests.
+See the full [Android Device Compatibility Matrix](docs/ANDROID_DEVICE_COMPATIBILITY.md) for API 26–37 behavior, OEM background controls, system-setting fallbacks, limitations, official manufacturer references, and physical-device acceptance tests.
 
 No ordinary app can use one universal setting to override every manufacturer's power manager.
 
@@ -224,7 +224,7 @@ A successful CI build confirms that the configured automated checks and APK asse
 | [Requirement Traceability Matrix](docs/REQUIREMENT_TRACEABILITY_MATRIX.md) | Requirement IDs mapped to owner files, tests, CI evidence, device validation, and release gates. |
 | [Device Owner Mode](docs/DEVICE_OWNER_MODE.md) | Managed-device requirements, capabilities, and rollback. |
 | [Android Settings & Alarm Hardening](docs/ANDROID_SETTINGS_AND_ALARM_HARDENING.md) | System settings and reliability guidance. |
-| [Android Device Compatibility](docs/ANDROID_DEVICE_COMPATIBILITY.md) | API 26–36 behavior, OEM-specific setup, fallback navigation, and device test matrix. |
+| [Android Device Compatibility](docs/ANDROID_DEVICE_COMPATIBILITY.md) | API 26–37 behavior, OEM-specific setup, fallback navigation, and device test matrix. |
 
 ## ⚠️ Honest security and reliability boundaries
 

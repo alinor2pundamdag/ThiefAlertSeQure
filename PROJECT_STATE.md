@@ -44,16 +44,16 @@ The bullets below include earlier work on predecessor branches; they are project
 - Historical verification note: the former instrumentation matrix requirement is superseded by the owner's current prohibition on instrumentation execution/compilation and emulator matrices. Current software acceptance uses JVM unit tests, source-contract checks, lint, release-build/APK checks and CodeQL; physical-device behavior remains separate.
 - Phase Two is not complete until final CI, documentation consistency, and branch review are verified. Do not claim production release readiness from emulator CI alone.
 
-## Current coding-head status (2026-11-17)
+## Latest code-bearing candidate status (2026-11-17)
 
 - Current coding branch: `work/phase-0-12-coding`.
-- Exact verified head: `475c1fa00b8c30c1280f77053d83eb91c0db7f64`.
+- Latest code-bearing source commit: `475c1fa00b8c30c1280f77053d83eb91c0db7f64`. Subsequent commits in this status-documentation pass change documentation only; no Kotlin, Gradle, manifest, or workflow source was changed after the verified code commit.
 - Android non-instrumentation CI [run 43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535): **PASS** on this exact commit. JVM unit tests, source-contract checks, lint, assets, APK packaging, minified release metadata, package/version/signer checks, and artifact upload all succeeded.
 - CodeQL [run 43950015623](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623): **PASS** for Java/Kotlin and GitHub Actions on this exact commit.
 - The branch contains 29 JVM unit-test source files. No instrumentation test compilation/execution or emulator matrix ran; this is an explicit owner-directed constraint.
 - Uploaded development artifact: `ThiefAlertSeQure-debug-apk`, artifact ID `14266362844`, 6,615,813 bytes. APK package `com.thiefalertsequre.app.v114test`, versionName `1.1.4-test`, versionCode `6`, minSdk `26`. APK SHA-256: `034d3cc076ca06ea3265bd468e42de8247352d3f8cf1f1882f7b4620971c641e`. Debug signer SHA-256: `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`. This is a development-only debug APK, not a production update.
 - The minified release variant also built and passed package/version metadata checks as `com.thiefalertsequre.app`, versionName `1.1.4`, versionCode `6`; the build was unsigned because permanent release signing was not configured in this CI run. No production APK was published.
-- Branch comparison against `main`: 495 commits ahead, 1 behind; 129 changed paths (89 added, 40 modified, 0 deleted), +10,430 / −648 lines. The sole main-only commit adds `PROJECT_STATE.md`, so the branch and main have diverged around that file. This was reviewed and intentionally not merged; do not merge/rebase without separate approval.
+- Branch comparison against `main`: 130 changed paths (90 added, 40 modified, 0 deleted). The sole main-only commit adds `PROJECT_STATE.md`, so the branch and main have diverged around that file. This was reviewed and intentionally not merged; do not merge/rebase without separate approval.
 - Phase 0–11 coding/source checks and Phase 12 physical-test preparation are recorded in the execution checklist. Actual v1.1.4 physical-device acceptance remains **NOT TESTED**.
 - `main` remains untouched. No merge, tag, publication, or production release has been performed or authorized.
 
