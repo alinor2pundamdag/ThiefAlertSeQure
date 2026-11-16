@@ -175,8 +175,12 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             stopRetryRunnable?.let(handler::removeCallbacks)
             stopRetryRunnable = null
         }
-        if (intent?.action == ACTION_STOP) {
-            if (!prefs.edit().putBoolean(KEY_ENABLED, false).commit()) {
+        val stopPreferenceAlreadyCommitted =
+            intent?.getBooleanExtra(EXTRA_STOP_PREFERENCE_COMMITTED, false) == true
+        val newerEnableSupersedesStop = stopPreferenceAlreadyCommitted &&
+            SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        if (intent?.action == ACTION_STOP && !newerEnableSupersedesStop) {
+            if (!stopPreferenceAlreadyCommitted && !prefs.edit().putBoolean(KEY_ENABLED, false).commit()) {
                 LocalTamperHistory.record(
                     this, "monitor_disable_preference_persist_failed",
                     "Android did not confirm that the monitor OFF preference was saved; stop request will be retried"
@@ -724,6 +728,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         private const val CHANNEL_ID = "protection_monitor"
         private const val NOTIFICATION_ID = 501
         const val ACTION_STOP = "com.thiefalertsequre.STOP_MONITOR"
+        const val EXTRA_STOP_PREFERENCE_COMMITTED = "stop_preference_committed"
         const val ACTION_REFRESH = "com.thiefalertsequre.REFRESH_MONITOR"
         private const val MOTION_COOLDOWN_MS = 5_000L
         private const val POWER_RETRY_MS = 1_000L
