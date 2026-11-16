@@ -33,7 +33,7 @@ jobs:
       matrix:
         include:
           - language: java-kotlin
-            build-mode: autobuild
+            build-mode: manual
           - language: actions
             build-mode: none
     steps:
@@ -47,12 +47,22 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Set up Gradle dependency cache
+        if: matrix.language == 'java-kotlin'
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
+        with:
+          cache-provider: basic
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-extended
+
+      - name: Build Android Java and Kotlin sources for CodeQL
+        if: matrix.language == 'java-kotlin'
+        run: ./gradlew --no-daemon --stacktrace :app:compileDebugKotlin :app:compileDebugJavaWithJavac
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
