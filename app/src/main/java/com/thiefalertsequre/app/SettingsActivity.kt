@@ -407,7 +407,7 @@ class SettingsActivity : FragmentActivity() {
         }
         android.widget.Toast.makeText(this, "Checking official GitHub release…", android.widget.Toast.LENGTH_SHORT).show()
         AppUpdateManager.checkAndDownload(this, ioExecutor) { result ->
-            if (isFinishing || isDestroyed) return@checkAndDownload
+            if (isFinishing || isDestroyed || !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return@checkAndDownload
             when (result) {
                 is AppUpdateResult.Ready -> {
                     val notes = result.releaseNotes.ifBlank { "No release notes were provided." }
