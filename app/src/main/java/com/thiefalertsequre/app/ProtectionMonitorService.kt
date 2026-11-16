@@ -98,13 +98,14 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                             ) {
                                 val now = System.currentTimeMillis()
                                 var transitioned = false
-                                val next = ProtectionStore(this@ProtectionMonitorService).update { current ->
+                                val update = ProtectionStore(this@ProtectionMonitorService).updatePersisted { current ->
                                     if (current.mode != ProtectionMode.ARMED) current else {
                                         transitioned = true
                                         ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, now, 0L, ProtectionClock.bootCount(this@ProtectionMonitorService))
                                     }
                                 }
-                                if (transitioned && next.mode == ProtectionMode.ALARM_TRIGGERED) {
+                                val next = update.state
+                                if (transitioned && update.persisted && next.mode == ProtectionMode.ALARM_TRIGGERED) {
                                     LocalTamperHistory.record(this@ProtectionMonitorService, "trusted_bluetooth_separation_alarm", "A registered trusted Bluetooth device remained disconnected beyond grace period")
                                     unregisterMotionSensor()
                                     startTheftAlarm()

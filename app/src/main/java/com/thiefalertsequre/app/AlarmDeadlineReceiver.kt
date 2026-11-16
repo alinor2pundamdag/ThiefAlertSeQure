@@ -11,7 +11,11 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         val pending = goAsync()
         Thread {
             try {
-                handleDeadline(context.applicationContext, callbackIntent)
+                if (callbackIntent.action == A2DisconnectScheduler.ACTION_DEADLINE) {
+                    handleA2DisconnectDeadline(context.applicationContext, callbackIntent)
+                } else {
+                    handleDeadline(context.applicationContext, callbackIntent)
+                }
             } catch (error: Exception) {
                 LocalTamperHistory.record(
                     context, "deadline_receiver_error",
@@ -33,6 +37,65 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
                 pending.finish()
             }
         }.start()
+    }
+
+    private fun handleA2DisconnectDeadline(context: Context, intent: Intent) {
+        val token = intent.data?.lastPathSegment ?: return
+        val pending = A2DisconnectScheduler.find(context, token) ?: return
+        if (ProtectionStore(context).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+            A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+            startAlarm(context, "Recovering an already-latched A2 alarm")
+            return
+        }
+        val nowElapsed = ProtectionClock.elapsedRealtime()
+        val sameBoot = A2DisconnectPolicy.isSameBoot(
+            pending.bootCount, ProtectionClock.bootCount(context),
+            pending.eventElapsedRealtimeMs, nowElapsed
+        )
+        if (!sameBoot) {
+            A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+            LocalTamperHistory.record(context, "a2_deadline_old_boot_rejected", "A2 deadline belonged to a different or unverifiable boot")
+            return
+        }
+        if (nowElapsed < pending.deadlineElapsedRealtimeMs) {
+            A2DisconnectScheduler.schedule(context, pending)
+            return
+        }
+
+        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        val valid = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false) &&
+            TrustedBluetoothRegistry.isTrusted(prefs, pending.address) &&
+            A2DisconnectPolicy.isPendingDisconnectCurrent(
+                pending.monitorRevision,
+                TrustedBluetoothRegistry.revision(prefs),
+                pending.deviceRevision,
+                TrustedBluetoothRegistry.deviceRevision(prefs, pending.address)
+            ) &&
+            !TrustedBluetoothRegistry.isBaselineConnected(prefs, pending.address) &&
+            ProtectionStore(context).read().mode == ProtectionMode.ARMED
+        if (!valid) {
+            A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+            LocalTamperHistory.record(context, "a2_deadline_invalidated", "A2 disconnect deadline failed a current trust, generation, connection, or protection-state guard")
+            return
+        }
+
+        val update = ProtectionStore(context).updatePersisted { current ->
+            if (current.mode != ProtectionMode.ARMED) current
+            else ProtectionState(
+                ProtectionMode.ALARM_TRIGGERED, 0L, System.currentTimeMillis(),
+                0L, ProtectionClock.bootCount(context)
+            )
+        }
+        if (!update.persisted) {
+            LocalTamperHistory.record(context, "a2_alarm_state_persist_failed", "A2 alarm was not started because the latched state could not be committed")
+            return
+        }
+        A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+        if (update.state.mode == ProtectionMode.ALARM_TRIGGERED) {
+            LocalTamperHistory.record(context, "trusted_bluetooth_separation_alarm", "A registered trusted Bluetooth device remained disconnected beyond grace period")
+            context.stopService(Intent(context, ProtectionMonitorService::class.java))
+            startAlarm(context, "Trusted Bluetooth separation deadline validated")
+        }
     }
 
     private fun handleDeadline(context: Context, intent: Intent) {
