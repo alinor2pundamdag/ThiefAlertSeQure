@@ -17,13 +17,17 @@ class AlarmVolumeControllerInstrumentationTest {
         val audio = context.getSystemService(AudioManager::class.java)
         val prefs = context.getSharedPreferences("alarm_volume_restore_v1", Context.MODE_PRIVATE)
         val original = audio.getStreamVolume(AudioManager.STREAM_ALARM)
+        val maximum = audio.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+        val testOriginal = maximum / 2
         try {
+            audio.setStreamVolume(AudioManager.STREAM_ALARM, testOriginal, 0)
+            assertEquals(testOriginal, audio.getStreamVolume(AudioManager.STREAM_ALARM))
             assertTrue(prefs.edit().remove("original_alarm_volume").commit())
             assertTrue(AlarmVolumeController.raiseToMaximum(context, audio))
             assertEquals(audio.getStreamMaxVolume(AudioManager.STREAM_ALARM),
                 audio.getStreamVolume(AudioManager.STREAM_ALARM))
             assertTrue(AlarmVolumeController.restore(context, audio))
-            assertEquals(original, audio.getStreamVolume(AudioManager.STREAM_ALARM))
+            assertEquals(testOriginal, audio.getStreamVolume(AudioManager.STREAM_ALARM))
             assertFalse(prefs.contains("original_alarm_volume"))
         } finally {
             runCatching { audio.setStreamVolume(AudioManager.STREAM_ALARM, original, 0) }

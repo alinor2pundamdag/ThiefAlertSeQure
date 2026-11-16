@@ -168,9 +168,13 @@ class BluetoothCenterActivity : FragmentActivity() {
                     TrustedBluetoothRegistry.remove(prefs, device.address)
                 }.getOrDefault(false)
                 if (removed) {
-                    A2DisconnectScheduler.cancel(this, device.address)
+                    val deadlineCancelled = A2DisconnectScheduler.cancel(this, device.address)
                     A2BluetoothReceiverController.sync(this)
-                    showResult("Accessory unregistered", "${device.name} is no longer trusted by A2. Android pairing was not changed.")
+                    if (deadlineCancelled) {
+                        showResult("Accessory unregistered", "${device.name} is no longer trusted by A2. Android pairing was not changed.")
+                    } else {
+                        showResult("Accessory unregistered; cleanup needs attention", "${device.name} is no longer trusted. Its per-device revision invalidates any old deadline, but Android did not confirm that the stored deadline record was cleared.")
+                    }
                 } else {
                     showResult("Unregister failed", "The trust record was not confirmed as removed. The existing record has been left unchanged where possible.")
                 }
@@ -236,14 +240,20 @@ class BluetoothCenterActivity : FragmentActivity() {
                 showResult("Could not disable A2", "Android did not confirm the preference change. The previous setting is retained.")
                 return
             }
-            A2DisconnectScheduler.clearAll(this)
+            val deadlinesCleared = A2DisconnectScheduler.clearAll(this)
             val baselinesCleared = runCatching {
                 TrustedBluetoothRegistry.clearBaselines(prefs)
                 true
             }.getOrDefault(false)
             A2BluetoothReceiverController.sync(this)
-            if (!baselinesCleared) {
-                showResult("A2 disabled; cleanup needs attention", "The OFF setting was saved, but the connection baseline could not be cleared. The stored data was retained.")
+            if (!baselinesCleared || !deadlinesCleared) {
+                showResult(
+                    "A2 disabled; cleanup needs attention",
+                    "The OFF setting was saved. " +
+                        if (!baselinesCleared && !deadlinesCleared) "The connection baseline and pending deadlines could not both be confirmed as cleared; source data was retained."
+                        else if (!baselinesCleared) "The connection baseline could not be cleared; source data was retained."
+                        else "Pending deadline cleanup could not be confirmed; callbacks still check the OFF setting and revision guards."
+                )
             } else {
                 showResult("A2 disabled", "Trusted-device separation alerts are now off.")
             }
@@ -275,6 +285,10 @@ class BluetoothCenterActivity : FragmentActivity() {
         }
         if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
             showResult("Alarm is active", "Do not change Bluetooth alert configuration while the theft alarm is active.")
+            return
+        }
+        if (!A2DisconnectScheduler.clearAll(this)) {
+            showResult("Could not enable A2", "Existing trusted-device deadlines could not be safely cleared. A2 remains OFF; resolve the stored schedule before retrying.")
             return
         }
         if (!prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, true).commit()) {

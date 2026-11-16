@@ -20,9 +20,7 @@ internal object OwnerAuthenticationCoordinator {
             return null
         }
 
-        val authenticated = store.update {
-            ProtectionEngine.authenticated(it, System.currentTimeMillis())
-        }
+        val authenticated = store.disarmAfterOwnerAuthentication(System.currentTimeMillis()) ?: return null
         if (authenticated.mode != ProtectionMode.DISARMED) return null
 
         AlarmRecoveryCoordinator.onAlarmDisarmed(appContext)

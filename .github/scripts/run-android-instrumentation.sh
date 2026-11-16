@@ -42,10 +42,6 @@ wait_for_stable_emulator() {
   return 1
 }
 
-if [[ "$api_level" =~ ^[0-9]+$ ]]; then
-  wait_for_stable_emulator || exit 1
-fi
-
 capture_android_diagnostics() {
   local test_exit_code=$?
   trap - EXIT
@@ -60,7 +56,7 @@ capture_android_diagnostics() {
     > "$diagnostics_dir/logcat-crash-buffer.txt" 2>&1
   adb logcat -b all -d -v threadtime 2>&1 | \
     grep -E -i -C 3 \
-      'FATAL EXCEPTION|Fatal signal|SIGSEGV|SIGABRT|SIGBUS|backtrace:|tombstone|crash_dump|tombstoned|AndroidRuntime|Instrumentation|com\\.thiefalertsequre|linker|libc|art runtime|am_crash|am_proc_died' \
+      'FATAL EXCEPTION|Fatal signal|SIGSEGV|SIGABRT|SIGBUS|backtrace:|tombstone|crash_dump|tombstoned|AndroidRuntime|Instrumentation|com\.thiefalertsequre|linker|libc|art runtime|am_crash|am_proc_died' \
     > "$diagnostics_dir/logcat-crash-context.txt" || true
 
   adb shell getprop > "$diagnostics_dir/device-properties.txt" 2>&1
@@ -91,6 +87,10 @@ capture_android_diagnostics() {
 }
 
 trap capture_android_diagnostics EXIT
+
+if [[ "$api_level" =~ ^[0-9]+$ ]]; then
+  wait_for_stable_emulator || exit 1
+fi
 
 run_instrumentation_attempt() {
   local attempt="$1"

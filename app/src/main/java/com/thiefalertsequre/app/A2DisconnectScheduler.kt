@@ -33,6 +33,7 @@ internal object A2DisconnectScheduler {
     fun schedule(context: Context, pending: Pending): Boolean {
         if (!TrustedBluetoothRegistry.isValidAddress(pending.address) ||
             pending.eventEpochMs <= 0L || pending.eventElapsedRealtimeMs <= 0L ||
+            pending.eventElapsedRealtimeMs > android.os.SystemClock.elapsedRealtime() ||
             pending.bootCount < -1 || pending.monitorRevision < 0L || pending.deviceRevision < 0L
         ) {
             LocalTamperHistory.record(context, "a2_deadline_metadata_rejected", "Invalid trusted-device deadline metadata was rejected")
@@ -75,7 +76,16 @@ internal object A2DisconnectScheduler {
 
     fun find(context: Context, token: String): Pending? {
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
-        return read(prefs)?.firstOrNull { tokenFor(it.address) == token }
+        val records = read(prefs) ?: run {
+            LocalTamperHistory.record(context, "a2_deadline_read_failed", "A2 deadline callback could not read the encrypted schedule; source retained")
+            return null
+        }
+        val pending = records.firstOrNull { tokenFor(it.address) == token } ?: return null
+        if (pending.eventElapsedRealtimeMs > android.os.SystemClock.elapsedRealtime()) {
+            LocalTamperHistory.record(context, "a2_future_deadline_rejected", "Future-dated A2 deadline metadata was rejected")
+            return null
+        }
+        return pending
     }
 
     fun cancel(context: Context, address: String, expectedEventElapsedMs: Long? = null): Boolean {

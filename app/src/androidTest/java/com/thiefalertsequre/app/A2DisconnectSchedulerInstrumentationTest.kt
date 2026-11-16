@@ -11,6 +11,35 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class A2DisconnectSchedulerInstrumentationTest {
+
+    @Test fun corruptRevisionAndFutureEventTimestampsAreRejectedBeforePersistence() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, 0)
+        val key = "trusted_bluetooth_pending_disconnects_v1"
+        assertTrue(A2DisconnectScheduler.clearAll(context))
+        val nowEpoch = System.currentTimeMillis()
+        val nowElapsed = SystemClock.elapsedRealtime()
+        val boot = ProtectionClock.bootCount(context)
+
+        val corruptRevision = A2DisconnectScheduler.Pending(
+            address = "02:00:00:00:00:43",
+            eventEpochMs = nowEpoch,
+            eventElapsedRealtimeMs = nowElapsed,
+            bootCount = boot,
+            monitorRevision = Long.MIN_VALUE,
+            deviceRevision = 0L
+        )
+        assertTrue("Corrupt revision sentinels must be rejected", !A2DisconnectScheduler.schedule(context, corruptRevision))
+
+        val futureEvent = corruptRevision.copy(
+            address = "02:00:00:00:00:44",
+            eventElapsedRealtimeMs = SystemClock.elapsedRealtime() + 60_000L,
+            monitorRevision = 0L
+        )
+        assertTrue("Future monotonic timestamps must be rejected", !A2DisconnectScheduler.schedule(context, futureEvent))
+        assertNull(prefs.getString(key, null))
+    }
+
     @Test fun pendingDeadlineIsEncryptedAndReconnectCancellationRemovesIt() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, 0)
