@@ -486,16 +486,18 @@ class SettingsActivity : FragmentActivity() {
         val apkFile = update.apkFile
         runCatching {
             val apkUri = FileProvider.getUriForFile(this, "$packageName.updates", apkFile)
+            // This handoff is restricted to the app-private cache and revalidated immediately
+            // above for SHA-256, production package ID, higher versionCode and the pinned signer.
+
             // codeql[java/android/arbitrary-apk-installation]
-            // This system-installer handoff receives only the private cached APK revalidated above
-            // for SHA-256, production package ID, higher versionCode and the pinned release signer.
             val installIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 putExtra(Intent.EXTRA_RETURN_RESULT, true)
             }
+            // OEM fallback uses the same app-private, checksum/package/version/signer-verified APK.
+
             // codeql[java/android/arbitrary-apk-installation]
-            // OEM fallback to Android's system installer using the same verified private APK URI.
             val installerFallback = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
