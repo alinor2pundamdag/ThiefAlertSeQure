@@ -726,7 +726,7 @@ class MainActivity : FragmentActivity() {
         val screenLockMessage = if (adminActive) "Automatic screen locking: ENABLED." else "Automatic screen locking: OFF; enable the device administrator in Device Hardening."
         val fullScreenDashboardEnabled = getSharedPreferences(
             ALARM_DISPLAY_PREFS, MODE_PRIVATE
-        ).getBoolean(KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
+        ).let { SafePreferences.boolean(it, KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false) }
         val fullScreenAccessGranted = Build.VERSION.SDK_INT < 34 || notificationManager.canUseFullScreenIntent()
         val fullScreenMessage = when {
             !fullScreenDashboardEnabled ->
