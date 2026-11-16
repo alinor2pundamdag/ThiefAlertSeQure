@@ -45,11 +45,12 @@ The bullets below include earlier work on predecessor branches; they are project
 - Phase Two is not complete until final CI, documentation consistency, and branch review are verified. Do not claim production release readiness from emulator CI alone.
 
 ## Last verified coding-head status (2026-11-16)
-- Current coding branch at the time of verification: `work/phase-0-12-coding`.
-- Last verified head: `5620a059eb699ffe6360be6778bdf6e7261dac41`.
-- GitHub Actions run [#1390](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43860715012): build job PASS, including JVM unit tests, Android instrumentation-source compilation (without execution), navigation/preferences/manifest/state checks, lint, asset/release-workflow checks, APK assembly, minified APK metadata, and package/version/signer checks; instrumentation job intentionally SKIPPED.
-- The earlier run #1270 instrumentation results below are historical evidence for its older commit only, not current-head verification.
-- Coding phases 0–12 are not yet certified complete. Remaining work includes the final all-source and requirement-by-requirement audit, closing any uncovered gaps, updating traceability, and a final exact-head CI run. Instrumentation execution remains deferred until all coding work and code-level verification are complete.
+- Current coding branch: `work/phase-0-12-coding`.
+- Latest verified head: `367e3fd163a7f1cac04d24a08c05e19120d43650`.
+- GitHub Actions run [#1395](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43865303650): build job PASS, including JVM unit tests, Android instrumentation-source compilation (without execution), navigation/preferences/manifest/state checks, lint, asset/release-workflow checks, APK assembly, minified APK metadata, and package/version/signer checks; instrumentation execution intentionally SKIPPED.
+- The preceding #1394 failed only at instrumentation-source compilation because `UpgradeDataPreservationTest` referenced a local history snapshot before declaring it. Commit `367e3fd` added the missing snapshot capture/restore; #1395 verifies that compile blocker is resolved.
+- The earlier run #1270 instrumentation results below remain historical evidence for its older commit only, not current-head verification.
+- Code-level implementation and non-instrumentation CI have been rechecked on the latest head. Coding phases 0–12 are not certified complete until the remaining cross-phase documentation, source-diff, and acceptance-preparation audit is closed. Instrumentation execution remains deferred until that coding audit is complete.
 
 ## Historical verification status
 - Source-head run #1270: PASS for the build job and all seven Android instrumentation jobs.
