@@ -44,6 +44,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private var receiverRegistered = false
     private var powerReceiverRegistered = false
     private var bluetoothReceiverRegistered = false
+    private var stopRetryRunnable: Runnable? = null
     private val powerTransitionReceiver = PowerTransitionReceiver()
     private val pendingBluetoothRunnables = mutableMapOf<String, Runnable>()
     private val bluetoothSeparationReceiver = object : BroadcastReceiver() {
@@ -168,6 +169,12 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action != ACTION_STOP &&
+            SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        ) {
+            stopRetryRunnable?.let(handler::removeCallbacks)
+            stopRetryRunnable = null
+        }
         if (intent?.action == ACTION_STOP) {
             if (!prefs.edit().putBoolean(KEY_ENABLED, false).commit()) {
                 LocalTamperHistory.record(
@@ -175,7 +182,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                     "Android did not confirm that the monitor OFF preference was saved; stop request will be retried"
                 )
                 ProtectionMonitorRecoveryNotice.show(this, "The monitor could not confirm its OFF setting. Retrying without changing the saved protection state.")
-                handler.postDelayed({ onStartCommand(intent, flags, startId) }, POWER_RETRY_MS)
+                scheduleStopRetry(intent, flags, startId)
                 return START_STICKY
             }
 
@@ -195,7 +202,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                 )
                 ProtectionMonitorRecoveryNotice.show(this, "Protection could not be safely disabled because its state was not saved. Retrying; any existing countdown remains active.")
                 if (update.state.mode == ProtectionMode.COUNTDOWN) AlarmScheduler.scheduleRetry(this, 1_000L)
-                handler.postDelayed({ onStartCommand(intent, flags, startId) }, POWER_RETRY_MS)
+                scheduleStopRetry(intent, flags, startId)
                 return START_STICKY
             }
 
@@ -662,6 +669,8 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
 
     override fun onDestroy() {
+        stopRetryRunnable?.let(handler::removeCallbacks)
+        stopRetryRunnable = null
         handler.removeCallbacks(countdownRunnable)
         unregisterMotionSensor()
         if (receiverRegistered) runCatching { unregisterReceiver(systemReceiver) }
