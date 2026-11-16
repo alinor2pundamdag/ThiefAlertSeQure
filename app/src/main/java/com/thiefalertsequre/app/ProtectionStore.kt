@@ -8,7 +8,12 @@ data class ProtectionStoreUpdateResult(
     val persisted: Boolean
 )
 
-class ProtectionStore(context: Context) {
+class ProtectionStore internal constructor(
+    context: Context,
+    private val commitEditor: (SharedPreferences.Editor) -> Boolean
+) {
+    constructor(context: Context) : this(context.applicationContext, { it.commit() })
+
     private val appContext = context.applicationContext
     private val prefs = appContext.getSharedPreferences("protection_state_v1", Context.MODE_PRIVATE)
     private var stateCorruptionDetected = false
@@ -280,14 +285,14 @@ class ProtectionStore(context: Context) {
         .putLong("changed", state.changedAtEpochMs)
         .putLong("deadline_elapsed", state.deadlineElapsedRealtimeMs)
         .putInt("boot_count", state.bootCount)
-        .commit()
+        .let(commitEditor)
 
     private fun writeThrottleUnlocked(state: AuthThrottleState): Boolean = prefs.edit()
         .putInt(KEY_AUTH_FAILURES, state.failedAttempts)
         .putLong(KEY_AUTH_COOLDOWN, state.cooldownUntilEpochMs)
         .putLong(KEY_AUTH_COOLDOWN_ELAPSED, state.cooldownUntilElapsedRealtimeMs)
         .putInt(KEY_AUTH_BOOT_COUNT, state.bootCount)
-        .commit()
+        .let(commitEditor)
 
     private fun corruptionFlag(key: String): Boolean? = when (
         val value = SafePreferences.readBoolean(corruptionPrefs(), key, false)
@@ -333,7 +338,7 @@ class ProtectionStore(context: Context) {
             .putLong("snapshot_${snapshot}_captured_at_epoch_ms", System.currentTimeMillis())
             .putLong(KEY_SNAPSHOT_COUNT, snapshot)
             .putBoolean(activeKey, true)
-            .commit()
+            .let(commitEditor)
         return saved
     }
 
@@ -343,7 +348,7 @@ class ProtectionStore(context: Context) {
             is PreferenceRead.Value -> value.value
             is PreferenceRead.Corrupt -> return false
         }
-        return !active || backup.edit().putBoolean(key, false).commit()
+        return !active || commitEditor(backup.edit().putBoolean(key, false))
     }
 
     private fun corruptionPrefs(): SharedPreferences = appContext.getSharedPreferences(
