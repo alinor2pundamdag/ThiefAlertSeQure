@@ -244,7 +244,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                 rootCheckExecutor.execute {
                     val report = RootCapabilityInspector.verifyRootAuthorization()
                     runOnUiThread {
-                        if (isFinishing || isDestroyed) return@runOnUiThread
+                        if (isFinishing || isDestroyed || !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return@runOnUiThread
                         val status = when (report.status) {
                             RootCapabilityInspector.RootStatus.ROOT_AUTHORIZED -> "ROOT ACCESS GRANTED — UID 0 VERIFIED"
                             RootCapabilityInspector.RootStatus.ROOT_NOT_AUTHORIZED -> "ROOT ACCESS DENIED / NOT GRANTED"
