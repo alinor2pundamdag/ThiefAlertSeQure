@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.ranging.RangingCapabilities
 import android.ranging.RangingManager
 import androidx.annotation.RequiresApi
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * API 36-only capability query isolated from the minSdk 26 Activity class.
@@ -19,6 +20,7 @@ internal class RangingCapabilityQuery(
     private val manager = context.getSystemService(RangingManager::class.java)
     private val executor = context.mainExecutor
     private var callback: RangingManager.RangingCapabilitiesCallback? = null
+    private val resultDelivered = AtomicBoolean(false)
 
     fun start(): Boolean {
         if (context.checkSelfPermission(Manifest.permission.RANGING) != PackageManager.PERMISSION_GRANTED) {
@@ -32,6 +34,7 @@ internal class RangingCapabilityQuery(
         }
         val listener = object : RangingManager.RangingCapabilitiesCallback {
             override fun onRangingCapabilities(capabilities: RangingCapabilities) {
+                if (!resultDelivered.compareAndSet(false, true)) return
                 val availability = capabilities.technologyAvailability
                 val knownTechnologies = listOf(
                     RangingManager.BLE_CS,
@@ -51,7 +54,7 @@ internal class RangingCapabilityQuery(
                 lines += "Enabled means this phone reports local availability only. A compatible peer, firmware, permissions and session setup are still required."
                 lines += "Capability discovery only. No peer discovery, ranging session, distance measurement, or location access was performed."
                 onResult(lines.joinToString("\n"))
-                stop()
+                executor.execute { stop() }
             }
         }
         callback = listener
@@ -59,7 +62,7 @@ internal class RangingCapabilityQuery(
             rangingManager.registerCapabilitiesCallback(executor, listener)
             true
         }.onFailure { error ->
-            callback = null
+            stop()
             onResult(
                 if (error is SecurityException) {
                     "Android denied the capability query. Confirm the Ranging permission in app settings."

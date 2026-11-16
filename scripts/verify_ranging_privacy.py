@@ -24,6 +24,9 @@ for description, passed in required.items():
 for forbidden in ("android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_BACKGROUND_LOCATION"):
     if forbidden in manifest:
         raise SystemExit(f"Ranging capability check must not add location permission: {forbidden}")
+for forbidden in ("Manifest.permission.ACCESS_FINE_LOCATION", "Manifest.permission.ACCESS_COARSE_LOCATION", "Manifest.permission.ACCESS_BACKGROUND_LOCATION"):
+    if forbidden in all_kotlin:
+        raise SystemExit(f"Ranging capability check must not request location permission: {forbidden}")
 if "createRangingSession(" in all_kotlin:
     raise SystemExit("Ranging capability inspection must not start a peer ranging session.")
 

@@ -2,8 +2,10 @@ package com.thiefalertsequre.app
 
 import android.ranging.RangingCapabilities
 import android.ranging.RangingManager
+import androidx.annotation.RequiresApi
 
 /** Converts platform ranging availability into explicit, non-overstated user-facing labels. */
+@RequiresApi(36)
 internal object RangingCapabilityStatus {
     fun label(status: Int?): String = when (status) {
         RangingCapabilities.ENABLED -> "Available"
