@@ -118,3 +118,12 @@ Reviewed source paths include `ProtectionStore.kt`, `ProtectionEngine.kt`, `Powe
 - Obtain Android build/unit/static/lint/APK checks and CodeQL evidence for the latest PR head. Connector status currently does not expose a confirmed run result for that head.
 - Resolve the branch divergence only within the existing no-merge/no-rebase approval boundary; do not alter `main`.
 - Reconcile all completion documentation to this code-only scope and the latest exact commit.
+
+
+### Additional confirmed code finding fixed — A2 multi-device deadline race
+
+- Finding: concurrent ACL callbacks for separate trusted accessories could race through the encrypted pending-deadline read-modify-write and overwrite one another's records.
+- Fix: `A2DisconnectScheduler` now serializes schedule/find/cancel/clear operations with a shared lock, uses namespace-correct failure cleanup, and exposes a pure per-device merge helper.
+- Source commits: `5cf2da0b7c1f134e9a1fcdfd4b913a2561aa85c3` and `679f22ac7c2721af15e298a851fdbbfbf8c4b31e`.
+- JVM regression tests: `f5bf25576de8a903699a989924a515ea506401a6` covers preserving another accessory's pending deadline and case-insensitive replacement.
+- Verification status: committed only; exact-head JVM/CI execution remains pending.
