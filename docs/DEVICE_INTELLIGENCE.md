@@ -19,6 +19,7 @@ The Device Intelligence page reads Android public APIs and package-manager featu
 - Presence and Android-reported name, vendor, maximum range, resolution, and power figures for accelerometer, gyroscope, magnetometer, proximity, light, barometer, step counter, step detector, rotation vector, and significant-motion sensors.
 - Package-manager feature flags for Bluetooth Classic/LE, Wi-Fi, NFC, GPS/network location hardware capability, telephony, camera/flash, fingerprint, USB host/accessory, and selected sensor categories.
 - ThiefAlertSeQure readiness signals: notification enablement, full-screen alarm-intent access where applicable, exact-alarm access, secure lock-screen configuration, Bluetooth Connect permission, Android Ranging permission where applicable, monitor preference/runtime-last-recorded state, and current protection state.
+- Optional Android 16+ RangingManager capability query, available only after the owner taps the explicit check button and grants the RANGING permission. It reports local BLE Channel Sounding, BLE RSSI, UWB, Wi-Fi RTT and future technology availability; it does not discover peers, start a ranging session, measure distance, or access location.
 - Device idle/doze mode and app data filesystem volume metrics.
 - Manufacturer-family background execution guidance and passive root indicators.
 
@@ -27,10 +28,11 @@ The Device Intelligence page reads Android public APIs and package-manager featu
 - Inspection is local and on demand; no telemetry or cloud upload is performed.
 - Do not read IMEI, SIM identifiers, serial number, MAC/BSSID, Wi-Fi identifiers, contacts, messages, files, precise location, microphone content, or camera content.
 - Build fingerprint is deliberately withheld from the displayed report.
-- No runtime permission is requested automatically by opening the page.
+- No runtime permission is requested automatically by opening the page. The optional API 36+ Ranging permission is requested only after the owner taps the capability-check button and confirms the disclosure dialog.
 - No system setting is changed automatically.
 - Passive root indicators are shown separately from active root authorization. The Device Intelligence page provides an explicit **Check Root Status (run su -c id)** action. After owner confirmation, it executes the read-only command off the UI thread and displays ROOT ACCESS GRANTED (uid=0), ROOT ACCESS NOT GRANTED, SU NOT AVAILABLE, POSSIBLE ROOT, TIMEOUT, or ERROR. A missing su command and no common indicators are reported as no root access detected, not as proof that hidden root is impossible. No root prompt runs automatically on page open.
-- Capability presence does not imply that a corresponding ThiefAlertSeQure feature is implemented or enabled.
+- Capability presence does not imply that a corresponding ThiefAlertSeQure feature is implemented or enabled. An enabled ranging technology means only that Android reports local device availability; a compatible peer, firmware, permissions and session setup are still required.
+- The capability check registers a one-shot local availability callback only; it never calls `createRangingSession`.
 
 ## UI/UX structure
 

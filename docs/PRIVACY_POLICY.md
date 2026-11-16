@@ -42,6 +42,7 @@ Depending on Android version and the user's choices, the app may use:
 - Alarm scheduling; precise alarm access is a special Android setting on supported versions.
 - Notifications and foreground services while protection monitoring or an alarm is active.
 - Bluetooth Connect permission on Android 12+ when the owner selects already-paired trusted accessories for A2. The app does not scan, advertise, or request location permission for this workflow.
+- Android RANGING permission on Android 16+ only after the owner explicitly selects **Check Android ranging capabilities** and confirms an explanation. The app reads local technology-availability metadata through `RangingManager`; it does not discover peers, create a ranging session, measure distance, or access precise location. This optional check is not required for core protection.
 - Alarm-stream volume control to temporarily raise the alarm volume and restore the previous level after successful disarm.
 - Android CameraManager torch control, enabled by default, to pulse a compatible device LED only while the alarm is latched. This API does not request CAMERA permission, open the camera for capture, or collect images/video. Flash hardware is optional and may be unavailable or temporarily busy.
 - Android's Storage Access Framework document/folder picker to read audio files explicitly selected by the owner and to write an event-history CSV only when the owner chooses an export destination.
@@ -60,7 +61,7 @@ Operational preferences remain in the app's private storage until changed by the
 
 ## 7. User choice
 
-The first-launch notice explains local data handling, alarm behavior, optional flashlight behavior and platform limitations. The owner acknowledges the notice with “I understand & continue”; that acknowledgement is stored locally. The notice can be reviewed again from Settings.
+The first-launch notice explains local data handling, alarm behavior, optional flashlight behavior and platform limitations. The optional Ranging permission is handled separately, only after the owner chooses the capability check and sees its disclosure. The owner acknowledges the notice with “I understand & continue”; that acknowledgement is stored locally. The notice can be reviewed again from Settings.
 
 ## 8. Limitations
 

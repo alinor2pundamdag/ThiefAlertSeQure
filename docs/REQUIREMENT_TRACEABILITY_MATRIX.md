@@ -157,3 +157,14 @@ A requirement is **complete** only when:
 - CI debug signing: the debug keystore path is created before cache restore so the cache action can save the first generated development key; push builds can reuse that identity. This is not a production release key.
 - Documentation corrections align charger receiver registration with the runtime foreground-service registration, and align the stated target SDK with Gradle (API 36).
 - Android 17 background-audio behavior is documented against the official platform guidance: [Android 17 background audio hardening](https://developer.android.com/develop/background-work/services/fgs/changes) and [Android 17 audio hardening details](https://developer.android.com/about/versions/17/changes/bg-audio).
+
+
+## Phase 10–12 additional traceability
+
+| ID | Requirement / acceptance condition | Primary owner(s) | Existing test / evidence | Status / limitation |
+|---|---|---|---|---|
+| DEV-INT-01 | Android 16+ ranging capability check is explicitly owner-initiated; request RANGING permission only after disclosure; query local availability only; never discover peers or create a ranging session | `DeviceIntelligenceActivity.kt`, `RangingCapabilityQuery.kt`, `RangingCapabilityStatus.kt` | `RangingCapabilityStatusTest`; source review against Android API 36 RangingManager contract | Implemented; runtime permission prompt and OEM capability response require physical API 36+ device verification |
+| PRIV-06 | Privacy policy accurately discloses optional RANGING permission and states that no peer/session/location data is collected or uploaded | `docs/PRIVACY_POLICY.md`, Device Intelligence screen | Manifest permission inventory and source review | Documentation aligned; exact-head CI still required |
+| CI-10 | No Android instrumentation source compilation/execution or emulator matrix in Android/release workflows | `scripts/verify_no_instrumentation.py`, Android and release workflows, Gradle config | CI policy guard | Enforced by source-contract step; exact-head CI still required |
+| REL-11 | Release candidate remains on development branch; no merge, tag, production APK publication or official release without separate owner approval | Release workflow and branch policy | GitHub branch/PR/release inventory review | No production release performed; integration conflict review remains separate |
+| DEV-12 | Physical acceptance records exact device, OS/API, OEM build, app version, tested commit, scenario and observed result | Device compatibility and HONOR 200 Pro acceptance documents | Physical-device evidence template | Prepared; current v1.1.4 candidate is NOT TESTED on physical hardware |
