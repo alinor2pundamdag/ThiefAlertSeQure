@@ -177,9 +177,13 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
         val stopPreferenceAlreadyCommitted =
             intent?.getBooleanExtra(EXTRA_STOP_PREFERENCE_COMMITTED, false) == true
-        val newerEnableSupersedesStop = stopPreferenceAlreadyCommitted &&
-            SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
-        if (intent?.action == ACTION_STOP && !newerEnableSupersedesStop) {
+        val monitorEnabled = SafePreferences.boolean(
+            prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
+        val applyStopRequest = ProtectionMonitorPolicy.shouldApplyStopRequest(
+            stopPreferenceAlreadyCommitted, monitorEnabled
+        )
+        if (intent?.action == ACTION_STOP && applyStopRequest) {
             if (!stopPreferenceAlreadyCommitted && !prefs.edit().putBoolean(KEY_ENABLED, false).commit()) {
                 LocalTamperHistory.record(
                     this, "monitor_disable_preference_persist_failed",
