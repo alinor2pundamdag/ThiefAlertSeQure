@@ -59,7 +59,7 @@ class PowerTransitionRecoveryInstrumentationTest {
                 transitionPrefs.edit()
                     .clear()
                     .putBoolean("baseline_known", true)
-                    .putBoolean("baseline_connected", true)
+                    .putBoolean("baseline_connected", false) // A pending candidate has already transitioned its baseline to disconnected
                     .putInt("baseline_boot_count", bootCount)
                     .putLong("transition_generation", 9L)
                     .putBoolean("pending_disconnect", true)
