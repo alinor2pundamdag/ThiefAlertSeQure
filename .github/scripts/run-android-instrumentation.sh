@@ -115,7 +115,7 @@ while true; do
   # reports that the emulator temporarily disappeared from its compatible set.
   attempt_log="$diagnostics_dir/instrumentation-attempt-$attempt.log"
   if [[ "$attempt" -ge 2 ]] || ! grep -Eq \
-      'No compatible devices connected\\.|Found [0-9]+ connected device\\(s\\), 0 of which were compatible' \
+      'No compatible devices connected\.|Found [0-9]+ connected device\(s\), 0 of which were compatible' \
       "$attempt_log"; then
     exit "$test_exit_code"
   fi
