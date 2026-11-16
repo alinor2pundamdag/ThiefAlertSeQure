@@ -35,7 +35,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     private lateinit var rootStatusView: TextView
     private val rootCheckExecutor = Executors.newSingleThreadExecutor()
     private var rangingStatus: String? = null
-    private var rangingQuery: RangingCapabilityQuery? = null
+    private var stopRangingQuery: (() -> Unit)? = null
     private val rangingPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) queryRangingCapabilities()
         else {
@@ -293,15 +293,15 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                 render()
             }
         }
-        rangingQuery = query
+        stopRangingQuery = { query.stop() }
         rangingStatus = "Querying local ranging capabilities…"
         render()
         query.start()
     }
 
     private fun clearRangingCallback() {
-        rangingQuery?.stop()
-        rangingQuery = null
+        stopRangingQuery?.invoke()
+        stopRangingQuery = null
     }
 
     override fun onStop() {
