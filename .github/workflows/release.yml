@@ -100,6 +100,7 @@ jobs:
             echo "Manual release preflight only: build and verify the signed APK, but do not publish a GitHub Release."
           fi
           PREVIOUS_TAG="$(gh release list --limit 1 --json tagName --jq '.[0].tagName // ""')"
+          PREVIOUS_CODE=""
           if [[ -n "$PREVIOUS_TAG" ]]; then
             PREVIOUS_CODE="$(git show "$PREVIOUS_TAG:app/build.gradle.kts" | sed -n 's/^val appVersionCode = \([0-9][0-9]*\)$/\1/p' | head -n 1)"
             if [[ -z "$PREVIOUS_CODE" || "$VERSION_CODE" -le "$PREVIOUS_CODE" ]]; then
@@ -117,6 +118,9 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Verify instrumentation is disabled
+        run: python3 scripts/verify_no_instrumentation.py
 
       - name: Run unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
@@ -163,35 +167,6 @@ jobs:
           cat "$APK_PATH.sha256"
           echo "Verified official APK: $PACKAGE_LINE"
           echo "Verified release signer: $ACTUAL_CERT"
-
-      - name: Assemble release instrumentation test APK
-        env:
-          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/thiefalertsequre-release.jks
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew :app:assembleReleaseAndroidTest -PinstrumentationTestBuild=true --no-daemon --stacktrace
-
-      - name: Prepare Android emulator framework-readiness shim
-        run: bash .github/scripts/prepare-adb-readiness-wrapper.sh
-
-      - name: Verify previous official APK upgrades in place without losing private data
-        timeout-minutes: 20
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/thiefalertsequre-release.jks
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        with:
-          api-level: 35
-          target: default
-          arch: x86_64
-          profile: pixel_2
-          emulator-boot-timeout: 900
-          disable-animations: true
-          script: bash .github/scripts/verify-in-place-upgrade.sh
 
       - name: Upload signed release preflight artifact (manual runs only)
         if: github.event_name == 'workflow_dispatch'

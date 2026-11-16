@@ -1,14 +1,14 @@
 # v1.1.4 UX/UI and interaction audit
 
-Status: source-level UX/UI implementation and CI audit passed on the current FIXALL coding head. Physical-device acceptance remains separate and is not inferred from CI. This is not a release certification.
+**Current status (2026-11-17):** Source-level UX/UI implementation and the static navigation/theme/dialog checks are recorded. Android instrumentation is not executed or compiled under the owner's current direction. The previous audit text below contains historical CI evidence and must not be read as current-head or physical-device acceptance. Current exact-head non-instrumentation CI run #1421 and CodeQL run #25 passed on commit `9168d1d`; any later code/documentation edits require a new exact-head run. Physical-device acceptance for this v1.1.4 candidate remains NOT TESTED.
 
-## Verified baseline
+## Historical verification baseline (not current-head evidence)
 - Branch: `work/phase-0-12-coding`
 - Latest code-level verified HEAD: `1141b10db19afc9ffa085b549adfd61ae0c39629`
 - GitHub Actions run [#1410](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43872054032) completed successfully on that exact commit.
-- Unit tests, instrumentation-source compilation (without execution), internal navigation/dialog checks, Android lint, asset/workflow validation, APK assembly, package/version/signer checks passed.
+- Unit tests, internal navigation/dialog checks, Android lint, asset/workflow validation, APK assembly, package/version/signer checks passed.
 - The successful run produced the `ThiefAlertSeQure-debug-apk` artifact (ID `14227919043`, archive SHA-256 `adcd4b859aed51eef6d65195cac56c5e481cb55f8cb1f66fb2796a8bec6cce23`). Verified APK: `com.thiefalertsequre.app.v114test`, versionCode `6`, versionName `1.1.4-test`, minSdk `26`; debug certificate SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`. APK SHA-256: `1523e03947550a5d06768a991222750a2fd16e824931dd17d39ae29469dd2a4c`. This debug signer is not the production signer.
-- The full API 26–37 emulator instrumentation matrix is enabled on the coding branch; this audit does not claim physical-device acceptance. No new physical-device test is claimed by this audit.
+- The historical API emulator matrix described in this section is superseded. No instrumentation or emulator matrix is part of the current workflow, and no new physical-device test is claimed.
 
 ## Implemented interaction contracts
 - Theme selection remains a local preview until Apply; Cancel does not persist the selection.

@@ -62,6 +62,9 @@ jobs:
       - name: Mark branch and pull-request builds as development-only
         run: echo "RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
 
+      - name: Verify instrumentation is disabled
+        run: python3 scripts/verify_no_instrumentation.py
+
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
 

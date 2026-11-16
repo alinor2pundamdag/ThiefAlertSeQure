@@ -10,9 +10,9 @@
 
 ## FIXALL work completed so far
 
-The authoritative coding scope and acceptance ledger is [docs/PHASE_0_12_EXECUTION_CHECKLIST.md](docs/PHASE_0_12_EXECUTION_CHECKLIST.md). The owner has directed that this work cover Phases 0–9 only and that no Android instrumentation tests, instrumentation compilation, or emulator test matrices be run.
+The authoritative coding scope and acceptance ledger is [docs/PHASE_0_12_EXECUTION_CHECKLIST.md](docs/PHASE_0_12_EXECUTION_CHECKLIST.md). The owner has directed completion of coding for Phases 0–12. Android instrumentation tests, instrumentation compilation, and emulator test matrices are prohibited. Phase 12 physical-device acceptance is prepared in software/documentation but can only be completed with real-device evidence.
 
-The bullets below include earlier work on predecessor branches; they are project history, not a claim that all Phases 0–9 are complete on the current branch.
+The bullets below include earlier work on predecessor branches; they are project history, not a claim that every Phase 0–12 acceptance gate is complete on the current branch.
 - Created a dedicated safety/work branch from the reviewed development candidate.
 - Restored the approved minSdk 26 invariant in the build candidate and aligned compatibility documentation.
 - Hardened charger-state handling so missing battery extras remain unknown rather than being treated as unplugged.
@@ -47,11 +47,11 @@ The bullets below include earlier work on predecessor branches; they are project
 ## Current coding-head status (2026-11-17)
 
 - Current coding branch: `work/phase-0-12-coding`.
-- Current candidate head: `fa82258965003b4807574f5b51cf355a050f5d37`.
-- Owner-directed scope: finish Phases 0–9 coding and non-instrumentation verification only. Do not run or compile instrumentation tests; do not run emulator matrices.
-- Android workflow was changed to remove the instrumentation job, dispatch input, and instrumentation-source compilation step. The prior matrix run was cancelled by the replacement workflow.
-- The exact-head non-instrumentation Android build and CodeQL workflows have been triggered; their results are pending. No 100% completion claim is made yet.
-- Older build/CodeQL and emulator results below are historical evidence for their own commits only.
+- Verified head before the current Phase 10–12 hardening commit: `9168d1d484e1ef1de78c465325711492b29fb07f`.
+- Owner-directed scope: complete coding for Phases 0–12, without instrumentation execution/compilation or emulator matrices.
+- Exact-head non-instrumentation Android CI run [#1421](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43938339649) and CodeQL run [#25](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43938339708) passed on `9168d1d`; subsequent edits require a fresh exact-head run.
+- Phase 10 covers documentation, privacy and assets; Phase 11 covers branch integration/release-candidate readiness without merging or publishing; Phase 12 prepares physical-device acceptance, whose execution requires real hardware.
+- The release workflow is being aligned with the no-instrumentation rule; no instrumentation compilation or emulator upgrade test may remain in any workflow.
 - `main` remains untouched. No merge, tag, APK publication, or production release has been performed or authorized.
 
 ## Historical verification status
@@ -62,12 +62,14 @@ The bullets below include earlier work on predecessor branches; they are project
 - Physical HONOR 200 Pro acceptance remains excluded from Phase 1 and is reserved for Phase 12. Emulator results are not represented as physical-device evidence.
 - Production-signed APK/update continuity, merge, tag, APK publication, and production release remain separate gates and are not authorized by this Phase 1 work.
 
-## Remaining non-instrumentation verification
+## Phase 0–12 completion gates
 
-1. Complete the Phase 0–9 source and cross-file integration audit; fix only confirmed defects or missing acceptance requirements.
-2. Run exact-head JVM unit tests, static/source-contract checks, Android lint, release build, APK metadata/package/signer checks, and CodeQL.
-3. Review the final diff and confirm production identity, local-first behavior, data preservation, permissions, and branch isolation.
-4. Keep physical-device acceptance, production merge, tag, APK publication and release as separate gates requiring real device evidence or explicit owner approval.
+1. Finish source and cross-file integration audits for Phases 0–9; fix only confirmed defects or missing acceptance requirements.
+2. Complete Phase 10 documentation/privacy/assets consistency and integrity checks.
+3. Complete Phase 11 branch diff, package/signing/version, workflow and release-candidate review. Do not merge or publish.
+4. Run exact-head non-instrumentation JVM unit tests, static/source-contract checks, Android lint, release build, APK metadata/package/signer checks, and CodeQL.
+5. Keep Phase 12 physical-device execution separate; use the documented matrix and record real model/build/commit evidence. No emulator or instrumentation substitute is allowed.
+6. Keep production merge, tag, APK publication and release as separate gates requiring explicit owner approval.
 
 ## Rules
 - Do not silently change scope or product behavior.
