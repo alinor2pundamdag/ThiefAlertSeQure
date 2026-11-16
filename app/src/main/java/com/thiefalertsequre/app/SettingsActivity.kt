@@ -280,6 +280,7 @@ class SettingsActivity : FragmentActivity() {
                     startService(
                         Intent(this, ProtectionMonitorService::class.java)
                             .setAction(ProtectionMonitorService.ACTION_STOP)
+                            .putExtra(ProtectionMonitorService.EXTRA_STOP_PREFERENCE_COMMITTED, true)
                     )
                 }.onFailure {
                     android.widget.Toast.makeText(this, "Monitor stop could not be requested: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
