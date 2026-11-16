@@ -58,9 +58,21 @@ adb install "$PREVIOUS_APK"
 adb install -t "$TEST_APK"
 TEST_RUNNER="com.thiefalertsequre.app.test/androidx.test.runner.AndroidJUnitRunner"
 TEST_CLASS="com.thiefalertsequre.app.UpgradeDataPreservationTest#upgradeDataCanBeSeededOrVerifiedAcrossPackageReplacement"
+UPGRADE_SNAPSHOT_SEEDED=false
+UPGRADE_SNAPSHOT_RESTORED=false
+restore_upgrade_test_state() {
+  if [[ "$UPGRADE_SNAPSHOT_SEEDED" == "true" && "$UPGRADE_SNAPSHOT_RESTORED" != "true" ]]; then
+    echo "::warning::Candidate install or verification did not finish; restoring the pre-upgrade emulator state."
+    adb shell am instrument -w -r -e class "$TEST_CLASS" -e upgradePhase cleanup "$TEST_RUNNER" || true
+  fi
+}
+trap restore_upgrade_test_state EXIT
 adb shell am instrument -w -r -e class "$TEST_CLASS" -e upgradePhase seed "$TEST_RUNNER"
+UPGRADE_SNAPSHOT_SEEDED=true
 adb install -r "$APK_PATH"
 adb shell am instrument -w -r -e class "$TEST_CLASS" -e upgradePhase verify "$TEST_RUNNER"
+UPGRADE_SNAPSHOT_RESTORED=true
+trap - EXIT
 NEW_BADGING="$("$BUILD_TOOLS/aapt" dump badging "$APK_PATH")"
 NEW_PACKAGE_LINE="$(printf '%s\n' "$NEW_BADGING" | grep -m1 "^package:")"
 for EXPECTED in "name='com.thiefalertsequre.app'" "versionCode='$APP_VERSION_CODE'" "versionName='$APP_VERSION_NAME'"; do
