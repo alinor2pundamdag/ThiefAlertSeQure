@@ -386,7 +386,7 @@ jobs:
           fi
           echo "Using Android SDK Manager: $real_sdkmanager"
           "$real_sdkmanager" --list --channel=3 | tee "$RUNNER_TEMP/android-sdk-preview-packages.txt"
-          grep -Eq 'platforms;android-37\\.0' "$RUNNER_TEMP/android-sdk-preview-packages.txt" || {
+          grep -Eq 'platforms;android-37\.0' "$RUNNER_TEMP/android-sdk-preview-packages.txt" || {
             echo "::error::Android 17 preview SDK package platforms;android-37.0 is not available from the configured SDK repositories."
             exit 1
           }
