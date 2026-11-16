@@ -75,6 +75,16 @@ if "Monitor runtime:" not in bluetooth_activity or "Monitoring runs only while A
 if "AndroidDeviceCompatibility.appInfoIntent(packageName)" not in device_activity:
     errors.append("DeviceIntelligenceActivity must provide a fallback for app Settings navigation")
 
+# Permission/capability screens must refresh their live snapshot after returning from Android Settings.
+for screen in (
+    "SettingsActivity.kt", "BluetoothCenterActivity.kt",
+    "DeviceIntelligenceActivity.kt", "SetupStatusActivity.kt"
+):
+    source = (APP / screen).read_text(encoding="utf-8")
+    resume = re.search(r"override fun onResume\\(\\)(.*?)(?=\\n    (?:override fun|private fun|protected fun))", source, re.S)
+    if not resume or "render()" not in resume.group(0):
+        errors.append(screen + " must refresh live permission/capability status on resume")
+
 for screen in (
     "MainActivity.kt", "SettingsActivity.kt", "BluetoothCenterActivity.kt",
     "DeviceIntelligenceActivity.kt", "ThemeActivity.kt", "SetupStatusActivity.kt"
