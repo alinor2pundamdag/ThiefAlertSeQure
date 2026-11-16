@@ -187,3 +187,13 @@ Physical-device tests, emulator tests, and instrumentation compilation/execution
 - These changes are committed on `work/phase-0-12-coding`; they have not yet received independently confirmed exact-head Android/JVM/CodeQL CI results.
 - Source review in this continuation covers the charger, protection state/persistence, alarm scheduling/recovery, boot, monitor lifecycle, A2 Bluetooth registry/scheduler/receiver, encryption, updater, alarm audio/volume, and authentication flows. Repository-wide audit remains open; no claim of 100% source audit is made.
 - Physical-device, emulator, and instrumentation execution remain explicitly excluded from the owner's completion criteria.
+
+
+### A2 concurrent deadline-store hardening — 2026-11-17
+
+- A2 pending deadline persistence now serializes schedule/find/cancel/clear operations to prevent concurrent ACL callbacks for different accessories from overwriting the shared encrypted list.
+- Failed schedule cleanup now uses the same isolated preference/PendingIntent namespace as the originating operation.
+- Pure per-device merge helper preserves unrelated accessory records and replaces only a case-insensitive match.
+- JVM tests added in `app/src/test/java/com/thiefalertsequre/app/A2DisconnectSchedulerMergeTest.kt`.
+- Source commits: `5cf2da0b7c1f134e9a1fcdfd4b913a2561aa85c3`, `679f22ac7c2721af15e298a851fdbbfbf8c4b31e`; test commit: `f5bf25576de8a903699a989924a515ea506401a6`.
+- Exact-head CI remains pending; this is not yet CI-verified.
