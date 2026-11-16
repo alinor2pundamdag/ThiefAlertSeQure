@@ -173,6 +173,8 @@ class UpgradeDataPreservationTest {
             ?: error("Original monitor preferences snapshot is missing")
         val upgradeSnapshot = backupPrefs.getString(KEY_UPGRADE_SNAPSHOT, null)
             ?: error("Original upgrade-test preferences snapshot is missing")
+        val historySnapshot = backupPrefs.getString(KEY_HISTORY_SNAPSHOT, null)
+            ?: error("Original local event history snapshot is missing")
         val markerExisted = backupPrefs.getBoolean(KEY_MARKER_EXISTED, false)
         val markerContents = backupPrefs.getString(KEY_MARKER_CONTENTS, "").orEmpty()
         val monitorWasRunning = backupPrefs.getBoolean(KEY_MONITOR_WAS_RUNNING, false)
@@ -197,6 +199,7 @@ class UpgradeDataPreservationTest {
         }
         // Package-replacement recovery can append events; restore the owner's
         // original bounded history after the test monitor state has been settled.
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
         restorePreferences(
             context.getSharedPreferences("local_tamper_history_v1", Context.MODE_PRIVATE),
             historySnapshot

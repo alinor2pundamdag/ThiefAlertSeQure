@@ -32,6 +32,7 @@ class PowerTransitionRecoveryInstrumentationTest {
     private var originalProtectionState: ProtectionState? = null
     private var originalMonitorEnabled = false
     private var originalMonitorWasRunning = false
+    private var stateCaptured = false
 
     @Before
     fun preserveExistingProtectionStateAndIsolateMonitor() {
@@ -45,7 +46,7 @@ class PowerTransitionRecoveryInstrumentationTest {
         val hasExistingAlarm = when (initialAlarmToken) {
             is PreferenceRead.Value -> initialAlarmToken.value != null
             is PreferenceRead.Corrupt -> true
-        }
+        } || AlarmScheduler.hasLegacyPendingIntent(appContext)
         assumeTrue(
             "Do not run recovery instrumentation while a real countdown or latched alarm is active",
             initialProtectionState.mode != ProtectionMode.COUNTDOWN &&
@@ -63,6 +64,7 @@ class PowerTransitionRecoveryInstrumentationTest {
             monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
         originalMonitorWasRunning = ProtectionMonitorService.isRunning
+        stateCaptured = true
         check(monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, false).commit())
         appContext.stopService(Intent(appContext, ProtectionMonitorService::class.java))
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
@@ -70,6 +72,7 @@ class PowerTransitionRecoveryInstrumentationTest {
 
     @After
     fun restoreExistingProtectionStateAndMonitor() {
+        if (!stateCaptured) return
         transitionSnapshot.restore()
         stateSnapshot.restore()
         corruptionSnapshot.restore()
