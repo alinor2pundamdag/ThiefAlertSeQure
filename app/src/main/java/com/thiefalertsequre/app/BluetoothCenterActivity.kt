@@ -408,7 +408,7 @@ class BluetoothCenterActivity : FragmentActivity() {
                     if (Build.VERSION.SDK_INT >= 37) append("\n\nWi-Fi Proximity Detection (not Bluetooth): ${status(5)}")
                     append("\n\nThis is a local capability query only. A compatible peer and supported ranging session are still required; no distance or direction is measured.")
                 }
-                runOnUiThread { if (!isFinishing && !isDestroyed) showResult("Ranging capability results", result) }
+                runOnUiThread { if (!isFinishing && !isDestroyed && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) showResult("Ranging capability results", result) }
             }
         }
         unregisterRangingCallback = { runCatching { manager.unregisterCapabilitiesCallback(callback) }; Unit }
@@ -433,7 +433,7 @@ class BluetoothCenterActivity : FragmentActivity() {
                         if (report.indicators.isNotEmpty()) append("\n\nIndicators:\n${report.indicators.joinToString("\n")}")
                         append("\n\nREAD-ONLY BLUETOOTH DIAGNOSTICS\n$diagnostics")
                     }.take(24000)
-                    runOnUiThread { if (!isFinishing && !isDestroyed) showResult("Device diagnostics", output) }
+                    runOnUiThread { if (!isFinishing && !isDestroyed && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) showResult("Device diagnostics", output) }
                 }
             }.showThemed(this)
     }
