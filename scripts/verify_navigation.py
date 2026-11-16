@@ -126,8 +126,8 @@ if "startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" i
 if "AndroidDeviceCompatibility.open(" not in settings_activity:
     errors.append("Settings external destinations must use the centralized guarded launcher")
 if (
-    "KEY_ENABLED, enabled).apply()" in settings_activity
-    or "KEY_ENABLED, enabled).commit()" not in settings_activity
+    "putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).apply()" in settings_activity
+    or "putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).commit()" not in settings_activity
     or "batteryAlertEdit.commit()" not in settings_activity
     or ".setAction(ProtectionMonitorService.ACTION_STOP)" not in settings_activity
     or "stopService(Intent(this, ProtectionMonitorService::class.java))" in settings_activity
