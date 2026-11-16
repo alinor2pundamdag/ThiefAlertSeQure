@@ -30,6 +30,23 @@ class AlarmSchedulerInstrumentationTest {
         }
     }
 
+    @Test fun failedAlarmSubmissionRestoresThePreviousPersistedToken() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val prefs = context.getSharedPreferences("alarm_scheduler_v1", Context.MODE_PRIVATE)
+        val existing = "previous-valid-token"
+        assertTrue(prefs.edit().clear().putString("last_token", existing).commit())
+        try {
+            val scheduled = AlarmScheduler.replaceTokenAndSchedule(context, "new-token") {
+                throw IllegalStateException("simulated AlarmManager submission failure")
+            }
+
+            assertFalse("A rejected AlarmManager submission must be reported as failure", scheduled)
+            assertEquals("The previous alarm token must be restored", existing, prefs.getString("last_token", null))
+        } finally {
+            AlarmScheduler.cancel(context)
+        }
+    }
+
     @Test fun invalidDeadlineDoesNotReplacePreviouslyPersistedToken() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prefs = context.getSharedPreferences("alarm_scheduler_v1", Context.MODE_PRIVATE)
