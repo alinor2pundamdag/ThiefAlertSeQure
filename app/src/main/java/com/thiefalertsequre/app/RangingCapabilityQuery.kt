@@ -3,6 +3,8 @@ package com.thiefalertsequre.app
 import android.content.Context
 import android.ranging.RangingCapabilities
 import android.ranging.RangingManager
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.RequiresApi
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -19,6 +21,13 @@ internal class RangingCapabilityQuery(
     private val executor = context.mainExecutor
     private var callback: RangingManager.RangingCapabilitiesCallback? = null
     private val resultDelivered = AtomicBoolean(false)
+    private val timeoutHandler = Handler(Looper.getMainLooper())
+    private val timeout = Runnable {
+        if (resultDelivered.compareAndSet(false, true)) {
+            unregisterCallback()
+            onResult("Android did not return ranging capability information within 8 seconds. No ranging session was started.")
+        }
+    }
 
     fun start(): Boolean {
         val rangingManager = manager
@@ -29,6 +38,7 @@ internal class RangingCapabilityQuery(
         val listener = object : RangingManager.RangingCapabilitiesCallback {
             override fun onRangingCapabilities(capabilities: RangingCapabilities) {
                 if (!resultDelivered.compareAndSet(false, true)) return
+                timeoutHandler.removeCallbacks(timeout)
                 val availability = capabilities.technologyAvailability
                 val knownTechnologies = listOf(
                     RangingManager.BLE_CS,
@@ -52,11 +62,14 @@ internal class RangingCapabilityQuery(
             }
         }
         callback = listener
+        timeoutHandler.postDelayed(timeout, 8_000L)
         return runCatching {
             rangingManager.registerCapabilitiesCallback(executor, listener)
             true
         }.onFailure { error ->
-            stop()
+            timeoutHandler.removeCallbacks(timeout)
+            resultDelivered.set(true)
+            unregisterCallback()
             onResult(
                 if (error is SecurityException) {
                     "Android or device policy denied the local capability query. No permission was requested; this API may be restricted on this device."
@@ -68,6 +81,12 @@ internal class RangingCapabilityQuery(
     }
 
     fun stop() {
+        resultDelivered.set(true)
+        timeoutHandler.removeCallbacks(timeout)
+        unregisterCallback()
+    }
+
+    private fun unregisterCallback() {
         val listener = callback ?: return
         callback = null
         runCatching { manager?.unregisterCapabilitiesCallback(listener) }
