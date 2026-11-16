@@ -500,7 +500,9 @@ class SettingsActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (::root.isInitialized) ThemeRuntime.apply(this, window.decorView)
+        // Re-read Android permission, channel, battery and service state after
+        // returning from system Settings instead of showing stale readiness.
+        if (::root.isInitialized) render()
         val pending = pendingUpdateInstall ?: return
         pendingUpdateInstall = null
         if (Build.VERSION.SDK_INT < 26 || packageManager.canRequestPackageInstalls()) {
