@@ -482,10 +482,18 @@ class MainActivity : FragmentActivity() {
         // Owner opt-out is authoritative for every non-triggered state. A
         // connected snapshot may arm only while monitoring is enabled.
         val state = when {
-            !monitorEnabled && current.mode != ProtectionMode.ALARM_TRIGGERED ->
-                store.update { old ->
+            !monitorEnabled && current.mode != ProtectionMode.ALARM_TRIGGERED -> {
+                val update = store.updatePersisted { old ->
                     ProtectionEngine.disableMonitoring(old, System.currentTimeMillis())
                 }
+                if (!update.persisted) {
+                    LocalTamperHistory.record(
+                        this, "dashboard_monitor_opt_out_state_persist_failed",
+                        "Monitoring is disabled, but the protection state was not durably disarmed; the prior state remains authoritative"
+                    )
+                }
+                update.state
+            }
             monitorEnabled && current.mode != ProtectionMode.ALARM_TRIGGERED &&
                 ExternalPowerState.readConnected(this) == true ->
                 PowerTransitionCoordinator.confirmConnectedAndArm(this, "Connected power confirmed during app reconciliation")
