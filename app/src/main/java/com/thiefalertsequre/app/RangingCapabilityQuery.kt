@@ -1,6 +1,8 @@
 package com.thiefalertsequre.app
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.ranging.RangingCapabilities
 import android.ranging.RangingManager
 import androidx.annotation.RequiresApi
@@ -19,6 +21,10 @@ internal class RangingCapabilityQuery(
     private var callback: RangingManager.RangingCapabilitiesCallback? = null
 
     fun start(): Boolean {
+        if (context.checkSelfPermission(Manifest.permission.RANGING) != PackageManager.PERMISSION_GRANTED) {
+            onResult("Ranging permission is not granted. No capability query was performed.")
+            return false
+        }
         val rangingManager = manager
         if (rangingManager == null) {
             onResult("Android exposes no RangingManager service on this device.")
