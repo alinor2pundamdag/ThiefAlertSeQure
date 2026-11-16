@@ -6,12 +6,43 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.After
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AlarmSchedulerInstrumentationTest {
+    private lateinit var appContext: Context
+    private lateinit var originalSchedulerPreferences: SharedPreferencesSnapshot
+    private var originalProtectionState: ProtectionState? = null
+
+    @Before
+    fun preserveExistingDeadline() {
+        appContext = InstrumentationRegistry.getInstrumentation().targetContext
+        originalSchedulerPreferences = SharedPreferencesSnapshot(appContext, "alarm_scheduler_v1")
+        originalProtectionState = ProtectionStore(appContext).read()
+    }
+
+    @After
+    fun restoreExistingDeadline() {
+        val state = originalProtectionState
+        if (state?.mode == ProtectionMode.COUNTDOWN) {
+            check(
+                AlarmScheduler.schedule(
+                    appContext,
+                    state.deadlineEpochMs,
+                    state.deadlineElapsedRealtimeMs,
+                    state.bootCount
+                )
+            ) { "The pre-test countdown deadline could not be restored" }
+        } else {
+            AlarmScheduler.cancel(appContext)
+        }
+        originalSchedulerPreferences.restore()
+    }
+
     @Test fun countdownDeadlineTokenIsCommittedAndRemovedByCancellation() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prefs = context.getSharedPreferences("alarm_scheduler_v1", Context.MODE_PRIVATE)
