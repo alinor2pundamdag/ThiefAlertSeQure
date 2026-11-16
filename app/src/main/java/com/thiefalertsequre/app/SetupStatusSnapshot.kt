@@ -27,9 +27,10 @@ object SetupStatusSnapshot {
  fun read(c:Context):SetupSnapshot{
   val x=mutableListOf<SetupItem>();val alarm=c.getSystemService(AlarmManager::class.java)
   if(Build.VERSION.SDK_INT>=31){val ok=runCatching{alarm.canScheduleExactAlarms()}.getOrDefault(false);x+=SetupItem("exact","Exact 10-second alarm access",if(ok)SetupState.VERIFIED else SetupState.ACTION_REQUIRED,if(ok)"Android confirms exact-alarm scheduling access." else "Android has not granted exact-alarm special access.")}else x+=SetupItem("exact","Exact alarm access",SetupState.UNSUPPORTED,"No separate access gate on this Android version.")
-  val notifs=runCatching{NotificationManagerCompat.from(c).areNotificationsEnabled()}.getOrDefault(false);x+=SetupItem("notifications","App notifications",if(notifs)SetupState.VERIFIED else SetupState.ACTION_REQUIRED,if(notifs)"Android reports notifications enabled." else "Android reports notifications disabled.")
+  val notifs=runCatching{NotificationManagerCompat.from(c).areNotificationsEnabled()}.getOrDefault(false)
+  x+=NotificationSetupStatusPolicy.appNotifications(notifs)
   val alarmChannel=runCatching{c.getSystemService(NotificationManager::class.java).getNotificationChannel(AlarmService.CHANNEL_ID)}.getOrNull()
-  x+=SetupItem("alarm_channel","Alarm notification channel",when{alarmChannel==null->SetupState.UNKNOWN;alarmChannel.importance==NotificationManager.IMPORTANCE_NONE->SetupState.ACTION_REQUIRED;else->SetupState.VERIFIED},when{alarmChannel==null->"Android has not created the alarm channel yet; it is created when the alarm service first starts.";alarmChannel.importance==NotificationManager.IMPORTANCE_NONE->"Android reports that the alarm notification channel is blocked.";else->"Android reports that the alarm notification channel is available."})
+  x+=NotificationSetupStatusPolicy.alarmChannel(alarmChannel?.importance)
   val dashboardEnabled=SafePreferences.boolean(c.getSharedPreferences(MainActivity.ALARM_DISPLAY_PREFS,0),MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN,false)
   val fullScreenAccess=Build.VERSION.SDK_INT<34||runCatching{c.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()}.getOrDefault(false)
   x+=FullScreenSetupStatusPolicy.evaluate(dashboardEnabled,Build.VERSION.SDK_INT,fullScreenAccess)

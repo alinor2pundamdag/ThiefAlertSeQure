@@ -48,6 +48,9 @@ for feature in (
     "android.hardware.bluetooth",
     "android.hardware.bluetooth_le",
     "android.hardware.sensor.accelerometer",
+    "android.hardware.camera",
+    "android.hardware.camera.flash",
+    "android.hardware.fingerprint",
 ):
     declaration = features.get(feature)
     if declaration is None or declaration.get(ANDROID + "required") != "false":
@@ -57,6 +60,9 @@ for permission in (
     "android.permission.CAMERA",
     "android.permission.ACCESS_FINE_LOCATION",
     "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.ACCESS_BACKGROUND_LOCATION",
+    "android.permission.BLUETOOTH_SCAN",
+    "android.permission.BLUETOOTH_ADVERTISE",
     "android.permission.RECORD_AUDIO",
     "android.permission.READ_CONTACTS",
     "android.permission.SEND_SMS",
