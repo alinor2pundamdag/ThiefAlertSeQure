@@ -106,8 +106,7 @@ class BootReceiver : BroadcastReceiver() {
         // Preserve the previous opt-out contract even when Android's sticky
         // battery snapshot is temporarily unavailable.
         ProtectionStore(context).update { current ->
-            if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
-            else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+            ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
         }
         PowerTransitionCoordinator.resetBaselineToCurrentPower(context, "Protection monitor is disabled")
         return ProtectionStore(context).read()
