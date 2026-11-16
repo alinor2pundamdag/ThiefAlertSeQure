@@ -1,8 +1,9 @@
 # ThiefAlertSeQure — Universal Maximum Protection Specification
 
 **Status:** Master implementation plan; not a claim that every item is implemented or physically verified.  
-**Source branch:** `feat/custom-audio-and-reliability`  
-**Baseline commit reviewed:** `49a7571c397d09fb76108148218cea348ace2159`  
+**Historical source branch:** `feat/custom-audio-and-reliability`  
+**Historical baseline commit reviewed:** `49a7571c397d09fb76108148218cea348ace2159`  
+**Current FIXALL coding branch:** `work/phase-0-12-coding` (see `PROJECT_STATE.md` and `docs/REQUIREMENT_TRACEABILITY_MATRIX.md` for exact-head evidence).  
 **Minimum Android version:** API 26 (Android 8.0), per current Gradle configuration.  
 **Current target SDK:** API 36. Re-audit platform behavior before changing target SDK.  
 **Product rule:** One universal local protection engine, Android-version-aware platform integration, and optional manufacturer guidance. HONOR is a test device, not the compatibility boundary.

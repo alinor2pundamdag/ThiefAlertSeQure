@@ -72,6 +72,11 @@ jobs:
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
 
+      # Compile instrumentation test sources without executing emulator tests.
+      # Execution remains gated until coding phases 0–12 are complete.
+      - name: Compile release instrumentation test sources (no execution)
+        run: ./gradlew :app:compileReleaseAndroidTestKotlin --no-daemon --stacktrace
+
       - name: Verify internal navigation and themed dialogs
         run: python3 scripts/verify_navigation.py
 

@@ -8,7 +8,9 @@
 
 # ThiefAlertSeQure — Feature Completion Matrix
 
-> **Detailed v1.1.4 coding percentages, device acceptance, and source-file traceability:** [V1.1.4 Feature Implementation Status](V1.1.4_FEATURE_IMPLEMENTATION_STATUS.md). The branch-scope coding estimate is 94%; v1.1.4 physical-device acceptance is not yet recorded.
+> **Historical v1.1.4 feature-branch assessment:** [V1.1.4 Feature Implementation Status](V1.1.4_FEATURE_IMPLEMENTATION_STATUS.md). Its 94% figure is an estimate for the earlier audited branch only; it is not a completion percentage for the current FIXALL work branch.
+
+> **Current FIXALL verification snapshot (2026-11-16):** branch `work/phase-0-12-coding`, commit `2bfd0a489599e06268be7f16eb5f8f44c9005977`. GitHub Actions run [#1386](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43854356458) passed the build job, unit tests, navigation/preferences/manifest/state checks, lint, APK assembly, and package/version/signer checks. The instrumentation job was intentionally skipped. This does not certify every Phase 0–12 requirement or physical-device behavior; no current overall completion percentage is claimed.
 
 > **Official successor baseline: v1.1.3 (versionCode 5).** This release line preserves the completed v1.1.2 feature set; its intended functional addition is the synchronized rear-LED flashlight during a latched alarm. No v1.1.2 protection, alarm, authentication, privacy, settings, history, or managed-device feature is intentionally removed. Flashlight availability is optional and cannot block audio.
 
