@@ -104,7 +104,7 @@ class BluetoothCenterActivity : FragmentActivity() {
                 "Android Ranging API is available from API 36. A platform query can report BLE Channel Sounding, BLE RSSI ranging, UWB, and Wi-Fi NAN RTT.",
                 "This check does not start a ranging session or measure distance. A compatible peer, setup, permissions, and hardware are still required."
             ))
-            root.addView(button("Check actual ranging hardware capabilities") { checkRangingPermission() }, matchWrap())
+            root.addView(button("Check actual ranging hardware capabilities") { checkRangingCapabilities() }, matchWrap())
             root.addView(space(14))
         }
         root.addView(sectionTitle("ROOT-AWARE DIAGNOSTICS"), matchWrap())
@@ -404,7 +404,7 @@ class BluetoothCenterActivity : FragmentActivity() {
         else -> R.color.tas_muted
     }
 
-    private fun checkRangingPermission() {
+    private fun checkRangingCapabilities() {
         if (Build.VERSION.SDK_INT < 36) {
             showResult("Ranging unavailable", "The Android Ranging capability API requires Android 16 (API 36) or newer.")
             return

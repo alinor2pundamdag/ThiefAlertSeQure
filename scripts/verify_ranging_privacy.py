@@ -12,9 +12,11 @@ all_kotlin = "\n".join(path.read_text(encoding="utf-8") for path in kotlin_sourc
 
 required = {
     "owner explicitly starts the capability check from Device Intelligence": 'button("Check Android ranging capabilities (optional)") { requestRangingCapabilityCheck() }' in activity,
-    "owner explicitly starts the capability check from Bluetooth Center": 'button("Check actual ranging hardware capabilities") { checkRangingPermission() }' in (ROOT / "app/src/main/java/com/thiefalertsequre/app/BluetoothCenterActivity.kt").read_text(encoding="utf-8"),
+    "owner explicitly starts the capability check from Bluetooth Center": 'button("Check actual ranging hardware capabilities") { checkRangingCapabilities() }' in (ROOT / "app/src/main/java/com/thiefalertsequre/app/BluetoothCenterActivity.kt").read_text(encoding="utf-8"),
     "both screens use the shared local-only capability query": "RangingCapabilityQuery(this)" in activity and "RangingCapabilityQuery(this)" in (ROOT / "app/src/main/java/com/thiefalertsequre/app/BluetoothCenterActivity.kt").read_text(encoding="utf-8"),
     "capability query registers and unregisters only the availability callback": "registerCapabilitiesCallback" in query and "unregisterCapabilitiesCallback" in query,
+    "capability callback has a bounded eight-second timeout": "timeoutHandler.postDelayed(timeout, 8_000L)" in query and "did not return ranging capability information within 8 seconds" in query,
+    "Bluetooth Center delegates to the shared helper rather than registering a duplicate callback": "RangingCapabilityQuery(this)" in (ROOT / "app/src/main/java/com/thiefalertsequre/app/BluetoothCenterActivity.kt").read_text(encoding="utf-8") and "android.ranging.RangingManager" not in (ROOT / "app/src/main/java/com/thiefalertsequre/app/BluetoothCenterActivity.kt").read_text(encoding="utf-8"),
     "privacy policy states no RANGING permission is requested for local capability inspection": "No Android RANGING permission is requested" in privacy,
 }
 for description, passed in required.items():
