@@ -177,3 +177,13 @@ Physical-device tests, emulator tests, and instrumentation compilation/execution
 - Draft review PR: [#7 — ThiefAlertSeQure Solo Phases 0–12 code completion](https://github.com/alinor2pundamdag/ThiefAlertSeQure/pull/7); draft and unmerged.
 - Exact-head CI for PR #7 has not yet been observed in the connector results at the time of this update. The last evidenced Android/CodeQL success remains the earlier commits listed above.
 - Branch comparison at this snapshot: 500 commits ahead (API comparison cap), 1 behind `main`; divergence remains unresolved. No merge or rebase was performed.
+
+
+## Continued software audit — 2026-11-17
+
+- Confirmed authentication freshness defect fixed in `e17f482264eba0d027b92499010be3b72c6d0086`: mismatched availability of issued/current boot identity now rejects the ephemeral proof.
+- Regression coverage added in `80c8c52be927db24a31a7c08d699998ffb72d559`: known-to-unknown, unknown-to-known, and both-unknown identity cases.
+- Instrumentation policy guard strengthened in `1e69aeb6b412ca52c9b79049e8be024cda8fb817`: it now scans every Gradle build/configuration file (`.gradle`, `.gradle.kts`, `.toml`) and all GitHub Actions workflow YAML files for forbidden instrumentation/emulator build wiring.
+- These changes are committed on `work/phase-0-12-coding`; they have not yet received independently confirmed exact-head Android/JVM/CodeQL CI results.
+- Source review in this continuation covers the charger, protection state/persistence, alarm scheduling/recovery, boot, monitor lifecycle, A2 Bluetooth registry/scheduler/receiver, encryption, updater, alarm audio/volume, and authentication flows. Repository-wide audit remains open; no claim of 100% source audit is made.
+- Physical-device, emulator, and instrumentation execution remain explicitly excluded from the owner's completion criteria.
