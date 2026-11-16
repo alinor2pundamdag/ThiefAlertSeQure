@@ -365,12 +365,31 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sdkmanager --list --channel=3 | tee "$RUNNER_TEMP/android-sdk-preview-packages.txt"
-          grep -Eq 'platforms;android-37\.0' "$RUNNER_TEMP/android-sdk-preview-packages.txt" || {
+          # GitHub-hosted Ubuntu images may have the Android SDK installed
+          # without adding sdkmanager to PATH. Resolve it from the active SDK root.
+          real_sdkmanager="$(command -v sdkmanager || true)"
+          if [[ -z "$real_sdkmanager" ]]; then
+            for sdk_root in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" /usr/local/lib/android/sdk /opt/android-sdk; do
+              [[ -n "$sdk_root" && -d "$sdk_root/cmdline-tools" ]] || continue
+              candidate="$(find "$sdk_root/cmdline-tools" -type f -name sdkmanager -perm -u+x 2>/dev/null | sort -V | tail -n 1)"
+              if [[ -n "$candidate" ]]; then
+                real_sdkmanager="$candidate"
+                break
+              fi
+            done
+          fi
+          if [[ -z "$real_sdkmanager" ]]; then
+            echo "::error::Android SDK Manager was not found on PATH or in known Android SDK command-line-tools locations."
+            printf 'ANDROID_HOME=%s\\nANDROID_SDK_ROOT=%s\\n' "${ANDROID_HOME:-unset}" "${ANDROID_SDK_ROOT:-unset}"
+            find /usr/local/lib/android /opt/android-sdk -maxdepth 5 -type f -name sdkmanager -print 2>/dev/null || true
+            exit 1
+          fi
+          echo "Using Android SDK Manager: $real_sdkmanager"
+          "$real_sdkmanager" --list --channel=3 | tee "$RUNNER_TEMP/android-sdk-preview-packages.txt"
+          grep -Eq 'platforms;android-37\\.0' "$RUNNER_TEMP/android-sdk-preview-packages.txt" || {
             echo "::error::Android 17 preview SDK package platforms;android-37.0 is not available from the configured SDK repositories."
             exit 1
           }
-          real_sdkmanager="$(command -v sdkmanager)"
           wrapper_dir="$RUNNER_TEMP/android-sdkmanager-preview"
           mkdir -p "$wrapper_dir"
           cat > "$wrapper_dir/sdkmanager" <<'WRAPPER'
