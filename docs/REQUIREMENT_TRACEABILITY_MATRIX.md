@@ -1,6 +1,6 @@
 > Current FIXALL candidate: v`1.1.4` / versionCode `6`, package `com.thiefalertsequre.app`; side-by-side debug test variant is `com.thiefalertsequre.app.v114test`. Production identity and signing configuration are protected invariants. No production release is authorized by this verification work.
 > Contract: [Universal Maximum Protection Specification](UNIVERSAL_MAXIMUM_PROTECTION_SPEC.md).
-> Status labels: **Implemented** means source code exists; **Unit-covered** means a named local test exists; **CI-verified** means the exact baseline commit passed the named GitHub Actions job; **Device-unverified** means no independently verified physical-device evidence is recorded. These labels are deliberately not interchangeable.
+> Status labels: **Implemented** means source code exists; **Unit-covered** means a named JVM unit test exists; **CI-verified** means the exact commit passed the named non-instrumentation GitHub Actions checks. Physical-device and emulator acceptance are explicitly outside the current owner-authorized completion scope and are not blockers. Dormant `androidTest` source files and historical instrumentation records are reference-only; they must not be compiled or executed.
 
 ## 1. Verification snapshot
 
@@ -120,18 +120,17 @@
 - ASUS, Sony, Nothing, Tecno, Infinix, and ZTE when hardware is available.
 - For each device: plug/unplug event timing; reconnect; screen off; foreground/background; battery saver; app swipe-away; force-stop boundary; reboot; exact-alarm denied/granted; notification denied/granted; audio route/volume; secure lock screen; Device Admin opt-in/out; OS update; app update.
 
-## 7. Definition of Done
+## 7. Definition of Done — code/GitHub scope
 
-A requirement is **complete** only when:
-1. Its owner implementation is present and reviewed.
-2. Its failure modes and cross-file interactions are covered by automated tests where testable.
-3. CI passes on the exact commit.
-4. Device-dependent behavior is validated on the named Android/OEM targets, or explicitly remains marked **Device-unverified**.
-5. UI and documentation accurately describe actual capability and limitations.
-6. No unrelated feature or cloud dependency is introduced.
-7. PR remains unmerged until the owner explicitly approves integration.
+A requirement is **complete** for this task only when:
+1. Its implementation is present and reviewed across the connected source files.
+2. Its software failure modes and cross-file interactions are covered by JVM tests or explicit static/source-contract checks where testable.
+3. Android build, JVM unit tests, lint, APK metadata/package/signing-contract checks, and CodeQL pass on the exact final commit.
+4. UI, security claims, permissions, and documentation accurately describe implemented behavior and platform limitations.
+5. No unrelated feature, cloud dependency, or destructive migration is introduced.
+6. The Draft PR remains unmerged until the owner explicitly approves integration.
 
-**No universal compatibility guarantee is implied by generic fallback guidance or a successful CI run.**
+Physical-device tests, emulator tests, and instrumentation compilation/execution are excluded from this task and do not block code/GitHub completion. **A green CI run does not imply universal hardware/OEM compatibility.**
 
 
 ## 8. Recent audit changes
@@ -165,6 +164,16 @@ A requirement is **complete** only when:
 |---|---|---|---|---|
 | DEV-INT-01 | Android 16+ ranging capability check is explicitly owner-initiated from Device Intelligence or Bluetooth Center; both screens share one bounded local availability callback; do not declare/request RANGING or location permission; never discover peers or create a ranging session | `DeviceIntelligenceActivity.kt`, `BluetoothCenterActivity.kt`, `RangingCapabilityQuery.kt`, `RangingCapabilityStatus.kt` | `RangingCapabilityStatusTest`; `verify_ranging_privacy.py`; exact-head Kotlin compile/JVM CI; Android API 36 RangingManager contract review | Implemented and CI-verified; callback is bounded to 8 seconds and lifecycle-cleaned; OEM capability response requires physical API 36+ device verification |
 | PRIV-06 | Privacy policy accurately states that no RANGING permission is requested and no peer/session/location data is collected or uploaded | `docs/PRIVACY_POLICY.md`, Device Intelligence screen | Manifest permission inventory and source review | Documentation aligned; exact-head CI still required |
-| CI-10 | No Android instrumentation source compilation/execution or emulator matrix in Android/release workflows | `scripts/verify_no_instrumentation.py`, Android and release workflows, Gradle config | CI policy guard | Enforced by source-contract step; exact-head CI still required |
+| CI-10 | No Android instrumentation source compilation/execution or emulator matrix in Android/release workflows | `scripts/verify_no_instrumentation.py`, Android and release workflows, Gradle config | CI policy guard | Enforced by source-contract step; physical-device and emulator acceptance excluded |
 | REL-11 | Release candidate remains on development branch; no merge, tag, production APK publication or official release without separate owner approval | Release workflow and branch policy | GitHub branch/PR/release inventory review | No production release performed; integration conflict review remains separate |
-| DEV-12 | Physical acceptance records exact device, OS/API, OEM build, app version, tested commit, scenario and observed result | Device compatibility and HONOR 200 Pro acceptance documents | Physical-device evidence template | Prepared; current v1.1.4 candidate is NOT TESTED on physical hardware |
+| DEV-12 | Physical acceptance records exact device, OS/API, OEM build, app version, tested commit, scenario and observed result | Device compatibility and HONOR 200 Pro acceptance documents | Physical-device evidence template | OUT OF SCOPE for current code/GitHub completion; retained as reference only |
+
+
+## Owner scope and current GitHub review — 2026-11-17
+
+- Authorized completion scope: repository code, documentation, non-instrumentation CI, and GitHub branch/PR readiness only.
+- Explicitly excluded: physical-device tests, emulator tests, instrumentation compilation/execution, and hardware/OEM acceptance.
+- Working branch HEAD: `c711bc16cb9a42452e10c8ec47f40b7d20fefe8a`.
+- Draft review PR: [#7 — ThiefAlertSeQure Solo Phases 0–12 code completion](https://github.com/alinor2pundamdag/ThiefAlertSeQure/pull/7); draft and unmerged.
+- Exact-head CI for PR #7 has not yet been observed in the connector results at the time of this update. The last evidenced Android/CodeQL success remains the earlier commits listed above.
+- Branch comparison at this snapshot: 500 commits ahead (API comparison cap), 1 behind `main`; divergence remains unresolved. No merge or rebase was performed.
