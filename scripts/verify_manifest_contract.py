@@ -44,10 +44,14 @@ features = {
     item.get(ANDROID + "name"): item
     for item in manifest.findall("uses-feature")
 }
-for feature in ("android.hardware.bluetooth", "android.hardware.bluetooth_le"):
+for feature in (
+    "android.hardware.bluetooth",
+    "android.hardware.bluetooth_le",
+    "android.hardware.sensor.accelerometer",
+):
     declaration = features.get(feature)
     if declaration is None or declaration.get(ANDROID + "required") != "false":
-        errors.append(feature + " must remain optional so Bluetooth-less devices can install")
+        errors.append(feature + " must remain optional because its feature is not required for core protection")
 
 for permission in (
     "android.permission.CAMERA",
