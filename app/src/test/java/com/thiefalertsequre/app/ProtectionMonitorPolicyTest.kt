@@ -1,6 +1,8 @@
 package com.thiefalertsequre.app
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProtectionMonitorPolicyTest {
@@ -27,4 +29,25 @@ class ProtectionMonitorPolicyTest {
         assertEquals(false, ProtectionMonitorPolicy.shouldMonitorMotion(true, ProtectionMode.DISARMED))
         assertEquals(false, ProtectionMonitorPolicy.shouldMonitorMotion(true, ProtectionMode.ALARM_TRIGGERED))
     }
+    @Test fun notificationStopAppliesEvenWhenMonitorIsEnabled() {
+        assertTrue(ProtectionMonitorPolicy.shouldApplyStopRequest(
+            preferenceAlreadyCommitted = false,
+            monitorEnabled = true
+        ))
+    }
+
+    @Test fun committedSettingsStopAppliesWhileMonitorRemainsOff() {
+        assertTrue(ProtectionMonitorPolicy.shouldApplyStopRequest(
+            preferenceAlreadyCommitted = true,
+            monitorEnabled = false
+        ))
+    }
+
+    @Test fun staleSettingsStopCannotOverrideANewerOwnerReenable() {
+        assertFalse(ProtectionMonitorPolicy.shouldApplyStopRequest(
+            preferenceAlreadyCommitted = true,
+            monitorEnabled = true
+        ))
+    }
+
 }
