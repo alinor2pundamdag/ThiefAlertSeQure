@@ -41,7 +41,6 @@ class AndroidCompatibilitySmokeTest {
     private lateinit var volumeSnapshot: SharedPreferencesSnapshot
     private var monitorWasRunning = false
     private var monitorWasEnabled = false
-    private var notificationsWereGranted = false
     private var safeToLaunchScreens = false
     private var originalAlarmStreamVolume = 0
 
@@ -62,9 +61,6 @@ class AndroidCompatibilitySmokeTest {
             monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
         monitorWasRunning = ProtectionMonitorService.isRunning
-        notificationsWereGranted = Build.VERSION.SDK_INT < 33 ||
-            ContextCompat.checkSelfPermission(appContext, android.Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
         originalAlarmStreamVolume = appContext.getSystemService(AudioManager::class.java)
             .getStreamVolume(AudioManager.STREAM_ALARM)
 
@@ -105,9 +101,9 @@ class AndroidCompatibilitySmokeTest {
         } else if (!monitorWasRunning) {
             appContext.stopService(Intent(appContext, ProtectionMonitorService::class.java))
         }
-        if (Build.VERSION.SDK_INT >= 33 && !notificationsWereGranted) {
-            runShell("pm revoke ${appContext.packageName} android.permission.POST_NOTIFICATIONS")
-        }
+        // The emulator is disposable. Do not revoke a runtime permission here:
+        // PackageManager kills the target process on permission revocation, which also
+        // terminates AndroidJUnitRunner before the remaining instrumentation tests run.
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
         historySnapshot.restore()
     }
@@ -282,7 +278,10 @@ class AndroidCompatibilitySmokeTest {
     }
 
     private fun grantNotificationPermissionForTest() {
-        if (Build.VERSION.SDK_INT >= 33 && !notificationsWereGranted) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(appContext, android.Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
             runShell("pm grant ${appContext.packageName} android.permission.POST_NOTIFICATIONS")
         }
     }
