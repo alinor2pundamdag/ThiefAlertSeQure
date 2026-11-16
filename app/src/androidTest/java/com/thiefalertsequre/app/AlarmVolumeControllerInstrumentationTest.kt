@@ -6,12 +6,27 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.After
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AlarmVolumeControllerInstrumentationTest {
+    private lateinit var originalPreferences: SharedPreferencesSnapshot
+
+    @Before
+    fun preserveSavedAlarmVolume() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        originalPreferences = SharedPreferencesSnapshot(context, "alarm_volume_restore_v1")
+    }
+
+    @After
+    fun restoreSavedAlarmVolume() {
+        originalPreferences.restore()
+    }
+
     @Test fun alarmVolumeSnapshotIsRestoredAndDurablyCleared() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val audio = context.getSystemService(AudioManager::class.java)
