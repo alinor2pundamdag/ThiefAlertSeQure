@@ -19,6 +19,10 @@ if [[ -z "$real_adb" || ! -x "$real_adb" ]]; then
     exit 1
 fi
 echo "Using Android platform-tools: $real_adb"
+# Start the ADB server before the emulator process registers its transport.
+# This avoids a known startup race where the emulator remains permanently offline.
+echo "Starting ADB server before emulator launch."
+"$real_adb" start-server
 wrapper_dir="${RUNNER_TEMP:-/tmp}/thiefalert-adb-readiness"
 mkdir -p "$wrapper_dir"
 
