@@ -1,14 +1,14 @@
 # v1.1.4 UX/UI and interaction audit
 
-Status: source-level UX/UI implementation and CI audit passed on the recorded development HEAD; physical-device acceptance remains pending. This is not a release certification.
+Status: source-level UX/UI implementation and CI audit passed on the current FIXALL coding head. Physical-device acceptance remains separate and is not inferred from CI. This is not a release certification.
 
 ## Verified baseline
-- Branch: `feature/persistent-themes-and-setup-status`
-- Verified HEAD: `0acd294d99856228dfc04e858ef8e3c8d0218c66`
-- GitHub Actions run [#1091](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43193065409) completed successfully on that exact commit.
-- Unit tests, internal navigation/dialog checks, Android lint, asset validation, workflow YAML validation, APK assembly, package/version/signer checks, and artifact upload passed.
+- Branch: `work/phase-0-12-coding`
+- Latest code-level verified HEAD: `367e3fd163a7f1cac04d24a08c05e19120d43650`
+- GitHub Actions run [#1395](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43865303650) completed successfully on that exact commit.
+- Unit tests, instrumentation-source compilation (without execution), internal navigation/dialog checks, Android lint, asset/workflow validation, APK assembly, package/version/signer checks passed.
 - The successful run produced the `ThiefAlertSeQure-debug-apk` artifact (ID `13931562732`). Verified APK: `com.thiefalertsequre.app.v114test`, versionCode `6`, versionName `1.1.4-test`, minSdk `26`; debug certificate SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`. APK SHA-256: `1523e03947550a5d06768a991222750a2fd16e824931dd17d39ae29469dd2a4c`. This debug signer is not the production signer.
-- No physical-device test has been performed by this audit.
+- Emulator instrumentation execution is deferred until coding phases 0–12 are closed. No new physical-device test is claimed by this audit.
 
 ## Implemented interaction contracts
 - Theme selection remains a local preview until Apply; Cancel does not persist the selection.
