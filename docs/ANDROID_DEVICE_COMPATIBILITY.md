@@ -40,7 +40,7 @@
 | Android 16 | 36 | Edge-to-edge enforcement and large-screen resizability/orientation changes for apps targeting API 36 | Apply insets; keep layouts adaptive and verify landscape, split-screen, foldables, and tablets |
 | Android 17 | 37 | Background audio hardening for all apps; target-37 apps have additional while-in-use FGS rules, with an exact-alarm + USAGE_ALARM exception; target-37 large-screen resizability restrictions cannot be opted out | Alarm audio and volume operations must remain inside a qualifying non-short foreground service; the project uses a mediaPlayback alarm FGS and a specialUse monitor FGS. Test Android 17 audio hardening with the platform ADB command |
 
-The approved build configuration is **minSdk 26, compileSdk 36, targetSdk 36**, using Android Gradle Plugin 8.10.1 and Gradle 8.11.1. Android 17 (API 37) is outside the configured emulator matrix and has not been certified; review its behavior changes separately before claiming compatibility or raising targetSdk.
+The approved build configuration is **minSdk 26, compileSdk 36, targetSdk 36**, using Android Gradle Plugin 8.10.1 and Gradle 8.11.1. The coding branch's opt-in instrumentation matrix includes API 36 and API 37; API 37 execution is not certified until that matrix passes on the final coding head. API 37 testing does not change compileSdk/targetSdk or imply universal Android 17 compatibility.
 
 ## Bluetooth compatibility and setup (Android 8–16)
 
