@@ -1,14 +1,18 @@
 package com.thiefalertsequre.app
 
+import android.content.Context
 import android.content.Intent
 import android.app.Instrumentation
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import androidx.core.content.ContextCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
+import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -18,6 +22,69 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class PowerTransitionRecoveryInstrumentationTest {
+    private lateinit var appContext: Context
+    private lateinit var monitorSnapshot: SharedPreferencesSnapshot
+    private lateinit var transitionSnapshot: SharedPreferencesSnapshot
+    private lateinit var stateSnapshot: SharedPreferencesSnapshot
+    private lateinit var corruptionSnapshot: SharedPreferencesSnapshot
+    private lateinit var schedulerSnapshot: SharedPreferencesSnapshot
+    private lateinit var historySnapshot: SharedPreferencesSnapshot
+    private var originalProtectionState: ProtectionState? = null
+    private var originalMonitorEnabled = false
+    private var originalMonitorWasRunning = false
+
+    @Before
+    fun preserveExistingProtectionStateAndIsolateMonitor() {
+        appContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val monitorPrefs = appContext.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        monitorSnapshot = SharedPreferencesSnapshot(appContext, ProtectionMonitorService.PREFS)
+        transitionSnapshot = SharedPreferencesSnapshot(appContext, "charger_transition_v2")
+        stateSnapshot = SharedPreferencesSnapshot(appContext, "protection_state_v1")
+        corruptionSnapshot = SharedPreferencesSnapshot(appContext, "protection_state_corrupt_backup_v1")
+        schedulerSnapshot = SharedPreferencesSnapshot(appContext, "alarm_scheduler_v1")
+        historySnapshot = SharedPreferencesSnapshot(appContext, "local_tamper_history_v1")
+        originalProtectionState = ProtectionStore(appContext).read()
+        originalMonitorEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
+        originalMonitorWasRunning = ProtectionMonitorService.isRunning
+        check(monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, false).commit())
+        appContext.stopService(Intent(appContext, ProtectionMonitorService::class.java))
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+    }
+
+    @After
+    fun restoreExistingProtectionStateAndMonitor() {
+        transitionSnapshot.restore()
+        stateSnapshot.restore()
+        corruptionSnapshot.restore()
+        historySnapshot.restore()
+        monitorSnapshot.restore()
+
+        val state = originalProtectionState
+        if (state?.mode == ProtectionMode.COUNTDOWN) {
+            check(
+                AlarmScheduler.schedule(
+                    appContext,
+                    state.deadlineEpochMs,
+                    state.deadlineElapsedRealtimeMs,
+                    state.bootCount
+                )
+            ) { "The pre-test protection countdown could not be restored" }
+        } else {
+            AlarmScheduler.cancel(appContext)
+        }
+        schedulerSnapshot.restore()
+
+        if (originalMonitorWasRunning && originalMonitorEnabled) {
+            runCatching {
+                ContextCompat.startForegroundService(
+                    appContext, Intent(appContext, ProtectionMonitorService::class.java)
+                )
+            }
+        }
+    }
+
     @Test fun confirmedConnectedPowerEventPersistsItsBaselineBeforeArming() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
