@@ -183,6 +183,12 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         val applyStopRequest = ProtectionMonitorPolicy.shouldApplyStopRequest(
             stopPreferenceAlreadyCommitted, monitorEnabled
         )
+        if (intent?.action == ACTION_STOP && !applyStopRequest) {
+            LocalTamperHistory.record(
+                this, "stale_monitor_stop_ignored",
+                "A newer owner re-enable setting superseded an older monitor stop request"
+            )
+        }
         if (intent?.action == ACTION_STOP && applyStopRequest) {
             if (!stopPreferenceAlreadyCommitted && !prefs.edit().putBoolean(KEY_ENABLED, false).commit()) {
                 LocalTamperHistory.record(
