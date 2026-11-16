@@ -111,18 +111,21 @@ while true; do
     test_exit_code="$?"
   fi
 
-  # Do not retry real assertion/test failures. Retry once only when DDMLib
-  # reports that the emulator temporarily disappeared from its compatible set.
+  # Never retry assertion failures. Retry only known emulator/framework failures:
+  # DDMLib can temporarily lose API identity or PackageManager while cold images settle.
   attempt_log="$diagnostics_dir/instrumentation-attempt-$attempt.log"
-  if [[ "$attempt" -ge 2 ]] || ! grep -Eq \
-      'No compatible devices connected\.|Found [0-9]+ connected device\(s\), 0 of which were compatible' \
+  if [[ "$attempt" -ge 3 ]] || ! grep -Eq \
+      'No compatible devices connected\\.|Found [0-9]+ connected device\\(s\\), 0 of which were compatible|Unknown API Level|Can.t find service: package|Failed to install split APK|ShellCommandUnresponsiveException|device offline' \
       "$attempt_log"; then
     exit "$test_exit_code"
   fi
 
-  echo "::warning::Android emulator lost its ADB/compatible-device state during instrumentation; waiting for framework recovery and retrying this infrastructure-only failure once."
+  echo "::warning::Android emulator/framework infrastructure failed during instrumentation; rebooting the emulator and retrying this infrastructure-only failure."
   adb reconnect offline >/dev/null 2>&1 || true
+  adb -s emulator-5554 reboot >/dev/null 2>&1 || true
+  sleep 5
   if ! wait_for_stable_emulator; then
+    echo "::error::Emulator framework did not recover after reboot; preserving diagnostics."
     exit "$test_exit_code"
   fi
   attempt=$((attempt + 1))

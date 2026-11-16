@@ -360,6 +360,38 @@ jobs:
       - name: Prepare Android emulator framework-readiness shim
         run: bash .github/scripts/prepare-adb-readiness-wrapper.sh
 
+      - name: Prepare Android 17 preview SDK package aliases
+        if: matrix.api-level == 37
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --list --channel=3 | tee "$RUNNER_TEMP/android-sdk-preview-packages.txt"
+          grep -Eq 'platforms;android-37\.0' "$RUNNER_TEMP/android-sdk-preview-packages.txt" || {
+            echo "::error::Android 17 preview SDK package platforms;android-37.0 is not available from the configured SDK repositories."
+            exit 1
+          }
+          real_sdkmanager="$(command -v sdkmanager)"
+          wrapper_dir="$RUNNER_TEMP/android-sdkmanager-preview"
+          mkdir -p "$wrapper_dir"
+          cat > "$wrapper_dir/sdkmanager" <<'WRAPPER'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          real="${THIEFALERT_REAL_SDKMANAGER:?SDK manager path was not exported}"
+          args=()
+          for arg in "$@"; do
+            case "$arg" in
+              platforms\;android-37) args+=("platforms;android-37.0") ;;
+              --channel=0) args+=("--channel=3") ;;
+              *) args+=("$arg") ;;
+            esac
+          done
+          exec "$real" "${args[@]}"
+          WRAPPER
+          chmod +x "$wrapper_dir/sdkmanager"
+          echo "THIEFALERT_REAL_SDKMANAGER=$real_sdkmanager" >> "$GITHUB_ENV"
+          echo "$wrapper_dir" >> "$GITHUB_PATH"
+          echo "Configured SDK Manager for the Android 17 preview platform and preview package channel."
+
       - name: Run Android instrumentation tests on API ${{ matrix.api-level }}
         timeout-minutes: 30
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
