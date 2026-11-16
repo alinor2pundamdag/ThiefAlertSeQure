@@ -27,7 +27,7 @@ This is the persistent source of truth for interrupted work. A phase is not comp
 | **2 — Power and charger** | Event-time capture, live power validation, debounce, generation guards, reconnect cancellation, 10-second deadline and reboot recovery | **CODING/CI PASS —** implementation and JVM policy coverage pass; charger hardware/OEM behavior remains physical-device-only |
 | **3 — Data integrity** | Safe typed preference reads, synchronous commits, corruption preservation/recovery, migration and test-state isolation | **PASS —** safe preference, manifest and state-ownership source checks plus JVM tests pass; physical storage-failure behavior remains device-dependent |
 | **4 — Alarm and recovery** | Persist latch before playback; scheduler token integrity; recovery/retry; audio fallback, volume restoration, optional flashlight and authenticated disarm | **CODING/CI PASS —** policy/JVM regression checks and APK build pass; speaker/torch/Keyguard behavior remains physical-device-only |
-| **5 — Bluetooth A2** | Encrypted trusted registry, ACL receiver lifecycle, per-device revisions, reconnect invalidation, 8-second grace period and safe fallback | **CODING/CI PASS —** encrypted registry, per-device deadlines and JVM policy coverage pass; real accessory/OEM callback behavior remains unverified |
+| **5 — Bluetooth A2** | Encrypted trusted registry, ACL receiver lifecycle, per-device revisions, reconnect invalidation, 8-second grace period and safe fallback | **CODE FIX COMMITTED / EXACT-HEAD CI PENDING —** serialized encrypted deadline read-modify-write prevents concurrent accessory events from overwriting each other's records; JVM tests cover per-device merge preservation; exact-head CI still required |
 | **6 — Authentication and security** | Ephemeral proof, Android credential/strong biometric gate, persisted throttle, anti-tampering and owner-only actions | **CODE FIX COMMITTED / EXACT-HEAD CI PENDING —** proof freshness now rejects asymmetric known/unknown boot identity; regression tests added; exact-head JVM/CI result still required |
 | **7 — Background services and lifecycle** | Foreground-service start/stop, notification channels, boot/package-replacement recovery, process recreation and Android-version restrictions | **CODING/CI PASS —** source checks and lint pass; OEM background execution and reboot delivery remain physical-device-only |
 | **8 — UI and accessibility** | Preserve screens, navigation, themes, readiness flows, edge-to-edge insets and accessibility semantics | **CODING/CI PASS —** navigation, themed dialogs, theme and accessibility source checks pass; TalkBack/display perception remains device-unverified |
@@ -104,3 +104,12 @@ This snapshot records the latest code-bearing source commit and the final docume
 - Draft PR #7 is open and unmerged. The latest PR head has not returned confirmed exact-head CI evidence through the available status/run queries; prior green runs remain historical evidence for their own commits only.
 - Do not compile/run dormant `androidTest` sources. The only required test execution is JVM unit tests plus non-instrumentation build/static/lint/security workflows.
 - Full repository-wide source review and exact-head CI are still pending; no 100% completion claim is authorized until those are evidenced.
+
+
+### A2 multi-accessory concurrency fix
+
+- Confirmed race: concurrent ACL disconnect callbacks could both read the same encrypted pending-deadline list and then overwrite each other's per-device records.
+- Fix: serialize schedule/find/cancel/clear operations on one scheduler lock; isolate failure cleanup to the same preferences/PendingIntent namespace; extract a pure per-device merge function.
+- Source commits: `5cf2da0b7c1f134e9a1fcdfd4b913a2561aa85c3` and `679f22ac7c2721af15e298a851fdbbfbf8c4b31e`.
+- JVM regression tests: `f5bf25576de8a903699a989924a515ea506401a6` adds coverage that updating one accessory preserves another accessory's deadline and address matching is case-insensitive.
+- Exact-head JVM/CI execution is pending; no instrumentation or emulator execution is involved.
