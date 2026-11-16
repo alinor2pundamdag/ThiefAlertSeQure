@@ -1,6 +1,8 @@
 package com.thiefalertsequre.app
 
 import android.content.Context
+import android.content.Intent
+import androidx.core.content.ContextCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
@@ -35,11 +37,28 @@ class ProtectionStoreUpdateResultTest {
 
     @Test
     fun corruptProtectionStateIsPreservedAndOrdinaryUpdatesCannotDisarmIt() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        val previousMonitorEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
+        val monitorWasRunning = ProtectionMonitorService.isRunning
+
+        // This is a ProtectionStore-only test. A monitor left running by an
+        // earlier Activity smoke test can receive the emulator's battery-reset
+        // broadcast and legitimately re-arm DISARMED state between assertions.
+        assertTrue(
+            "Test must disable monitor before isolating persisted-state recovery",
+            monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, false).commit()
+        )
+        context.stopService(Intent(context, ProtectionMonitorService::class.java))
+        instrumentation.waitForIdleSync()
+
         val prefs = context.getSharedPreferences("protection_state_v1", Context.MODE_PRIVATE)
         val backup = context.getSharedPreferences("protection_state_corrupt_backup_v1", Context.MODE_PRIVATE)
-        prefs.edit().clear().putBoolean("mode", true).commit()
-        backup.edit().clear().commit()
+        assertTrue(prefs.edit().clear().putBoolean("mode", true).commit())
+        assertTrue(backup.edit().clear().commit())
         try {
             val store = ProtectionStore(context)
             assertEquals(ProtectionMode.ALARM_TRIGGERED, store.read().mode)
@@ -63,6 +82,14 @@ class ProtectionStoreUpdateResultTest {
         } finally {
             prefs.edit().clear().commit()
             backup.edit().clear().commit()
+            monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, previousMonitorEnabled).commit()
+            if (monitorWasRunning && previousMonitorEnabled) {
+                runCatching {
+                    ContextCompat.startForegroundService(
+                        context, Intent(context, ProtectionMonitorService::class.java)
+                    )
+                }
+            }
         }
     }
 
