@@ -23,7 +23,6 @@ required_permissions = {
     "android.permission.BLUETOOTH",
     "android.permission.BLUETOOTH_ADMIN",
     "android.permission.BLUETOOTH_CONNECT",
-    "android.permission.RANGING",
     "android.permission.REQUEST_INSTALL_PACKAGES",
     "android.permission.RECEIVE_BOOT_COMPLETED",
     "android.permission.FOREGROUND_SERVICE",
@@ -57,6 +56,9 @@ for feature in (
         errors.append(feature + " must remain optional because its feature is not required for core protection")
 
 for permission in (
+    # RANGING is only required to create sessions; this app performs local capability
+    # inspection only and deliberately does not request that dangerous permission.
+    "android.permission.RANGING",
     "android.permission.CAMERA",
     "android.permission.ACCESS_FINE_LOCATION",
     "android.permission.ACCESS_COARSE_LOCATION",
