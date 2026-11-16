@@ -1,5 +1,6 @@
 package com.thiefalertsequre.app
 
+import android.Manifest
 import android.app.ActivityManager
 import android.app.AlarmManager
 import android.app.NotificationManager
@@ -14,11 +15,14 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.os.StatFs
+import android.ranging.RangingCapabilities
+import android.ranging.RangingManager
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.FragmentActivity
 import com.google.android.material.button.MaterialButton
@@ -32,6 +36,16 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     private lateinit var root: LinearLayout
     private lateinit var rootStatusView: TextView
     private val rootCheckExecutor = Executors.newSingleThreadExecutor()
+    private var rangingStatus: String? = null
+    private var rangingManager: RangingManager? = null
+    private var rangingCapabilitiesCallback: RangingManager.RangingCapabilitiesCallback? = null
+    private val rangingPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) queryRangingCapabilities()
+        else {
+            rangingStatus = "Permission denied. No ranging capability query or ranging session was started."
+            render()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); render() }
 
@@ -204,6 +218,11 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             "Background guidance family: $family"
         )
         addCard("THIEFALERTSEQuRE READINESS", appReadiness)
+        if (Build.VERSION.SDK_INT >= 36) {
+            root.addView(button("Check Android ranging capabilities (optional)") { requestRangingCapabilityCheck() }, matchWrap())
+            root.addView(space(6))
+            rangingStatus?.let { addCard("ANDROID RANGING CAPABILITY RESULT", listOf(it)) }
+        }
         val rootReport = RootCapabilityInspector.inspectPassive()
         addCard("ROOT / SUPERUSER STATUS", listOf(
             when (rootReport.status) {
@@ -232,6 +251,104 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
         ThemeRuntime.apply(this, scroll)
+    }
+
+
+    /**
+     * Requests the dangerous RANGING permission only after the owner explicitly chooses
+     * the capability check. This does not discover peers or start a ranging session.
+     */
+    private fun requestRangingCapabilityCheck() {
+        if (Build.VERSION.SDK_INT < 36) {
+            rangingStatus = "Ranging capability queries require Android 16 (API 36) or newer."
+            render()
+            return
+        }
+        if (checkSelfPermission(Manifest.permission.RANGING) == PackageManager.PERMISSION_GRANTED) {
+            queryRangingCapabilities()
+            return
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Optional nearby ranging permission")
+            .setMessage(
+                "Allow a one-time check of this phone's local Bluetooth Channel Sounding, BLE RSSI, UWB and Wi-Fi RTT capability availability. " +
+                    "This check does not scan for nearby devices, discover peers, start a ranging session, measure distance, read precise location, or upload data. " +
+                    "Android will ask for the Ranging permission only after you continue."
+            )
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Continue") { _, _ ->
+                rangingPermissionLauncher.launch(Manifest.permission.RANGING)
+            }
+            .showThemed(this)
+    }
+
+    private fun queryRangingCapabilities() {
+        if (Build.VERSION.SDK_INT < 36) return
+        if (checkSelfPermission(Manifest.permission.RANGING) != PackageManager.PERMISSION_GRANTED) {
+            rangingStatus = "Ranging permission is not granted. No capability query was performed."
+            render()
+            return
+        }
+        val manager = runCatching { getSystemService(RangingManager::class.java) }.getOrNull()
+        if (manager == null) {
+            rangingStatus = "Android exposes no RangingManager service on this device."
+            render()
+            return
+        }
+        clearRangingCallback()
+        val callback = object : RangingManager.RangingCapabilitiesCallback {
+            override fun onRangingCapabilities(capabilities: RangingCapabilities) {
+                val availability = capabilities.technologyAvailability
+                val lines = listOf(
+                    RangingManager.BLE_CS to "Bluetooth Channel Sounding",
+                    RangingManager.BLE_RSSI to "Bluetooth RSSI ranging",
+                    RangingManager.UWB to "Ultra-wideband",
+                    RangingManager.WIFI_NAN_RTT to "Wi-Fi NAN RTT"
+                ).map { (technology, name) ->
+                    "$name: ${RangingCapabilityStatus.label(availability[technology])}"
+                }.toMutableList()
+                capabilities.csCapabilities?.let { cs ->
+                    lines += "BLE CS security levels: ${cs.supportedSecurityLevels.sorted().joinToString()}"
+                }
+                lines += "Capability discovery only. No peer discovery, ranging session, distance measurement, or location access was performed."
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) {
+                        rangingStatus = lines.joinToString("\n")
+                        if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) render()
+                    }
+                    clearRangingCallback()
+                }
+            }
+        }
+        rangingManager = manager
+        rangingCapabilitiesCallback = callback
+        rangingStatus = "Querying local ranging capabilities…"
+        render()
+        runCatching {
+            manager.registerCapabilitiesCallback(mainExecutor, callback)
+        }.onFailure { error ->
+            clearRangingCallback()
+            rangingStatus = when (error) {
+                is SecurityException -> "Android denied the capability query. Confirm the Ranging permission in app settings."
+                else -> "Capability query failed safely: ${error.javaClass.simpleName}"
+            }
+            render()
+        }
+    }
+
+    private fun clearRangingCallback() {
+        val manager = rangingManager
+        val callback = rangingCapabilitiesCallback
+        if (manager != null && callback != null) {
+            runCatching { manager.unregisterCapabilitiesCallback(callback) }
+        }
+        rangingManager = null
+        rangingCapabilitiesCallback = null
+    }
+
+    override fun onStop() {
+        clearRangingCallback()
+        super.onStop()
     }
 
     private fun confirmRootCheck() {
@@ -325,6 +442,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     private fun matchWrap() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     override fun onDestroy() {
+        clearRangingCallback()
         rootCheckExecutor.shutdownNow()
         super.onDestroy()
     }
