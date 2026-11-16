@@ -287,7 +287,7 @@ object PowerTransitionCoordinator {
             return ProtectionStore(appContext).read()
         }
         return synchronized(lock) {
-            confirmConnectedAndArmLocked(appContext, "Power-connected event confirmed by five reads including three consecutive live-state samples")
+            confirmConnectedAndArmLocked(appContext, "Power-connected event confirmed by three consecutive live-state samples")
         }
     }
 
