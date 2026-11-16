@@ -1,6 +1,6 @@
 # Phase Two — Power Detection and Charger Reliability
 
-Status: Phase Two implementation is on `dev/fixall-data-integrity`; exact-head CI and emulator instrumentation are the remaining software verification gates. Physical-device certification is separate. This document records the source contract, not universal device certification.
+Status: Phase Two source implementation is carried forward on `work/phase-0-12-coding`. The current-head build, unit tests, static contracts and lint are tracked in `docs/REQUIREMENT_TRACEABILITY_MATRIX.md`. Instrumentation execution is deliberately deferred until all coding phases 0–12 are complete; physical-device certification is separate. This document records the source contract, not universal device certification.
 
 ## Detection path
 

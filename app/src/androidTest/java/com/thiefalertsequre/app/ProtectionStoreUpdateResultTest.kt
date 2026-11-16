@@ -17,9 +17,9 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ProtectionStoreUpdateResultTest {
     private lateinit var context: Context
-    private var originalProtection: Map<String, *> = emptyMap()
-    private var originalCorruptBackup: Map<String, *> = emptyMap()
-    private var originalMonitor: Map<String, *> = emptyMap()
+    private var originalProtection: Map<String, *> = emptyMap<String, Any?>()
+    private var originalCorruptBackup: Map<String, *> = emptyMap<String, Any?>()
+    private var originalMonitor: Map<String, *> = emptyMap<String, Any?>()
 
     @Before
     fun preserveExistingAppPreferences() {

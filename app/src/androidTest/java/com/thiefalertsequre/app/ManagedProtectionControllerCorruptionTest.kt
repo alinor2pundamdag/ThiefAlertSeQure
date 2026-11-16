@@ -13,7 +13,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ManagedProtectionControllerCorruptionTest {
-    private var originalPreferences: Map<String, *> = emptyMap()
+    private var originalPreferences: Map<String, *> = emptyMap<String, Any?>()
 
     private val context: Context
         get() = InstrumentationRegistry.getInstrumentation().targetContext
