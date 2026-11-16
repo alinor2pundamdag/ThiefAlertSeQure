@@ -267,9 +267,10 @@ object PowerTransitionCoordinator {
         // The original OS event timestamp is captured by the receiver before this
         // sampling window, so confirmation time never extends the 10-second grace.
         val confirmation = try {
-            PowerTransitionSamplingPolicy.confirm(true) {
-                ExternalPowerState.readConnected(appContext)
-            }
+            PowerTransitionSamplingPolicy.confirm(
+                expectedConnected = true,
+                readConnected = { ExternalPowerState.readConnected(appContext) }
+            )
         } catch (interrupted: InterruptedException) {
             Thread.currentThread().interrupt()
             LocalTamperHistory.record(
@@ -467,9 +468,10 @@ object PowerTransitionCoordinator {
         candidate: DisconnectCandidate
     ): ProtectionState {
         val confirmation = try {
-            PowerTransitionSamplingPolicy.confirm(false) {
-                ExternalPowerState.readConnected(context)
-            }
+            PowerTransitionSamplingPolicy.confirm(
+                expectedConnected = false,
+                readConnected = { ExternalPowerState.readConnected(context) }
+            )
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
             synchronized(lock) {
