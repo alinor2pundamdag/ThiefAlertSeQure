@@ -22,21 +22,21 @@
 - Corrected README, privacy, protection-rules, traceability, and Android compatibility documentation.
 
 ## Phase 1 — Compilation and architecture
-- Architecture ownership and the UI → runtime → persistence → Android boundary map are documented in `docs/PHASE_1_ARCHITECTURE_MAP.md`.
-- Corrected `AlarmDeadlineReceiver.kt`'s persisted-update lambda return label.
-- Corrected Bluetooth registry Base64 compatibility test fixtures to use actual tab/newline delimiters; the previous failure was a malformed test fixture, not a production decoder defect.
-- The previous exact-head build job on `b487f84b96fb29a6a1eb45f64b0b5a50c8d20dd3` passed compilation, unit tests, navigation verification, lint, asset/config checks, APK assembly, and package/version/signer checks.
-- Follow-up instrumentation investigation found real test failures on API 26 and 28: missing `alarm_channel` readiness item and a biometric Keystore test that assumed an enrolled strong biometric. API 30 failed separately because its emulator stayed offline and was reported as API level 1.
-- Corrective source/test changes are being committed on this branch. Exact-head CI rerun is required before Phase 1 can be accepted.
+- Architecture ownership and the UI → runtime → persistence → Android boundary map are documented in `docs/PHASE_1_ARCHITECTURE_MAP.md`; the map was checked against the current source for UI entry points, services/receivers, state persistence, authentication, permissions, and Android boundaries.
+- Corrected `AlarmDeadlineReceiver.kt`'s persisted-update lambda return label so a stale callback cannot be mistaken for a committed transition.
+- Corrected Bluetooth registry Base64 compatibility test fixtures to use actual tab/newline delimiters; the earlier failure was a malformed test fixture, not a production decoder defect.
+- Exact source-head workflow run [#1270](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43734061025) passed on `72cfad5e3f7e539a385cc09d6dd820d0de80dffa`: build, unit tests, navigation checks, lint, asset/config checks, APK assembly, and package/version/signer validation.
+- Instrumentation jobs passed on API 26, 28, 30, 32, 34, 35, and 36 on that same head.
+- All seven diagnostic artifacts were inspected. Each API report records 25 tests, zero failures, zero errors, and one intentional skip for the Keystore biometric test when the emulator has no enrolled strong biometric. Emulator system-process crash entries were distinguished from app failures; no ThiefAlertSeQure process crash was found.
+- Source review confirmed the protected invariants remain in source: minSdk 26, 10-second charger countdown, 8-second A2 grace period, latched-alarm disarm through fresh Android authentication proof, and local-only protection state.
 
 ## Verification status
-- Build job: PASS on the previous exact head; the new corrective head must be re-run.
-- Instrumentation API 26/28: FAIL on the previous head; source/test causes identified and corrective changes prepared.
-- Instrumentation API 30: infrastructure failure (ADB offline / invalid API-level detection); retry required after corrective commit.
-- Instrumentation API 32/34/35/36: not yet all confirmed successful; check the final run's complete job matrix.
-- Physical HONOR 200 Pro testing for changed v1.1.4 behavior remains pending and is not inferred from emulator results.
-- Production-signed APK/update continuity remains pending.
-- This document does not assert release readiness.
+- Source-head run #1270: PASS for the build job and all seven Android instrumentation jobs.
+- Instrumentation reports: 175 total test executions across the matrix; 168 passed and 7 intentionally skipped (one per API); zero test failures/errors.
+- Diagnostic review: complete; the single skipped test is explicitly guarded by the test's enrolled-strong-biometric precondition. Emulator system-service crashes are not app-process crashes.
+- A documentation consistency correction is being applied to remove an obsolete minSdk 23 statement; the corrected documentation commit must receive its own exact-head CI run before Phase 1 is formally closed.
+- Physical HONOR 200 Pro acceptance remains excluded from Phase 1 and is reserved for Phase 12. Emulator results are not represented as physical-device evidence.
+- Production-signed APK/update continuity, merge, tag, APK publication, and production release remain separate gates and are not authorized by this Phase 1 work.
 
 ## Remaining FIXALL work
 1. Review and test alarm retry scheduling, cancellation, and process-death behavior.
