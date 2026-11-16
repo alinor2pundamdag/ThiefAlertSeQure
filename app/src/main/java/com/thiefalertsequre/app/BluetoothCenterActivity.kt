@@ -150,7 +150,7 @@ class BluetoothCenterActivity : FragmentActivity() {
             "Feature: ${if (enabled) "ON" else "OFF"}",
             "Stored trusted-device data: ${if (registryReadable) "Readable" else "UNREADABLE — original data retained"}",
             "Registered trusted accessories: ${devices.size}",
-            "Connection baselines confirmed: $baselineCount / ${devices.size}",
+            baselineSummary,
             "Monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled by owner"}",
             "Monitor runtime: ${if (monitorRunning) "Running" else "Not confirmed running"}",
             "Protection state: $protectionMode",
