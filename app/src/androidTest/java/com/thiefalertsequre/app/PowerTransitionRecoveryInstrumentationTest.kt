@@ -3,6 +3,7 @@ package com.thiefalertsequre.app
 import android.app.Instrumentation
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import androidx.core.content.ContextCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
@@ -17,6 +18,59 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class PowerTransitionRecoveryInstrumentationTest {
+    @Test fun confirmedConnectedPowerEventPersistsItsBaselineBeforeArming() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, 0)
+        val previousMonitorEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
+        val monitorWasRunning = ProtectionMonitorService.isRunning
+        val transitionPrefs = context.getSharedPreferences("charger_transition_v2", 0)
+        val statePrefs = context.getSharedPreferences("protection_state_v1", 0)
+        val corruptionPrefs = context.getSharedPreferences("protection_state_corrupt_backup_v1", 0)
+
+        try {
+            assertTrue(monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit())
+            context.stopService(Intent(context, ProtectionMonitorService::class.java))
+            instrumentation.waitForIdleSync()
+            repeat(40) {
+                if (ProtectionMonitorService.isRunning) SystemClock.sleep(25L)
+            }
+
+            runShell(instrumentation, "dumpsys battery set ac 1")
+            assumeTrue(
+                "Emulator did not expose a confirmed connected battery snapshot",
+                ExternalPowerState.readConnected(context) == true
+            )
+
+            assertTrue(transitionPrefs.edit().clear().commit())
+            assertTrue(statePrefs.edit().clear().commit())
+            assertTrue(corruptionPrefs.edit().clear().commit())
+
+            val armed = PowerTransitionCoordinator.onPowerConnected(context)
+            assertEquals(ProtectionMode.ARMED, armed.mode)
+            assertEquals(ProtectionMode.ARMED, ProtectionStore(context).read().mode)
+            assertTrue("Connected baseline must be durable before ARMED is accepted", transitionPrefs.getBoolean("baseline_known", false))
+            assertTrue("The persisted baseline must reflect confirmed external power", transitionPrefs.getBoolean("baseline_connected", false))
+            assertEquals(ProtectionClock.bootCount(context), transitionPrefs.getInt("baseline_boot_count", -1))
+        } finally {
+            AlarmScheduler.cancel(context)
+            transitionPrefs.edit().clear().commit()
+            statePrefs.edit().clear().commit()
+            corruptionPrefs.edit().clear().commit()
+            monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, previousMonitorEnabled).commit()
+            runShell(instrumentation, "dumpsys battery reset")
+            if (monitorWasRunning && previousMonitorEnabled) {
+                runCatching {
+                    ContextCompat.startForegroundService(
+                        context, Intent(context, ProtectionMonitorService::class.java)
+                    )
+                }
+            }
+        }
+    }
+
     @Test fun persistedDisconnectCandidateRecoversIdempotently() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
