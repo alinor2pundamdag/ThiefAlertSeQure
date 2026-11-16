@@ -165,16 +165,51 @@ class ProtectionMonitorService : Service(), SensorEventListener {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
-            prefs.edit().putBoolean(KEY_ENABLED, false).apply()
-            val disabledState = ProtectionStore(this).update { current ->
-                if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
-                else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+            if (!prefs.edit().putBoolean(KEY_ENABLED, false).commit()) {
+                LocalTamperHistory.record(
+                    this, "monitor_disable_preference_persist_failed",
+                    "Android did not confirm that the monitor OFF preference was saved; stop request will be retried"
+                )
+                ProtectionMonitorRecoveryNotice.show(this, "The monitor could not confirm its OFF setting. Retrying without changing the saved protection state.")
+                handler.postDelayed({ onStartCommand(intent, flags, startId) }, POWER_RETRY_MS)
+                return START_STICKY
             }
-            if (disabledState.mode != ProtectionMode.ALARM_TRIGGERED) AlarmScheduler.cancel(this)
-            A2DisconnectScheduler.clearAll(this)
-            runCatching { TrustedBluetoothRegistry.clearBaselines(prefs) }
+
+            val store = ProtectionStore(this)
+            val current = store.read()
+            val update = if (current.mode == ProtectionMode.ALARM_TRIGGERED) {
+                ProtectionStoreUpdateResult(current, true)
+            } else {
+                store.updatePersisted {
+                    if (it.mode == ProtectionMode.ALARM_TRIGGERED) it
+                    else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+                }
+            }
+            if (!update.persisted) {
+                LocalTamperHistory.record(
+                    this, "monitor_disable_state_persist_failed",
+                    "Protection state was not durably disarmed; the existing deadline and alarm state remain authoritative"
+                )
+                ProtectionMonitorRecoveryNotice.show(this, "Protection could not be safely disabled because its state was not saved. Retrying; any existing countdown remains active.")
+                if (update.state.mode == ProtectionMode.COUNTDOWN) AlarmScheduler.scheduleRetry(this, 1_000L)
+                handler.postDelayed({ onStartCommand(intent, flags, startId) }, POWER_RETRY_MS)
+                return START_STICKY
+            }
+
+            if (update.state.mode != ProtectionMode.ALARM_TRIGGERED) {
+                AlarmScheduler.cancel(this)
+                PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Protection monitor disabled by owner")
+            }
+            val deadlinesCleared = A2DisconnectScheduler.clearAll(this)
+            val baselinesCleared = runCatching { TrustedBluetoothRegistry.clearBaselines(prefs) }.getOrDefault(false)
             A2BluetoothReceiverController.sync(this)
-            PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Protection monitor disabled by owner")
+            if (!deadlinesCleared || !baselinesCleared) {
+                LocalTamperHistory.record(
+                    this, "monitor_disable_cleanup_incomplete",
+                    "Monitor is OFF, but trusted-device deadline or baseline cleanup could not be confirmed"
+                )
+                ProtectionMonitorRecoveryNotice.show(this, "Monitoring is OFF, but trusted-device cleanup needs attention. Reopen Bluetooth settings to review it.")
+            }
             stopSelf()
             return START_NOT_STICKY
         }
