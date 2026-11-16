@@ -137,9 +137,7 @@ class SettingsActivity : FragmentActivity() {
             13f, R.color.tas_muted
         ))
         val alarmDisplayPrefs = getSharedPreferences(MainActivity.ALARM_DISPLAY_PREFS, MODE_PRIVATE)
-        val showAlarmScreenOverLockScreen = alarmDisplayPrefs.getBoolean(
-            MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false
-        )
+        val showAlarmScreenOverLockScreen = SafePreferences.boolean(alarmDisplayPrefs, MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
         val fullScreenAccessGranted = Build.VERSION.SDK_INT < 34 ||
             getSystemService(android.app.NotificationManager::class.java).canUseFullScreenIntent()
         val dashboardStateLabel = when {
@@ -148,9 +146,7 @@ class SettingsActivity : FragmentActivity() {
             else -> "ON — Android access not granted"
         }
         root.addView(action("Full-screen app alarm dashboard: $dashboardStateLabel") {
-            val enabled = !alarmDisplayPrefs.getBoolean(
-                MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false
-            )
+            val enabled = !SafePreferences.boolean(alarmDisplayPrefs, MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
             alarmDisplayPrefs.edit()
                 .putBoolean(MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, enabled)
                 .apply()
@@ -259,7 +255,7 @@ class SettingsActivity : FragmentActivity() {
             13f, R.color.tas_muted
         ))
         val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        val monitorEnabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         root.addView(action(if (monitorEnabled) "Disable background monitoring" else "Enable background monitoring") {
             val enabled = !monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
             monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).apply()
@@ -290,13 +286,9 @@ class SettingsActivity : FragmentActivity() {
             }
             render()
         })
-        val motionEnabled = monitorPrefs.getBoolean(
-            ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED
-        )
+        val motionEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED)
         root.addView(action("Independent motion alarm: ${if (motionEnabled) "ON" else "OFF"}") {
-            val enabled = !monitorPrefs.getBoolean(
-                ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED
-            )
+            val enabled = !SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED)
             monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_MOTION_ENABLED, enabled).apply()
             sendBroadcast(Intent(ProtectionMonitorService.ACTION_REFRESH).setPackage(packageName))
             render()
@@ -308,7 +300,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(18))
         root.addView(space(18))
         val sensitivity = MotionSensitivity.fromStored(
-            monitorPrefs.getString(ProtectionMonitorService.KEY_SENSITIVITY, MotionSensitivity.MEDIUM.name)
+            SafePreferences.string(monitorPrefs, ProtectionMonitorService.KEY_SENSITIVITY, MotionSensitivity.MEDIUM.name)
         )
         root.addView(action("Motion sensitivity (when enabled): ${sensitivity.name.lowercase()}") {
             val choices = MotionSensitivity.values().map { it.name.lowercase() }.toTypedArray()
@@ -322,7 +314,7 @@ class SettingsActivity : FragmentActivity() {
                 .setNegativeButton("Cancel", null)
                 .showThemed(this)
         })
-        val batteryAlertEnabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BATTERY_ALERT_ENABLED, false)
+        val batteryAlertEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_BATTERY_ALERT_ENABLED, false)
         root.addView(action("Battery threshold alert: ${if (batteryAlertEnabled) "ON" else "OFF"}") {
             val enabled = !batteryAlertEnabled
             monitorPrefs.edit()
@@ -343,7 +335,7 @@ class SettingsActivity : FragmentActivity() {
             }
             render()
         })
-        val threshold = monitorPrefs.getInt(ProtectionMonitorService.KEY_BATTERY_THRESHOLD, 80)
+        val threshold = SafePreferences.int(monitorPrefs, ProtectionMonitorService.KEY_BATTERY_THRESHOLD, 80)
         root.addView(action("Battery alert threshold: ${threshold}%") {
             val choices = arrayOf("80%", "85%", "90%", "95%", "100%")
             val values = intArrayOf(80, 85, 90, 95, 100)

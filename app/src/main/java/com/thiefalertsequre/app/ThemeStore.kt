@@ -41,7 +41,7 @@ object ThemeStore {
  p("sky","Sky","Light","#1769AA","#FFFFFF","#EFF7FF","#FFFFFF","#DCEBFA","#183047","#58728A","#167A55","#956000","#B4233C"),
  p("contrast","High Contrast","Light","#003B70","#FFFFFF","#FFFFFF","#FFFFFF","#E5E5E5","#000000","#333333","#006B3C","#805000","#A40019"))
  fun valid(id:String?)=all.any{it.id==id}
- fun selected(c:Context):String { val id=runCatching{c.getSharedPreferences(PREFS,0).getString(KEY,null)}.getOrNull(); return if(valid(id)) id!! else DEFAULT_ID }
+ fun selected(c:Context):String { val id=SafePreferences.string(c.getSharedPreferences(PREFS,0),KEY,null); return if(valid(id)) id!! else DEFAULT_ID }
  fun get(c:Context,id:String=selected(c))=all.firstOrNull{it.id==id}?:all.first{it.id==DEFAULT_ID}
  fun save(c:Context,id:String)=valid(id)&&c.getSharedPreferences(PREFS,0).edit().putString(KEY,id).commit()
 }

@@ -159,13 +159,12 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         val notificationManager = getSystemService(NotificationManager::class.java)
         val fullScreenIntent = if (Build.VERSION.SDK_INT >= 34) runCatching { notificationManager.canUseFullScreenIntent() }.getOrDefault(false) else true
         val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        val monitorEnabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
-        val monitorRunning = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_RUNNING, false)
+        val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        val monitorRunning = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_RUNNING, false)
         val protectionMode = ProtectionStore(this).read().mode
         val btConnect = Build.VERSION.SDK_INT < 31 || checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
-        val a2Enabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-        val dashboardEnabled = getSharedPreferences(MainActivity.ALARM_DISPLAY_PREFS, MODE_PRIVATE)
-            .getBoolean(MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
+        val a2Enabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+        val dashboardEnabled = SafePreferences.boolean(getSharedPreferences(MainActivity.ALARM_DISPLAY_PREFS, MODE_PRIVATE), MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
         val fullScreenSummary = when {
             !dashboardEnabled -> "Not needed — optional dashboard is OFF"
             Build.VERSION.SDK_INT < 34 -> "Available — no separate access gate on this Android version"

@@ -65,8 +65,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         applyAlarmWindowPolicy()
 
-        val privacyDecision = getSharedPreferences("privacy_notice_v2", MODE_PRIVATE)
-            .getString("decision", null)
+        val privacyDecision = SafePreferences.string(getSharedPreferences("privacy_notice_v2", MODE_PRIVATE), "decision", null)
         // Require acknowledgement of this updated notice on every existing
         // install once; it now discloses the optional alarm flashlight and its safety toggle.
         if (privacyDecision != "acknowledged") {
@@ -347,8 +346,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun applyAlarmWindowPolicy() {
-        val showOverLockScreen = getSharedPreferences(ALARM_DISPLAY_PREFS, MODE_PRIVATE)
-            .getBoolean(KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
+        val showOverLockScreen = SafePreferences.boolean(getSharedPreferences(ALARM_DISPLAY_PREFS, MODE_PRIVATE), KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
         if (Build.VERSION.SDK_INT >= 27) {
             setShowWhenLocked(showOverLockScreen)
             setTurnScreenOn(showOverLockScreen)
@@ -477,9 +475,8 @@ class MainActivity : FragmentActivity() {
         PowerTransitionCoordinator.initializeBaseline(this)
         val store = ProtectionStore(this)
         val current = store.read()
-        val monitorEnabled = getSharedPreferences(
-            ProtectionMonitorService.PREFS, MODE_PRIVATE
-        ).getBoolean(
+        val monitorEnabled = SafePreferences.boolean(
+            getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE),
             ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
         // Owner opt-out is authoritative for every non-triggered state. A
@@ -518,7 +515,7 @@ class MainActivity : FragmentActivity() {
 
     private fun syncProtectionMonitor(state: ProtectionState) {
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        val enabled = prefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        val enabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         if (ProtectionMonitorPolicy.shouldRun(enabled, state.mode)) {
             runCatching {
                 ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
@@ -754,15 +751,13 @@ class MainActivity : FragmentActivity() {
         }
         val soundMessage = "Main alarm sound: ${AlarmSoundStore.displayName(this, AlarmSoundStore.ALARM)} (custom override optional)"
         val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        val motionAlarmEnabled = monitorPrefs.getBoolean(
-            ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED
-        )
+        val motionAlarmEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED)
         val motionMessage = if (motionAlarmEnabled) {
             "Independent motion alarm: ON; it can trigger while the charger is connected."
         } else {
             "Independent motion alarm: OFF; charger-removal-only behavior is active."
         }
-        val monitorMessage = if (monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
+        val monitorMessage = if (SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
             "Charger protection monitor: ENABLED; keep its persistent notification visible. $motionMessage"
         } else {
             "Charger protection monitor: OFF by owner choice; automatic plug/unplug detection is unavailable until re-enabled."
@@ -770,9 +765,7 @@ class MainActivity : FragmentActivity() {
         val keyguard = getSystemService(KeyguardManager::class.java)
         val secureCredentialReady = keyguard.isDeviceSecure
         val exactAlarmReady = Build.VERSION.SDK_INT < 31 || getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
-        val monitorEnabled = monitorPrefs.getBoolean(
-            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
-        )
+        val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         val monitorRunning = ProtectionMonitorService.isRunning
         shield.update(state.mode, monitorEnabled && monitorRunning)
         val bootIdentityReady = ProtectionClock.bootCount(this) >= 0
