@@ -15,6 +15,9 @@ internal object A2DisconnectScheduler {
     private const val ACTION = "com.thiefalertsequre.A2_DISCONNECT_DEADLINE"
     private const val URI_PREFIX = "thiefalertsequre://a2-disconnect/"
     private const val REQUEST_BASE = 20_000
+    // ACL broadcasts can arrive concurrently for different accessories. Serialize
+    // every encrypted read-modify-write so one device cannot overwrite another.
+    private val lock = Any()
 
     data class Pending(
         val address: String,
@@ -46,7 +49,7 @@ internal object A2DisconnectScheduler {
         pending: Pending,
         preferencesName: String,
         namespace: String?
-    ): Boolean {
+    ): Boolean = synchronized(lock) {
         if (!TrustedBluetoothRegistry.isValidAddress(pending.address) ||
             pending.eventEpochMs <= 0L || pending.eventElapsedRealtimeMs <= 0L ||
             pending.eventElapsedRealtimeMs > android.os.SystemClock.elapsedRealtime() ||
@@ -85,12 +88,14 @@ internal object A2DisconnectScheduler {
             true
         }.getOrElse {
             LocalTamperHistory.record(context, "a2_deadline_schedule_failed", it.javaClass.simpleName + ": " + it.message)
-            runCatching { cancel(context, pending.address, pending.eventElapsedRealtimeMs) }
+            runCatching {
+                cancelInternal(context, pending.address, pending.eventElapsedRealtimeMs, preferencesName, namespace)
+            }
             false
         }
     }
 
-    fun find(context: Context, token: String): Pending? {
+    fun find(context: Context, token: String): Pending? = synchronized(lock) {
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
         val records = read(prefs) ?: run {
             LocalTamperHistory.record(context, "a2_deadline_read_failed", "A2 deadline callback could not read the encrypted schedule; source retained")
@@ -121,7 +126,7 @@ internal object A2DisconnectScheduler {
         expectedEventElapsedMs: Long?,
         preferencesName: String,
         namespace: String?
-    ): Boolean {
+    ): Boolean = synchronized(lock) {
         val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
         val records = read(prefs) ?: run {
             LocalTamperHistory.record(context, "a2_deadline_cancel_store_unreadable", "A2 deadline cancellation could not read the encrypted schedule; source retained")
@@ -152,7 +157,7 @@ internal object A2DisconnectScheduler {
         context: Context,
         preferencesName: String,
         namespace: String?
-    ): Boolean {
+    ): Boolean = synchronized(lock) {
         val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
         val records = read(prefs) ?: run {
             LocalTamperHistory.record(context, "a2_pending_clear_store_unreadable", "A2 deadline cleanup could not read the encrypted schedule; source retained")
