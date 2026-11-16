@@ -59,7 +59,7 @@ internal class RangingCapabilityQuery(
             stop()
             onResult(
                 if (error is SecurityException) {
-                    "Android denied the capability query. Confirm the Ranging permission in app settings."
+                    "Android or device policy denied the local capability query. No permission was requested; this API may be restricted on this device."
                 } else {
                     "Capability query failed safely: ${error.javaClass.simpleName}"
                 }
