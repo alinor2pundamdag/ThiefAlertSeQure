@@ -81,7 +81,7 @@ for screen in (
     "DeviceIntelligenceActivity.kt", "SetupStatusActivity.kt"
 ):
     source = (APP / screen).read_text(encoding="utf-8")
-    resume = re.search(r"override fun onResume\\(\\)(.*?)(?=\\n    (?:override fun|private fun|protected fun))", source, re.S)
+    resume = re.search(r"override fun onResume\(\)(.*?)(?=\n    (?:override fun|private fun|protected fun))", source, re.S)
     if not resume or "render()" not in resume.group(0):
         errors.append(screen + " must refresh live permission/capability status on resume")
 
