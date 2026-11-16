@@ -156,7 +156,7 @@ Read the complete [Privacy Policy](docs/PRIVACY_POLICY.md).
 - **Manufacturer-aware setup:** Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO, OPPO, realme, OnePlus, vivo / iQOO, Google Pixel, Motorola, ASUS, Sony Xperia, Nothing OS, Lenovo, TECNO / Infinix / itel, ZTE / nubia, and safe generic Android guidance.
 - **Settings fallback:** Public Android Settings action → app-specific settings → general Settings.
 - **Android 15+:** Edge-to-edge safe insets are applied to the app's scrollable screens.
-- **Android 17:** Background alarm audio remains inside the qualifying foreground-service architecture; Android 17 hardening still requires physical/emulator verification.
+- **Android 17:** Background alarm audio remains inside the qualifying foreground-service architecture; Android 17 hardening requires physical-device verification; instrumentation and emulator CI are intentionally disabled.
 
 - **Interface:** Material-based dark UI with a scrollable layout, readable text sizing, and large touch targets.
 
@@ -209,7 +209,7 @@ Build a debug APK and run unit tests:
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 ```
 
-Branch and pull-request GitHub Actions run unit tests, Android lint, asset validation, APK assembly, package/version verification, and debug-signer verification. They upload a development-only side-by-side test APK using package ID `com.thiefalertsequre.app.v114test`, so it can be installed alongside the production app without replacing the production app. The test APK is not eligible for official in-app updates. After merge, a manual release preflight can build and verify a permanent-key production APK without publishing; only a `v*` tag push publishes an official release after the permanent signing secrets, version monotonicity, package identity, tests, and pinned certificate all pass.
+Branch and pull-request GitHub Actions run JVM unit tests, static/source-contract checks, Android lint, asset validation, debug and minified-release APK builds, package/version verification, and debug-signer verification. The owner-directed workflow does not compile or execute instrumentation tests and does not run emulator matrices. They upload a development-only side-by-side test APK using package ID `com.thiefalertsequre.app.v114test`, so it can be installed alongside the production app without replacing the production app. The test APK is not eligible for official in-app updates. After merge, a manual release preflight can build and verify a permanent-key production APK without publishing; only a `v*` tag push publishes an official release after the permanent signing secrets, version monotonicity, package identity, tests, and pinned certificate all pass.
 
 A successful CI build confirms that the configured automated checks and APK assembly passed. It does **not** prove correct behavior on every physical phone. Charger broadcasts, alarm timing, sound output, reboot recovery, notifications, and manufacturer battery controls still require real-device testing.
 

@@ -10,7 +10,7 @@
 
 > **Historical v1.1.4 feature-branch assessment:** [V1.1.4 Feature Implementation Status](V1.1.4_FEATURE_IMPLEMENTATION_STATUS.md). Its 94% figure is an estimate for the earlier audited branch only; it is not a completion percentage for the current FIXALL work branch.
 
-> **Current FIXALL scope (2026-11-17):** Phases 0–12 coding on `work/phase-0-12-coding`. Android instrumentation execution/compilation and emulator matrices are prohibited by owner direction. Phase 10 covers documentation/privacy/assets; Phase 11 covers branch/release-candidate readiness without merge or publication; Phase 12 requires real physical-device evidence. CI run #1421 and CodeQL run #25 passed on predecessor commit `9168d1d`; they are historical after subsequent commits. Always verify the latest exact branch head and its current workflows before claiming green. No current-head physical-device acceptance or production release is claimed.
+> **Current FIXALL status (2026-11-17):** Exact head `475c1fa00b8c30c1280f77053d83eb91c0db7f64` on `work/phase-0-12-coding` passed [Android CI run 43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535) and [CodeQL run 43950015623](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623). The 29-file JVM unit suite, static/source checks, lint, assets, debug APK, minified release metadata and signer checks passed. Instrumentation execution/compilation and emulator matrices are excluded by owner direction. Phase 10 documentation/privacy/assets checks pass; Phase 11 branch review is complete but integration is held because `main` is one commit ahead and diverged at `PROJECT_STATE.md`; Phase 12 physical acceptance is prepared but NOT TESTED. No merge, tag, publication or production release is claimed.
 
 > **Official successor baseline: v1.1.3 (versionCode 5).** This release line preserves the completed v1.1.2 feature set; its intended functional addition is the synchronized rear-LED flashlight during a latched alarm. No v1.1.2 protection, alarm, authentication, privacy, settings, history, or managed-device feature is intentionally removed. Flashlight availability is optional and cannot block audio.
 
@@ -31,7 +31,7 @@ The production baseline remains v1.1.3. The current feature branch contains the 
 | Multi-accessory A2 | Local multi-device trust registry, per-device baselines/revisions, dynamically enabled manifest ACL receiver for process-death events, encrypted per-device AlarmManager deadlines, foreground Handler fast path, reconnect cancellation, and unregister-without-unpairing semantics; exact-alarm denial uses inexact idle-aware fallback and may be delayed in Doze |
 | Navigation and interaction audit | CI static checks cover declared Activity destinations, obvious empty click listeners, themed dialogs, edge-to-edge insets, theme reapplication, and external launch fallbacks |
 | Alarm/authentication regression protection | JVM tests cover the existing 10-second charger countdown, reconnect cancellation, latched alarm behavior, reboot recovery, authentication cooldown, and A2 disconnect gates |
-| Development build | CI run #1092 verified artifact `ThiefAlertSeQure-debug-apk` (ID `13932770270`): package `com.thiefalertsequre.app.v114test`, versionCode `6`, versionName `1.1.4-test`, minSdk `26`; debug certificate SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`. Not a production update or release |
+| Development build | Latest exact-head CI run [43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535) uploaded artifact `ThiefAlertSeQure-debug-apk` (ID `14266362844`): package `com.thiefalertsequre.app.v114test`, versionCode `6`, versionName `1.1.4-test`, minSdk `26`; APK SHA-256 `034d3cc076ca06ea3265bd468e42de8247352d3f8cf1f1882f7b4620971c641e`; CI debug certificate SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`. Development-only, not a production update or release |
 
 ## Implemented in this branch
 
@@ -88,7 +88,7 @@ Strong face authentication is available only if Android reports the enrolled fac
 - Device Owner enrollment is a deliberate enterprise provisioning operation, not a runtime permission and not something the app can self-grant.
 
 ## Release gates
-1. Exact-head non-instrumentation GitHub Actions pass: JVM unit tests, source-contract checks, lint, APK assembly/metadata/signer checks and CodeQL.
+1. Exact-head non-instrumentation GitHub Actions and CodeQL passed on `475c1fa` (runs 43950015535 and 43950015623): JVM unit tests, source-contract checks, lint, APK assembly/metadata/signer checks and CodeQL.
 2. Debug test APK assembles with its isolated development package identity.
 3. Install on physical Android 8–17 devices where available (API 26–37); API 23–25 are below the approved minSdk and are not supported.
 4. Verify selected audio URI survives reboot, decodes, previews and loops; verify vibration fallback on missing/corrupt audio.

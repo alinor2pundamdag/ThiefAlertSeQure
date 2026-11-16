@@ -47,12 +47,15 @@ The bullets below include earlier work on predecessor branches; they are project
 ## Current coding-head status (2026-11-17)
 
 - Current coding branch: `work/phase-0-12-coding`.
-- Verified head before the current Phase 10–12 hardening commit: `9168d1d484e1ef1de78c465325711492b29fb07f`.
-- Owner-directed scope: complete coding for Phases 0–12, without instrumentation execution/compilation or emulator matrices.
-- Exact-head non-instrumentation Android CI run [#1421](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43938339649) and CodeQL run [#25](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43938339708) passed on `9168d1d`; subsequent edits require a fresh exact-head run.
-- Phase 10 covers documentation, privacy and assets; Phase 11 covers branch integration/release-candidate readiness without merging or publishing; Phase 12 prepares physical-device acceptance, whose execution requires real hardware.
-- The release workflow and Gradle build wiring were updated to remove instrumentation compilation/execution and emulator upgrade checks; `scripts/verify_no_instrumentation.py` now guards both Android and release workflows.
-- `main` remains untouched. No merge, tag, APK publication, or production release has been performed or authorized.
+- Exact verified head: `475c1fa00b8c30c1280f77053d83eb91c0db7f64`.
+- Android non-instrumentation CI [run 43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535): **PASS** on this exact commit. JVM unit tests, source-contract checks, lint, assets, APK packaging, minified release metadata, package/version/signer checks, and artifact upload all succeeded.
+- CodeQL [run 43950015623](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623): **PASS** for Java/Kotlin and GitHub Actions on this exact commit.
+- The branch contains 29 JVM unit-test source files. No instrumentation test compilation/execution or emulator matrix ran; this is an explicit owner-directed constraint.
+- Uploaded development artifact: `ThiefAlertSeQure-debug-apk`, artifact ID `14266362844`, 6,615,813 bytes. APK package `com.thiefalertsequre.app.v114test`, versionName `1.1.4-test`, versionCode `6`, minSdk `26`. APK SHA-256: `034d3cc076ca06ea3265bd468e42de8247352d3f8cf1f1882f7b4620971c641e`. Debug signer SHA-256: `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`. This is a development-only debug APK, not a production update.
+- The minified release variant also built and passed package/version metadata checks as `com.thiefalertsequre.app`, versionName `1.1.4`, versionCode `6`; the build was unsigned because permanent release signing was not configured in this CI run. No production APK was published.
+- Branch comparison against `main`: 495 commits ahead, 1 behind; 129 changed paths (89 added, 40 modified, 0 deleted), +10,430 / −648 lines. The sole main-only commit adds `PROJECT_STATE.md`, so the branch and main have diverged around that file. This was reviewed and intentionally not merged; do not merge/rebase without separate approval.
+- Phase 0–11 coding/source checks and Phase 12 physical-test preparation are recorded in the execution checklist. Actual v1.1.4 physical-device acceptance remains **NOT TESTED**.
+- `main` remains untouched. No merge, tag, publication, or production release has been performed or authorized.
 
 ## Historical verification status
 - Source-head run #1270: PASS for the build job and all seven Android instrumentation jobs.

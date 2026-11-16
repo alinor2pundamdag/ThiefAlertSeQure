@@ -22,19 +22,19 @@ This is the persistent source of truth for interrupted work. A phase is not comp
 
 | Phase | Required coding and integration work | Current disposition |
 |---|---|---|
-| **0 — Safety and baseline** | Preserve source baseline, package/signing identity, SDK floor, data, feature/permission inventory and production boundary | Baseline review recorded; verify again against final diff |
-| **1 — Compilation and architecture** | One owner for state transitions, persistence, Android boundaries and UI/runtime dependencies | Architecture map and state-ownership checks exist; exact-head non-instrumentation CI required after final edits |
-| **2 — Power and charger** | Event-time capture, live power validation, debounce, generation guards, reconnect cancellation, 10-second deadline and reboot recovery | Implementation and JVM policy coverage exist; source integration audit and final CI required |
-| **3 — Data integrity** | Safe typed preference reads, synchronous commits, corruption preservation/recovery, migration and test-state isolation | Safe preference/state ownership code and JVM coverage exist; audit all critical stores and final CI required |
-| **4 — Alarm and recovery** | Persist latch before playback; scheduler token integrity; recovery/retry; audio fallback, volume restoration, optional flashlight and authenticated disarm | Implementation and policy/unit coverage exist; source integration audit and final CI required |
-| **5 — Bluetooth A2** | Encrypted trusted registry, ACL receiver lifecycle, per-device revisions, reconnect invalidation, 8-second grace period and safe fallback | Implementation and JVM policy/registry coverage exist; accessory/OEM behavior is device-unverified |
-| **6 — Authentication and security** | Ephemeral proof, Android credential/strong biometric gate, persisted throttle, anti-tampering and owner-only actions | Implementation and JVM auth-policy coverage exist; audit every disarm/failure/cancel path and final CI required |
-| **7 — Background services and lifecycle** | Foreground-service start/stop, notification channels, boot/package-replacement recovery, process recreation and Android-version restrictions | Implementation and source checks exist; Android/OEM runtime behavior remains device-dependent |
-| **8 — UI and accessibility** | Preserve screens, navigation, themes, readiness flows, edge-to-edge insets and accessibility semantics | UI implementation and static navigation/theme checks exist; TalkBack/display behavior remains device-unverified |
-| **9 — Automated tests and CI** | JVM tests, source-contract checks, manifest/preferences/ownership checks, lint, assets, release build and APK identity checks | Non-instrumentation Android CI and CodeQL passed on commit `9168d1d`; rerun on final exact head. Instrumentation is excluded by owner direction |
-| **10 — Documentation, Privacy & Assets** | Reconcile README, privacy policy, permissions, feature matrix, threat model, update/install docs, asset formats/integrity and user-facing capability claims | Documentation and assets exist; stale phase/status statements and CI guard coverage are being corrected. Do not claim complete until consistency audit and CI pass |
-| **11 — Branch Integration & Release Candidate** | Review complete branch diff, branch ancestry, package/version/signer invariants, release workflow, secrets references, artifact identity, update path and release gates | Candidate remains on development branch. No merge/tag/release authorized. Release workflow must contain no instrumentation or emulator steps; signed release preflight remains a separate owner-approved gate |
-| **12 — Physical Device Testing & Final Acceptance** | Prepare a reproducible physical-device matrix, evidence template, safe recovery/cleanup and known platform/OEM limitations; record model/build/app commit for each test | Test procedure and HONOR/OEM matrix are documented. New v1.1.4 candidate physical acceptance is NOT TESTED until actual device evidence is supplied; CI cannot satisfy this phase |
+| **0 — Safety and baseline** | Preserve source baseline, package/signing identity, SDK floor, data, feature/permission inventory and production boundary | **PASS —** final diff has no deleted paths; minSdk 26, compile/target 36, package identity and signing contract guards pass; main remains untouched |
+| **1 — Compilation and architecture** | One owner for state transitions, persistence, Android boundaries and UI/runtime dependencies | **PASS —** architecture map, state-ownership checks, Kotlin compilation and exact-head CI pass |
+| **2 — Power and charger** | Event-time capture, live power validation, debounce, generation guards, reconnect cancellation, 10-second deadline and reboot recovery | **CODING/CI PASS —** implementation and JVM policy coverage pass; charger hardware/OEM behavior remains physical-device-only |
+| **3 — Data integrity** | Safe typed preference reads, synchronous commits, corruption preservation/recovery, migration and test-state isolation | **PASS —** safe preference, manifest and state-ownership source checks plus JVM tests pass; physical storage-failure behavior remains device-dependent |
+| **4 — Alarm and recovery** | Persist latch before playback; scheduler token integrity; recovery/retry; audio fallback, volume restoration, optional flashlight and authenticated disarm | **CODING/CI PASS —** policy/JVM regression checks and APK build pass; speaker/torch/Keyguard behavior remains physical-device-only |
+| **5 — Bluetooth A2** | Encrypted trusted registry, ACL receiver lifecycle, per-device revisions, reconnect invalidation, 8-second grace period and safe fallback | **CODING/CI PASS —** encrypted registry, per-device deadlines and JVM policy coverage pass; real accessory/OEM callback behavior remains unverified |
+| **6 — Authentication and security** | Ephemeral proof, Android credential/strong biometric gate, persisted throttle, anti-tampering and owner-only actions | **CODING/CI PASS —** ephemeral proof and auth-policy checks pass; actual Keyguard/strong-biometric hardware flows remain physical-device-only |
+| **7 — Background services and lifecycle** | Foreground-service start/stop, notification channels, boot/package-replacement recovery, process recreation and Android-version restrictions | **CODING/CI PASS —** source checks and lint pass; OEM background execution and reboot delivery remain physical-device-only |
+| **8 — UI and accessibility** | Preserve screens, navigation, themes, readiness flows, edge-to-edge insets and accessibility semantics | **CODING/CI PASS —** navigation, themed dialogs, theme and accessibility source checks pass; TalkBack/display perception remains device-unverified |
+| **9 — Automated tests and CI** | JVM tests, source-contract checks, manifest/preferences/ownership checks, lint, assets, release build and APK identity checks | **PASS on exact head `475c1fa` —** [Android run 43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535) and [CodeQL run 43950015623](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623) both succeeded. Instrumentation compilation/execution and emulator matrices were not run by owner direction |
+| **10 — Documentation, Privacy & Assets** | Reconcile README, privacy policy, permissions, feature matrix, threat model, update/install docs, asset formats/integrity and user-facing capability claims | **PASS —** privacy/permission claims reconciled, optional ranging is disclosed accurately, README/API scope corrected, packaged icon/audio assets validated and static privacy guards pass |
+| **11 — Branch Integration & Release Candidate** | Review complete branch diff, branch ancestry, package/version/signer invariants, release workflow, secrets references, artifact identity, update path and release gates | **REVIEW PASS / INTEGRATION HELD —** 495 ahead, 1 behind; 129 paths changed (89 added, 40 modified, none deleted). Main-only `PROJECT_STATE.md` commit creates a divergence to reconcile before integration. Exact-head debug APK and minified release metadata checks pass. Permanent signing-secret presence was not independently verified; no merge/tag/publication/release performed |
+| **12 — Physical Device Testing & Final Acceptance** | Prepare a reproducible physical-device matrix, evidence template, safe recovery/cleanup and known platform/OEM limitations; record model/build/app commit for each test | **PREPARATION PASS / PHYSICAL ACCEPTANCE NOT TESTED —** reproducible HONOR 200 Pro scenario matrix and evidence record are prepared; only real-device execution can close this phase |
 
 ## Phase 10 — documentation, privacy and assets
 
@@ -55,7 +55,7 @@ This is the persistent source of truth for interrupted work. A phase is not comp
 
 ## Phase 12 — physical-device acceptance preparation
 
-Use `docs/HONOR_200_PRO_COMPATIBILITY_AUDIT.md`, `docs/ANDROID_DEVICE_COMPATIBILITY.md` and `docs/UX_UI_AUDIT.md`. Record exact device model, Android/API version, OEM OS/build fingerprint, app version, tested commit, date/time, settings, scenario ID, expected result, observed result and PASS/FAIL/NOT TESTED. Preserve logs and redact personal data. Do not uninstall, clear app data, factory-reset or bypass authenticated recovery as test cleanup.
+Use `docs/PHASE_12_DEVICE_ACCEPTANCE_RECORD.md`, `docs/HONOR_200_PRO_COMPATIBILITY_AUDIT.md`, `docs/ANDROID_DEVICE_COMPATIBILITY.md` and `docs/UX_UI_AUDIT.md`. Record exact device model, Android/API version, OEM OS/build fingerprint, app version, tested commit, date/time, settings, scenario ID, expected result, observed result and PASS/FAIL/NOT TESTED. Preserve logs and redact personal data. Do not uninstall, clear app data, factory-reset or bypass authenticated recovery as test cleanup.
 
 ## Mandatory execution order
 
@@ -67,3 +67,19 @@ Use `docs/HONOR_200_PRO_COMPATIBILITY_AUDIT.md`, `docs/ANDROID_DEVICE_COMPATIBIL
 6. Re-read this ledger, `PROJECT_STATE.md`, current branch HEAD and latest workflow results before reporting completion.
 
 **Completion rule:** Report software coding completion separately from physical-device acceptance and production release. No phase is marked 100% accepted without its own evidence.
+
+
+## Exact-head verification snapshot — 2026-11-17
+
+- Branch: `work/phase-0-12-coding`
+- Commit: `475c1fa00b8c30c1280f77053d83eb91c0db7f64`
+- Android workflow: [run 43950015535 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535)
+- CodeQL: [run 43950015623 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623)
+- JVM test source files: 29; unit-test step passed.
+- Instrumentation: no instrumentation task, compilation or execution; no emulator matrix.
+- Development artifact: `ThiefAlertSeQure-debug-apk`, ID `14266362844`, 6,615,813 bytes; package `com.thiefalertsequre.app.v114test`, version `1.1.4-test`, code 6, minSdk 26; APK SHA-256 `034d3cc076ca06ea3265bd468e42de8247352d3f8cf1f1882f7b4620971c641e`; CI debug signer SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`.
+- Minified release build: package `com.thiefalertsequre.app`, version `1.1.4`, code 6; build and metadata checks passed, but this CI output was unsigned because permanent release signing was not configured. It is not a production release.
+- Branch comparison: 495 ahead / 1 behind; 129 changed paths, 89 added, 40 modified, 0 deleted. The main-only commit adds `PROJECT_STATE.md`; do not merge/rebase without separate approval.
+- Physical acceptance on HONOR 200 Pro: **NOT TESTED**.
+
+This snapshot applies only to the exact commit above. Any subsequent commit requires a fresh exact-head Android and CodeQL verification.

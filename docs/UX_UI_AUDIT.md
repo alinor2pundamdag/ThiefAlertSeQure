@@ -1,6 +1,6 @@
 # v1.1.4 UX/UI and interaction audit
 
-**Current status (2026-11-17):** Source-level UX/UI implementation and the static navigation/theme/dialog checks are recorded. Android instrumentation is not executed or compiled under the owner's current direction. The previous audit text below contains historical CI evidence and must not be read as current-head or physical-device acceptance. Current exact-head non-instrumentation CI run #1421 and CodeQL run #25 passed on commit `9168d1d`; any later code/documentation edits require a new exact-head run. Physical-device acceptance for this v1.1.4 candidate remains NOT TESTED.
+**Current status (2026-11-17):** Source-level UX/UI implementation and static navigation/theme/dialog checks are recorded. Exact head `475c1fa00b8c30c1280f77053d83eb91c0db7f64` passed [Android CI run 43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535) and [CodeQL run 43950015623](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623). Instrumentation is not compiled or executed and no emulator matrix runs. The uploaded debug APK is development-only. Physical-device acceptance for this v1.1.4 candidate remains NOT TESTED; subsequent commits require new exact-head CI.
 
 ## Historical verification baseline (not current-head evidence)
 - Branch: `work/phase-0-12-coding`
