@@ -22,7 +22,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Framework-level smoke coverage across the supported Android API 26–36 range.
+ * Framework-level smoke coverage across the Android API 26–37 emulator matrix.
  *
  * These tests verify app launch and manifest declarations on the release package.
  * OEM-specific guidance and capability logic have JVM regression coverage; these

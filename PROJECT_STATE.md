@@ -46,12 +46,14 @@ The bullets below include earlier work on predecessor branches; they are project
 
 ## Last verified coding-head status (2026-11-16)
 - Current coding branch: `work/phase-0-12-coding`.
-- Latest verified head: `367e3fd163a7f1cac04d24a08c05e19120d43650`.
-- GitHub Actions run [#1395](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43865303650): build job PASS, including JVM unit tests, Android instrumentation-source compilation (without execution), navigation/preferences/manifest/state checks, lint, asset/release-workflow checks, APK assembly, minified APK metadata, and package/version/signer checks; instrumentation execution intentionally SKIPPED.
-- The preceding #1394 failed only at instrumentation-source compilation because `UpgradeDataPreservationTest` referenced a local history snapshot before declaring it. Commit `367e3fd` added the missing snapshot capture/restore; #1395 verifies that compile blocker is resolved.
-- The earlier run #1270 instrumentation results below remain historical evidence for its older commit only, not current-head verification.
-- Code-level implementation and non-instrumentation CI have been rechecked on the latest head. Coding phases 0–12 are not certified complete until the remaining cross-phase documentation, source-diff, and acceptance-preparation audit is closed. Instrumentation execution remains deferred until that coding audit is complete.
-
+- Latest verified application/test coding head: `1141b10db19afc9ffa085b549adfd61ae0c39629`.
+- Android build run [#1410](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43872054032): PASS. JVM unit tests, Android instrumentation-source compilation, navigation/preferences/manifest/state checks, Android lint, asset and release-workflow validation, debug APK assembly, minified release APK metadata, package/version/signer verification, and artifact upload all passed.
+- CodeQL run [#14](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43872054576): completed successfully for Java/Kotlin and GitHub Actions code on the FIXALL work branch.
+- Fixed the #1394 instrumentation-source compilation blocker by capturing/restoring the local event-history snapshot. Fixed the generic instrumentation suite's upgrade-test argument issue with an explicit JUnit assumption and added a cleanup mode/trap so interrupted in-place upgrade verification restores emulator test state.
+- Updated the Android update contract to minSdk 26 and corrected the Android 17 / API 37 compatibility matrix documentation.
+- The CodeQL workflow now includes `work/**`; the Android workflow is configured to run the full representative API 26–37 matrix on this branch after coding closure.
+- The earlier #1270 instrumentation results remain historical evidence for their older commit only, not current-head verification.
+- Coding phases 0–12 are complete at source, unit/static, documentation, branch-review and test-preparation level. The remaining non-physical acceptance gate is execution of the full emulator instrumentation matrix on the final workflow head. Physical-device acceptance remains separate and is not inferred from emulator CI.
 ## Historical verification status
 - Source-head run #1270: PASS for the build job and all seven Android instrumentation jobs.
 - Instrumentation reports: 175 total test executions across the matrix; 168 passed and 7 intentionally skipped (one per API); zero test failures/errors.
@@ -60,16 +62,10 @@ The bullets below include earlier work on predecessor branches; they are project
 - Physical HONOR 200 Pro acceptance remains excluded from Phase 1 and is reserved for Phase 12. Emulator results are not represented as physical-device evidence.
 - Production-signed APK/update continuity, merge, tag, APK publication, and production release remain separate gates and are not authorized by this Phase 1 work.
 
-## Remaining FIXALL work (live checklist; predecessor-branch checkmarks are not current-head acceptance)
-1. Review and test alarm retry scheduling, cancellation, and process-death behavior.
-2. Review all critical SharedPreferences readers and fail-closed behavior.
-3. Verify Bluetooth revision migration and user-facing recovery/registration failures.
-4. Complete scheduler-token and connected-baseline persistence fixes.
-5. Audit all alarm-volume restore and cleanup commit results.
-6. Reconcile all docs and assets against the exact candidate.
-7. Complete source/API, manifest, UI, accessibility, and integration review.
-8. Run exact-head CI and address actual app/test failures separately from emulator infrastructure failures.
-9. Prepare focused physical-device acceptance steps for changed behavior.
+## Remaining non-physical verification
+1. Execute the final Android instrumentation matrix on API 26, 28, 30, 31, 32, 33, 34, 35, 36 and 37.
+2. Inspect every API report and diagnostic artifact; fix app/test failures, distinguish emulator infrastructure failures, and rerun affected APIs until all required jobs pass.
+3. Keep physical-device acceptance, production merge, tag, APK publication and release as separate gates requiring real device evidence or explicit owner approval.
 
 ## Rules
 - Do not silently change scope or product behavior.

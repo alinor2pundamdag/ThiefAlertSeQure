@@ -24,7 +24,7 @@ Checked on 11 November 2026:
 - Open secret-scanning alerts: none returned.
 - Dependabot vulnerability alerts: enabled; no open alerts returned.
 - Dependabot automated security updates: enabled. GitHub may open dependency update pull requests; these are not auto-merged.
-- Code scanning: the advanced CodeQL workflow analyzes Java/Kotlin application code and GitHub Actions workflow code on pushes to `main`, `feat/**`, `feature/**`, `fix/**`, `security/**`, and `work/**`, pull requests to `main`, and a weekly schedule. The FIXALL coding branch is now included; its first exact-head result must pass before the security scan is marked clean.
+- Code scanning: the advanced CodeQL workflow analyzes Java/Kotlin application code and GitHub Actions workflow code on pushes to `main`, `feat/**`, `feature/**`, `fix/**`, `security/**`, and `work/**`, pull requests to `main`, and a weekly schedule. The FIXALL coding branch is included. CodeQL run [#14](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43872054576) completed successfully on head `1141b10db19afc9ffa085b549adfd61ae0c39629`; this records successful analysis execution, not a guarantee that no findings exist.
 
 The signed release workflow's manual preflight is restricted to `refs/heads/main`. Tag-triggered publication separately verifies that the tagged commit is already an ancestor of `main`. The preflight builds and verifies but does not publish a GitHub Release.
 
@@ -120,7 +120,7 @@ A final alarm recovery-path review found that `ProtectionMonitorService.startThe
 No failure details were supplied. These results clear the reported HONOR 200 Pro functional test gate for the listed scenarios. They do not establish Android 17 compatibility, all Android/OEM versions, Play policy approval, Device Owner behavior on every build, or production signing/update migration.
 
 ## Remaining verification
-1. Latest code-level CI evidence before the documentation refresh: **PASS** (run [#1395](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43865303650) on head `367e3fd163a7f1cac04d24a08c05e19120d43650`). It passed unit tests, instrumentation-source compilation, static contracts, lint, APK packaging and package/version/signer verification. Instrumentation execution was intentionally skipped. Every later source or documentation commit requires a fresh exact-head run before it can be treated as verified.
+1. Latest code-level CI evidence: **PASS** (run [#1410](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43872054032) on head `1141b10db19afc9ffa085b549adfd61ae0c39629`). It passed unit tests, instrumentation-source compilation, static contracts, lint, APK packaging, minified APK metadata and package/version/signer verification. The API 26–37 instrumentation matrix is the next acceptance gate.
 2. Android 8 through Android 17 compatibility paths: still pending where devices are unavailable; Android 17 background-audio hardening remains specifically unverified.
 3. Target HONOR 200 Pro: the 11 scenarios above are owner-reported **PASS**; capture exact Android/MagicOS build and date-stamped evidence if available.
 4. Opus decoding/loop and volume restoration: volume restoration is reported **PASS**; separate decoder-failure/vibration fallback test remains pending.
