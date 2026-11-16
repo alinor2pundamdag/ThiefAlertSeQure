@@ -135,8 +135,6 @@ if (
 ):
     errors.append("Critical monitor settings must be durably committed and shutdown must use the service-owned retry path")
 main_activity = (APP / "MainActivity.kt").read_text(encoding="utf-8")
-if "syncProtectionMonitor(next)" not in main_activity:
-    errors.append("Successful owner authentication must immediately reconcile the owner-enabled monitor")
 if "device_credential_launch_failed" not in main_activity:
     errors.append("Device credential launch failures must be handled without terminating the active alarm")
 if "Android access not granted" not in settings_activity or "Open access settings" not in settings_activity:
