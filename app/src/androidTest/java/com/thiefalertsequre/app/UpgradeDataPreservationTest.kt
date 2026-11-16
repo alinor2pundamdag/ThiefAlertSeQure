@@ -60,7 +60,7 @@ class UpgradeDataPreservationTest {
         val upgradePhase = InstrumentationRegistry.getArguments().getString("upgradePhase")
         assumeTrue(
             "This regression is driven only by the explicit in-place upgrade workflow",
-            upgradePhase == "seed" || upgradePhase == "verify"
+            upgradePhase == "seed" || upgradePhase == "verify" || upgradePhase == "cleanup"
         )
         when (upgradePhase) {
             "seed" -> {
@@ -87,6 +87,12 @@ class UpgradeDataPreservationTest {
                         restoreOriginalState(context, preferences, monitorPrefs, backupPrefs, markerFile)
                     }
                     throw failure
+                }
+            }
+
+            "cleanup" -> {
+                if (backupPrefs.contains(KEY_MONITOR_SNAPSHOT)) {
+                    restoreOriginalState(context, preferences, monitorPrefs, backupPrefs, markerFile)
                 }
             }
 
