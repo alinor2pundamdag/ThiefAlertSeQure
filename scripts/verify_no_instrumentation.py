@@ -3,8 +3,19 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-gradle = (ROOT / "app/build.gradle.kts").read_text(encoding="utf-8")
-workflows = list((ROOT / ".github/workflows").glob("*.yml"))
+# Inspect every Gradle build/configuration file, not only the app module.
+# This also catches instrumentation wiring hidden in root scripts, included
+# build logic, or a future version catalog.
+gradle_files = sorted(
+    path
+    for pattern in ("*.gradle", "*.gradle.kts", "*.toml")
+    for path in ROOT.rglob(pattern)
+    if not any(part in {".git", ".gradle", "build"} for part in path.relative_to(ROOT).parts)
+)
+if not gradle_files:
+    raise SystemExit("No Gradle configuration files were found to audit.")
+
+workflows = sorted((ROOT / ".github/workflows").glob("*.yml"))
 forbidden_gradle = (
     "androidTest",
     "connectedCheck",
@@ -21,9 +32,13 @@ forbidden_gradle = (
     "connectedReleaseAndroidTest",
     "signReleaseForTests",
 )
-for token in forbidden_gradle:
-    if token in gradle:
-        raise SystemExit(f"Instrumentation build wiring is forbidden: {token}")
+for path in gradle_files:
+    source = path.read_text(encoding="utf-8")
+    for token in forbidden_gradle:
+        if token in source:
+            raise SystemExit(
+                f"Instrumentation build wiring is forbidden: {path.relative_to(ROOT)}: {token}"
+            )
 
 obsolete_helpers = (
     ROOT / ".github/scripts/run-android-instrumentation.sh",
@@ -56,4 +71,7 @@ for workflow in workflows:
         if token in source:
             raise SystemExit(f"Instrumentation/emulator workflow wiring is forbidden: {workflow}: {token}")
 
-print("Verified: no instrumentation runner/dependencies/build tasks or emulator execution in Gradle or GitHub Actions workflows.")
+print(
+    "Verified: no instrumentation runner/dependencies/build tasks or emulator execution "
+    f"across {len(gradle_files)} Gradle configuration files and {len(workflows)} GitHub Actions workflows."
+)
