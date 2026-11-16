@@ -274,16 +274,16 @@ class SettingsActivity : FragmentActivity() {
                     android.widget.Toast.makeText(this, "Monitor could not start: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
                 }
             } else if (!enabled) {
-                // Explicit owner opt-out stops pending charger countdowns too,
-                // but never clears a latched alarm without authentication.
-                val disabledState = ProtectionStore(this).update { current ->
-                    ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
+                // The service owns durable disarm, deadline cleanup and latched-alarm preservation.
+                // Do not stop it directly: it retries if the protection-state commit fails.
+                runCatching {
+                    startService(
+                        Intent(this, ProtectionMonitorService::class.java)
+                            .setAction(ProtectionMonitorService.ACTION_STOP)
+                    )
+                }.onFailure {
+                    android.widget.Toast.makeText(this, "Monitor stop could not be requested: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
                 }
-                if (disabledState.mode != ProtectionMode.ALARM_TRIGGERED) AlarmScheduler.cancel(this)
-                A2DisconnectScheduler.clearAll(this)
-                runCatching { TrustedBluetoothRegistry.clearBaselines(monitorPrefs) }
-                A2BluetoothReceiverController.sync(this)
-                stopService(Intent(this, ProtectionMonitorService::class.java))
             } else {
                 android.widget.Toast.makeText(this, "Monitoring will resume after owner authentication.", android.widget.Toast.LENGTH_LONG).show()
             }
