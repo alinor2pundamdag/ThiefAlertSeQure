@@ -9,7 +9,7 @@ This document is the persistent acceptance contract for ThiefAlertSeQure Android
 - Candidate v1.1.4: versionCode 6, versionName `1.1.4`.
 - Official release signing-certificate SHA-256:
   `9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64`.
-- Debug/instrumentation APKs use a separate `com.thiefalertsequre.app.v114test` application ID. They must never replace the production installation or be published as an update.
+- The development-only debug APK uses a separate `com.thiefalertsequre.app.v114test` application ID. It must never replace the production installation or be published as an update. No instrumentation APK is built.
 - Current compatibility candidate: minSdk 26, targetSdk 36, compileSdk 36. API 26 (Android 8.0) remains the approved minimum; do not lower it without explicit owner approval.
 
 Every official update must:
@@ -18,14 +18,14 @@ Every official update must:
 3. Use the permanent release keystore; never sign a distributable release with a debug key.
 4. Verify the downloaded APK's package, versionName, versionCode, signer certificate and SHA-256 before opening Android Package Installer.
 5. Use Android's in-place update path. Never uninstall the existing app, clear app data, or change the package identity to work around an installer error.
-6. Run the previous-official-release-to-candidate instrumentation test with `adb install -r`, never `adb uninstall`, and verify SharedPreferences, app-private files, monitor preference and monitor restart.
+6. During physical-device acceptance, install the previous official release and then the candidate with `adb install -r`, never `adb uninstall`, and verify SharedPreferences, app-private files, monitor preference and monitor restart. This is a manual physical-device check, not an instrumentation test.
 7. Keep the same checks in every later release workflow; update this document only when a deliberate, reviewed migration is approved.
 
 ## v1.1.3 → v1.1.4 upgrade behavior
 
 - The v1.1.3 updater requires the owner to disarm protection and turn its background monitor off before downloading/installing. After this first update, the owner must re-enable monitoring if it was disabled for the update; v1.1.3 does not persist a separate “temporarily paused for update” intent, so v1.1.4 cannot safely infer whether `monitor_enabled=false` was temporary or an intentional opt-out.
 - Starting with v1.1.4, an update is allowed when protection is DISARMED and there is no countdown or active alarm. A running monitor may remain enabled; Android stops the old process during package replacement and the package-replaced receiver attempts to restart it. Explicit owner opt-out remains respected.
-- Android's package installer normally preserves the app's private data on an in-place update when package identity, signer and version rules are satisfied. The release workflow proves this using the previous official APK, private preference/file markers and `adb install -r`. This is a CI emulator test, not a physical HONOR 200 Pro test.
+- Android's package installer normally preserves the app's private data on an in-place update when package identity, signer and version rules are satisfied. The physical-device acceptance procedure must verify this using the previous official APK and `adb install -r`; no emulator upgrade test is run in CI under the current owner direction.
 
 ## HONOR 200 Pro background acceptance
 
@@ -61,8 +61,8 @@ HONOR menus vary by region and MagicOS version. The device's actual Settings UI 
 ## Required release verification
 
 - Unit tests and Android lint pass.
-- Internal navigation, manifest permissions, component exposure and foreground-service declarations pass instrumentation.
-- Emulator instrumentation matrix covers API 23–37; distinguish emulator-image/infrastructure failures from app failures. The CI emulator-readiness shim must remain before each emulator action: Android can report `sys.boot_completed=1` before InputManager and SettingsProvider are ready.
+- Internal navigation, manifest permissions, component exposure and foreground-service declarations are checked by source-contract scripts, Android lint and APK build; runtime behavior remains device-dependent.
+- No emulator or instrumentation matrix is configured or executed. API 23–25 are below minSdk 26 and are unsupported. Physical-device acceptance is recorded separately for supported API levels and OEM builds.
 - Release APK is minified, package/version metadata is verified, official certificate matches, and APK ZIP integrity/checksum pass.
 - The previous official APK installs first, test markers are seeded, candidate installs with `adb install -r`, and markers/versionCode/monitor restart are verified.
 - Signed preflight artifact is not an official release until the release is deliberately merged/tagged through the approved production process.

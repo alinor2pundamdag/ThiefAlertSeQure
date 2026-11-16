@@ -1,6 +1,6 @@
 # Phase Two — Power Detection and Charger Reliability
 
-Status: Phase Two source implementation is carried forward on `work/phase-0-12-coding`. The current-head build, unit tests, static contracts and lint are tracked in `docs/REQUIREMENT_TRACEABILITY_MATRIX.md`. Instrumentation execution is deliberately deferred until all coding phases 0–12 are complete; physical-device certification is separate. This document records the source contract, not universal device certification.
+Status: Phase Two source implementation is carried forward on `work/phase-0-12-coding`. The current-head build, unit tests, static contracts and lint are tracked in `docs/REQUIREMENT_TRACEABILITY_MATRIX.md`. Android instrumentation execution and compilation are prohibited by the owner's current direction; physical-device certification is separate. This document records the source contract, not universal device certification.
 
 ## Detection path
 
@@ -46,6 +46,5 @@ The existing A2 trusted-Bluetooth separation path remains a separate signal from
 ## Verification record
 
 - Unit coverage: `PowerTransitionSamplingPolicyTest` covers early confirmation, unknown/opposite sample resets, bounded rejection, and unknown-only input. `A2DisconnectPolicyTest` covers same-boot validation, deadline overflow, revision invalidation, reconnect cancellation, and alarm guards.
-- Android instrumentation coverage: `A2DisconnectSchedulerInstrumentationTest` verifies encrypted per-device deadline persistence and reconnect cancellation; `A2BluetoothReceiverControllerInstrumentationTest` verifies manifest receiver gating by monitor/A2 state and Bluetooth permission.
-- Android integration coverage: `PowerTransitionRecoveryInstrumentationTest` seeds a persisted same-boot disconnect candidate, confirms recovery from Android's live battery snapshot, and checks replay idempotency.
+- Historical Android instrumentation source files describe receiver, scheduler and recovery scenarios, but are not compiled or executed under the current owner direction. Current automated evidence is JVM policy/registry coverage plus source-contract checks; actual Android event delivery, process death, Doze and OEM behavior require physical-device acceptance.
 - Still device-dependent: real charger attach/detach timing, OEM receiver/service survival, actual process kill/restart timing, exact/inexact alarm delivery under Doze, Bluetooth permission revocation behavior, and real Bluetooth accessory ACL behavior.
