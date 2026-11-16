@@ -6,13 +6,14 @@
 
 | Area | Current evidence | Status / limitation |
 |---|---|---|
-| Branch / identity | `dev/fixall-data-integrity`; production branch `main` remains untouched; package `com.thiefalertsequre.app`; minSdk 26, compile/target SDK 36; Java/Kotlin 17; versionCode 6 / versionName 1.1.4 | Source-verified; recheck exact-head CI metadata |
-| Previous exact-head build | Commit `b487f84b96fb29a6a1eb45f64b0b5a50c8d20dd3`, run [43728223602](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43728223602), build job passed unit tests, navigation checks, lint, asset/config validation, APK assembly and metadata/signer checks | PASS for that build job only; does not certify instrumentation |
-| Instrumentation API 26 / 28 | Both jobs exposed two failures: setup snapshot omitted `alarm_channel`; biometric Keystore test attempted per-use key creation without an enrolled strong biometric | FAIL on previous head; corrective changes made in current follow-up |
-| Instrumentation API 30 | Emulator remained ADB-offline; Gradle later detected emulator API level 1 and could not install the test APK | Infrastructure failure; retry needed |
-| Instrumentation API 32 / 34 / 35 / 36 | Must be checked from the complete final-head workflow run; no pass is inferred from queued/running state | Pending final-head evidence |
-| Architecture / event ownership | Source-backed map covers charger, countdown/alarm, authentication, Bluetooth, boot, settings, theme, history and updater paths | Documented; hardware/OEM behavior remains device-dependent |
-| Physical-device acceptance | Prior owner-reported HONOR 200 Pro scenarios are not independently reproduced by this CI review | Physical-device verification pending |
+| Branch / identity | `dev/fixall-data-integrity`; exact head `72cfad5e3f7e539a385cc09d6dd820d0de80dffa`; production branch `main` remains untouched; package `com.thiefalertsequre.app`; minSdk 26, compile/target SDK 36; Java/Kotlin 17; versionCode 6 / versionName 1.1.4 | Source-verified; branch ref points to the tested head |
+| Build and static checks | Workflow run [#1270](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43734061025), exact head above; build, unit tests, navigation verification, lint, asset/config checks, APK assembly and package/version/signer validation | PASS on that exact source head |
+| Instrumentation API 26 / 28 | 25 tests per API; zero failures and errors; one documented biometric-enrollment skip per API | PASS; skip is expected when emulator has no enrolled strong biometric |
+| Instrumentation API 30 | 25 tests; zero failures and errors; one documented biometric-enrollment skip | PASS; earlier ADB-offline failure was superseded by this successful exact-head run |
+| Instrumentation API 32 / 34 / 35 / 36 | 25 tests per API; zero failures and errors; one documented biometric-enrollment skip per API | PASS on exact head |
+| Diagnostics | All seven API diagnostic artifacts from run #1270 were inspected, including XML reports and logcat/crash context | No ThiefAlertSeQure process crash or test failure found; emulator system-process noise was identified separately |
+| Architecture / event ownership | Source-backed map covers charger, countdown/alarm, authentication, Bluetooth, boot, settings, theme, history and updater paths | Documented and source-checked for Phase 1; hardware/OEM behavior remains device-dependent |
+| Physical-device acceptance | HONOR 200 Pro testing for changed v1.1.4 behavior | Reserved for Phase 12; not a Phase 1 blocker and not inferred from emulator results |
 | Release boundary | No merge, tag, production APK publication or official release in this work | Not authorized |
 
 ## 2. Core protection requirements
@@ -58,7 +59,7 @@
 
 | ID | Requirement / acceptance condition | Primary owner(s) | Existing test / evidence | Baseline status |
 |---|---|---|---|---|
-| AND-01 | minSdk 26 and target/compile SDK 36 are consistent with the owner-approved project invariant | `app/build.gradle.kts` | Build/lint on exact head | Source configuration restored to minSdk 26; exact-head CI pending |
+| AND-01 | minSdk 26 and target/compile SDK 36 are consistent with the owner-approved project invariant | `app/build.gradle.kts` | Build/lint on exact head | Source configuration minSdk 26; exact-head build and instrumentation matrix passed in run #1270 |
 | AND-02 | Charger events are registered at runtime from foreground monitor; do not rely on manifest-only implicit broadcast delivery | monitor service, receiver, manifest | source inspection | Implemented; Android-version device matrix required |
 | AND-03 | Foreground-service declarations/types/permissions match service behavior and target SDK | manifest, monitor/alarm service | CI lint/build | Needs API 34–36 emulator/instrumentation validation and policy review |
 | AND-04 | Exact-alarm denial does not silently claim precise delivery; fallback/recovery is surfaced | scheduler, boot receiver, UI | scheduler test not identified | Needs explicit tests and UI state verification |
