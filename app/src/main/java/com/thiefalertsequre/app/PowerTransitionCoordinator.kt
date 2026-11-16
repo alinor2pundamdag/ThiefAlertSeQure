@@ -167,7 +167,7 @@ object PowerTransitionCoordinator {
             // must never leave an ARMED state paired with a disconnected baseline.
             val disarm = store.updatePersisted { current ->
                 if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
-                else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+                else ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
             }
             if (!disarm.persisted || disarm.state.mode == ProtectionMode.ALARM_TRIGGERED) {
                 LocalTamperHistory.record(context, "power_baseline_reset_state_failed", "$reason; protection state was not durably disarmed")
@@ -324,9 +324,7 @@ object PowerTransitionCoordinator {
         val update = ProtectionStore(context).updatePersisted { current ->
             when {
                 current.mode == ProtectionMode.ALARM_TRIGGERED -> current
-                !monitorEnabled -> ProtectionState(
-                    ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1
-                )
+                !monitorEnabled -> ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
                 current.mode == ProtectionMode.ARMED -> current
                 else -> ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
             }
