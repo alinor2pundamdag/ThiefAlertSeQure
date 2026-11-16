@@ -11,10 +11,20 @@ forbidden_gradle = (
     "androidTestImplementation",
     "assembleAndroidTest",
     "compileReleaseAndroidTest",
+    "signReleaseForTests",
 )
 for token in forbidden_gradle:
     if token in gradle:
         raise SystemExit(f"Instrumentation build wiring is forbidden: {token}")
+
+obsolete_helpers = (
+    ROOT / ".github/scripts/run-android-instrumentation.sh",
+    ROOT / ".github/scripts/prepare-adb-readiness-wrapper.sh",
+    ROOT / ".github/scripts/verify-in-place-upgrade.sh",
+)
+for helper in obsolete_helpers:
+    if helper.exists():
+        raise SystemExit(f"Obsolete instrumentation/emulator helper must be removed: {helper.relative_to(ROOT)}")
 
 for workflow in workflows:
     source = workflow.read_text(encoding="utf-8")

@@ -41,7 +41,7 @@ The bullets below include earlier work on predecessor branches; they are project
 - Trusted Bluetooth detection: live foreground-service ACL receiver plus a manifest ACL receiver dynamically enabled only while monitoring, A2, and BLUETOOTH_CONNECT permission are active. Per-device encrypted disconnect deadlines use AlarmManager and reconnect/revision/boot/state guards; the foreground Handler remains the fast path while service is alive.
 - Exact-alarm access unavailable: inexact idle-aware fallback is used and recorded. Android may defer inexact alarms and throttle exact idle alarms, especially in Doze; eight-second delivery is a target, not a platform guarantee. Force-stop and OEM/hardware behavior remain outside app control.
 - Boot behavior: old-boot A2 deadlines and connection baselines are invalidated; a fresh ACL connection event is required after reboot.
-- Verification: final build/lint/unit/instrumentation matrix must pass on the final branch head. Physical-device testing is explicitly separate and is not a blocker for finishing Phase Two software work.
+- Historical verification note: the former instrumentation matrix requirement is superseded by the owner's current prohibition on instrumentation execution/compilation and emulator matrices. Current software acceptance uses JVM unit tests, source-contract checks, lint, release-build/APK checks and CodeQL; physical-device behavior remains separate.
 - Phase Two is not complete until final CI, documentation consistency, and branch review are verified. Do not claim production release readiness from emulator CI alone.
 
 ## Current coding-head status (2026-11-17)
@@ -51,7 +51,7 @@ The bullets below include earlier work on predecessor branches; they are project
 - Owner-directed scope: complete coding for Phases 0–12, without instrumentation execution/compilation or emulator matrices.
 - Exact-head non-instrumentation Android CI run [#1421](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43938339649) and CodeQL run [#25](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43938339708) passed on `9168d1d`; subsequent edits require a fresh exact-head run.
 - Phase 10 covers documentation, privacy and assets; Phase 11 covers branch integration/release-candidate readiness without merging or publishing; Phase 12 prepares physical-device acceptance, whose execution requires real hardware.
-- The release workflow is being aligned with the no-instrumentation rule; no instrumentation compilation or emulator upgrade test may remain in any workflow.
+- The release workflow and Gradle build wiring were updated to remove instrumentation compilation/execution and emulator upgrade checks; `scripts/verify_no_instrumentation.py` now guards both Android and release workflows.
 - `main` remains untouched. No merge, tag, APK publication, or production release has been performed or authorized.
 
 ## Historical verification status

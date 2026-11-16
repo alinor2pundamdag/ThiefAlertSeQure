@@ -10,7 +10,7 @@
 
 > **Historical v1.1.4 feature-branch assessment:** [V1.1.4 Feature Implementation Status](V1.1.4_FEATURE_IMPLEMENTATION_STATUS.md). Its 94% figure is an estimate for the earlier audited branch only; it is not a completion percentage for the current FIXALL work branch.
 
-> **Current FIXALL scope (2026-11-17):** Phases 0–12 coding on `work/phase-0-12-coding`. Android instrumentation execution/compilation and emulator matrices are prohibited by owner direction. Phase 10 covers documentation/privacy/assets; Phase 11 covers branch/release-candidate readiness without merge or publication; Phase 12 requires real physical-device evidence. Android CI run #1421 and CodeQL run #25 passed on commit `9168d1d`; later edits require a fresh exact-head run. No current-head physical-device acceptance or production release is claimed.
+> **Current FIXALL scope (2026-11-17):** Phases 0–12 coding on `work/phase-0-12-coding`. Android instrumentation execution/compilation and emulator matrices are prohibited by owner direction. Phase 10 covers documentation/privacy/assets; Phase 11 covers branch/release-candidate readiness without merge or publication; Phase 12 requires real physical-device evidence. CI run #1421 and CodeQL run #25 passed on predecessor commit `9168d1d`; they are historical after subsequent commits. Always verify the latest exact branch head and its current workflows before claiming green. No current-head physical-device acceptance or production release is claimed.
 
 > **Official successor baseline: v1.1.3 (versionCode 5).** This release line preserves the completed v1.1.2 feature set; its intended functional addition is the synchronized rear-LED flashlight during a latched alarm. No v1.1.2 protection, alarm, authentication, privacy, settings, history, or managed-device feature is intentionally removed. Flashlight availability is optional and cannot block audio.
 
@@ -87,9 +87,9 @@ Strong face authentication is available only if Android reports the enrolled fac
 - Device Owner enrollment is a deliberate enterprise provisioning operation, not a runtime permission and not something the app can self-grant.
 
 ## Release gates
-1. Latest GitHub Actions unit tests pass.
-2. Latest debug APK assembles.
-3. Install on physical Android 6–17 devices where available; prioritize API 23, 26, 31–37, and Android 17 audio hardening.
+1. Exact-head non-instrumentation GitHub Actions pass: JVM unit tests, source-contract checks, lint, APK assembly/metadata/signer checks and CodeQL.
+2. Debug test APK assembles with its isolated development package identity.
+3. Install on physical Android 8–17 devices where available (API 26–37); API 23–25 are below the approved minSdk and are not supported.
 4. Verify selected audio URI survives reboot, decodes, previews and loops; verify vibration fallback on missing/corrupt audio.
 5. Verify foreground monitor, motion sensitivity, battery threshold crossing and stop action on physical devices.
 6. Verify icon and label before and after installation.
@@ -98,4 +98,4 @@ Strong face authentication is available only if Android reports the enrolled fac
 9. Verify repeated five-failure / 30-second cooldown and cancellation.
 10. Verify volume restoration, DND, silent mode, notification denial, battery settings, and full-screen dashboard with Android 14+ access both granted and denied.
 11. Device Owner enrollment, lock-task restrictions and in-app rollback are user-reported PASS on a separate test device; record its Android build and repeat after managed-policy changes.
-12. Complete Google Play foreground-service declaration for specialUse; approval is not guaranteed. The four permanent release-signing secrets are configured, but no signed production APK or Play approval exists yet. Branch CI intentionally uploads only the isolated debug test APK. Keep the PR unmerged until source review and fresh CI pass; the 11 HONOR 200 Pro physical scenarios are owner-reported PASS, while Android 17 and the remaining platform edge cases stay pending.
+12. Complete the Google Play foreground-service declaration for specialUse; approval is not guaranteed. The repository references four permanent release-signing secrets, but their current presence and a signed production APK were not independently verified in this session. Branch CI uploads only the isolated debug test APK. Keep the branch unmerged until owner review and explicit approval. The 11 HONOR 200 Pro v1.1.3 scenarios are historical owner-reported PASS; they do not establish acceptance of the v1.1.4 candidate. Android 17 and remaining OEM/permission edge cases stay pending.

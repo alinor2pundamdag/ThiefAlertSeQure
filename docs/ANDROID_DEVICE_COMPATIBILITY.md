@@ -40,7 +40,7 @@
 | Android 16 | 36 | Edge-to-edge enforcement and large-screen resizability/orientation changes for apps targeting API 36 | Apply insets; keep layouts adaptive and verify landscape, split-screen, foldables, and tablets |
 | Android 17 | 37 | Background audio hardening for all apps; target-37 apps have additional while-in-use FGS rules, with an exact-alarm + USAGE_ALARM exception; target-37 large-screen resizability restrictions cannot be opted out | Alarm audio and volume operations must remain inside a qualifying non-short foreground service; the project uses a mediaPlayback alarm FGS and a specialUse monitor FGS. Test Android 17 audio hardening with the platform ADB command |
 
-The approved build configuration is **minSdk 26, compileSdk 36, targetSdk 36**, using Android Gradle Plugin 8.10.1 and Gradle 8.11.1. The coding branch's final representative instrumentation matrix covers API 26, 28, 30, 31, 32, 33, 34, 35, 36 and 37. API 37 is an emulator test target only; it does not change compileSdk 36 / targetSdk 36 or imply universal Android 17 compatibility.
+The approved build configuration is **minSdk 26, compileSdk 36, targetSdk 36**, using Android Gradle Plugin 8.10.1 and Gradle 8.11.1. Earlier API 26–37 instrumentation/emulator matrices are historical evidence only and are not part of the current workflow. Current CI does not execute or compile instrumentation tests and does not run emulator matrices. API 37 / Android 17 behavior remains platform-unverified for this candidate.
 
 ## Bluetooth compatibility and setup (Android 8–16)
 
@@ -279,7 +279,7 @@ Source-level OEM detection, manufacturer-specific guidance, public Settings fall
 
 ## Automated emulator smoke-test coverage
 
-The Android CI workflow now runs the instrumentation smoke suite on emulator API levels 26 through 36. The matrix checks that all internal screens can be created, required manifest permissions remain declared, and device-capability inspection does not crash across the supported API range.
+The earlier Android CI instrumentation smoke suite is retired under the owner's current direction. The current workflow runs non-instrumentation JVM, static/source-contract, lint, build and APK checks only; it makes no claim about emulator runtime behavior.
 
 This is framework-level compatibility evidence only. It does not certify OEM Settings screens, proprietary battery managers, real Bluetooth accessory callbacks, charger broadcasts on physical hardware, biometric sensors, torch hardware, force-stop behavior, or manufacturer-specific background process policies. Those remain physical-device acceptance tests and must be recorded per model and OS build.
 
@@ -287,4 +287,4 @@ This is framework-level compatibility evidence only. It does not certify OEM Set
 
 ## Minimum Android support invariant
 
-The owner-approved minimum remains **minSdk 26 (Android 8.0)**. Do not lower it to API 23–25 without explicit approval and a separate compatibility review. The configured emulator matrix covers representative supported API levels 26, 28, 30, 32, 34, 35 and 36. A matrix configuration or successful emulator run does not certify physical OEM behavior.
+The owner-approved minimum remains **minSdk 26 (Android 8.0)**. Do not lower it to API 23–25 without explicit approval and a separate compatibility review. Historical emulator matrix configurations do not certify physical OEM behavior and are not executed by the current project workflow. A real device is required for OEM-specific acceptance.
