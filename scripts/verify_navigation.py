@@ -98,8 +98,8 @@ if not accessibility_helper.is_file() or "ViewCompat.setAccessibilityHeading" no
     errors.append("PageAccessibility.kt must use AndroidX ViewCompat accessibility heading semantics")
 
 settings_activity = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
-resume_block = re.search(r"override fun onResume\\(\\).*?override fun onPause\\(", settings_activity, re.S)
-pause_block = re.search(r"override fun onPause\\(\\).*?override fun onDestroy\\(", settings_activity, re.S)
+resume_block = re.search(r"override fun onResume\(\).*?override fun onPause\(", settings_activity, re.S)
+pause_block = re.search(r"override fun onPause\(\).*?override fun onDestroy\(", settings_activity, re.S)
 if not resume_block or "render()" not in resume_block.group(0):
     errors.append("SettingsActivity must refresh Android permission/readiness state after returning from Settings")
 if not pause_block or "stopPreview()" not in pause_block.group(0):
