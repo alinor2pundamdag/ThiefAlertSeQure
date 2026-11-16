@@ -12,12 +12,11 @@ import java.util.Locale
 object LocalTamperHistory {
     private const val PREFS = "local_tamper_history_v1"
     private const val KEY_EVENTS = "events"
-    private const val MAX_EVENTS = 100
 
     @Synchronized
     fun record(context: Context, event: String, detail: String = "") {
-        val safeEvent = event.filter { it.isLetterOrDigit() || it in "_- ." }.take(48)
-        val safeDetail = detail.replace(Regex("[\\r\\n\\t]"), " ").take(180)
+        val safeEvent = LocalTamperHistoryPolicy.sanitizeEvent(event)
+        val safeDetail = LocalTamperHistoryPolicy.sanitizeDetail(detail)
         val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
         val line = "$stamp | $safeEvent" + if (safeDetail.isBlank()) "" else " | $safeDetail"
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -25,8 +24,8 @@ object LocalTamperHistory {
             is PreferenceRead.Value -> stored.value.orEmpty()
             is PreferenceRead.Corrupt -> return
         }
-        val next = (existing.split('\n').filter { it.isNotBlank() } + line).takeLast(MAX_EVENTS)
-        prefs.edit().putString(KEY_EVENTS, next.joinToString("\n")).commit()
+        val next = LocalTamperHistoryPolicy.append(existing, line)
+        prefs.edit().putString(KEY_EVENTS, next).commit()
     }
 
     fun read(context: Context, limit: Int = 100): List<String> =
@@ -37,8 +36,7 @@ object LocalTamperHistory {
                 is PreferenceRead.Value -> stored.value.orEmpty()
                 is PreferenceRead.Corrupt -> ""
             }
-            value.split('\n').filter { it.isNotBlank() }
-                .takeLast(limit.coerceIn(1, MAX_EVENTS)).reversed()
+            LocalTamperHistoryPolicy.newestFirst(value, limit)
         }
 
     fun clear(context: Context): Boolean =

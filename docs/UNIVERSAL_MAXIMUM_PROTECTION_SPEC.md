@@ -400,13 +400,13 @@ The app must not use covert persistence, exploit APIs, root, hidden accessibilit
 - Managed-mode policy decision logic (pure logic separated from Android calls where practical).
 - Compatibility family selection and fallback guidance.
 
-**Layer B — Android platform contracts (source verification only; instrumentation execution and compilation are excluded by owner direction)**
-- Manifest declarations and receiver/service exported flags.
-- AlarmManager scheduling/cancellation and permission-race behavior.
-- Service start/idempotency/stop lifecycle.
-- Notification channel and full-screen-intent handling.
-- Audio resource decode/fallback and volume restoration.
-- Keyguard and DevicePolicyManager behavior where testable.
+**Layer B — Android platform contracts (non-instrumentation)**
+- Static manifest declarations, receiver/service exported flags, foreground-service types and permissions.
+- Source-contract checks for AlarmManager scheduling/cancellation and permission-race handling.
+- Source-contract checks for service start/idempotency/stop lifecycle.
+- JVM policy tests for notification/full-screen-intent decisions, audio fallback policy, authentication proof and Device Owner rollback policy.
+- Android lint and APK manifest/package metadata checks.
+- Runtime-only Android framework behavior is recorded for physical-device acceptance; no Android instrumentation source is compiled or executed.
 
 **Layer C — Physical Android OS / OEM acceptance (real devices only)**
 - API 26 minimum-supported baseline.

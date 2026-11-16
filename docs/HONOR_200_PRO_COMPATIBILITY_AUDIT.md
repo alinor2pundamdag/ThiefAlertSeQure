@@ -54,7 +54,7 @@ Record the exact HONOR model, Android version, MagicOS version/build number, app
 
 ## Release decision
 
-Do not mark HONOR 200 Pro compatibility as passed until the physical matrix is completed on the owner's actual firmware. Android instrumentation validates framework contracts, not MagicOS background scheduling, vendor battery manager behavior, charger hardware, Bluetooth radio behavior, or alarm audibility.
+Do not mark HONOR 200 Pro compatibility as passed until the physical matrix is completed on the owner's actual firmware. Static CI checks do not validate MagicOS background scheduling, vendor battery-manager behavior, charger hardware, Bluetooth radio behavior, or alarm audibility. These require physical-device evidence.
 
 ## Evidence capture and safe recovery procedure
 
