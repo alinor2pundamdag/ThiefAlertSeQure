@@ -72,7 +72,7 @@ class PowerTransitionRecoveryInstrumentationTest {
 
             val recovered = PowerTransitionCoordinator.recoverPendingDisconnectCandidate(context)
             assertEquals(ProtectionMode.COUNTDOWN, recovered.mode)
-            assertEquals(eventElapsedMs + ProtectionEngine.COUNTDOWN_MS, recovered.deadlineElapsedRealtimeMs)
+            assertEquals(eventElapsedMs + COUNTDOWN_MS, recovered.deadlineElapsedRealtimeMs)
 
             // Replaying recovery after the first commit must not create a second
             // countdown or move the original event-time deadline.
