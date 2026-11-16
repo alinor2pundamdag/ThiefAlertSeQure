@@ -49,6 +49,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private val bluetoothSeparationReceiver = object : BroadcastReceiver() {
         @Suppress("DEPRECATION", "MissingPermission")
         override fun onReceive(context: Context, intent: Intent) {
+            // Anchor the grace deadline to broadcast receipt, not the time spent
+            // validating encrypted trust state and protection guards.
+            val eventUptimeMs = android.os.SystemClock.uptimeMillis()
             if (!SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false)) return
             if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 LocalTamperHistory.record(context, "bluetooth_permission_missing", "Trusted Bluetooth disconnect monitoring paused; grant Bluetooth Connect permission")
@@ -109,7 +112,10 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                             }
                         }
                         pendingBluetoothRunnables[address] = runnable
-                        handler.postDelayed(runnable, BLUETOOTH_DISCONNECT_GRACE_MS)
+                        handler.postAtTime(
+                            runnable,
+                            A2DisconnectPolicy.graceDeadlineUptimeMs(eventUptimeMs, BLUETOOTH_DISCONNECT_GRACE_MS)
+                        )
                         LocalTamperHistory.record(context, "trusted_bluetooth_disconnected", "Registered trusted device disconnected; 8-second grace period started")
                     }
                 }

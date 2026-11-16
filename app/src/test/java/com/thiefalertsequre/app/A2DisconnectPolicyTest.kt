@@ -1,10 +1,19 @@
 package com.thiefalertsequre.app
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class A2DisconnectPolicyTest {
+    @Test fun disconnectGraceDeadlineStartsAtBroadcastReceipt() {
+        assertEquals(9_000L, A2DisconnectPolicy.graceDeadlineUptimeMs(1_000L, 8_000L))
+    }
+
+    @Test fun graceDeadlineDoesNotOverflowMonotonicClock() {
+        assertEquals(Long.MAX_VALUE, A2DisconnectPolicy.graceDeadlineUptimeMs(Long.MAX_VALUE - 5L, 8L))
+    }
+
     @Test fun gracePeriodRequiresEnabledTrustedDeviceWithConfirmedBaselineWhileArmed() {
         assertTrue(A2DisconnectPolicy.shouldStartGracePeriod(true, true, true, ProtectionMode.ARMED))
     }
