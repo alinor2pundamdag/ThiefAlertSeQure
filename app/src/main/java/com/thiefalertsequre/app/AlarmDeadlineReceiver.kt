@@ -80,10 +80,8 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         }
 
         val update = ProtectionStore(context).updatePersisted { current ->
-            if (current.mode != ProtectionMode.ARMED) current
-            else ProtectionState(
-                ProtectionMode.ALARM_TRIGGERED, 0L, System.currentTimeMillis(),
-                0L, ProtectionClock.bootCount(context)
+            ProtectionEngine.triggerFromArmed(
+                current, System.currentTimeMillis(), ProtectionClock.bootCount(context)
             )
         }
         if (!update.persisted) {
@@ -130,8 +128,7 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         )
         if (!monitorEnabled && state.mode != ProtectionMode.ALARM_TRIGGERED) {
             val disabledUpdate = ProtectionStore(context).updatePersisted { current ->
-                if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
-                else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+                ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
             }
             if (!disabledUpdate.persisted) {
                 LocalTamperHistory.record(
