@@ -268,6 +268,19 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         return START_STICKY
     }
 
+    private fun scheduleStopRetry(intent: Intent?, flags: Int, startId: Int) {
+        stopRetryRunnable?.let(handler::removeCallbacks)
+        val retry = Runnable {
+            stopRetryRunnable = null
+            // A newer owner action that re-enabled monitoring supersedes this retry.
+            if (!SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
+                onStartCommand(intent, flags, startId)
+            }
+        }
+        stopRetryRunnable = retry
+        handler.postDelayed(retry, POWER_RETRY_MS)
+    }
+
     private fun registerSystemReceiver() {
         if (receiverRegistered) return
         val filter = IntentFilter().apply {
