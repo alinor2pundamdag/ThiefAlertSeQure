@@ -105,11 +105,19 @@ class BootReceiver : BroadcastReceiver() {
         A2BluetoothReceiverController.sync(context)
         // Preserve the previous opt-out contract even when Android's sticky
         // battery snapshot is temporarily unavailable.
-        ProtectionStore(context).update { current ->
+        val store = ProtectionStore(context)
+        val update = store.updatePersisted { current ->
             ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
         }
+        if (!update.persisted) {
+            LocalTamperHistory.record(
+                context, "boot_monitor_opt_out_state_persist_failed",
+                "Monitor is disabled, but the protection state was not durably disarmed; the prior deadline and state remain authoritative"
+            )
+            return update.state
+        }
         PowerTransitionCoordinator.resetBaselineToCurrentPower(context, "Protection monitor is disabled")
-        return ProtectionStore(context).read()
+        return store.read()
     }
 
     private fun monitorEnabled(context: Context): Boolean =
