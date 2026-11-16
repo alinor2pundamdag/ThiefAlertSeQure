@@ -125,8 +125,14 @@ if "startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" i
     errors.append("Battery optimization request must use guarded Android Settings/activity fallback")
 if "AndroidDeviceCompatibility.open(" not in settings_activity:
     errors.append("Settings external destinations must use the centralized guarded launcher")
-if "KEY_ENABLED, enabled).apply()" in settings_activity or "batteryAlertEdit.commit()" not in settings_activity:
-    errors.append("Critical monitoring and battery-alert preferences must be durably committed before service transitions")
+if (
+    "KEY_ENABLED, enabled).apply()" in settings_activity
+    or "KEY_ENABLED, enabled).commit()" not in settings_activity
+    or "batteryAlertEdit.commit()" not in settings_activity
+    or ".setAction(ProtectionMonitorService.ACTION_STOP)" not in settings_activity
+    or "stopService(Intent(this, ProtectionMonitorService::class.java))" in settings_activity
+):
+    errors.append("Critical monitor settings must be durably committed and shutdown must use the service-owned retry path")
 main_activity = (APP / "MainActivity.kt").read_text(encoding="utf-8")
 if "device_credential_launch_failed" not in main_activity:
     errors.append("Device credential launch failures must be handled without terminating the active alarm")
