@@ -8,12 +8,53 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.After
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ProtectionStoreUpdateResultTest {
+    private lateinit var context: Context
+    private var originalProtection: Map<String, *> = emptyMap()
+    private var originalCorruptBackup: Map<String, *> = emptyMap()
+    private var originalMonitor: Map<String, *> = emptyMap()
+
+    @Before
+    fun preserveExistingAppPreferences() {
+        context = InstrumentationRegistry.getInstrumentation().targetContext
+        originalProtection = preferences("protection_state_v1").all.toMap()
+        originalCorruptBackup = preferences("protection_state_corrupt_backup_v1").all.toMap()
+        originalMonitor = preferences(ProtectionMonitorService.PREFS).all.toMap()
+    }
+
+    @After
+    fun restoreExistingAppPreferences() {
+        restore("protection_state_v1", originalProtection)
+        restore("protection_state_corrupt_backup_v1", originalCorruptBackup)
+        restore(ProtectionMonitorService.PREFS, originalMonitor)
+    }
+
+    private fun preferences(name: String) =
+        context.getSharedPreferences(name, Context.MODE_PRIVATE)
+
+    private fun restore(name: String, values: Map<String, *>) {
+        val editor = preferences(name).edit().clear()
+        values.forEach { (key, value) ->
+            when (value) {
+                is String -> editor.putString(key, value)
+                is Boolean -> editor.putBoolean(key, value)
+                is Int -> editor.putInt(key, value)
+                is Long -> editor.putLong(key, value)
+                is Float -> editor.putFloat(key, value)
+                is Set<*> -> editor.putStringSet(key, value.filterIsInstance<String>().toSet())
+                else -> error("Unsupported SharedPreferences value type for $name/$key")
+            }
+        }
+        assertTrue("Original $name preferences must be restored", editor.commit())
+    }
+
     @Test
     fun updateReportsSuccessfulDurableCommit() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
