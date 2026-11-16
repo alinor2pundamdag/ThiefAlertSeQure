@@ -24,7 +24,7 @@ Checked on 11 November 2026:
 - Open secret-scanning alerts: none returned.
 - Dependabot vulnerability alerts: enabled; no open alerts returned.
 - Dependabot automated security updates: enabled. GitHub may open dependency update pull requests; these are not auto-merged.
-- Code scanning: an advanced CodeQL workflow now covers Java/Kotlin application code and GitHub Actions workflow code on the compatibility branch, pull requests to `main`, and a weekly schedule. The first exact-head CodeQL result is pending; do not treat workflow creation as a clean scan.
+- Code scanning: the advanced CodeQL workflow analyzes Java/Kotlin application code and GitHub Actions workflow code on pushes to `main`, `feat/**`, `feature/**`, `fix/**`, `security/**`, and `work/**`, pull requests to `main`, and a weekly schedule. The FIXALL coding branch is now included; its first exact-head result must pass before the security scan is marked clean.
 
 The signed release workflow's manual preflight is restricted to `refs/heads/main`. Tag-triggered publication separately verifies that the tagged commit is already an ancestor of `main`. The preflight builds and verifies but does not publish a GitHub Release.
 
