@@ -74,7 +74,10 @@ internal object OwnerAuthenticationProofPolicy {
     ): Boolean {
         if (issuedElapsedRealtimeMs <= 0L || nowElapsedRealtimeMs < issuedElapsedRealtimeMs) return false
         if (nowElapsedRealtimeMs - issuedElapsedRealtimeMs > MAX_AGE_MS) return false
-        if (issuedBootCount >= 0 && currentBootCount >= 0 && issuedBootCount != currentBootCount) return false
+        // A known boot identity becoming unavailable (or vice versa) is not proof
+        // that this ephemeral credential result belongs to the current boot.
+        if ((issuedBootCount >= 0) != (currentBootCount >= 0)) return false
+        if (issuedBootCount >= 0 && issuedBootCount != currentBootCount) return false
         return true
     }
 }
