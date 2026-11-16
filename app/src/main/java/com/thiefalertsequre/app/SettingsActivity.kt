@@ -297,7 +297,6 @@ class SettingsActivity : FragmentActivity() {
             12f, R.color.tas_muted
         ))
         root.addView(space(18))
-        root.addView(space(18))
         val sensitivity = MotionSensitivity.fromStored(
             SafePreferences.string(monitorPrefs, ProtectionMonitorService.KEY_SENSITIVITY, MotionSensitivity.MEDIUM.name)
         )
