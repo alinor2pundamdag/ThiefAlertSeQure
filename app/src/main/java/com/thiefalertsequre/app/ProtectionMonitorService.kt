@@ -51,6 +51,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         override fun onReceive(context: Context, intent: Intent) {
             // Anchor the grace deadline to broadcast receipt, not the time spent
             // validating encrypted trust state and protection guards.
+            if (!SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) return
             val eventUptimeMs = android.os.SystemClock.uptimeMillis()
             val eventElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime()
             val eventEpochMs = System.currentTimeMillis()
@@ -474,6 +475,10 @@ class ProtectionMonitorService : Service(), SensorEventListener {
 
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type != Sensor.TYPE_ACCELEROMETER) return
+        if (!SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
+            unregisterMotionSensor()
+            return
+        }
         val motionEnabled = SafePreferences.boolean(prefs, KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED)
         val mode = ProtectionStore(this).read().mode
         if (!ProtectionMonitorPolicy.shouldMonitorMotion(motionEnabled, mode)) {
@@ -525,6 +530,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     }
 
     private fun handleBatteryChanged(intent: Intent) {
+        if (!SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) return
         if (!SafePreferences.boolean(prefs, KEY_BATTERY_ALERT_ENABLED, false)) return
         val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
         if (!plugged) {
