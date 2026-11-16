@@ -6,6 +6,9 @@ ROOT = Path(__file__).resolve().parents[1]
 gradle = (ROOT / "app/build.gradle.kts").read_text(encoding="utf-8")
 workflows = list((ROOT / ".github/workflows").glob("*.yml"))
 forbidden_gradle = (
+    "androidTest",
+    "connectedCheck",
+    "managedDeviceCheck",
     "instrumentationTestBuild",
     "testInstrumentationRunner",
     "androidTestImplementation",
@@ -34,6 +37,9 @@ for helper in obsolete_helpers:
 for workflow in workflows:
     source = workflow.read_text(encoding="utf-8")
     forbidden_workflow = (
+        "androidTest",
+        "connectedCheck",
+        "managedDeviceCheck",
         "android-emulator-runner",
         "am instrument",
         "assembleReleaseAndroidTest",

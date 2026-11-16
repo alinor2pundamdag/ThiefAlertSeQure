@@ -122,6 +122,9 @@ jobs:
       - name: Verify instrumentation is disabled
         run: python3 scripts/verify_no_instrumentation.py
 
+      - name: Verify optional ranging permission boundary
+        run: python3 scripts/verify_ranging_privacy.py
+
       - name: Run unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
 
