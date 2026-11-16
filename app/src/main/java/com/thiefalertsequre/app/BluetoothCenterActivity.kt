@@ -40,7 +40,11 @@ class BluetoothCenterActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); render() }
 
-    override fun onResume() { super.onResume(); ThemeRuntime.apply(this, window.decorView) }
+    override fun onResume() {
+        super.onResume()
+        // Re-read adapter, permission and trusted-device runtime state after Android Settings.
+        if (::root.isInitialized) render()
+    }
 
     private fun render() {
         val scroll = ScrollView(this).apply { isFillViewport = true; setBackgroundColor(getColor(R.color.tas_background)) }
