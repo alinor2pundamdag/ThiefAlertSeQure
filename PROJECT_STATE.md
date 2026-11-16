@@ -10,9 +10,9 @@
 
 ## FIXALL work completed so far
 
-The authoritative phase sequencing and acceptance ledger is [docs/PHASE_0_12_EXECUTION_CHECKLIST.md](docs/PHASE_0_12_EXECUTION_CHECKLIST.md). Read it first whenever resuming interrupted work.
+The authoritative coding scope and acceptance ledger is [docs/PHASE_0_12_EXECUTION_CHECKLIST.md](docs/PHASE_0_12_EXECUTION_CHECKLIST.md). The owner has directed that this work cover Phases 0–9 only and that no Android instrumentation tests, instrumentation compilation, or emulator test matrices be run.
 
-The bullets below include earlier work on predecessor branches; they are project history, not a claim that all Phases 0–12 are complete on the current branch.
+The bullets below include earlier work on predecessor branches; they are project history, not a claim that all Phases 0–9 are complete on the current branch.
 - Created a dedicated safety/work branch from the reviewed development candidate.
 - Restored the approved minSdk 26 invariant in the build candidate and aligned compatibility documentation.
 - Hardened charger-state handling so missing battery extras remain unknown rather than being treated as unplugged.
@@ -44,16 +44,16 @@ The bullets below include earlier work on predecessor branches; they are project
 - Verification: final build/lint/unit/instrumentation matrix must pass on the final branch head. Physical-device testing is explicitly separate and is not a blocker for finishing Phase Two software work.
 - Phase Two is not complete until final CI, documentation consistency, and branch review are verified. Do not claim production release readiness from emulator CI alone.
 
-## Last verified coding-head status (2026-11-16)
+## Current coding-head status (2026-11-17)
+
 - Current coding branch: `work/phase-0-12-coding`.
-- Latest verified application/test coding head: `1141b10db19afc9ffa085b549adfd61ae0c39629`.
-- Android build run [#1410](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43872054032): PASS. JVM unit tests, Android instrumentation-source compilation, navigation/preferences/manifest/state checks, Android lint, asset and release-workflow validation, debug APK assembly, minified release APK metadata, package/version/signer verification, and artifact upload all passed.
-- CodeQL run [#14](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43872054576): completed successfully for Java/Kotlin and GitHub Actions code on the FIXALL work branch.
-- Fixed the #1394 instrumentation-source compilation blocker by capturing/restoring the local event-history snapshot. Fixed the generic instrumentation suite's upgrade-test argument issue with an explicit JUnit assumption and added a cleanup mode/trap so interrupted in-place upgrade verification restores emulator test state.
-- Updated the Android update contract to minSdk 26 and corrected the Android 17 / API 37 compatibility matrix documentation.
-- The CodeQL workflow now includes `work/**`; the Android workflow is configured to run the full representative API 26–37 matrix on this branch after coding closure.
-- The earlier #1270 instrumentation results remain historical evidence for their older commit only, not current-head verification.
-- Coding phases 0–12 are complete at source, unit/static, documentation, branch-review and test-preparation level. The remaining non-physical acceptance gate is execution of the full emulator instrumentation matrix on the final workflow head. Physical-device acceptance remains separate and is not inferred from emulator CI.
+- Current candidate head: `fa82258965003b4807574f5b51cf355a050f5d37`.
+- Owner-directed scope: finish Phases 0–9 coding and non-instrumentation verification only. Do not run or compile instrumentation tests; do not run emulator matrices.
+- Android workflow was changed to remove the instrumentation job, dispatch input, and instrumentation-source compilation step. The prior matrix run was cancelled by the replacement workflow.
+- The exact-head non-instrumentation Android build and CodeQL workflows have been triggered; their results are pending. No 100% completion claim is made yet.
+- Older build/CodeQL and emulator results below are historical evidence for their own commits only.
+- `main` remains untouched. No merge, tag, APK publication, or production release has been performed or authorized.
+
 ## Historical verification status
 - Source-head run #1270: PASS for the build job and all seven Android instrumentation jobs.
 - Instrumentation reports: 175 total test executions across the matrix; 168 passed and 7 intentionally skipped (one per API); zero test failures/errors.
@@ -62,10 +62,12 @@ The bullets below include earlier work on predecessor branches; they are project
 - Physical HONOR 200 Pro acceptance remains excluded from Phase 1 and is reserved for Phase 12. Emulator results are not represented as physical-device evidence.
 - Production-signed APK/update continuity, merge, tag, APK publication, and production release remain separate gates and are not authorized by this Phase 1 work.
 
-## Remaining non-physical verification
-1. Execute the final Android instrumentation matrix on API 26, 28, 30, 31, 32, 33, 34, 35, 36 and 37.
-2. Inspect every API report and diagnostic artifact; fix app/test failures, distinguish emulator infrastructure failures, and rerun affected APIs until all required jobs pass.
-3. Keep physical-device acceptance, production merge, tag, APK publication and release as separate gates requiring real device evidence or explicit owner approval.
+## Remaining non-instrumentation verification
+
+1. Complete the Phase 0–9 source and cross-file integration audit; fix only confirmed defects or missing acceptance requirements.
+2. Run exact-head JVM unit tests, static/source-contract checks, Android lint, release build, APK metadata/package/signer checks, and CodeQL.
+3. Review the final diff and confirm production identity, local-first behavior, data preservation, permissions, and branch isolation.
+4. Keep physical-device acceptance, production merge, tag, APK publication and release as separate gates requiring real device evidence or explicit owner approval.
 
 ## Rules
 - Do not silently change scope or product behavior.
