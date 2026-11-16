@@ -202,7 +202,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                 PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Protection monitor disabled by owner")
             }
             val deadlinesCleared = A2DisconnectScheduler.clearAll(this)
-            val baselinesCleared = runCatching { TrustedBluetoothRegistry.clearBaselines(prefs) }.getOrDefault(false)
+            val baselinesCleared = runCatching { TrustedBluetoothRegistry.clearBaselines(prefs); true }.getOrDefault(false)
             A2BluetoothReceiverController.sync(this)
             if (!deadlinesCleared || !baselinesCleared) {
                 LocalTamperHistory.record(
