@@ -129,9 +129,19 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
         if (!monitorEnabled && state.mode != ProtectionMode.ALARM_TRIGGERED) {
-            ProtectionStore(context).update { current ->
+            val disabledUpdate = ProtectionStore(context).updatePersisted { current ->
                 if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
                 else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+            }
+            if (!disabledUpdate.persisted) {
+                LocalTamperHistory.record(
+                    context, "disabled_monitor_state_persist_failed",
+                    "The monitor is OFF, but the protection state was not durably disarmed; the existing deadline was retained"
+                )
+                if (disabledUpdate.state.mode == ProtectionMode.COUNTDOWN) {
+                    AlarmScheduler.scheduleRetry(context, 1_000L)
+                }
+                return
             }
             AlarmScheduler.cancel(context)
             return
