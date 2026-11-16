@@ -13,7 +13,7 @@ import androidx.annotation.RequiresApi
  */
 @RequiresApi(36)
 internal class RangingCapabilityQuery(
-    context: Context,
+    private val context: Context,
     private val onResult: (String) -> Unit
 ) {
     private val manager = context.getSystemService(RangingManager::class.java)
