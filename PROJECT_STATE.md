@@ -145,11 +145,24 @@ This section supersedes earlier candidate snapshots and pending-verification not
 - Android build and tests passed on this exact head: [run #44005105554](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105554). The successful job includes JVM unit tests, source-contract guards, Android lint, APK assembly and metadata/package/signer checks. The instrumentation-disabled guard also passed.
 - CodeQL passed on this exact head: [run #44005105442](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105442), including Java/Kotlin and Actions analysis.
 - The A2 per-accessory pending-deadline serialization fix and owner-authentication proof freshness fix are included in the exact-head Android/JVM CI pass.
-- Recursive tree audit returned 222 entries without truncation and identified 64 production Kotlin source files. The current continuation reviewed all 64 source files for cross-layer responsibilities, persistence writes, platform entry points, exception boundaries, updater/install sinks, and TODO/FIXME markers. This was a static source review; no runtime or device behavior is inferred.
+- Recursive tree audit returned 222 entries without truncation and identified 64 production Kotlin source files. Automated marker/pattern sweeps covered the source set, with focused manual review of high-risk charger, alarm, authentication, persistence, Bluetooth, and updater/install paths. This is not claimed as exhaustive line-by-line formal verification; no runtime or device behavior is inferred.
 - The PR has one inline review thread and it is resolved. It references CodeQL alert #8. The available GitHub connector cannot retrieve the repository Code Scanning Alerts endpoint or private security page; the alert's active/closed state remains **NOT VERIFIED**. A successful CodeQL workflow is not proof that all alerts are closed.
-- Branch comparison: 519 commits ahead, 0 behind `main`; 131 changed paths (90 added, 41 modified, 0 deleted). GitHub reports PR #7 mergeable. PR #7 remains draft/open/unmerged.
+- Branch comparison: 524 commits ahead, 0 behind `main`; 131 changed paths (90 added, 41 modified, 0 deleted). GitHub reports PR #7 mergeable. PR #7 remains draft/open/unmerged.
 - The protected release workflow requires the four permanent signing secrets and checks the pinned certificate, tag ancestry, package, versionCode and signer before publishing. Secret presence and production-signed APK availability are **NOT VERIFIED**; CI development artifacts are not production releases.
 - The release workflow YAML and Android workflow YAML passed the current Android workflow's validation steps. The Android workflow confirms instrumentation is disabled.
 - `main` remains untouched. No merge, rebase, tag, publication or production release was performed.
 - Explicit exclusions remain: no Codespaces, no emulator, no instrumentation compilation/execution, and no physical-device testing.
 - The active phase checklist is `docs/PHASE_0_12_EXECUTION_CHECKLIST.md`; consult its latest exact-head snapshot for phase dispositions and remaining Phase 11 verification boundaries.
+
+
+## Final exact-head verification — 2026-11-17
+
+- Documentation-reconciled branch head at verification: `d70f79f5d66e30765eba39e0ce58cc4e651ccc63`.
+- Android workflow [#44009392497](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44009392497): **SUCCESS**. All steps passed, including the instrumentation-disabled guard, 30 JVM unit-test files, source-contract guards, lint, assets, debug APK build, minified release metadata, package/version/signer verification and artifact upload.
+- CodeQL workflow [#44009392512](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44009392512): **SUCCESS**. Java/Kotlin and Actions analysis completed; SARIF results uploaded successfully.
+- Artifact: `ThiefAlertSeQure-debug-apk`, 6,616,246 bytes; development-only.
+- Current branch compare: 524 ahead / 0 behind; 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 is draft/open/unmerged and GitHub reports mergeable.
+- One inline PR review thread is resolved. CodeQL alert #8's underlying active/closed state remains **NOT VERIFIED**; green CodeQL execution and a resolved review thread do not prove alert closure.
+- Permanent production signing-secret presence and a production-signed APK remain **NOT VERIFIED**.
+- Automated source inventory/pattern sweeps covered all 64 production Kotlin source files; targeted manual review covered high-risk flows. This is not a claim of exhaustive line-by-line formal verification.
+- No instrumentation compilation/execution, emulator, physical-device test, merge, rebase, tag, publication or production release was performed.
