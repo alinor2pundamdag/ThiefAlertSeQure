@@ -25,8 +25,23 @@ checks = {
         "orderly_shutdown_observed" in monitor and "cannot block shutdown" in monitor,
     "managed shutdown hardening remains Device Owner gated":
         "isDeviceOwner(activity)" in managed and "setLockTaskFeatures" in managed,
-    "seven explicit flash patterns exist":
-        all(f"{name}(" in flash for name in ("STEADY", "SLOW", "NORMAL", "FAST", "BURST", "SOS", "ALTERNATING")),
+    "seven named plus one custom flash pattern exist":
+        all(f"{name}(" in flash for name in ("STEADY", "SLOW", "NORMAL", "FAST", "BURST", "SOS", "ALTERNATING", "CUSTOM")),
+    "flash speed and custom ON/OFF cadence are persisted and applied by the torch controller":
+        "speedPercent(context)" in flash_controller and "customTimings(context)" in flash_controller
+        and "saveCustomTimings" in flash and "speedPercent: Int" in flash,
+    "flash preview is time-bounded and hardware availability is checked":
+        "previewFlashPattern" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
+        and "postDelayed(stop, 5_000L)" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
+        and "hasFlashHardware" in flash_controller,
+    "secondary alarm loops independently with an owner-controlled toggle":
+        "media.isLooping = true" in (APP / "AlarmService.kt").read_text(encoding="utf-8")
+        and "syncSecondaryAlarm" in (APP / "AlarmService.kt").read_text(encoding="utf-8")
+        and "isSecondaryAlarmEnabled" in (APP / "AlarmSoundStore.kt").read_text(encoding="utf-8"),
+    "independent repeating haptics have selectable patterns and owner controls":
+        "AlarmHapticsPolicy.waveform" in (APP / "AlarmService.kt").read_text(encoding="utf-8")
+        and "Independent repeating vibration" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
+        and "AlarmHapticPattern.entries" in (APP / "AlarmHapticsPolicy.kt").read_text(encoding="utf-8"),
     "flash pattern policy drives the torch controller":
         "AlarmFlashPatternPolicy.delayMs" in flash_controller and "AlarmFlashPatternPolicy.nextTorchState" in flash_controller,
     "optional flash failure remains independent of audio alarm":
