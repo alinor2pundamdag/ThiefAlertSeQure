@@ -68,6 +68,9 @@ checks = {
         "recordAsync(context, safeEvent, safeDetail)" in (APP / "LocalTamperHistory.kt").read_text(encoding="utf-8") and "ArrayBlockingQueue(64)" in vault and "generation.incrementAndGet()" in vault,
     "cached and bounded current location evidence are owner-requested":
         "getLastKnownLocation" in location and "getCurrentLocation" in location and "requestSingleUpdate" in location and "CURRENT_LOCATION_TIMEOUT_MS = 20_000L" in location,
+    "current location tries every enabled GPS/network provider with bounded completion":
+        "enabledProviders(" in location and "pendingProviders" in location
+        and "EvidenceLocationCapture.enabledProviders" in (ROOT / "app/src/test/java/com/thiefalertsequre/app/EvidenceLocationCaptureTest.kt").read_text(encoding="utf-8"),
     "five built-in alarm tone presets are selectable and integrated":
         "val builtIns = listOf(SIREN, PULSE, DOUBLE, URGENT, CONTINUOUS)" in (APP / "AlarmTonePreset.kt").read_text(encoding="utf-8")
         and "AlarmToneController" in alarm and "selectNextBuiltInPreset" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8"),
