@@ -151,6 +151,8 @@ for screen in ("ProtectionMonitorService.kt", "AlarmService.kt"):
         errors.append(screen + " must retain the dedicated monochrome status-bar shield icon")
     if ".setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)" not in source:
         errors.append(screen + " must request immediate foreground notification visibility")
+    if ".setLargeIcon(" in source:
+        errors.append(screen + " must not misuse the app logo as the notification large icon")
 
 if (
     "LocalEvidenceVault.verifyIntegrity(this@SettingsActivity)" not in settings_activity
