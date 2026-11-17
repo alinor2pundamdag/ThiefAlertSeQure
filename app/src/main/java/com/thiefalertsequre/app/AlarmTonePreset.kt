@@ -39,7 +39,9 @@ internal class AlarmToneController(
             if (!running) return
             val active = generator ?: return
             try {
-                active.startTone(preset.toneType, preset.durationMs)
+                if (!active.startTone(preset.toneType, preset.durationMs)) {
+                    throw IllegalStateException("Android ToneGenerator could not start the selected alarm tone.")
+                }
                 handler.postDelayed(this, preset.durationMs + preset.gapMs)
             } catch (error: Throwable) {
                 stop()
