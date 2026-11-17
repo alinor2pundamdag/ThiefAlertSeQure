@@ -421,10 +421,10 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             val state = protectionStore.read()
             val storeIntegrity = protectionStore.integritySnapshot()
             val evidenceIntegrity = LocalEvidenceVault.verifyIntegrity(this)
-            val cameraEvidenceIntegrity = CameraEvidenceVault.verifyIntegrity(this)
+            val cameraEvidenceIntegrity = runCatching { CameraEvidenceVault.verifyIntegrity(this) }.getOrDefault(false)
             val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
             val cameraPermissionGranted = checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-            val cameraEvidenceCount = CameraEvidenceVault.entries(this).size
+            val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(this).size }.getOrDefault(0)
             val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
             val monitorProcessRunning = runCatching {
                 getSystemService(ActivityManager::class.java).getRunningServices(100)
