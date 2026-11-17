@@ -10,6 +10,9 @@ android = "{http://schemas.android.com/apk/res/android}"
 permissions = {item.get(android + "name", "") for item in manifest.findall("uses-permission")}
 location = (ROOT / "app/src/main/java/com/thiefalertsequre/app/EvidenceLocationCapture.kt").read_text(encoding="utf-8")
 vault = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalEvidenceVault.kt").read_text(encoding="utf-8")
+camera_vault = (ROOT / "app/src/main/java/com/thiefalertsequre/app/CameraEvidenceVault.kt").read_text(encoding="utf-8")
+camera_capture = (ROOT / "app/src/main/java/com/thiefalertsequre/app/CameraEvidenceCapture.kt").read_text(encoding="utf-8")
+camera_policy = (ROOT / "app/src/main/java/com/thiefalertsequre/app/CameraEvidencePolicy.kt").read_text(encoding="utf-8")
 settings = (ROOT / "app/src/main/java/com/thiefalertsequre/app/SettingsActivity.kt").read_text(encoding="utf-8")
 privacy = (ROOT / "docs/PRIVACY_POLICY.md").read_text(encoding="utf-8")
 main = (ROOT / "app/src/main/java/com/thiefalertsequre/app/MainActivity.kt").read_text(encoding="utf-8")
@@ -39,13 +42,38 @@ required = {
         "PBKDF2WithHmacSHA256" in (ROOT / "app/src/main/java/com/thiefalertsequre/app/EvidenceVaultBackup.kt").read_text(encoding="utf-8")
         and "AES/GCM/NoPadding" in (ROOT / "app/src/main/java/com/thiefalertsequre/app/EvidenceVaultBackup.kt").read_text(encoding="utf-8")
         and "Export encrypted evidence backup" in settings and "Restore encrypted evidence backup" in settings,
+    "camera permission is optional and declared only for the front-camera evidence feature":
+        "android.permission.CAMERA" in permissions
+        and 'android:name="android.hardware.camera.front" android:required="false"' in (ROOT / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8"),
+    "camera permission is requested only after explicit owner opt-in":
+        "Enable front-camera photo evidence?" in settings
+        and "requestCameraEvidencePermission.launch(Manifest.permission.CAMERA)" in settings
+        and "CAMERA permission is requested only after you choose Enable" in settings,
+    "photo capture is gated by successful authentication and a visible Activity":
+        "CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this)" in main
+        and "OwnerAuthenticationCoordinator.complete(this, proof)" in main
+        and main.index("OwnerAuthenticationCoordinator.complete(this, proof)") < main.index("CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this)")
+        and "Lifecycle.State.STARTED" in camera_capture
+        and "authenticationSucceeded && activityVisible" in camera_policy,
+    "camera photos use Android Keystore AES-GCM and authenticated metadata":
+        "AndroidKeyStore" in camera_vault and "AES/GCM/NoPadding" in camera_vault
+        and "updateAAD(id.toByteArray" in camera_vault and "sha256" in camera_vault,
+    "camera evidence has bounded retention, count, and image size":
+        "MAX_IMAGES = 20" in camera_policy and "MAX_IMAGE_BYTES = 2 * 1024 * 1024" in camera_policy
+        and "RETENTION_MS = 30L" in camera_policy,
+    "camera evidence can be viewed, exported and deleted by the owner":
+        "showCameraEvidenceArchive" in settings and "exportCameraEvidence.launch" in settings
+        and "CameraEvidenceVault.delete(this, entry.id)" in settings and "CameraEvidenceVault.deleteAll(this)" in settings,
+    "camera privacy notice and policy explain the opt-in capture boundary":
+        "front-camera photo evidence" in main and "CAMERA permission only after" in main
+        and "CAMERA permission only after" in privacy,
 }
 for description, passed in required.items():
     if not passed:
         raise SystemExit("Evidence privacy contract failed: " + description)
 
-for forbidden in ("android.permission.CAMERA", "android.permission.RECORD_AUDIO", "android.permission.ACCESS_BACKGROUND_LOCATION"):
+for forbidden in ("android.permission.RECORD_AUDIO", "android.permission.ACCESS_BACKGROUND_LOCATION"):
     if forbidden in permissions:
         raise SystemExit("Evidence Vault must not add invasive/background permission: " + forbidden)
 
-print("Verified: owner-requested cached/current location, no background tracking, encrypted bounded local evidence, password-protected backup, and matching privacy disclosures.")
+print("Verified: owner-requested location, explicit visible front-camera consent/capture, encrypted bounded local evidence, no microphone/background location, password-protected metadata backup, and matching privacy disclosures.")
