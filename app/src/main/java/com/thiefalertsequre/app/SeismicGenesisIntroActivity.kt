@@ -300,8 +300,6 @@ private fun SeismicGenesisIntroContent(
             .background(Color.Black)
     ) {
         val p = progress.value
-        val fractureReveal = ((p - 0.23f) / 0.35f).coerceIn(0f, 1f)
-        val background = lerp(Color.Black, Color(0xFF121212), fractureReveal)
         val shakeEnvelope = when {
             p in 0.245f..0.278333f -> sin(((p - 0.245f) / 0.033333f) * 6f * PI).toFloat() * 15f
             p in 0.405f..0.455f -> sin(((p - 0.405f) / 0.05f) * 8f * PI).toFloat() * 22f
@@ -316,7 +314,6 @@ private fun SeismicGenesisIntroContent(
         ) {
             GenesisFractureCanvas(
                 progress = p,
-                background = background,
                 modifier = Modifier.fillMaxSize()
             )
 
@@ -419,14 +416,27 @@ private fun SeismicGenesisIntroContent(
 @Composable
 private fun GenesisFractureCanvas(
     progress: Float,
-    background: Color,
     modifier: Modifier = Modifier
 ) {
     Canvas(modifier = modifier) {
-        drawRect(background)
+        drawRect(Color.Black)
         val center = androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height * 0.46f)
         val fracture = ((progress - 0.23f) / 0.36f).coerceIn(0f, 1f)
         if (fracture > 0f) {
+            // A jagged radial fracture opens from the impact point and reveals #121212 underneath.
+            val revealPath = androidx.compose.ui.graphics.Path().apply {
+                val segments = 48
+                for (point in 0..segments) {
+                    val angle = point * (2f * PI.toFloat() / segments)
+                    val edgeFactor = if (point % 2 == 0) 1f else 0.84f
+                    val radius = maxOf(size.width, size.height) * fracture * edgeFactor
+                    val x = center.x + cos(angle) * radius
+                    val y = center.y + sin(angle) * radius
+                    if (point == 0) moveTo(x, y) else lineTo(x, y)
+                }
+                close()
+            }
+            drawPath(revealPath, Color(0xFF121212))
             val crackColor = Color(0xFF565D66).copy(alpha = fracture * 0.72f)
             val branches = listOf(
                 listOf(0f to 0f, -0.08f to -0.06f, -0.13f to -0.02f, -0.20f to -0.12f, -0.27f to -0.16f),
