@@ -128,6 +128,14 @@ checks = {
         ))
         and "Intent(this, AboutActivity::class.java)" in dashboard
         and 'android:name=".AboutActivity"' in (ROOT / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8"),
+    "dashboard tabs deep-link to sounds, tamper history, and more settings":
+        "SECTION_SOUNDS_FLASH" in dashboard and "SECTION_TAMPER_HISTORY" in dashboard
+        and "SECTION_MORE" in dashboard and "sectionAnchors[section]" in settings
+        and "scroll.smoothScrollTo(0, target.top)" in settings,
+    "About screen exposes app identity and privacy destinations":
+        "class AboutActivity" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
+        and "Privacy & Data" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
+        and "SECTION_PRIVACY" in (APP / "AboutActivity.kt").read_text(encoding="utf-8"),
     "authentication and tamper evidence remain reachable from the owner-authentication section":
         "Review authentication & tamper evidence" in dashboard and "Intent(this, SettingsActivity::class.java)" in dashboard,
     "charger countdown remains exactly ten seconds":
