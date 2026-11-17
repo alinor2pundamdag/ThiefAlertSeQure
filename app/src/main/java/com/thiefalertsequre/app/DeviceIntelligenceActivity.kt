@@ -471,7 +471,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                 put("recentAlarmOutputEvents", org.json.JSONArray(
                     LocalTamperHistory.read(this@DeviceIntelligenceActivity, 100)
                         .filter { line -> listOf("alarm_audio_", "alarm_audio_focus_", "secondary_alarm_", "alarm_haptics_", "alarm_flash_").any(line::contains) }
-                        .takeLast(20).map { it.take(180) }
+                        .takeLast(20).map(LocalTamperHistoryPolicy::eventCodeFromLine)
                 ))
                 put("monitorEnabled", monitorEnabled)
                 put("monitorLastRecordedRunning", SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_RUNNING, false))
@@ -485,7 +485,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                 put("appStandbyBucket", if (Build.VERSION.SDK_INT >= 28) {
                     runCatching { standbyBucketLabel(getSystemService(UsageStatsManager::class.java).appStandbyBucket) }.getOrDefault("Unavailable")
                 } else "Not exposed before API 28")
-                put("recentEventCodes", org.json.JSONArray(LocalTamperHistory.read(this@DeviceIntelligenceActivity, 20).map { it.substringAfter("|").trim().substringBefore("|").take(48) }))
+                put("recentEventCodes", org.json.JSONArray(LocalTamperHistory.read(this@DeviceIntelligenceActivity, 20).map(LocalTamperHistoryPolicy::eventCodeFromLine)))
                 put("privacyNote", "Redacted local diagnostics only. No photo content, location, microphone, credentials, serial, IMEI, MAC, or build fingerprint is exported.")
             }
         }.getOrElse {
