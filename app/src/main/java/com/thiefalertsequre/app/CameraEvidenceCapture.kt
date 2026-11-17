@@ -124,7 +124,7 @@ internal object CameraEvidenceCapture {
             val jpeg = try {
                 val buffer = image.planes.firstOrNull()?.buffer
                     ?: throw IllegalStateException("Camera returned no JPEG plane")
-                ByteArray(buffer.remaining()).also(buffer::get)
+                ByteArray(buffer.remaining()).also { buffer.get(it) }
             } catch (error: Exception) {
                 image.close()
                 finish("camera_evidence_image_read_failed", error.javaClass.simpleName)
