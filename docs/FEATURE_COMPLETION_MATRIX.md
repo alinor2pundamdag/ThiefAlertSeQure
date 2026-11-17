@@ -33,6 +33,20 @@ The production baseline remains v1.1.3. The current feature branch contains the 
 | Alarm/authentication regression protection | JVM tests cover the existing 10-second charger countdown, reconnect cancellation, latched alarm behavior, reboot recovery, authentication cooldown, and A2 disconnect gates |
 | Development build | Latest exact-head CI run [43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535) uploaded artifact `ThiefAlertSeQure-debug-apk` (ID `14266362844`): package `com.thiefalertsequre.app.v114test`, versionCode `6`, versionName `1.1.4-test`, minSdk `26`; APK SHA-256 `034d3cc076ca06ea3265bd468e42de8247352d3f8cf1f1882f7b4620971c641e`; CI debug certificate SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`. Development-only, not a production update or release |
 
+## Batch 2 implementation additions — Phases 5–9
+
+> **Working status:** implementation is in progress on `work/phase-0-12-coding`. Do not mark Batch 2 complete until the exact-head Android CI and CodeQL checks pass and the remaining camera-evidence requirement is explicitly resolved. No instrumentation, emulator, Codespaces, or physical-device testing is part of this software-only work.
+
+| Phase | Current implementation on this branch | Remaining boundary |
+|---|---|---|
+| 5 — Shutdown / managed protection | Dynamically observed orderly shutdown event; optional Device Owner Lock Task hardening and managed global-actions restriction retained. | Standard apps cannot universally block power-menu shutdown or hardware shutdown. Event observation is diagnostic, not shutdown prevention. |
+| 6 — Alarm outputs | Seven flash patterns; five Android-generated built-in tone presets plus packaged default and custom main/secondary audio; tone preview; audio focus; packaged-audio/vibration fallback; severe-thermal flash suppression independent of alarm audio. | Tone/torch output and OEM thermal behavior still require handset verification. |
+| 7 — Evidence | Bounded encrypted AES-GCM event vault; owner-requested cached location and one-shot current GPS/network request (20-second timeout); fix age/provider/accuracy; password-derived PBKDF2 + AES-GCM evidence backup/restore. | Automatic front-camera evidence capture is not implemented. Android 14+ camera foreground services require camera permission and are subject to while-in-use/background-start restrictions; do not add covert background capture or silently change the privacy contract. |
+| 8 — Diagnostics / readiness | Readiness score explicitly labeled as setup readiness, not a security guarantee; redacted JSON diagnostics export; encrypted evidence backup/restore. | No device-integrity guarantee; OEM-specific controls remain capability-dependent and unverified until tested. |
+| 9 — Dashboard | 136dp shield and horizontally swipeable category/destination navigation. | The horizontal navigation is a destination row, not a full content-swiping pager. |
+
+The evidence backup contains only the encrypted evidence-vault records, not a complete export of every app preference or Android system setting. Its separate backup password is not stored by the app. Camera capture remains excluded from the privacy contract; Android's official background camera restrictions are documented at [foreground-service background-start restrictions](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start) and [Android 14 foreground-service camera requirements](https://developer.android.com/about/versions/14/changes/fgs-types-required).
+
 ## Implemented in this branch
 
 | Feature | Implementation |
