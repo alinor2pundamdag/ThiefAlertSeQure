@@ -16,6 +16,27 @@ class NotificationSetupStatusPolicyTest {
     }
 
     @Test
+    fun missingProtectionChannelIsUnknownRatherThanAssumedBlocked() {
+        assertEquals(SetupState.UNKNOWN, NotificationSetupStatusPolicy.monitorChannel(null).state)
+    }
+
+    @Test
+    fun blockedProtectionChannelRequiresOwnerAction() {
+        assertEquals(
+            SetupState.ACTION_REQUIRED,
+            NotificationSetupStatusPolicy.monitorChannel(NotificationManager.IMPORTANCE_NONE).state
+        )
+    }
+
+    @Test
+    fun availableProtectionChannelIsVerified() {
+        assertEquals(
+            SetupState.VERIFIED,
+            NotificationSetupStatusPolicy.monitorChannel(NotificationManager.IMPORTANCE_LOW).state
+        )
+    }
+
+    @Test
     fun missingAlarmChannelIsUnknownRatherThanAssumedBlocked() {
         assertEquals(SetupState.UNKNOWN, NotificationSetupStatusPolicy.alarmChannel(null).state)
     }
