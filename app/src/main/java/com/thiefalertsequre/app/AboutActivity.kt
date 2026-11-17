@@ -105,6 +105,11 @@ class AboutActivity : FragmentActivity() {
             "Pinned official release SHA-256\n${formatFingerprint(AppUpdatePolicy.EXPECTED_CERT_SHA256)}",
             11f, R.color.tas_muted
         ))
+        root.addView(space(6))
+        root.addView(text(
+            "The installed signer fingerprint is computed locally on this device and is never uploaded.",
+            11f, R.color.tas_muted
+        ))
         root.addView(space(18))
 
         root.addView(text("PRIVACY BY DESIGN", 11f, R.color.tas_primary, true))
