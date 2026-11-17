@@ -777,7 +777,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         const val KEY_BT_BASELINE_CONNECTED = "trusted_bluetooth_baseline_connected"
         private const val KEY_BATTERY_ALERT_FIRED = "battery_alert_fired"
         private const val KEY_LAST_BATTERY_LEVEL = "last_battery_level"
-        private const val CHANNEL_ID = "protection_monitor"
+        internal const val CHANNEL_ID = "protection_monitor"
         private const val NOTIFICATION_ID = 501
         const val ACTION_STOP = "com.thiefalertsequre.STOP_MONITOR"
         const val EXTRA_STOP_PREFERENCE_COMMITTED = "stop_preference_committed"
