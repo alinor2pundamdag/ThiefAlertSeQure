@@ -403,7 +403,8 @@ class AlarmService : Service() {
         val fullScreenAccessGranted = Build.VERSION.SDK_INT < 34 ||
             getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
         val builder = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setSmallIcon(R.drawable.ic_notification_shield)
+            .setLargeIcon(android.graphics.BitmapFactory.decodeResource(resources, R.drawable.app_logo))
             .setContentTitle("ThiefAlertSeQure — Alarm active")
             .setContentText("Open to authenticate with your device lock or supported biometric.")
             .setStyle(NotificationCompat.BigTextStyle().bigText(

@@ -1,5 +1,6 @@
 package com.thiefalertsequre.app
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.ColorFilter
@@ -65,6 +66,7 @@ object AppearanceStudioStore {
         return GradientDrawable(GradientDrawable.Orientation.TL_BR, colors).apply { cornerRadius = 0f }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     fun applyButtonAnimation(context: Context, view: View) {
         if (view.getTag(R.id.batch_three_animation_bound) == true) return
         view.setTag(R.id.batch_three_animation_bound, true)

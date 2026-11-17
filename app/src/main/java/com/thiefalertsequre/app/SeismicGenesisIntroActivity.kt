@@ -1,5 +1,6 @@
 package com.thiefalertsequre.app
 
+import android.annotation.SuppressLint
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
@@ -29,6 +30,7 @@ import androidx.fragment.app.FragmentActivity
 import kotlin.math.min
 
 /** Four-stage, nine-second Canvas-rendered first-launch sequence; privacy acknowledgement remains next. */
+@SuppressLint("SetTextI18n")
 class SeismicGenesisIntroActivity : FragmentActivity() {
     private var animator: ValueAnimator? = null
     private var toneGenerator: ToneGenerator? = null

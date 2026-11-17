@@ -18,12 +18,16 @@ abstract class BaseProtectionWidgetProvider : AppWidgetProvider() {
     }
 
     private fun render(context: Context, title: String): RemoteViews {
-        val state = ProtectionStore(context).read()
-        val monitor = SafePreferences.boolean(
+        val store = ProtectionStore(context)
+        val integrity = store.integritySnapshot()
+        val state = store.read()
+        val monitorEnabled = SafePreferences.boolean(
             context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE),
             ProtectionMonitorService.KEY_ENABLED,
             ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
+        val monitor = monitorEnabled && ProtectionMonitorService.isRunning
+        val now = System.currentTimeMillis()
         val modeLabel = when (state.mode) {
             ProtectionMode.DISARMED -> "NOT ARMED"
             ProtectionMode.ARMED -> if (monitor) "PROTECTED" else "ARMED • MONITOR UNKNOWN"
@@ -32,21 +36,22 @@ abstract class BaseProtectionWidgetProvider : AppWidgetProvider() {
         }
         val detail = when (state.mode) {
             ProtectionMode.DISARMED -> "Protection is disarmed"
-            ProtectionMode.ARMED -> "Local protection is armed"
-            ProtectionMode.COUNTDOWN -> "Removal grace period in progress"
+            ProtectionMode.ARMED -> if (monitor) "Local protection monitor is confirmed running" else "Protection is armed; monitor is not confirmed"
+            ProtectionMode.COUNTDOWN -> {
+                val seconds = ((state.deadlineEpochMs - now + 999L) / 1_000L).coerceAtLeast(0L)
+                "Removal grace period • ${seconds}s remaining"
+            }
             ProtectionMode.ALARM_TRIGGERED -> "Owner authentication required"
         }
-        val now = System.currentTimeMillis()
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val previousUpdate = SafePreferences.long(prefs, KEY_LAST_UPDATE, 0L)
-        val stale = previousUpdate > 0L && now - previousUpdate > STALE_AFTER_MS
         val committed = prefs.edit().putLong(KEY_LAST_UPDATE, now).commit()
+        val stale = !integrity.protectionStateHealthy || !committed
         val views = RemoteViews(context.packageName, R.layout.widget_protection_status)
         views.setTextViewText(R.id.widget_title, title)
         views.setTextViewText(R.id.widget_status, modeLabel)
         views.setTextViewText(R.id.widget_detail, detail)
         views.setTextViewText(R.id.widget_freshness,
-            if (!committed || stale) "Status may be stale • Open app to refresh" else "Live local status")
+            if (stale) "Status needs review • Open app" else "Live local status")
         val open = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -62,7 +67,6 @@ abstract class BaseProtectionWidgetProvider : AppWidgetProvider() {
     companion object {
         private const val PREFS = "batch_three_widget_state_v1"
         private const val KEY_LAST_UPDATE = "last_update_epoch_ms"
-        private const val STALE_AFTER_MS = 15 * 60 * 1000L
 
         fun refreshAll(context: Context) {
             val providers = listOf(

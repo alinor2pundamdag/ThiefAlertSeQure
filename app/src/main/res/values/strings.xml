@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_protection_description">Read-only local ThiefAlertSeQure protection status. Tap to open the app.</string>
+    <string name="widget_status_content_description">ThiefAlertSeQure protection status. Tap to open the app.</string>
+    <string name="widget_status_title">Protection</string>
+    <string name="widget_status_unknown">STATUS UNKNOWN</string>
+    <string name="widget_status_open_to_refresh">Open the app to refresh</string>
+    <string name="widget_status_stale">Status may be stale</string>
 </resources>

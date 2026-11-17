@@ -717,7 +717,8 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             ProtectionMode.ALARM_TRIGGERED -> ThemeStore.get(this).danger
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setSmallIcon(R.drawable.ic_notification_shield)
+            .setLargeIcon(android.graphics.BitmapFactory.decodeResource(resources, R.drawable.app_logo))
             .setColor(statusColor)
             .setContentTitle("ThiefAlertSeQure • " + mode.name.replace('_', ' '))
             .setContentText(statusText)

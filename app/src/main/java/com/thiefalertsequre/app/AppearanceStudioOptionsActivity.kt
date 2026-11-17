@@ -1,8 +1,10 @@
 package com.thiefalertsequre.app
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -11,6 +13,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /** Functional catalog for local icon, background, animation, audio and intro preferences. */
+@SuppressLint("SetTextI18n")
 class AppearanceStudioOptionsActivity : FragmentActivity() {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun params(top: Int = 8) = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(top) }
@@ -51,6 +54,16 @@ class AppearanceStudioOptionsActivity : FragmentActivity() {
             textSize = 13f
             setTextColor(palette.muted)
         }, params(6))
+        val iconPreview = ImageView(this).apply {
+            AppearanceStudioStore.applyIconPreview(this@AppearanceStudioOptionsActivity, this, palette)
+            contentDescription = "Preview of the selected in-app app mark"
+        }
+        root.addView(iconPreview, LinearLayout.LayoutParams(dp(76), dp(76)).apply { topMargin = dp(16) })
+        root.addView(TextView(this).apply {
+            text = "APP MARK PREVIEW"
+            textSize = 10f
+            setTextColor(palette.muted)
+        }, params(4))
 
         choiceButton("App mark • ${AppearanceStudioStore.icons[AppearanceStudioStore.iconIndex(this)]}", AppearanceStudioStore.icons) {
             AppearanceStudioStore.saveIcon(this, it)
@@ -71,6 +84,20 @@ class AppearanceStudioOptionsActivity : FragmentActivity() {
             AlarmSoundStore.setBuiltInPreset(this, presets[index])
             render()
         }
+        root.addView(TextView(this).apply {
+            text = "A custom alarm file selected in Sounds / Flash takes priority over the built-in preset."
+            textSize = 12f
+            setTextColor(palette.muted)
+        }, params(4))
+        root.addView(MaterialButton(this).apply {
+            text = "Preview / manage alarm sounds"
+            isAllCaps = false
+            minHeight = dp(48)
+            setOnClickListener {
+                startActivity(Intent(this@AppearanceStudioOptionsActivity, SettingsActivity::class.java)
+                    .putExtra(SettingsActivity.EXTRA_SECTION, SettingsActivity.SECTION_SOUNDS_FLASH))
+            }
+        }, params(6))
 
         toggleButton("Reduced motion", AppearanceStudioStore.reduceMotion(this)) {
             AppearanceStudioStore.setReduceMotion(this, it)
