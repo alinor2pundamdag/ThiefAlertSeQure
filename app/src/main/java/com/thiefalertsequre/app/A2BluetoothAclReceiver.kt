@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
+import java.util.concurrent.Executors
 
 /** Dynamically enables the manifest ACL listener only while the owner enabled A2 monitoring. */
 internal object A2BluetoothReceiverController {
@@ -36,6 +37,18 @@ internal object A2BluetoothReceiverController {
     }
 }
 
+
+/** Serializes process-absent ACL callbacks so reconnects cannot overtake older disconnects. */
+internal object A2BluetoothEventQueue {
+    private val executor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "A2BluetoothAclEvents").apply { isDaemon = true }
+    }
+
+    fun execute(task: () -> Unit) {
+        executor.execute(task)
+    }
+}
+
 /**
  * Receives Android's manifest-exempt ACL broadcasts while the app process is absent.
  * When the foreground service's runtime receiver is ready, that service owns the event.
@@ -49,7 +62,8 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
         val eventElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime()
         val eventBootCount = ProtectionClock.bootCount(context)
         val pendingResult = goAsync()
-        Thread {
+        try {
+            A2BluetoothEventQueue.execute {
             try {
                 A2DisconnectStateLock.withLock {
                     if (ProtectionMonitorService.isBluetoothReceiverRegistered) return@withLock
@@ -57,19 +71,19 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
                 val prefs = app.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
                 if (!SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED) ||
                     !SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-                ) return@Thread
+                ) return@execute
                 if (Build.VERSION.SDK_INT >= 31 &&
                     ContextCompat.checkSelfPermission(app, android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
                 ) {
                     A2BluetoothReceiverController.sync(app)
                     LocalTamperHistory.record(app, "bluetooth_permission_missing", "Trusted Bluetooth separation monitoring paused; grant Bluetooth Connect permission")
-                    return@Thread
+                    return@execute
                 }
                 val device = runCatching {
                     intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
-                }.getOrNull() ?: return@Thread
-                val address = device.address ?: return@Thread
-                if (!TrustedBluetoothRegistry.isTrusted(prefs, address)) return@Thread
+                }.getOrNull() ?: return@execute
+                val address = device.address ?: return@execute
+                if (!TrustedBluetoothRegistry.isTrusted(prefs, address)) return@execute
 
                 when (intent.action) {
                     BluetoothDevice.ACTION_ACL_CONNECTED -> {
@@ -111,6 +125,13 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
             } finally {
                 pendingResult.finish()
             }
-        }.start()
+            }
+        } catch (error: Exception) {
+            pendingResult.finish()
+            LocalTamperHistory.record(
+                context, "a2_manifest_receiver_queue_failed",
+                error.javaClass.simpleName + ": " + error.message
+            )
+        }
     }
 }
