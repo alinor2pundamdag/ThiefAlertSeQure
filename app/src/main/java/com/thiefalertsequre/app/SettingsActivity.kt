@@ -41,6 +41,12 @@ class SettingsActivity : FragmentActivity() {
     private val exportEvents = registerForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         if (uri != null) exportHistory(uri)
     }
+    private val exportEvidenceBackup = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri -> if (uri != null) promptEvidenceBackupPassword("Encrypt evidence backup") { password -> writeEvidenceBackup(uri, password) } }
+    private val importEvidenceBackup = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) promptEvidenceBackupPassword("Decrypt evidence backup") { password -> restoreEvidenceBackup(uri, password) } }
     private val requestEvidenceLocation = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
@@ -433,6 +439,17 @@ class SettingsActivity : FragmentActivity() {
                 .setPositiveButton("Close", null)
                 .showThemed(this)
         })
+        root.addView(action("Export encrypted evidence backup") {
+            exportEvidenceBackup.launch("ThiefAlertSeQure-evidence-backup.tasbackup")
+        })
+        root.addView(action("Restore encrypted evidence backup") {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Replace local evidence archive?")
+                .setMessage("Restore replaces the current encrypted evidence vault with records from the selected backup. The file must be a valid ThiefAlertSeQure backup and you must know its password. Existing local evidence will be replaced only after successful decryption and integrity validation.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Choose backup") { _, _ -> importEvidenceBackup.launch(arrayOf("application/octet-stream", "*/*")) }
+                .showThemed(this)
+        })
         root.addView(action("Save last-known GPS location (optional, owner-requested)") {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Save a location snapshot?")
@@ -730,6 +747,70 @@ class SettingsActivity : FragmentActivity() {
         val name = file.name.orEmpty().lowercase()
         return listOf(".mp3", ".m4a", ".aac", ".wav", ".ogg", ".opus", ".flac", ".3gp", ".amr")
             .any { name.endsWith(it) }
+    }
+
+    private fun promptEvidenceBackupPassword(title: String, onPassword: (CharArray) -> Unit) {
+        val field = android.widget.EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            hint = "At least 12 characters"
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setMessage("Use a strong password with at least 12 characters. It is not saved by the app. You will need the same password to restore this backup.")
+            .setView(field)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Continue") { _, _ ->
+                val password = field.text?.toString().orEmpty()
+                field.text?.clear()
+                if (password.length < 12) {
+                    android.widget.Toast.makeText(this, "Password must contain at least 12 characters.", android.widget.Toast.LENGTH_LONG).show()
+                } else {
+                    onPassword(password.toCharArray())
+                }
+            }
+            .showThemed(this)
+    }
+
+    private fun writeEvidenceBackup(uri: Uri, password: CharArray) {
+        ioExecutor.execute {
+            val result = runCatching {
+                val entries = LocalEvidenceVault.read(this, 100)
+                val bytes = EvidenceVaultBackup.encrypt(entries, password)
+                contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                    ?: error("Android could not open the selected backup destination.")
+                bytes.size
+            }
+            runOnUiThread {
+                android.widget.Toast.makeText(
+                    this,
+                    result.fold({ "Encrypted evidence backup exported (${it} bytes)." }, { "Backup export failed: ${it.message}" }),
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    private fun restoreEvidenceBackup(uri: Uri, password: CharArray) {
+        ioExecutor.execute {
+            val result = runCatching {
+                val bytes = contentResolver.openInputStream(uri)?.use { input ->
+                    val data = input.readBytes()
+                    require(data.size <= 1_000_000) { "Backup file is too large." }
+                    data
+                } ?: error("Android could not open the selected backup file.")
+                val entries = EvidenceVaultBackup.decrypt(bytes, password)
+                require(LocalEvidenceVault.replaceAll(this, entries)) { "The validated evidence archive could not be stored." }
+                entries.size
+            }
+            runOnUiThread {
+                android.widget.Toast.makeText(
+                    this,
+                    result.fold({ "Evidence backup restored: ${it} records." }, { "Backup restore failed: ${it.message}" }),
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                render()
+            }
+        }
     }
 
     private fun requestFreshEvidenceLocation() {
