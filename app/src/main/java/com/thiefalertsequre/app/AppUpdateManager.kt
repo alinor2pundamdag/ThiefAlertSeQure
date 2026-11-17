@@ -75,7 +75,7 @@ object AppUpdateManager {
         }
 
         val tag = release.optString("tag_name")
-        require(tag.matches(Regex("^v[0-9]+(\\.[0-9]+){1,3}$"))) {
+        require(AppUpdatePolicy.isValidReleaseTag(tag)) {
             "The latest release tag has an invalid version format."
         }
         val remoteVersionName = tag.removePrefix("v")
