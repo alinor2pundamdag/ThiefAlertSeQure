@@ -65,6 +65,24 @@ class TrustedBluetoothRegistryEncryptionTest {
     }
 
     @Test
+    fun duplicateDisconnectDoesNotCreateASecondConnectionBaselineTransition() {
+        prefs.edit().clear().commit()
+        val address = "AA:BB:CC:DD:EE:20"
+        try {
+            assertTrue(TrustedBluetoothRegistry.add(prefs, address, "Test watch"))
+            assertFalse("First connect establishes, but does not replace, a baseline",
+                TrustedBluetoothRegistry.markConnected(prefs, address, true))
+            assertTrue("The first disconnect consumes the existing connected baseline",
+                TrustedBluetoothRegistry.markConnected(prefs, address, false))
+            assertFalse("A duplicate disconnect must not create a second grace-period candidate",
+                TrustedBluetoothRegistry.markConnected(prefs, address, false))
+            assertFalse(TrustedBluetoothRegistry.isBaselineConnected(prefs, address))
+        } finally {
+            prefs.edit().clear().commit()
+        }
+    }
+
+    @Test
     fun wrongTypedRegistryPayloadFailsClosedAndIsRetained() {
         prefs.edit().clear().putBoolean(TrustedBluetoothRegistry.KEY_DEVICES, true).commit()
         try {
