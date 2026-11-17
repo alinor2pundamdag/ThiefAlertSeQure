@@ -12,7 +12,7 @@ import android.provider.OpenableColumns
 object AlarmSoundStore {
     const val ALARM = "alarm"
     const val ALERT = "alert"
-    private const val PREFS = "user_alarm_sounds_v1"
+    private const val PREFS = "user_alarm_sounds_v1"\n    private const val KEY_BUILT_IN_PRESET = "built_in_alarm_preset"\n\n    fun selectedBuiltInPreset(context: Context): AlarmTonePreset {\n        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)\n        val raw = when (val value = SafePreferences.readString(prefs, KEY_BUILT_IN_PRESET, AlarmTonePreset.DEFAULT_AUDIO.name)) {\n            is PreferenceRead.Value -> value.value\n            is PreferenceRead.Corrupt -> AlarmTonePreset.DEFAULT_AUDIO.name\n        }\n        return AlarmTonePreset.fromStored(raw)\n    }\n\n    fun selectNextBuiltInPreset(context: Context): AlarmTonePreset {\n        val current = selectedBuiltInPreset(context)\n        val choices = listOf(AlarmTonePreset.DEFAULT_AUDIO) + AlarmTonePreset.builtIns\n        val next = choices[(choices.indexOf(current).coerceAtLeast(0) + 1) % choices.size]\n        val saved = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)\n            .edit().putString(KEY_BUILT_IN_PRESET, next.name).commit()\n        return if (saved) next else current\n    }
 
     fun uri(context: Context, slot: String): Uri? {
         require(slot == ALARM || slot == ALERT)
