@@ -52,6 +52,9 @@ checks = {
         "Export redacted diagnostics report (JSON)" in diagnostics and "CreateDocument" in diagnostics,
     "readiness score labels itself as non-guarantee":
         "not a security/integrity guarantee" in score and "PROTECTION READINESS SCORE" in diagnostics,
+    "device intelligence reports OEM/background restriction, Doze, and standby bucket states":
+        "OEM AND BACKGROUND EXECUTION" in diagnostics and "isBackgroundRestricted" in diagnostics
+        and "isDeviceIdleMode" in diagnostics and "appStandbyBucket" in diagnostics,
     "dashboard has a double-size shield and horizontal navigation":
         "dp(136), dp(136)" in dashboard and "HorizontalScrollView" in dashboard and "navigationRow" in dashboard,
     "four Batch 2 destinations appear between the local-security header and live shield":
