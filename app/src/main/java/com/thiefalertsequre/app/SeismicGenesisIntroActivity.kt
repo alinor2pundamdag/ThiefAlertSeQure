@@ -198,7 +198,7 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
         private const val PREFS = "batch_three_intro_v1"
         private const val KEY_COMPLETED = "completed"
         private const val KEY_COMPLETED_AT = "completed_at"
-        private const val INTRO_DURATION_MS = 9_000
+        internal const val INTRO_DURATION_MS = 9_000
     }
 }
 
@@ -460,7 +460,7 @@ private fun GenesisFractureCanvas(
             repeat(74) { index ->
                 val angle = index * 2.3999632f
                 val ring = 18f + (index % 9) * 6f
-                val distance = ring + dustProgress * (size.maxDimension * (0.22f + (index % 5) * 0.045f))
+                val distance = ring + dustProgress * (maxOf(size.width, size.height) * (0.22f + (index % 5) * 0.045f))
                 val x = center.x + cos(angle) * distance
                 val y = center.y + sin(angle) * distance
                 val radius = (1.2f + (index % 4) * 0.55f) * (1f - dustProgress * 0.55f)
