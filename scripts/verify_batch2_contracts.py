@@ -112,13 +112,22 @@ checks = {
     "front-camera photos can be viewed, exported and deleted":
         "showCameraEvidenceArchive" in settings and "exportCameraEvidence.launch" in settings
         and "CameraEvidenceVault.delete(this, entry.id)" in settings and "CameraEvidenceVault.deleteAll(this)" in settings,
-    "dashboard has a double-size shield and horizontal navigation":
-        "dp(136), dp(136)" in dashboard and "HorizontalScrollView" in dashboard and "navigationRow" in dashboard,
-    "four Batch 2 destinations appear between the local-security header and live shield":
-        dashboard.index("LOCAL SECURITY  •  NO ACCOUNT  •  NO BACKEND") <
-        dashboard.index("Hardening & Reliability") <
-        dashboard.index("LIVE PROTECTION STATUS") and
-        all(label in dashboard for label in ("Authentication & Evidence", "Device Intelligence", "More / About")),
+    "dashboard keeps the enlarged fixed-color shield above compact swipeable tabs":
+        "dp(136), dp(136)" in dashboard and "val navigationScroll = HorizontalScrollView" in dashboard
+        and dashboard.index("LIVE PROTECTION STATUS") < dashboard.index("val navigationScroll")
+        and "private fun navigationTab" in dashboard and "minHeight = dp(48)" in dashboard
+        and "contentDescription = \"Open $description\"" in dashboard
+        and "Color.rgb(64, 177, 224)" in (APP / "ProtectionShieldView.kt").read_text(encoding="utf-8"),
+    "all nine owner-requested dashboard destinations are wired":
+        all(token in dashboard for token in (
+            '"Bluetooth", "Bluetooth Settings"', '"Hardening", "Device Hardening and Reliability"',
+            '"Sounds / Flash", "Sounds and Flash Alert"', '"Auth / Evidence", "Authentication Evidence"',
+            '"Device Info", "Device Intelligence"', '"Appearance", "Appearance Studio"',
+            '"Tamper History", "Local Tamper History"', '"More", "More Settings"',
+            '"About", "About ThiefAlertSeQure"'
+        ))
+        and "Intent(this, AboutActivity::class.java)" in dashboard
+        and 'android:name=".AboutActivity"' in (ROOT / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8"),
     "authentication and tamper evidence remain reachable from the owner-authentication section":
         "Review authentication & tamper evidence" in dashboard and "Intent(this, SettingsActivity::class.java)" in dashboard,
     "charger countdown remains exactly ten seconds":
