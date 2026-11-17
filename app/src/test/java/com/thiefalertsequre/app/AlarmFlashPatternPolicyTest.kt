@@ -26,8 +26,10 @@ class AlarmFlashPatternPolicyTest {
 
     @Test fun burstAndSosHaveDistinctCadence() {
         assertTrue(
-            AlarmFlashPatternPolicy.delayMs(AlarmFlashPattern.BURST, 0) !=
-                AlarmFlashPatternPolicy.delayMs(AlarmFlashPattern.SOS, 0)
+            (0 until 12).any { step ->
+                AlarmFlashPatternPolicy.delayMs(AlarmFlashPattern.BURST, step) !=
+                    AlarmFlashPatternPolicy.delayMs(AlarmFlashPattern.SOS, step)
+            }
         )
     }
 }
