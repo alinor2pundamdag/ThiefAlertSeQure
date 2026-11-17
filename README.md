@@ -110,7 +110,7 @@ ThiefAlertSeQure is designed to do its essential work on your Android device.
 - No configured advertising SDK or analytics tracker.
 - No sale or advertising-based sharing of app-collected data.
 - No collection of your device PIN, password, pattern, fingerprint data, or face templates.
-- Contacts, SMS, microphone, and **camera permission** are not requested. Optional coarse/fine location permission is requested only after the owner explicitly chooses to save one cached location fix into the encrypted local evidence vault. No background location or continuous tracking is used. The optional flashlight uses Android's public torch API and does not capture photos/video.
+- Contacts, SMS, microphone, and **camera permission** are not requested. Optional coarse/fine location permission is requested only after the owner explicitly chooses to save one cached or one current GPS/network location result into the encrypted local evidence vault. Current requests time out after 20 seconds. No background location or continuous tracking is used. The owner can export or restore the vault through a separate password-encrypted backup file. The optional flashlight uses Android's public torch API and does not capture photos/video.
 
 ### What stays on your device
 
