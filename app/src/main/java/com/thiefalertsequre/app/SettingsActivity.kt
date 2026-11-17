@@ -541,7 +541,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(6))
         val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
         val cameraPermissionGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        val cameraEvidenceCount = CameraEvidenceVault.entries(this).size
+        val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(this).size }.getOrDefault(0)
         root.addView(text(
             "Front-camera photo evidence: ${when { cameraEvidenceEnabled && cameraPermissionGranted -> "ON"; cameraEvidenceEnabled -> "NEEDS CAMERA PERMISSION"; else -> "OFF" }} • $cameraEvidenceCount encrypted photos",
             12f, R.color.tas_muted
@@ -586,7 +586,7 @@ class SettingsActivity : FragmentActivity() {
                     .setMessage("This permanently deletes every encrypted front-camera photo stored by ThiefAlertSeQure. It does not change the owner-authentication setting or event metadata.")
                     .setNegativeButton("Cancel", null)
                     .setPositiveButton("Delete all") { _, _ ->
-                        val deleted = CameraEvidenceVault.deleteAll(this)
+                        val deleted = runCatching { CameraEvidenceVault.deleteAll(this) }.getOrDefault(false)
                         LocalEvidenceVault.recordAsync(this, "camera_evidence_deleted", "Owner deleted all front-camera photo evidence; success=$deleted")
                         android.widget.Toast.makeText(this, if (deleted) "Front-camera photos deleted." else "Photo deletion could not be confirmed.", android.widget.Toast.LENGTH_LONG).show()
                         render()
@@ -1108,7 +1108,7 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun showCameraEvidenceArchive() {
-        val entries = CameraEvidenceVault.entries(this)
+        val entries = runCatching { CameraEvidenceVault.entries(this) }.getOrDefault(emptyList())
         if (entries.isEmpty()) {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Front-camera evidence")
@@ -1126,7 +1126,7 @@ class SettingsActivity : FragmentActivity() {
             .setItems(labels) { _, index ->
                 val entry = entries[index]
                 ioExecutor.execute {
-                    val bytes = CameraEvidenceVault.read(this, entry.id)
+                    val bytes = runCatching { CameraEvidenceVault.read(this, entry.id) }.getOrNull()
                     runOnUiThread {
                         if (bytes == null) {
                             android.widget.Toast.makeText(this, "Photo failed its integrity check or is unavailable.", android.widget.Toast.LENGTH_LONG).show()
@@ -1149,7 +1149,7 @@ class SettingsActivity : FragmentActivity() {
                                 exportCameraEvidence.launch("ThiefAlertSeQure-front-camera-${entry.timestampEpochMs}.jpg")
                             }
                             .setNegativeButton("Delete") { _, _ ->
-                                val deleted = CameraEvidenceVault.delete(this, entry.id)
+                                val deleted = runCatching { CameraEvidenceVault.delete(this, entry.id) }.getOrDefault(false)
                                 LocalEvidenceVault.recordAsync(this, "camera_evidence_deleted", "Owner deleted photo id=${entry.id}; success=$deleted")
                                 android.widget.Toast.makeText(this, if (deleted) "Photo deleted." else "Photo deletion could not be confirmed.", android.widget.Toast.LENGTH_LONG).show()
                                 render()
@@ -1166,7 +1166,7 @@ class SettingsActivity : FragmentActivity() {
     private fun writeCameraEvidenceExport(uri: Uri, id: String) {
         ioExecutor.execute {
             val result = runCatching {
-                val bytes = CameraEvidenceVault.read(this, id)
+                val bytes = runCatching { CameraEvidenceVault.read(this, id) }.getOrNull()
                     ?: throw IllegalStateException("Photo is missing or failed its integrity check.")
                 contentResolver.openOutputStream(uri)?.use { output ->
                     output.write(bytes)
