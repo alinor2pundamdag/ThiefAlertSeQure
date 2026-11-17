@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ThermalFlashPolicyTest {
-    private val severe = 4
+    private val severe = 3
 
     @Test fun suppressesFlashWhenThermalListenerCannotBeRegistered() {
         assertTrue(ThermalFlashPolicy.shouldSuppress(0, false, severe))
