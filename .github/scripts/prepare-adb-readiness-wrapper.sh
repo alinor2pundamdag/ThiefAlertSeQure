@@ -1,36 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-real_adb="$(command -v adb || true)"
-if [[ -z "$real_adb" ]]; then
-    sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-    for candidate in "$sdk_root/platform-tools/adb" \
-        /usr/local/lib/android/sdk/platform-tools/adb \
-        /opt/android-sdk/platform-tools/adb \
-        "$HOME/Android/Sdk/platform-tools/adb"; do
-        if [[ -x "$candidate" ]]; then
-            real_adb="$candidate"
-            break
-        fi
-    done
-fi
-if [[ -z "$real_adb" || ! -x "$real_adb" ]]; then
-    echo "Android platform-tools adb was not found on this runner" >&2
+# android-emulator-runner prepends ANDROID_HOME/platform-tools to PATH after
+# ordinary GITHUB_PATH entries. Install the wrapper at that exact path, and do
+# so through pre-emulator-launch-script (after SDK installation) so sdkmanager
+# cannot overwrite it.
+sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+real_adb="$sdk_root/platform-tools/adb"
+if [[ ! -x "$real_adb" ]]; then
+    echo "Expected Android platform-tools adb at $real_adb; refusing to wrap a different binary." >&2
     exit 1
 fi
-echo "Using Android platform-tools: $real_adb"
-# Start the ADB server before the emulator process registers its transport.
-# This avoids a known startup race where the emulator remains permanently offline.
-echo "Starting ADB server before emulator launch."
-"$real_adb" start-server
-wrapper_dir="${RUNNER_TEMP:-/tmp}/thiefalert-adb-readiness"
-mkdir -p "$wrapper_dir"
+backup_adb="${real_adb}.thiefalert-real"
+if [[ -e "$backup_adb" ]]; then
+    echo "ADB backup already exists at $backup_adb; refusing to replace it." >&2
+    exit 1
+fi
 
-cat > "$wrapper_dir/adb" <<'WRAPPER'
+echo "Installing ADB readiness wrapper at the SDK path used by android-emulator-runner: $real_adb"
+mv "$real_adb" "$backup_adb"
+
+cat > "$real_adb" <<'WRAPPER'
 #!/usr/bin/env bash
 set -euo pipefail
 
-REAL_ADB="${THIEFALERT_REAL_ADB:?THIEFALERT_REAL_ADB was not exported by the preparation step}"
+REAL_ADB="${0}.thiefalert-real"
+if [[ ! -x "$REAL_ADB" ]]; then
+    echo "Original Android platform-tools adb is missing: $REAL_ADB" >&2
+    exit 1
+fi
 args=("$@")
 serial=""
 for ((i = 0; i < ${#args[@]} - 1; i++)); do
@@ -90,6 +88,7 @@ esac
 exec "$REAL_ADB" "$@"
 WRAPPER
 
-chmod +x "$wrapper_dir/adb"
-echo "THIEFALERT_REAL_ADB=$real_adb" >> "$GITHUB_ENV"
-echo "$wrapper_dir" >> "$GITHUB_PATH"
+chmod +x "$real_adb"
+"$real_adb" start-server
+"$real_adb" version
+echo "ADB server started and in-place readiness wrapper is ready."

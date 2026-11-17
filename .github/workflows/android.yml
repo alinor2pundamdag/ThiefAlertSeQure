@@ -357,9 +357,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
         with:
           cache-provider: basic
-      - name: Prepare Android emulator framework-readiness shim
-        run: bash .github/scripts/prepare-adb-readiness-wrapper.sh
-
       - name: Prepare Android 17 preview SDK package aliases
         if: matrix.api-level == 37
         shell: bash
@@ -437,6 +434,7 @@ jobs:
           heap-size: 512M
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           emulator-boot-timeout: 1200
+          pre-emulator-launch-script: bash .github/scripts/prepare-adb-readiness-wrapper.sh
           disable-animations: true
           disable-spellchecker: true
           script: bash .github/scripts/run-android-instrumentation.sh
