@@ -19,6 +19,12 @@ internal object LocalTamperHistoryPolicy {
         return (prior + entry).takeLast(maxEvents).joinToString("\n")
     }
 
+    /** Export only the event code; never include free-form details in redacted diagnostics. */
+    fun eventCodeFromLine(line: String): String =
+        line.substringAfter("|", "").trim().substringBefore("|")
+            .filter { it.isLetterOrDigit() || it in "_- ." }
+            .take(48)
+
     fun newestFirst(existing: String, limit: Int = MAX_EVENTS): List<String> {
         val boundedLimit = limit.coerceIn(1, MAX_EVENTS)
         return existing.lineSequence()
