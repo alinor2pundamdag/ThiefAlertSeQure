@@ -80,7 +80,9 @@ internal object CameraEvidenceVault {
         val app = context.applicationContext
         val entry = (readIndex(app) ?: return null).firstOrNull { it.id == id } ?: return null
         if (!CameraEvidencePolicy.isRetained(entry.timestampEpochMs, System.currentTimeMillis())) return null
-        val encrypted = runCatching { evidenceDirectory(app).resolve("$id.aesgcm").readBytes() }.getOrNull() ?: return null
+        val encryptedFile = evidenceDirectory(app).resolve("$id.aesgcm")
+        if (!encryptedFile.isFile || encryptedFile.length() > CameraEvidencePolicy.MAX_IMAGE_BYTES + 64L) return null
+        val encrypted = runCatching { encryptedFile.readBytes() }.getOrNull() ?: return null
         val plaintext = runCatching { decrypt(id, encrypted) }.getOrNull() ?: return null
         if (plaintext.size != entry.sizeBytes || sha256(plaintext) != entry.sha256 ||
             !CameraEvidencePolicy.isValidImageSize(plaintext.size)
@@ -96,8 +98,8 @@ internal object CameraEvidenceVault {
         if (entries.none { it.id == id }) return false
         val next = entries.filterNot { it.id == id }
         if (!writeIndex(app, next)) return false
-        evidenceDirectory(app).resolve("$id.aesgcm").delete()
-        return true
+        val file = evidenceDirectory(app).resolve("$id.aesgcm")
+        return file.delete() || !file.exists()
     }
 
     @Synchronized
