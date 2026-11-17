@@ -37,6 +37,8 @@ internal object PermissionChangeMonitor {
             context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         current["fine_location"] =
             context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        current["camera_permission"] =
+            context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         current["notifications_enabled"] =
             runCatching { NotificationManagerCompat.from(context).areNotificationsEnabled() }.getOrDefault(false)
         if (Build.VERSION.SDK_INT >= 23) {
