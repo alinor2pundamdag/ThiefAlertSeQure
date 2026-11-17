@@ -29,6 +29,7 @@ The app stores only the operational information needed to provide its functions:
 - Trusted Bluetooth accessory names and MAC addresses selected by the owner, plus the per-device connection-baseline and revision data used by A2. The registry payload and baselines are encrypted locally with an Android Keystore-backed AES-GCM key; identifiers are not uploaded.
 - The owner's local preference for enabling or disabling the alarm flashlight.
 - URI references and Android read-access grants for owner-selected alarm and secondary-alert audio. The app stores references/permissions, not a second copy of the selected audio file.
+- The installed package name, app version, and signing-certificate fingerprint are read locally for About/Info transparency and official-update verification. The fingerprint is calculated on-device and is not uploaded.
 
 This information is stored in the app's private local preferences. The app does not upload it.
 
