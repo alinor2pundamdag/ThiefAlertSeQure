@@ -135,3 +135,21 @@ Reviewed source paths include `ProtectionStore.kt`, `ProtectionEngine.kt`, `Powe
 - Restricted manual signed preflight in `.github/workflows/release.yml` to `main` only; this closes the extra compatibility-branch path and matches the documented release boundary. No preflight or release was triggered.
 - Final Android CI must be checked against the post-hardening branch HEAD before marking the software phases complete. The current scope excludes all emulator, instrumentation and physical-device testing.
 - PR #7 remains draft/open. Branch integration is held because the working branch is one commit behind `main` and contains a separate `PROJECT_STATE.md` history; no merge or rebase was performed.
+
+
+## Current authoritative repository status — 2026-11-17
+
+This section supersedes earlier candidate snapshots and pending-verification notes above where they conflict.
+
+- Working branch: `work/phase-0-12-coding`; exact verified source/workflow head: `a1a567bf53f97189be2547ccf872ae665c30a54b`.
+- Android build and tests passed on this exact head: [run #44005105554](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105554). The successful job includes JVM unit tests, source-contract guards, Android lint, APK assembly and metadata/package/signer checks. The instrumentation-disabled guard also passed.
+- CodeQL passed on this exact head: [run #44005105442](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105442), including Java/Kotlin and Actions analysis.
+- The A2 per-accessory pending-deadline serialization fix and owner-authentication proof freshness fix are included in the exact-head Android/JVM CI pass.
+- Recursive tree audit returned 222 entries without truncation and identified 64 production Kotlin source files. The current continuation reviewed all 64 source files for cross-layer responsibilities, persistence writes, platform entry points, exception boundaries, updater/install sinks, and TODO/FIXME markers. This was a static source review; no runtime or device behavior is inferred.
+- The PR has one inline review thread and it is resolved. It references CodeQL alert #8. The available GitHub connector cannot retrieve the repository Code Scanning Alerts endpoint or private security page; the alert's active/closed state remains **NOT VERIFIED**. A successful CodeQL workflow is not proof that all alerts are closed.
+- Branch comparison: 519 commits ahead, 0 behind `main`; 131 changed paths (90 added, 41 modified, 0 deleted). GitHub reports PR #7 mergeable. PR #7 remains draft/open/unmerged.
+- The protected release workflow requires the four permanent signing secrets and checks the pinned certificate, tag ancestry, package, versionCode and signer before publishing. Secret presence and production-signed APK availability are **NOT VERIFIED**; CI development artifacts are not production releases.
+- The release workflow YAML and Android workflow YAML passed the current Android workflow's validation steps. The Android workflow confirms instrumentation is disabled.
+- `main` remains untouched. No merge, rebase, tag, publication or production release was performed.
+- Explicit exclusions remain: no Codespaces, no emulator, no instrumentation compilation/execution, and no physical-device testing.
+- The active phase checklist is `docs/PHASE_0_12_EXECUTION_CHECKLIST.md`; consult its latest exact-head snapshot for phase dispositions and remaining Phase 11 verification boundaries.
