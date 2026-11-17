@@ -9,6 +9,10 @@ object A2DisconnectPolicy {
         else eventUptimeMs + gracePeriodMs
     }
 
+    /** Exact access enables the precise path; callers must still retain an inexact fallback. */
+    fun shouldScheduleExactAlarm(apiLevel: Int, canScheduleExactAlarms: Boolean): Boolean =
+        apiLevel < 31 || canScheduleExactAlarms
+
     /** Rejects stale timers after reboot, including OEMs where BOOT_COUNT is unreadable. */
     fun isSameBoot(
         storedBootCount: Int,

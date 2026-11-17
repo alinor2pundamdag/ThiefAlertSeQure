@@ -115,7 +115,7 @@ while true; do
   # DDMLib can temporarily lose API identity or PackageManager while cold images settle.
   attempt_log="$diagnostics_dir/instrumentation-attempt-$attempt.log"
   if [[ "$attempt" -ge 3 ]] || ! grep -Eq \
-      'No compatible devices connected|Found [0-9]+ connected device|Unknown API Level|Can.t find service: package|Failed to install split APK|ShellCommandUnresponsiveException|device offline' \
+      'No compatible devices connected|Found [0-9]+ connected device|Unknown API Level|Can.t find service: package|Failed to install split APK|Failed to commit install session|Failure calling service package|Broken pipe|ShellCommandUnresponsiveException|device offline' \
       "$attempt_log"; then
     exit "$test_exit_code"
   fi

@@ -342,10 +342,10 @@ jobs:
     name: Android instrumentation (API ${{ matrix.api-level }})
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 1
       matrix:
         api-level: [36, 37]
     steps:
@@ -390,6 +390,10 @@ jobs:
             echo "::error::Android 17 preview SDK package platforms;android-37.0 is not available from the configured SDK repositories."
             exit 1
           }
+          grep -Fq 'system-images;android-37.0;google_apis;x86_64' "$RUNNER_TEMP/android-sdk-preview-packages.txt" || {
+            echo "::error::Android 17 Google APIs x86_64 system image is not available from the configured SDK repositories."
+            exit 1
+          }
           wrapper_dir="$RUNNER_TEMP/android-sdkmanager-preview"
           mkdir -p "$wrapper_dir"
           cat > "$wrapper_dir/sdkmanager" <<'WRAPPER'
@@ -400,6 +404,7 @@ jobs:
           for arg in "$@"; do
             case "$arg" in
               platforms\;android-37) args+=("platforms;android-37.0") ;;
+              system-images\;android-37\;google_apis\;x86_64) args+=("system-images;android-37.0;google_apis;x86_64") ;;
               --channel=0) args+=("--channel=3") ;;
               *) args+=("$arg") ;;
             esac
@@ -409,18 +414,37 @@ jobs:
           chmod +x "$wrapper_dir/sdkmanager"
           echo "THIEFALERT_REAL_SDKMANAGER=$real_sdkmanager" >> "$GITHUB_ENV"
           echo "$wrapper_dir" >> "$GITHUB_PATH"
-          echo "Configured SDK Manager for the Android 17 preview platform and preview package channel."
+          echo "PATH=$wrapper_dir:$PATH" >> "$GITHUB_ENV"
+          echo "Configured SDK Manager for the Android 17 preview platform and Google APIs image."
+
+      - name: Verify Android 17 preview SDK Manager alias
+        if: matrix.api-level == 37
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$RUNNER_TEMP/android-sdkmanager-preview/sdkmanager"
+          actual="$(command -v sdkmanager || true)"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::Preview SDK Manager wrapper is not first on PATH. Expected $expected; got ${actual:-not found}."
+            exit 1
+          fi
+          sdkmanager --list --channel=3 | grep -Fq 'platforms;android-37.0'
+          sdkmanager --list --channel=3 | grep -Fq 'system-images;android-37.0;google_apis;x86_64'
+          echo "Verified preview platform and Google APIs image aliases through $actual."
 
       - name: Run Android instrumentation tests on API ${{ matrix.api-level }}
-        timeout-minutes: 30
+        timeout-minutes: 45
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         env:
           ANDROID_API_LEVEL: ${{ matrix.api-level }}
         with:
           api-level: ${{ matrix.api-level }}
-          target: default
+          target: google_apis
           arch: x86_64
-          profile: pixel_2
+          profile: pixel_5
+          cores: 4
+          ram-size: 3072M
+          heap-size: 512M
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           emulator-boot-timeout: 1200
           disable-animations: true

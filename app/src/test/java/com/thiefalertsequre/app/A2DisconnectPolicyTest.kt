@@ -14,6 +14,12 @@ class A2DisconnectPolicyTest {
         assertEquals(Long.MAX_VALUE, A2DisconnectPolicy.graceDeadlineUptimeMs(Long.MAX_VALUE - 5L, 8L))
     }
 
+    @Test fun exactAlarmPermissionOnlyGatesThePreciseCallback() {
+        assertTrue(A2DisconnectPolicy.shouldScheduleExactAlarm(30, false))
+        assertFalse(A2DisconnectPolicy.shouldScheduleExactAlarm(31, false))
+        assertTrue(A2DisconnectPolicy.shouldScheduleExactAlarm(31, true))
+    }
+
     @Test fun sameBootRequiresMatchingKnownBootCounts() {
         assertTrue(A2DisconnectPolicy.isSameBoot(4, 4, 12_000L, 13_000L))
         assertFalse(A2DisconnectPolicy.isSameBoot(4, 5, 12_000L, 13_000L))

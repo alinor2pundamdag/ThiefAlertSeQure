@@ -13,6 +13,7 @@ import java.security.MessageDigest
 internal object A2DisconnectScheduler {
     private const val KEY_PENDING = "trusted_bluetooth_pending_disconnects_v1"
     private const val ACTION = "com.thiefalertsequre.A2_DISCONNECT_DEADLINE"
+    private const val ACTION_FALLBACK = "com.thiefalertsequre.A2_DISCONNECT_DEADLINE_FALLBACK"
     private const val URI_PREFIX = "thiefalertsequre://a2-disconnect/"
     private const val REQUEST_BASE = 20_000
 
@@ -49,29 +50,21 @@ internal object A2DisconnectScheduler {
             LocalTamperHistory.record(context, "a2_deadline_persist_failed", "Encrypted A2 disconnect deadline could not be committed")
             return false
         }
-        return runCatching {
-            val manager = context.getSystemService(AlarmManager::class.java)
-            val operation = pendingIntent(context, pending.address)
-            val deadline = pending.deadlineElapsedRealtimeMs.coerceAtLeast(android.os.SystemClock.elapsedRealtime())
-            val exactAllowed = Build.VERSION.SDK_INT < 31 || manager.canScheduleExactAlarms()
-            if (!exactAllowed) {
-                LocalTamperHistory.record(context, "a2_exact_alarm_access_missing", "Using the inexact idle-aware A2 deadline fallback; Android may delay delivery")
-            }
-            if (exactAllowed) {
-                try {
-                    manager.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, operation)
-                } catch (_: SecurityException) {
-                    manager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, operation)
-                }
-            } else {
-                manager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, operation)
-            }
-            true
-        }.getOrElse {
-            LocalTamperHistory.record(context, "a2_deadline_schedule_failed", it.javaClass.simpleName + ": " + it.message)
-            runCatching { cancel(context, pending.address, pending.eventElapsedRealtimeMs) }
-            false
+        val scheduled = scheduleCallbacks(context, pending)
+        if (!scheduled) cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+        return scheduled
+    }
+
+    /** Reinstall persisted callbacks after exact-alarm access is granted or the APK is replaced. */
+    fun rescheduleAll(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        val records = read(prefs) ?: run {
+            LocalTamperHistory.record(context, "a2_deadline_reschedule_store_unreadable", "Persisted A2 deadlines could not be read for rescheduling; source retained")
+            return false
         }
+        var allScheduled = true
+        records.forEach { if (!scheduleCallbacks(context, it)) allScheduled = false }
+        return allScheduled
     }
 
     fun find(context: Context, token: String): Pending? {
@@ -95,10 +88,15 @@ internal object A2DisconnectScheduler {
             return false
         }
         val matching = records.firstOrNull { it.address.equals(address, true) }
-        if (matching == null || (expectedEventElapsedMs != null &&
-                matching.eventElapsedRealtimeMs != expectedEventElapsedMs)
-        ) return true
-        context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context, address))
+        if (matching == null) {
+            cancelCallbacks(context, address)
+            return true
+        }
+        if (expectedEventElapsedMs != null && matching.eventElapsedRealtimeMs != expectedEventElapsedMs) {
+            // A stale callback must not cancel a newer disconnect for the same accessory.
+            return true
+        }
+        cancelCallbacks(context, address)
         val removed = write(prefs, records.filterNot { it.address.equals(address, true) })
         if (!removed) {
             LocalTamperHistory.record(context, "a2_deadline_cancel_persist_failed", "Reconnect cancellation removed the AlarmManager callback but could not commit the updated encrypted deadline list")
@@ -112,8 +110,7 @@ internal object A2DisconnectScheduler {
             LocalTamperHistory.record(context, "a2_pending_clear_store_unreadable", "A2 deadline cleanup could not read the encrypted schedule; source retained")
             return false
         }
-        val manager = context.getSystemService(AlarmManager::class.java)
-        records.forEach { manager.cancel(pendingIntent(context, it.address)) }
+        records.forEach { cancelCallbacks(context, it.address) }
         val cleared = prefs.edit().remove(KEY_PENDING).commit()
         if (!cleared) {
             LocalTamperHistory.record(context, "a2_pending_clear_failed", "Pending trusted-device deadlines could not be cleared")
@@ -169,17 +166,91 @@ internal object A2DisconnectScheduler {
         .digest(address.trim().uppercase().toByteArray(StandardCharsets.UTF_8))
         .joinToString("") { "%02x".format(it) }
 
-    private fun pendingIntent(context: Context, address: String): PendingIntent {
+    private fun scheduleCallbacks(context: Context, pending: Pending): Boolean = runCatching {
+        val manager = context.getSystemService(AlarmManager::class.java)
+        val exactOperation = pendingIntent(context, pending.address, fallback = false)
+        val fallbackOperation = pendingIntent(context, pending.address, fallback = true)
+        val deadline = pending.deadlineElapsedRealtimeMs.coerceAtLeast(android.os.SystemClock.elapsedRealtime())
+        val exactAllowed = A2DisconnectPolicy.shouldScheduleExactAlarm(
+            Build.VERSION.SDK_INT,
+            Build.VERSION.SDK_INT < 31 || manager.canScheduleExactAlarms()
+        )
+        if (exactAllowed) {
+            try {
+                manager.setExactAndAllowWhileIdle(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, exactOperation
+                )
+            } catch (error: Exception) {
+                runCatching { cancelPendingIntent(manager, exactOperation) }
+                LocalTamperHistory.record(
+                    context, "a2_exact_alarm_schedule_failed",
+                    error.javaClass.simpleName + ": " + error.message + "; inexact fallback remains scheduled"
+                )
+            }
+        } else {
+            runCatching { cancelPendingIntent(manager, exactOperation) }
+            LocalTamperHistory.record(
+                context, "a2_exact_alarm_access_missing",
+                "Using the inexact idle-aware A2 deadline fallback; Android may delay delivery"
+            )
+        }
+
+        // Keep a distinct inexact callback alive even when exact access is granted.
+        // Android cancels exact alarms and stops the app when SCHEDULE_EXACT_ALARM
+        // is revoked; this independent callback preserves a delayed recovery path.
+        manager.setAndAllowWhileIdle(
+            AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, fallbackOperation
+        )
+        true
+    }.getOrElse { error ->
+        LocalTamperHistory.record(
+            context, "a2_deadline_schedule_failed",
+            error.javaClass.simpleName + ": " + error.message
+        )
+        false
+    }
+
+    private fun cancelCallbacks(context: Context, address: String) {
+        val manager = context.getSystemService(AlarmManager::class.java)
+        cancelPendingIntent(manager, pendingIntent(context, address, fallback = false))
+        cancelPendingIntent(manager, pendingIntent(context, address, fallback = true))
+    }
+
+    private fun cancelPendingIntent(manager: AlarmManager, operation: PendingIntent) {
+        manager.cancel(operation)
+        operation.cancel()
+    }
+
+    private fun pendingIntent(context: Context, address: String, fallback: Boolean): PendingIntent {
         val token = tokenFor(address)
         return PendingIntent.getBroadcast(
             context,
             REQUEST_BASE + (token.take(7).toLong(16) % 1_000_000L).toInt(),
             Intent(context, AlarmDeadlineReceiver::class.java)
-                .setAction(ACTION)
+                .setAction(if (fallback) ACTION_FALLBACK else ACTION)
                 .setData(Uri.parse(URI_PREFIX + token)),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
 
+    internal fun hasPendingIntent(context: Context, address: String, fallback: Boolean): Boolean {
+        if (!TrustedBluetoothRegistry.isValidAddress(address)) return false
+        val token = tokenFor(address)
+        val intent = Intent(context, AlarmDeadlineReceiver::class.java)
+            .setAction(if (fallback) ACTION_FALLBACK else ACTION)
+            .setData(Uri.parse(URI_PREFIX + token))
+        val flags = PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        return PendingIntent.getBroadcast(
+            context,
+            REQUEST_BASE + (token.take(7).toLong(16) % 1_000_000L).toInt(),
+            intent,
+            flags
+        ) != null
+    }
+
+    fun isDeadlineAction(action: String?): Boolean =
+        action == ACTION || action == ACTION_FALLBACK
+
     const val ACTION_DEADLINE = ACTION
+    const val ACTION_FALLBACK_DEADLINE = ACTION_FALLBACK
 }

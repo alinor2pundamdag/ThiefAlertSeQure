@@ -25,6 +25,7 @@ class BootReceiver : BroadcastReceiver() {
         )
         if (intent.action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED) {
             if (Build.VERSION.SDK_INT >= 31 && context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()) {
+                A2DisconnectScheduler.rescheduleAll(context)
                 val state = enforceMonitorOptOut(context)
                 when (state.mode) {
                     ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
@@ -38,6 +39,7 @@ class BootReceiver : BroadcastReceiver() {
             return
         }
         if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            A2DisconnectScheduler.rescheduleAll(context)
             restoreAfterAppUpdate(context)
             return
         }

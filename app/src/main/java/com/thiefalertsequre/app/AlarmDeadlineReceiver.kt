@@ -11,7 +11,7 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         val pending = goAsync()
         Thread {
             try {
-                if (callbackIntent.action == A2DisconnectScheduler.ACTION_DEADLINE) {
+                if (A2DisconnectScheduler.isDeadlineAction(callbackIntent.action)) {
                     handleA2DisconnectDeadline(context.applicationContext, callbackIntent)
                 } else {
                     handleDeadline(context.applicationContext, callbackIntent)
@@ -21,7 +21,7 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
                     context, "deadline_receiver_error",
                     error.javaClass.simpleName + ": " + error.message
                 )
-                if (callbackIntent.action == A2DisconnectScheduler.ACTION_DEADLINE) {
+                if (A2DisconnectScheduler.isDeadlineAction(callbackIntent.action)) {
                     val token = callbackIntent.data?.lastPathSegment
                     if (token != null) A2DisconnectScheduler.find(context, token)?.let {
                         A2DisconnectScheduler.schedule(context, it)
