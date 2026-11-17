@@ -37,7 +37,7 @@ required = {
     "privacy policy discloses one-shot location":
         "one cached location fix or request one current GPS/network fix" in privacy and "No background location permission" in privacy,
     "first-launch notice discloses optional location snapshot and encrypted backups":
-        "current GPS/network location request" in main and "password-protected file" in main and "privacy_notice_v4" in main,
+        "current GPS/network location request" in main and "password-protected file" in main and "privacy_notice_v5" in main,
     "evidence backup uses password-derived authenticated encryption":
         "PBKDF2WithHmacSHA256" in (ROOT / "app/src/main/java/com/thiefalertsequre/app/EvidenceVaultBackup.kt").read_text(encoding="utf-8")
         and "AES/GCM/NoPadding" in (ROOT / "app/src/main/java/com/thiefalertsequre/app/EvidenceVaultBackup.kt").read_text(encoding="utf-8")
@@ -65,8 +65,8 @@ required = {
         "showCameraEvidenceArchive" in settings and "exportCameraEvidence.launch" in settings
         and "CameraEvidenceVault.delete(this, entry.id)" in settings and "CameraEvidenceVault.deleteAll(this)" in settings,
     "camera privacy notice and policy explain the opt-in capture boundary":
-        "front-camera photo evidence" in main and "CAMERA permission only after" in main
-        and "CAMERA permission only after" in privacy,
+        "front-camera photo evidence" in main and "CAMERA permission is requested only after that choice" in main
+        and "explicitly enables front-camera photo evidence" in privacy,
 }
 for description, passed in required.items():
     if not passed:
