@@ -33,16 +33,18 @@ internal object CameraEvidenceCapture {
     private const val PREFERRED_HEIGHT = 720
     private val inFlight = AtomicBoolean(false)
 
-    fun isEnabled(context: Context): Boolean =
+    fun isEnabled(context: Context): Boolean = runCatching {
         SafePreferences.boolean(
             context.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE),
             KEY_ENABLED,
             false
         )
+    }.getOrDefault(false)
 
-    fun setEnabled(context: Context, enabled: Boolean): Boolean =
+    fun setEnabled(context: Context, enabled: Boolean): Boolean = runCatching {
         context.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE)
             .edit().putBoolean(KEY_ENABLED, enabled).commit()
+    }.getOrDefault(false)
 
     fun captureAfterSuccessfulAuthentication(activity: Activity) {
         val app = activity.applicationContext
