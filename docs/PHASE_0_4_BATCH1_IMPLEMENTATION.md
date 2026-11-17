@@ -29,6 +29,12 @@ The new Bypass Charging controller, adapter contract, fail-closed registry, read
 
 This is an intentional safety boundary, not a claim that OEM system Bypass Charging is absent. Owners can still use any Bypass Charging feature exposed by their phone's own Settings or gaming tools.
 
-## Completion rule
+## Verification result
 
-Batch 1 is not fully complete until new exact-head Android/JVM/source-contract/lint/APK checks and CodeQL pass. Direct OEM charging control remains blocked until an authorized OEM integration is available.
+The non-physical implementation passed on code-bearing commit e8aabcb4dc42df7817b4ec4c2fb7e7c1ac392523:
+- Android build and tests: [run #44048497535 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44048497535).
+- CodeQL: [run #44048497474 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44048497474).
+- JVM tests, Bypass Charging privilege/state guard, instrumentation-disabled guard, Android lint, manifest/protection invariants, APK build and metadata checks all passed.
+- Development debug artifact: [artifact #14312886783](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44048497535/artifacts/14312886783), SHA-256 628cd98ceab0e24af26d29f0502862456ed4e3d2f8615cc85130084a2b19a945. The minified release APK passed metadata verification but remains unsigned because permanent owner signing secrets are not configured.
+
+**Batch 1 non-physical implementation is complete for the available software scope.** Direct OEM charging control remains blocked until a documented and authorized model/firmware-specific integration is available; no universal third-party ON/OFF capability is claimed.
