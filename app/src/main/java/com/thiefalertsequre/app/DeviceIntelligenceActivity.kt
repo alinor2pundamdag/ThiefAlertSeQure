@@ -260,10 +260,15 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         ))
         val storeIntegrity = protectionStore.integritySnapshot()
         val evidenceIntegrity = LocalEvidenceVault.verifyIntegrity(this)
+        val cameraEvidenceIntegrity = CameraEvidenceVault.verifyIntegrity(this)
+        val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
+        val cameraPermissionGranted = checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        val cameraEvidenceCount = CameraEvidenceVault.entries(this).size
         val integritySignals = listOf(
             IntegritySignal("Protection state storage", if (storeIntegrity.protectionStateHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 3),
             IntegritySignal("Owner-authentication throttle storage", if (storeIntegrity.authenticationThrottleHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
             IntegritySignal("Encrypted evidence vault", if (evidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
+            IntegritySignal("Encrypted front-camera photo vault", if (cameraEvidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 1),
             IntegritySignal(
                 "Protection monitor runtime",
                 when {
@@ -310,6 +315,12 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         val flashDependency = if (pm.hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)) {
             "HARDWARE DECLARED — runtime torch access can still be interrupted by camera contention or thermal policy"
         } else "UNSUPPORTED — no camera flash feature declared"
+        val cameraDependency = when {
+            !cameraEvidenceEnabled -> "OPTIONAL OFF — no camera permission is requested until owner opt-in"
+            !cameraPermissionGranted -> "OWNER ENABLED — CAMERA permission missing; photo capture is skipped"
+            cameraEvidenceIntegrity -> "OWNER ENABLED — one front-camera still after successful visible owner authentication; $cameraEvidenceCount encrypted photos retained"
+            else -> "FAILED — encrypted camera evidence vault integrity check failed"
+        }
         val dependencyMap = listOf(
             "Charger protection → foreground monitor + power broadcasts + exact scheduling + notifications: $monitorDependency",
             "Bluetooth separation (A2) → owner opt-in + paired trusted device + Bluetooth Connect + fresh baseline: $a2Dependency",
@@ -318,7 +329,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             "Evidence vault → Android Keystore AES-GCM + local storage + integrity-checked records: ${if (evidenceIntegrity) "OPERATIONAL" else "FAILED"}",
             "GPS evidence → explicit owner action + coarse/fine location permission + one-shot provider fix: $gpsDependency",
             "Managed hardening → Device Owner enrollment + Lock Task policy: ${if (ManagedProtectionController.isDeviceOwner(this)) "DEVICE OWNER PRESENT" else "OPTIONAL / NOT ENROLLED"}",
-            "Camera photo evidence → NOT ENABLED under the current no-camera-permission privacy boundary"
+            "Front-camera photo evidence → explicit opt-in + CAMERA permission + successful owner authentication + visible Activity + encrypted local vault: $cameraDependency"
         )
         addCard("FEATURE DEPENDENCY MAP", dependencyMap)
         val recentOutputEvents = LocalTamperHistory.read(this, 100)
@@ -367,7 +378,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             exportDiagnostics.launch("thiefalertsequre-diagnostics.json")
         }, matchWrap())
         root.addView(space(12))
-        root.addView(label("Privacy boundary: this report reads public local Android APIs and hardware feature flags. It does not read IMEI, serial number, MAC address, Wi-Fi identifiers, contacts, messages, files, microphone, camera content, or precise location. Results stay on this device.", 12f, R.color.tas_muted, false), matchWrap())
+        root.addView(label("Privacy boundary: this report reads public local Android APIs and hardware feature flags. It does not read IMEI, serial number, MAC address, Wi-Fi identifiers, contacts, messages, microphone, or precise location. Optional front-camera capture is separate and occurs only after explicit owner opt-in and successful authentication while the app is visible; this diagnostics report never reads or exports photo content. Results stay on this device.", 12f, R.color.tas_muted, false), matchWrap())
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
         ThemeRuntime.apply(this, scroll)
@@ -409,6 +420,10 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             val state = protectionStore.read()
             val storeIntegrity = protectionStore.integritySnapshot()
             val evidenceIntegrity = LocalEvidenceVault.verifyIntegrity(this)
+            val cameraEvidenceIntegrity = CameraEvidenceVault.verifyIntegrity(this)
+            val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
+            val cameraPermissionGranted = checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+            val cameraEvidenceCount = CameraEvidenceVault.entries(this).size
             val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
             val monitorProcessRunning = runCatching {
                 getSystemService(ActivityManager::class.java).getRunningServices(100)
@@ -418,6 +433,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                 IntegritySignal("Protection state storage", if (storeIntegrity.protectionStateHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 3),
                 IntegritySignal("Authentication throttle storage", if (storeIntegrity.authenticationThrottleHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
                 IntegritySignal("Encrypted evidence vault", if (evidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
+                IntegritySignal("Encrypted front-camera photo vault", if (cameraEvidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 1),
                 IntegritySignal("Protection monitor runtime", when {
                     !monitorEnabled -> IntegrityStatus.UNSUPPORTED
                     monitorProcessRunning -> IntegrityStatus.VERIFIED
@@ -439,6 +455,10 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                 put("protectionStateStoreHealthy", storeIntegrity.protectionStateHealthy)
                 put("authenticationThrottleHealthy", storeIntegrity.authenticationThrottleHealthy)
                 put("evidenceVaultIntegrityHealthy", evidenceIntegrity)
+                put("cameraEvidenceVaultIntegrityHealthy", cameraEvidenceIntegrity)
+                put("cameraEvidenceEnabledByOwner", cameraEvidenceEnabled)
+                put("cameraPermissionGranted", cameraPermissionGranted)
+                put("encryptedCameraPhotoCount", cameraEvidenceCount)
                 put("monitorProcessCurrentlyConfirmed", monitorProcessRunning)
                 put("protectionIntegrityScorePercent", integrityScore.percent)
                 put("protectionIntegrityScorePoints", "${integrityScore.earnedPoints}/${integrityScore.possiblePoints}")
@@ -461,7 +481,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                     runCatching { standbyBucketLabel(getSystemService(UsageStatsManager::class.java).appStandbyBucket) }.getOrDefault("Unavailable")
                 } else "Not exposed before API 28")
                 put("recentEventCodes", org.json.JSONArray(LocalTamperHistory.read(this@DeviceIntelligenceActivity, 20).map { it.substringAfter("|").trim().substringBefore("|").take(48) }))
-                put("privacyNote", "Redacted local diagnostics only. No location, camera, microphone, credentials, serial, IMEI, MAC, or build fingerprint.")
+                put("privacyNote", "Redacted local diagnostics only. No photo content, location, microphone, credentials, serial, IMEI, MAC, or build fingerprint is exported.")
             }
         }.getOrElse {
             android.widget.Toast.makeText(this, "Could not build diagnostics: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
