@@ -6,7 +6,7 @@ This document is the persistent acceptance contract for ThiefAlertSeQure Android
 
 - Production application ID / namespace: `com.thiefalertsequre.app`.
 - Last official installed baseline: v1.1.3, versionCode 5.
-- Candidate v1.1.4: versionCode 6, versionName `1.1.4`.
+- Candidate v1.1.4: versionCode 6, versionName `1.1.4_Developer_Alinor`. The next official release must use versionCode 7 and versionName `1.1.5_Developer_Alinor`.
 - Official release signing-certificate SHA-256:
   `9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64`.
 - The development-only debug APK uses a separate `com.thiefalertsequre.app.v114test` application ID. It must never replace the production installation or be published as an update. No instrumentation APK is built.
