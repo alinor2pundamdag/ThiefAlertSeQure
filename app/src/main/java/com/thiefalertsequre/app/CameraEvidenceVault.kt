@@ -237,9 +237,8 @@ internal object CameraEvidenceVault {
         val entries = readIndex(context) ?: return
         val now = System.currentTimeMillis()
         val retained = entries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
-        if (retained.size != entries.size && writeIndex(context, retained)) {
-            removeUnreferencedFiles(context, retained)
-        }
+        val indexReady = retained.size == entries.size || writeIndex(context, retained)
+        if (indexReady) removeUnreferencedFiles(context, retained)
     }
 
     private fun evidenceDirectory(context: Context): File =
