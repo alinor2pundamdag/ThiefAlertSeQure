@@ -43,6 +43,7 @@ class MainActivity : FragmentActivity() {
     private var fullScreenAccessButton: MaterialButton? = null
     private var biometricPrompt: BiometricPrompt? = null
     private var autoAuthenticationRequested = false
+    private var notificationPermissionAskedThisSession = false
     private var lastBatchThreeRefreshAt = 0L
 
     private val notificationPermission = registerForActivityResult(
@@ -391,11 +392,19 @@ class MainActivity : FragmentActivity() {
         status.removeCallbacks(ticker)
         status.post(ticker)
 
-        if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED && Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        requestNotificationPermissionIfNeeded()
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (
+            notificationPermissionAskedThisSession ||
+            Build.VERSION.SDK_INT < 33 ||
+            ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED ||
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        ) return
+        // Do not interrupt alarm recovery. Ask once the owner has returned to normal app use.
+        notificationPermissionAskedThisSession = true
+        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     override fun onResume() {
@@ -405,6 +414,7 @@ class MainActivity : FragmentActivity() {
         reconcileCharging()
         ManagedProtectionController.startIfConfigured(this)
         if (!::status.isInitialized) return
+        requestNotificationPermissionIfNeeded()
         ThemeRuntime.apply(this, window.decorView)
         if (::setupSummary.isInitialized) setupSummary.text = SetupStatusSnapshot.read(this).dashboardSummary()
         render()
