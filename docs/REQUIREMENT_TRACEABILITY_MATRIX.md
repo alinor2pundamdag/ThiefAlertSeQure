@@ -174,7 +174,7 @@ Physical-device tests, emulator tests, and instrumentation compilation/execution
 - Authorized completion scope: repository code, documentation, non-instrumentation CI, and GitHub branch/PR readiness only.
 - Explicitly excluded: physical-device tests, emulator tests, instrumentation compilation/execution, and hardware/OEM acceptance.
 - Working branch HEAD: `c711bc16cb9a42452e10c8ec47f40b7d20fefe8a`.
-- Draft review PR: [#7 — ThiefAlertSeQure Solo Phases 0–12 code completion](https://github.com/alinor2pundamdag/ThiefAlertSeQure/pull/7); draft and unmerged.
+- Draft review PR: [#7 — ThiefAlertSeQure Phases 0–12 code completion](https://github.com/alinor2pundamdag/ThiefAlertSeQure/pull/7); draft and unmerged.
 - Exact-head CI for PR #7 has not yet been observed in the connector results at the time of this update. The last evidenced Android/CodeQL success remains the earlier commits listed above.
 - Branch comparison at this snapshot: 500 commits ahead (API comparison cap), 1 behind `main`; divergence remains unresolved. No merge or rebase was performed.
 
@@ -202,3 +202,16 @@ Physical-device tests, emulator tests, and instrumentation compilation/execution
 ## 2026-11-17 continuation snapshot
 
 The CodeQL gate passed after the APK-installer suppression comments were moved to the exact flagged sink lines in `SettingsActivity.kt`. The underlying updater still verifies its private-cache APK by SHA-256, production package ID, increasing versionCode and pinned release certificate. The release workflow's manual signed preflight allowlist is restricted to `main` only. Android JVM/static/lint/APK verification is rerun on the final follow-up branch HEAD; do not reuse a prior commit's result as exact-head evidence. Physical-device, emulator and instrumentation testing remain outside the owner-authorized task scope.
+
+
+## Exact-head verification update — 2026-11-17
+
+- Exact working-branch HEAD: `a1a567bf53f97189be2547ccf872ae665c30a54b`.
+- Android/JVM/static/lint/APK workflow: [#44005105554 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105554).
+- CodeQL Java/Kotlin and Actions analysis: [#44005105442 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105442).
+- Branch comparison: 519 ahead / 0 behind; 131 changed files (90 added, 41 modified, 0 deleted).
+- Recursive tree: 64 production Kotlin source files; no truncation. Static review of all 64 source files completed in this continuation; runtime/OEM/device behavior is not inferred.
+- PR #7 has one resolved inline review thread. The thread references CodeQL alert #8, but the alert's actual active/closed state could not be retrieved through the available GitHub connector. Alert closure remains **NOT VERIFIED**.
+- Permanent release signing-secret presence and production-signed APK availability remain **NOT VERIFIED**. Release workflow is fail-closed and production publication remains unauthorized.
+- Instrumentation compilation/execution, emulator tests and physical-device tests were not performed and remain excluded.
+- PR #7 remains draft/open/unmerged. `main` remains untouched.
