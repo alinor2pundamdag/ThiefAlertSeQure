@@ -178,8 +178,6 @@ class MainActivity : FragmentActivity() {
         var hardeningAnchor: View? = null
         var authenticationEvidenceAnchor: View? = null
 
-        var reliabilityAnchor: View? = null
-
         val statusCard = card()
         val statusContent = column()
         statusContent.setPadding(dp(20), dp(20), dp(20), dp(20))
@@ -327,9 +325,7 @@ class MainActivity : FragmentActivity() {
         root.addView(hardeningCard, matchWrap())
         root.addView(space(20))
 
-        val reliabilityTitle = sectionTitle("RELIABILITY & SYSTEM ACCESS")
-        reliabilityAnchor = reliabilityTitle
-        root.addView(reliabilityTitle, matchWrap())
+        root.addView(sectionTitle("RELIABILITY & SYSTEM ACCESS"), matchWrap())
         root.addView(space(10))
         root.addView(systemSettingRow("Enable precise 10-second alarm timing", "Exact alarms",
             "Android 12 (API 31)+ requires special Alarms & reminders access for exact scheduling. Allow ThiefAlertSeQure if listed. Android 8–11 has no separate exact-alarm access page; timing uses the platform's available alarm behavior.") { requestExactAlarmAccess() }, matchWrap())
