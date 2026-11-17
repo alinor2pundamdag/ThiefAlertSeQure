@@ -119,7 +119,9 @@ checks = {
         "CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this)" in dashboard
         and "OwnerAuthenticationCoordinator.complete(this, proof)" in dashboard
         and dashboard.index("OwnerAuthenticationCoordinator.complete(this, proof)") < dashboard.index("CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this)")
-        and "Lifecycle.State.STARTED" in camera_capture,
+        and "Lifecycle.State.STARTED" in camera_capture
+        and "LifecycleEventObserver" in camera_capture and "Lifecycle.Event.ON_STOP" in camera_capture
+        and "activityVisible.get()" in camera_capture,
     "successful owner authentication and biometric failures enter encrypted evidence":
         "LocalEvidenceVault.recordAsync" in (APP / "OwnerAuthenticationCoordinator.kt").read_text(encoding="utf-8")
         and "owner_authenticated_alarm_stopped" in (APP / "OwnerAuthenticationCoordinator.kt").read_text(encoding="utf-8")
