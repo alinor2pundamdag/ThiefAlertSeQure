@@ -69,6 +69,18 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    private val privacyRecoveryPoll = object : Runnable {
+        override fun run() {
+            if (isFinishing || isDestroyed || ::status.isInitialized) return
+            if (ProtectionStore(this@MainActivity).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                window.decorView.removeCallbacks(this)
+                buildDashboard()
+                return
+            }
+            window.decorView.postDelayed(this, 500L)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val introPrefs = getSharedPreferences("batch_three_intro_v1", MODE_PRIVATE)
@@ -162,9 +174,14 @@ class MainActivity : FragmentActivity() {
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
         ThemeRuntime.apply(this, scroll)
+        // If a countdown reaches ALARM_TRIGGERED while this first-run notice is open,
+        // replace the notice with owner recovery immediately; never cover authentication.
+        window.decorView.removeCallbacks(privacyRecoveryPoll)
+        window.decorView.postDelayed(privacyRecoveryPoll, 500L)
     }
 
     private fun buildDashboard() {
+        window.decorView.removeCallbacks(privacyRecoveryPoll)
         val scroll = ScrollView(this).apply {
             isFillViewport = true
             setBackgroundColor(getColor(R.color.tas_background))
@@ -413,7 +430,10 @@ class MainActivity : FragmentActivity() {
         applyAlarmWindowPolicy()
         reconcileCharging()
         ManagedProtectionController.startIfConfigured(this)
-        if (!::status.isInitialized) return
+        if (!::status.isInitialized) {
+            if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) buildDashboard()
+            return
+        }
         requestNotificationPermissionIfNeeded()
         ThemeRuntime.apply(this, window.decorView)
         if (::setupSummary.isInitialized) setupSummary.text = SetupStatusSnapshot.read(this).dashboardSummary()
@@ -426,12 +446,22 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        launchAutomaticOwnerAuthenticationIfNeeded()
+        if (!::status.isInitialized && ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+            buildDashboard()
+        } else {
+            launchAutomaticOwnerAuthenticationIfNeeded()
+        }
     }
 
     override fun onPause() {
         if (::status.isInitialized) status.removeCallbacks(ticker)
         super.onPause()
+    }
+
+    override fun onDestroy() {
+        window.decorView.removeCallbacks(privacyRecoveryPoll)
+        if (::status.isInitialized) status.removeCallbacks(ticker)
+        super.onDestroy()
     }
 
     private fun applyAlarmWindowPolicy() {
