@@ -145,6 +145,12 @@ if "Skip intro" in intro_activity or "Skip the introduction" in intro_activity:
     errors.append("SeismicGenesisIntroActivity must not contain an unrequested Skip Intro path")
 if "id(\"org.jetbrains.kotlin.plugin.compose\")" not in (ROOT / "app" / "build.gradle.kts").read_text(encoding="utf-8"):
     errors.append("Seismic Genesis must use the requested Jetpack Compose implementation")
+setup_snapshot = (APP / "SetupStatusSnapshot.kt").read_text(encoding="utf-8")
+setup_activity = (APP / "SetupStatusActivity.kt").read_text(encoding="utf-8")
+if "NotificationSetupStatusPolicy.monitorChannel(monitorChannel?.importance)" not in setup_snapshot:
+    errors.append("Verified Android setup must inspect the persistent protection notification channel separately from the alarm channel")
+if '"monitor_channel" -> "Open protection notification channel"' not in setup_activity:
+    errors.append("Verified Android setup must provide a direct route to the protection notification channel")
 for screen in ("ProtectionMonitorService.kt", "AlarmService.kt"):
     source = (APP / screen).read_text(encoding="utf-8")
     if ".setSmallIcon(R.drawable.ic_notification_shield)" not in source:
