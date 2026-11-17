@@ -29,6 +29,10 @@ checks = {
         "orderly_shutdown_observed" in monitor and "cannot block shutdown" in monitor,
     "managed shutdown hardening remains Device Owner gated":
         "isDeviceOwner(activity)" in managed and "setLockTaskFeatures" in managed,
+    "managed restriction API 34 scope excludes unsupported global DISALLOW_ADD_USER":
+        "ManagedRestrictionPolicy.useGlobalRestriction" in managed
+        and "key != UserManager.DISALLOW_ADD_USER" in managed
+        and "ManagedRestrictionPolicyTest" in (ROOT / "app/src/test/java/com/thiefalertsequre/app/ManagedRestrictionPolicyTest.kt").read_text(encoding="utf-8"),
     "seven named plus one custom flash pattern exist":
         all(f"{name}(" in flash for name in ("STEADY", "SLOW", "NORMAL", "FAST", "BURST", "SOS", "ALTERNATING", "CUSTOM")),
     "flash speed and custom ON/OFF cadence are persisted and applied by the torch controller":
