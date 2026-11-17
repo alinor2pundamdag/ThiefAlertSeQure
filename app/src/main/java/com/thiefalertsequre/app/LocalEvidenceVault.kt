@@ -9,10 +9,9 @@ import java.util.TimeZone
 /**
  * Encrypted local evidence metadata archive.
  *
- * It stores only app-observed protection/authentication event metadata. It does
- * not capture camera, microphone, credentials, biometrics, or location. Those
- * sources require separate visible owner consent and are intentionally not
- * inferred from an alarm event.
+ * It stores app-observed protection/authentication event metadata and optional
+ * cached location snapshots only after an explicit owner action and permission.
+ * It never captures camera or microphone content or stores credentials/biometrics.
  */
 object LocalEvidenceVault {
     private const val PREFS = "local_evidence_vault_v1"
