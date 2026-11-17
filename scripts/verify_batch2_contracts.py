@@ -78,6 +78,7 @@ checks = {
         "PBKDF2WithHmacSHA256" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "AES/GCM/NoPadding" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "authentication secrets" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
+        and "ProtectionMode.ALARM_TRIGGERED" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "Export encrypted app configuration" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8"),
     "permission changes are detected on primary screens and recorded locally":
         "PermissionChangeMonitor.check(this)" in (APP / "MainActivity.kt").read_text(encoding="utf-8")
