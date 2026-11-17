@@ -156,6 +156,20 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_BATTERY_CHANGED -> handleBatteryChanged(intent)
+                Intent.ACTION_SHUTDOWN -> {
+                    // ACTION_SHUTDOWN is delivered only to dynamically registered receivers
+                    // on Android 9+. This records an orderly system shutdown observation;
+                    // it cannot block shutdown or detect hardware-forced power-off.
+                    val mode = ProtectionStore(this@ProtectionMonitorService).read().mode
+                    val userspaceOnly = intent.getBooleanExtra(
+                        "android.intent.extra.SHUTDOWN_USERSPACE_ONLY", false
+                    )
+                    LocalTamperHistory.record(
+                        this@ProtectionMonitorService,
+                        "orderly_shutdown_observed",
+                        "System delivered ACTION_SHUTDOWN; protection mode=$mode; userspaceOnly=$userspaceOnly"
+                    )
+                }
                 ACTION_REFRESH -> refreshProtectionState()
             }
         }
@@ -299,6 +313,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         if (receiverRegistered) return
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_BATTERY_CHANGED)
+            addAction(Intent.ACTION_SHUTDOWN)
             addAction(ACTION_REFRESH)
         }
         ContextCompat.registerReceiver(this, systemReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
