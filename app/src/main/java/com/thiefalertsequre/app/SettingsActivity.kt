@@ -539,7 +539,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(text("ENCRYPTED CONFIGURATION BACKUP", 11f, R.color.tas_primary, true))
         root.addView(space(6))
         root.addView(text(
-            "Backs up allowlisted owner settings with password-derived AES-GCM encryption. It excludes authentication secrets, protection/alarm state, Device Owner policies, permission grants, Bluetooth identities, custom audio URI grants, and the separate evidence vault.",
+            "Backs up allowlisted owner settings with password-derived AES-GCM encryption. It excludes authentication secrets, protection/alarm state, Device Owner policies, permission grants, Bluetooth identities, custom audio URI grants and the secondary-audio toggle, and the separate evidence vault.",
             12f, R.color.tas_muted
         ))
         root.addView(action("Export encrypted app configuration") {
