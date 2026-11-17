@@ -104,7 +104,8 @@ checks = {
     "successful owner authentication and biometric failures enter encrypted evidence":
         "LocalEvidenceVault.recordAsync" in (APP / "OwnerAuthenticationCoordinator.kt").read_text(encoding="utf-8")
         and "owner_authenticated_alarm_stopped" in (APP / "OwnerAuthenticationCoordinator.kt").read_text(encoding="utf-8")
-        and "owner_biometric_failed" in dashboard,
+        and "owner_biometric_failed" in dashboard
+        and "AuthenticationThrottle.remainingMs" in dashboard,
     "front-camera capture is explicitly owner-enabled and permission-gated":
         "Enable front-camera photo evidence?" in settings
         and "requestCameraEvidencePermission.launch(Manifest.permission.CAMERA)" in settings
