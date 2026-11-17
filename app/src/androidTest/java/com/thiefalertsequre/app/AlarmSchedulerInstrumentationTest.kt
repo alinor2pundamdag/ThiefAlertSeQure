@@ -21,10 +21,29 @@ class AlarmSchedulerInstrumentationTest {
             val elapsed = SystemClock.elapsedRealtime() + 60_000L
             val boot = ProtectionClock.bootCount(context)
             assertTrue(AlarmScheduler.schedule(context, epoch, elapsed, boot))
-            assertEquals("deadline:$epoch:$elapsed:$boot", prefs.getString("last_token", null))
+            val token = "deadline:$epoch:$elapsed:$boot"
+            assertEquals(token, prefs.getString("last_token", null))
+            assertTrue("The inexact fallback must exist regardless of exact-alarm access",
+                AlarmScheduler.hasPendingIntent(context, token, fallback = true))
+            val exactAllowed = android.os.Build.VERSION.SDK_INT < 31 ||
+                context.getSystemService(android.app.AlarmManager::class.java).canScheduleExactAlarms()
+            assertEquals(exactAllowed, AlarmScheduler.hasPendingIntent(context, token, fallback = false))
 
             AlarmScheduler.cancel(context)
             assertFalse(prefs.contains("last_token"))
+            assertFalse(AlarmScheduler.hasPendingIntent(context, token, fallback = true))
+            assertFalse(AlarmScheduler.hasPendingIntent(context, token, fallback = false))
+        } finally {
+            AlarmScheduler.cancel(context)
+        }
+    }
+
+    @Test fun recoveryRetryAlwaysRetainsAnInexactFallback() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        AlarmScheduler.cancel(context)
+        try {
+            assertTrue(AlarmScheduler.scheduleRecoveryRetry(context, 1_000L))
+            assertTrue(AlarmScheduler.hasPendingIntent(context, "recovery", fallback = true))
         } finally {
             AlarmScheduler.cancel(context)
         }
