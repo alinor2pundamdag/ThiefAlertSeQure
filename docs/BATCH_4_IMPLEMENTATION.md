@@ -26,9 +26,17 @@ This record distinguishes existing capabilities reused by Batch Four from the ad
 - About now reads the installed package signer, calculates its SHA-256 fingerprint, and compares the production package against the existing pinned official certificate. Development packages are identified separately rather than incorrectly shown as production-verified.
 - About includes direct dependency license acknowledgments: AndroidX and Material runtime dependencies (Apache 2.0), JUnit test dependency (EPL 1.0), and the project Apache 2.0 license.
 
-### Branding reconciliation
+### Developer signature card
 
-The fetched Batch Three baseline `AboutActivity.kt` did not contain the exact “Developed by Alinor Pundandag” line or an infinite glowing animation. No second developer-credit label was added in this branch, in accordance with the owner's instruction not to duplicate existing branding. The claimed existing branding must be reconciled against the intended source/build before declaring that particular visual element verified.
+The Batch Three baseline did not contain the previously planned top developer credit, so Batch Four adds it exactly once inside the existing `AboutActivity` (no second About screen or duplicate branding module):
+
+- Exact credit: `Developed by Alinor Pundandag`.
+- Fixed dark/black card at the top of About, immediately after the back navigation control.
+- Twenty light-spectrum colors with a smooth, continuous letter-by-letter glow.
+- Seven A–G animation stages cycle through the credit; the palette continues across loops.
+- Reuses the existing `AppearanceStudioStore.reduceMotion` preference. Reduced-motion mode renders a stable high-contrast static credit with no animation.
+- Animation is cancelled while the Activity is paused or destroyed and restarts on resume.
+- The credit is a branding statement only; it is not represented as cryptographic proof. Cryptographic authenticity is separately verified by the signing-certificate fingerprint.
 
 ## Phase 15 — Integration, Quality and Release Readiness
 
