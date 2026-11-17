@@ -17,6 +17,10 @@ diagnostics = (APP / "DeviceIntelligenceActivity.kt").read_text(encoding="utf-8"
 score = (APP / "ReadinessScorePolicy.kt").read_text(encoding="utf-8")
 dashboard = (APP / "MainActivity.kt").read_text(encoding="utf-8")
 engine = (APP / "ProtectionEngine.kt").read_text(encoding="utf-8")
+camera_capture = (APP / "CameraEvidenceCapture.kt").read_text(encoding="utf-8")
+camera_vault = (APP / "CameraEvidenceVault.kt").read_text(encoding="utf-8")
+camera_policy = (APP / "CameraEvidencePolicy.kt").read_text(encoding="utf-8")
+settings = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
 
 checks = {
     "orderly shutdown is observed only through the dynamically registered system receiver":
@@ -92,6 +96,22 @@ checks = {
         and "integritySnapshot()" in diagnostics and "verifyIntegrity(this)" in diagnostics,
     "dependency map and emergency recovery guide are available":
         "FEATURE DEPENDENCY MAP" in diagnostics and "showEmergencyRecoveryGuide" in diagnostics,
+    "front-camera photo evidence runs only after successful visible owner authentication":
+        "CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this)" in dashboard
+        and "OwnerAuthenticationCoordinator.complete(this, proof)" in dashboard
+        and dashboard.index("OwnerAuthenticationCoordinator.complete(this, proof)") < dashboard.index("CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this)")
+        and "Lifecycle.State.STARTED" in camera_capture,
+    "front-camera capture is explicitly owner-enabled and permission-gated":
+        "Enable front-camera photo evidence?" in settings
+        and "requestCameraEvidencePermission.launch(Manifest.permission.CAMERA)" in settings
+        and "CameraEvidencePolicy.shouldCapture(true, permissionGranted, true, visible)" in camera_capture,
+    "camera photo files are encrypted and integrity checked with bounded retention":
+        "AES/GCM/NoPadding" in camera_vault and "AndroidKeyStore" in camera_vault
+        and "sha256(plaintext) != entry.sha256" in camera_vault
+        and "MAX_IMAGES = 20" in camera_policy and "RETENTION_MS = 30L" in camera_policy,
+    "front-camera photos can be viewed, exported and deleted":
+        "showCameraEvidenceArchive" in settings and "exportCameraEvidence.launch" in settings
+        and "CameraEvidenceVault.delete(this, entry.id)" in settings and "CameraEvidenceVault.deleteAll(this)" in settings,
     "dashboard has a double-size shield and horizontal navigation":
         "dp(136), dp(136)" in dashboard and "HorizontalScrollView" in dashboard and "navigationRow" in dashboard,
     "four Batch 2 destinations appear between the local-security header and live shield":
