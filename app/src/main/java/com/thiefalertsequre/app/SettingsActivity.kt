@@ -53,6 +53,12 @@ class SettingsActivity : FragmentActivity() {
     private val importEvidenceBackup = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri -> if (uri != null) promptEvidenceBackupPassword("Decrypt evidence backup") { password -> restoreEvidenceBackup(uri, password) } }
+    private val exportConfigurationBackup = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri -> if (uri != null) promptEvidenceBackupPassword("Encrypt app configuration backup") { password -> writeConfigurationBackup(uri, password) } }
+    private val importConfigurationBackup = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) promptEvidenceBackupPassword("Decrypt app configuration backup") { password -> restoreConfigurationBackup(uri, password) } }
     private val requestEvidenceLocation = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
@@ -523,6 +529,24 @@ class SettingsActivity : FragmentActivity() {
                 .setPositiveButton("Choose backup") { _, _ -> importEvidenceBackup.launch(arrayOf("application/octet-stream", "*/*")) }
                 .showThemed(this)
         })
+        root.addView(space(14))
+        root.addView(text("ENCRYPTED CONFIGURATION BACKUP", 11f, R.color.tas_primary, true))
+        root.addView(space(6))
+        root.addView(text(
+            "Backs up allowlisted owner settings with password-derived AES-GCM encryption. It excludes authentication secrets, protection/alarm state, Device Owner policies, permission grants, Bluetooth identities, custom audio URI grants, and the separate evidence vault.",
+            12f, R.color.tas_muted
+        ))
+        root.addView(action("Export encrypted app configuration") {
+            exportConfigurationBackup.launch("ThiefAlertSeQure-configuration.tascfg")
+        })
+        root.addView(action("Restore encrypted app configuration") {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Restore owner settings?")
+                .setMessage("This restores only supported app preferences. It does not restore authentication secrets, permissions, evidence, custom audio files, Bluetooth device identities, or the active protection/alarm state. Existing settings are retained if validation or a write fails.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Choose backup") { _, _ -> importConfigurationBackup.launch(arrayOf("application/octet-stream", "*/*")) }
+                .showThemed(this)
+        })
         root.addView(action("Save last-known GPS location (optional, owner-requested)") {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Save a location snapshot?")
@@ -892,6 +916,94 @@ class SettingsActivity : FragmentActivity() {
                 render()
             }
         }
+    }
+
+    private fun writeConfigurationBackup(uri: Uri, password: CharArray) {
+        ioExecutor.execute {
+            val result = runCatching {
+                val bytes = ConfigurationBackup.encrypt(this, password)
+                contentResolver.openOutputStream(uri)?.use { stream ->
+                    stream.write(bytes)
+                    stream.flush()
+                } ?: error("Android could not open the selected configuration backup destination.")
+                bytes.size
+            }.also { password.fill('\u0000') }
+            runOnUiThread {
+                android.widget.Toast.makeText(
+                    this,
+                    result.fold({ "Encrypted configuration backup exported (${it} bytes)." }, { "Configuration backup export failed: ${it.message}" }),
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    private fun restoreConfigurationBackup(uri: Uri, password: CharArray) {
+        ioExecutor.execute {
+            val result = runCatching {
+                val bytes = contentResolver.openInputStream(uri)?.use { input ->
+                    val output = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(4_096)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        require(output.size() + count <= 128_000) { "Configuration backup file is too large." }
+                        output.write(buffer, 0, count)
+                    }
+                    output.toByteArray()
+                } ?: error("Android could not open the selected configuration backup file.")
+                ConfigurationBackup.decryptAndRestore(this, bytes, password)
+            }.also { password.fill('\u0000') }
+            runOnUiThread {
+                result.onSuccess { count ->
+                    applyRestoredConfiguration()
+                    android.widget.Toast.makeText(
+                        this, "Restored $count supported owner settings. Authentication, permissions, evidence, and active protection state were left unchanged.",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                    render()
+                }.onFailure { error ->
+                    android.widget.Toast.makeText(
+                        this, "Configuration restore failed: ${error.message}",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun applyRestoredConfiguration() {
+        val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+        val monitorEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
+        if (monitorEnabled) {
+            if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED) {
+                PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Owner restored configuration backup")
+            }
+            runCatching {
+                ContextCompat.startForegroundService(
+                    this, Intent(this, ProtectionMonitorService::class.java).setAction(ProtectionMonitorService.ACTION_REFRESH)
+                )
+            }
+        } else {
+            runCatching {
+                ContextCompat.startForegroundService(
+                    this,
+                    Intent(this, ProtectionMonitorService::class.java)
+                        .setAction(ProtectionMonitorService.ACTION_STOP)
+                        .putExtra(ProtectionMonitorService.EXTRA_STOP_PREFERENCE_COMMITTED, true)
+                )
+            }
+        }
+        if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+            runCatching {
+                ContextCompat.startForegroundService(
+                    this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_REFRESH_OUTPUTS)
+                )
+            }
+        }
+        if (::root.isInitialized) ThemeRuntime.apply(this, root)
     }
 
     private fun requestFreshEvidenceLocation() {
