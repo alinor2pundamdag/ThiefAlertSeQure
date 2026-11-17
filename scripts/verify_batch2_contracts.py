@@ -89,6 +89,9 @@ checks = {
         and "fun replaceAll(context" in vault,
     "diagnostics export is user initiated":
         "Export redacted diagnostics report (JSON)" in diagnostics and "CreateDocument" in diagnostics,
+    "redacted diagnostics export only event codes, never free-form event details":
+        "eventCodeFromLine" in diagnostics
+        and "eventCodeFromLine" in (APP / "LocalTamperHistoryPolicy.kt").read_text(encoding="utf-8"),
     "readiness score labels itself as non-guarantee":
         "not a security/integrity guarantee" in score and "PROTECTION READINESS SCORE" in diagnostics,
     "device intelligence reports OEM/background restriction, Doze, and standby bucket states":
