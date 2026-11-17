@@ -41,6 +41,12 @@ class SettingsActivity : FragmentActivity() {
     private val exportEvents = registerForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         if (uri != null) exportHistory(uri)
     }
+    private val requestEvidenceLocation = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        if (grants.values.any { it }) saveLastKnownEvidenceLocation()
+        else android.widget.Toast.makeText(this, "Location permission was not granted; no location was saved.", android.widget.Toast.LENGTH_LONG).show()
+    }
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { renderStatus() }
@@ -414,8 +420,24 @@ class SettingsActivity : FragmentActivity() {
                 .setPositiveButton("Close", null)
                 .showThemed(this)
         })
+        root.addView(action("Save last-known GPS location (optional, owner-requested)") {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Save a location snapshot?")
+                .setMessage("Only after you grant location permission, the app reads one cached Android location fix and saves its coordinates, provider, accuracy, and fix age into the encrypted local evidence vault. No background tracking, continuous updates, cloud upload, or automatic location capture occurs. A cached fix may be old or unavailable.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Continue") { _, _ ->
+                    if (EvidenceLocationCapture.hasPermission(this)) {
+                        saveLastKnownEvidenceLocation()
+                    } else {
+                        requestEvidenceLocation.launch(arrayOf(
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ))
+                    }
+                }.showThemed(this)
+        })
         root.addView(text(
-            "This archive contains app-observed event metadata only. It does not contain camera images, GPS coordinates, microphone recordings, PINs, passwords, or biometric material.",
+            "The archive contains app-observed event metadata and only the location snapshots you explicitly request. It does not contain camera images, microphone recordings, PINs, passwords, or biometric material.",
             12f, R.color.tas_muted
         ))
         root.addView(space(22))
@@ -679,6 +701,27 @@ class SettingsActivity : FragmentActivity() {
         val name = file.name.orEmpty().lowercase()
         return listOf(".mp3", ".m4a", ".aac", ".wav", ".ogg", ".opus", ".flac", ".3gp", ".amr")
             .any { name.endsWith(it) }
+    }
+
+    private fun saveLastKnownEvidenceLocation() {
+        val snapshot = EvidenceLocationCapture.readLastKnown(this)
+        if (snapshot == null) {
+            android.widget.Toast.makeText(this, "No cached location fix is available. No location was saved.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        val saved = LocalEvidenceVault.record(
+            this,
+            "owner_requested_location_snapshot",
+            snapshot.toVaultDetail()
+        )
+        val ageSeconds = snapshot.fixAgeMs / 1_000L
+        android.widget.Toast.makeText(
+            this,
+            if (saved) "Location snapshot saved (${snapshot.classification}, ${ageSeconds}s old, ±${snapshot.accuracyMeters ?: "?"}m)."
+            else "The encrypted location snapshot could not be saved.",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+        if (saved) render()
     }
 
     private fun exportHistory(uri: Uri) {
