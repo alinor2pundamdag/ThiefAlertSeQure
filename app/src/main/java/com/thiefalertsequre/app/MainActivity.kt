@@ -175,7 +175,37 @@ class MainActivity : FragmentActivity() {
         root.addView(label("Protection that stays\non this device.", 30f, getColor(R.color.tas_text), true).markAsPageHeading(), matchWrap())
         root.addView(space(8))
         root.addView(label("LOCAL SECURITY  •  NO ACCOUNT  •  NO BACKEND", 10f, getColor(R.color.tas_muted), true), matchWrap())
-        root.addView(space(24))
+        var hardeningAnchor: View? = null
+        var authenticationEvidenceAnchor: View? = null
+
+        // The four roadmap destinations sit between the local-security header
+        // and the live shield, keeping the primary protection state immediately
+        // below the navigation while retaining native horizontal swipe access.
+        val navigationScroll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+        }
+        val navigationRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        navigationRow.addView(outlinedButton("Hardening & Reliability") {
+            hardeningAnchor?.let { scroll.smoothScrollTo(0, it.top) }
+        })
+        navigationRow.addView(horizontalSpace(6))
+        navigationRow.addView(outlinedButton("Authentication & Evidence") {
+            authenticationEvidenceAnchor?.let { scroll.smoothScrollTo(0, it.top) }
+        })
+        navigationRow.addView(horizontalSpace(6))
+        navigationRow.addView(outlinedButton("Device Intelligence") {
+            startActivity(Intent(this, DeviceIntelligenceActivity::class.java))
+        })
+        navigationRow.addView(horizontalSpace(6))
+        navigationRow.addView(outlinedButton("More / About") {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        })
+        navigationScroll.addView(navigationRow)
+        root.addView(navigationScroll, matchWrap())
+        root.addView(space(16))
 
         val statusCard = card()
         val statusContent = column()
@@ -199,34 +229,6 @@ class MainActivity : FragmentActivity() {
         root.addView(statusCard, matchWrap())
         root.addView(space(12))
 
-        // Compact, horizontally swipeable destinations keep the primary
-        // protection dashboard focused while exposing the major app areas.
-        val navigationScroll = HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-        }
-        val navigationRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        navigationRow.addView(outlinedButton("Protection") { scroll.smoothScrollTo(0, 0) })
-        navigationRow.addView(horizontalSpace(6))
-        navigationRow.addView(outlinedButton("Bluetooth") {
-            startActivity(Intent(this, BluetoothCenterActivity::class.java))
-        })
-        navigationRow.addView(horizontalSpace(6))
-        navigationRow.addView(outlinedButton("Device") {
-            startActivity(Intent(this, DeviceIntelligenceActivity::class.java))
-        })
-        navigationRow.addView(horizontalSpace(6))
-        navigationRow.addView(outlinedButton("Settings") {
-            startActivity(Intent(this, SettingsActivity::class.java))
-        })
-        navigationRow.addView(horizontalSpace(6))
-        navigationRow.addView(outlinedButton("Theme") {
-            startActivity(Intent(this, ThemeActivity::class.java))
-        })
-        navigationScroll.addView(navigationRow)
-        root.addView(navigationScroll, matchWrap())
         root.addView(space(20))
 
         root.addView(sectionTitle("DEVICE INTELLIGENCE"), matchWrap())
@@ -250,7 +252,9 @@ class MainActivity : FragmentActivity() {
         root.addView(intelligenceCard, matchWrap())
         root.addView(space(20))
 
-        root.addView(sectionTitle("OWNER AUTHENTICATION"), matchWrap())
+        val authenticationTitle = sectionTitle("OWNER AUTHENTICATION")
+        authenticationEvidenceAnchor = authenticationTitle
+        root.addView(authenticationTitle, matchWrap())
         root.addView(space(10))
         biometricButton = button("Use fingerprint or supported strong face") { authenticateBiometric() }
         credentialButton = outlinedButton("Use device PIN, pattern or password") { authenticateDeviceCredential() }
@@ -265,11 +269,16 @@ class MainActivity : FragmentActivity() {
         root.addView(credentialButton, matchWrap())
         root.addView(space(4))
         root.addView(cancelButton, matchWrap())
+        root.addView(space(8))
+        root.addView(outlinedButton("Review authentication & tamper evidence") {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }, matchWrap())
         root.addView(space(24))
 
         root.addView(sectionTitle("DEVICE HARDENING"), matchWrap())
         root.addView(space(10))
         val hardeningCard = card()
+        hardeningAnchor = hardeningCard
         val hardeningContent = column()
         hardeningContent.setPadding(dp(16), dp(16), dp(16), dp(16))
         hardeningContent.addView(label("Managed-device lockdown", 17f, getColor(R.color.tas_text), true), matchWrap())
