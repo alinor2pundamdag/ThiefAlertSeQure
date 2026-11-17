@@ -127,6 +127,9 @@ class AlarmService : Service() {
     private fun requestToneAudioFocus() {
         val audio = getSystemService(AudioManager::class.java)
         audioManager = audio
+        if (!AlarmVolumeController.raiseToMaximum(this, audio)) {
+            LocalTamperHistory.record(this, "alarm_volume_raise_unconfirmed", "Built-in tone startup continued, but maximum alarm-stream volume was not confirmed")
+        }
         val attributes = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_ALARM)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
