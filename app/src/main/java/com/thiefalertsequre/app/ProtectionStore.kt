@@ -8,6 +8,11 @@ data class ProtectionStoreUpdateResult(
     val persisted: Boolean
 )
 
+data class ProtectionStoreIntegrity(
+    val protectionStateHealthy: Boolean,
+    val authenticationThrottleHealthy: Boolean
+)
+
 class ProtectionStore internal constructor(
     context: Context,
     private val commitEditor: (SharedPreferences.Editor) -> Boolean
@@ -20,6 +25,20 @@ class ProtectionStore internal constructor(
     private var throttleCorruptionDetected = false
 
     fun read(): ProtectionState = synchronized(LOCK) { readUnlocked() }
+
+    /** Read-only health snapshot; does not clear corruption latches or disarm protection. */
+    fun integritySnapshot(): ProtectionStoreIntegrity = synchronized(LOCK) {
+        readUnlocked()
+        readThrottleUnlocked(
+            System.currentTimeMillis(),
+            ProtectionClock.elapsedRealtime(),
+            ProtectionClock.bootCount(appContext)
+        )
+        ProtectionStoreIntegrity(
+            protectionStateHealthy = !stateCorruptionDetected,
+            authenticationThrottleHealthy = !throttleCorruptionDetected
+        )
+    }
 
     fun write(state: ProtectionState): Boolean = synchronized(LOCK) {
         readUnlocked()
