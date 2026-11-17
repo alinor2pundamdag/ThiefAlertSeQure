@@ -194,6 +194,8 @@ if not permission_request or "ProtectionMode.ALARM_TRIGGERED" not in permission_
     errors.append("Notification permission must be deferred during active alarm recovery and requested afterward")
 if "requestNotificationPermissionIfNeeded()" not in main_activity:
     errors.append("Dashboard and resume lifecycle must re-check notification permission readiness")
+if "private val privacyRecoveryPoll" not in main_activity or "ProtectionMode.ALARM_TRIGGERED" not in main_activity or "removeCallbacks(privacyRecoveryPoll)" not in main_activity:
+    errors.append("An alarm starting while the first-run privacy notice is visible must surface owner recovery and stop its foreground poll")
 if "device_credential_launch_failed" not in main_activity:
     errors.append("Device credential launch failures must be handled without terminating the active alarm")
 if "Android access not granted" not in settings_activity or "Open access settings" not in settings_activity:
