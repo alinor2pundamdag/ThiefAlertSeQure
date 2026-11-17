@@ -209,19 +209,19 @@ class MainActivity : FragmentActivity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         navigationRow.addView(outlinedButton("Protection") { scroll.smoothScrollTo(0, 0) })
-        navigationRow.addView(space(6))
+        navigationRow.addView(horizontalSpace(6))
         navigationRow.addView(outlinedButton("Bluetooth") {
             startActivity(Intent(this, BluetoothCenterActivity::class.java))
         })
-        navigationRow.addView(space(6))
+        navigationRow.addView(horizontalSpace(6))
         navigationRow.addView(outlinedButton("Device") {
             startActivity(Intent(this, DeviceIntelligenceActivity::class.java))
         })
-        navigationRow.addView(space(6))
+        navigationRow.addView(horizontalSpace(6))
         navigationRow.addView(outlinedButton("Settings") {
             startActivity(Intent(this, SettingsActivity::class.java))
         })
-        navigationRow.addView(space(6))
+        navigationRow.addView(horizontalSpace(6))
         navigationRow.addView(outlinedButton("Theme") {
             startActivity(Intent(this, ThemeActivity::class.java))
         })
@@ -1040,6 +1040,7 @@ class MainActivity : FragmentActivity() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
     private fun matchWrap() = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
     private fun space(height: Int) = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dp(height)) }
+    private fun horizontalSpace(width: Int) = View(this).apply { layoutParams = LinearLayout.LayoutParams(dp(width), 1) }
 
     private fun column() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
