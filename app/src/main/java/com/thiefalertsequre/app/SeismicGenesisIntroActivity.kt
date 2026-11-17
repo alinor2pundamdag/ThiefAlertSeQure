@@ -41,6 +41,13 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val replay = intent.getBooleanExtra(EXTRA_REPLAY, false)
+        val protectionMode = ProtectionStore(this).read().mode
+        if (protectionMode != ProtectionMode.DISARMED) {
+            if (replay) Toast.makeText(this, "Intro replay is unavailable while protection is active.", Toast.LENGTH_LONG).show()
+            else openMain()
+            finish()
+            return
+        }
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
         if (!replay && SafePreferences.boolean(prefs, KEY_COMPLETED, false)) {
             openMain()

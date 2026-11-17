@@ -1,5 +1,6 @@
 package com.thiefalertsequre.app
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
 import android.service.quicksettings.Tile
@@ -12,6 +13,7 @@ class ProtectionQuickSettingsTile : TileService() {
         syncTile()
     }
 
+    @SuppressLint("StartActivityAndCollapseDeprecated")
     override fun onClick() {
         super.onClick()
         val launch = packageManager.getLaunchIntentForPackage(packageName)

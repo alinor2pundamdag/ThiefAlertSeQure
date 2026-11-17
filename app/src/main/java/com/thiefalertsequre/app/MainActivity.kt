@@ -71,7 +71,10 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val introPrefs = getSharedPreferences("batch_three_intro_v1", MODE_PRIVATE)
-        if (!SafePreferences.boolean(introPrefs, "completed", false)) {
+        val introCompleted = SafePreferences.boolean(introPrefs, "completed", false)
+        val protectionModeAtLaunch = ProtectionStore(this).read().mode
+        // Never let a cosmetic first-run sequence delay an active countdown or owner authentication.
+        if (!introCompleted && protectionModeAtLaunch == ProtectionMode.DISARMED) {
             startActivity(Intent(this, SeismicGenesisIntroActivity::class.java))
             finish()
             return

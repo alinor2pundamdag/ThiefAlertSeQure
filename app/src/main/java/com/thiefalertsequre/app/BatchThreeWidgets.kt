@@ -11,6 +11,7 @@ import android.widget.RemoteViews
 /** Seven read-only widget choices share one authoritative state projection. */
 abstract class BaseProtectionWidgetProvider : AppWidgetProvider() {
     protected abstract val widgetTitle: String
+    protected abstract val widgetLayout: Int
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         super.onUpdate(context, manager, ids)
@@ -46,7 +47,7 @@ abstract class BaseProtectionWidgetProvider : AppWidgetProvider() {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val committed = prefs.edit().putLong(KEY_LAST_UPDATE, now).commit()
         val stale = !integrity.protectionStateHealthy || !committed
-        val views = RemoteViews(context.packageName, R.layout.widget_protection_status)
+        val views = RemoteViews(context.packageName, widgetLayout)
         views.setTextViewText(R.id.widget_title, title)
         views.setTextViewText(R.id.widget_status, modeLabel)
         views.setTextViewText(R.id.widget_detail, detail)
@@ -89,13 +90,34 @@ abstract class BaseProtectionWidgetProvider : AppWidgetProvider() {
     }
 }
 
-class ProtectionWidgetCompact : BaseProtectionWidgetProvider() { override val widgetTitle = "Protection" }
-class ProtectionWidgetStatus : BaseProtectionWidgetProvider() { override val widgetTitle = "Protection Status" }
-class ProtectionWidgetShield : BaseProtectionWidgetProvider() { override val widgetTitle = "Shield Status" }
-class ProtectionWidgetWide : BaseProtectionWidgetProvider() { override val widgetTitle = "Protection Overview" }
-class ProtectionWidgetCountdown : BaseProtectionWidgetProvider() { override val widgetTitle = "Charger Countdown" }
-class ProtectionWidgetAlarm : BaseProtectionWidgetProvider() { override val widgetTitle = "Alarm Status" }
-class ProtectionWidgetMonitor : BaseProtectionWidgetProvider() { override val widgetTitle = "Monitor Status" }
+class ProtectionWidgetCompact : BaseProtectionWidgetProvider() {
+    override val widgetTitle = "Protection"
+    override val widgetLayout = R.layout.widget_protection_compact
+}
+class ProtectionWidgetStatus : BaseProtectionWidgetProvider() {
+    override val widgetTitle = "Protection Status"
+    override val widgetLayout = R.layout.widget_protection_status
+}
+class ProtectionWidgetShield : BaseProtectionWidgetProvider() {
+    override val widgetTitle = "Shield Status"
+    override val widgetLayout = R.layout.widget_protection_compact
+}
+class ProtectionWidgetWide : BaseProtectionWidgetProvider() {
+    override val widgetTitle = "Protection Overview"
+    override val widgetLayout = R.layout.widget_protection_large
+}
+class ProtectionWidgetCountdown : BaseProtectionWidgetProvider() {
+    override val widgetTitle = "Charger Countdown"
+    override val widgetLayout = R.layout.widget_protection_status
+}
+class ProtectionWidgetAlarm : BaseProtectionWidgetProvider() {
+    override val widgetTitle = "Alarm Status"
+    override val widgetLayout = R.layout.widget_protection_status
+}
+class ProtectionWidgetMonitor : BaseProtectionWidgetProvider() {
+    override val widgetTitle = "Monitor Status"
+    override val widgetLayout = R.layout.widget_protection_compact
+}
 
 object BatchThreeUiBridge {
     fun refresh(context: Context) {
