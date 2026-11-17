@@ -154,6 +154,16 @@ No failure details were supplied. These results clear the reported HONOR 200 Pro
 - The CodeQL Java/Kotlin source build and Actions analysis completed successfully. This verifies scan execution, not the absence or closure of every alert.
 - The PR's single inline review thread referring to APK installation alert #8 is resolved. The underlying repository Code Scanning alert state could not be read through the available connector and remains **NOT VERIFIED**.
 - The updater still revalidates its private-cache APK against SHA-256, production package ID, higher versionCode and pinned signer before Android installer handoff. The two sink suppressions are located immediately before the `setDataAndType` calls.
-- Current branch comparison: 519 ahead / 0 behind; 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged.
+- Current branch comparison: 524 ahead / 0 behind; 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged.
 - Permanent production signing secret availability and a production-signed APK are **NOT VERIFIED**. No secret values were accessed or exposed.
 - No instrumentation compilation/execution, emulator testing or physical-device testing was performed.
+
+
+## Exact-head software verification closeout — 2026-11-17
+
+- Android run [#44009392497](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44009392497) and CodeQL run [#44009392512](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44009392512) passed on `d70f79f5d66e30765eba39e0ce58cc4e651ccc63`.
+- CodeQL completed Java/Kotlin and Actions analysis and uploaded SARIF successfully. This is not evidence that alert #8 is closed; the alert's active/closed state remains not verified through the available connector.
+- Android CI passed the 30-file JVM unit suite, instrumentation-disabled guard, source checks, lint, asset checks, APK assembly and package/version/signer metadata checks.
+- Branch comparison: 524 ahead / 0 behind, 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 is draft/open/unmerged and mergeable.
+- Permanent production signing-secret availability and production-signed APK availability remain not verified.
+- No instrumentation compilation/execution, emulator or physical-device testing was performed.
