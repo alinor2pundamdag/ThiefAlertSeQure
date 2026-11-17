@@ -24,6 +24,7 @@ internal object CameraEvidenceVault {
     private const val IV_BYTES = 12
     private const val TAG_BITS = 128
     private const val DIRECTORY = "camera_evidence"
+    private val keyLock = Any()
 
     data class Entry(
         val id: String,
@@ -67,9 +68,12 @@ internal object CameraEvidenceVault {
         return entry
     }
 
+    @Synchronized
     fun entries(context: Context): List<Entry> {
+        val app = context.applicationContext
+        pruneExpired(app)
         val now = System.currentTimeMillis()
-        return (readIndex(context.applicationContext) ?: emptyList())
+        return (readIndex(app) ?: emptyList())
             .filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
             .takeLast(CameraEvidencePolicy.MAX_IMAGES)
             .asReversed()
@@ -117,8 +121,10 @@ internal object CameraEvidenceVault {
         return allDeleted
     }
 
+    @Synchronized
     fun verifyIntegrity(context: Context): Boolean {
         val app = context.applicationContext
+        pruneExpired(app)
         val entries = readIndex(app) ?: return false
         val indexedFiles = entries.map { "${it.id}.aesgcm" }.toSet()
         val actualFiles = evidenceDirectory(app).listFiles().orEmpty()
@@ -192,27 +198,43 @@ internal object CameraEvidenceVault {
         val iv = payload.copyOfRange(1, 1 + ivSize)
         val ciphertext = payload.copyOfRange(1 + ivSize, payload.size)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(TAG_BITS, iv))
+        cipher.init(Cipher.DECRYPT_MODE, getExistingKey(), GCMParameterSpec(TAG_BITS, iv))
         cipher.updateAAD(id.toByteArray(Charsets.UTF_8))
         return cipher.doFinal(ciphertext)
     }
 
-    private fun getOrCreateKey(): SecretKey {
+    private fun getOrCreateKey(): SecretKey = synchronized(keyLock) {
         val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
-        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
-        generator.init(
-            KeyGenParameterSpec.Builder(
-                KEY_ALIAS,
-                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+        (keyStore.getKey(KEY_ALIAS, null) as? SecretKey) ?: run {
+            val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+            generator.init(
+                KeyGenParameterSpec.Builder(
+                    KEY_ALIAS,
+                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+                )
+                    .setKeySize(256)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setRandomizedEncryptionRequired(true)
+                    .build()
             )
-                .setKeySize(256)
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setRandomizedEncryptionRequired(true)
-                .build()
-        )
-        return generator.generateKey()
+            generator.generateKey()
+        }
+    }
+
+    private fun getExistingKey(): SecretKey {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        return keyStore.getKey(KEY_ALIAS, null) as? SecretKey
+            ?: throw IllegalStateException("Camera evidence encryption key is missing; existing photos cannot be decrypted.")
+    }
+
+    private fun pruneExpired(context: Context) {
+        val entries = readIndex(context) ?: return
+        val now = System.currentTimeMillis()
+        val retained = entries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
+        if (retained.size != entries.size && writeIndex(context, retained)) {
+            removeUnreferencedFiles(context, retained)
+        }
     }
 
     private fun evidenceDirectory(context: Context): File =
