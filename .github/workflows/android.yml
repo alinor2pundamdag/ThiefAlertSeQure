@@ -428,6 +428,7 @@ jobs:
           ANDROID_API_LEVEL: ${{ matrix.api-level }}
         with:
           api-level: ${{ matrix.api-level }}
+          system-image-api-level: ${{ matrix.api-level == 37 && '37.0' || matrix.api-level }}
           target: google_apis
           arch: x86_64
           profile: pixel_5
