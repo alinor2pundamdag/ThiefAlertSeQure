@@ -29,6 +29,14 @@ class NotificationSetupStatusPolicyTest {
     }
 
     @Test
+    fun minimumProtectionChannelRequiresOwnerActionForStatusBarVisibility() {
+        assertEquals(
+            SetupState.ACTION_REQUIRED,
+            NotificationSetupStatusPolicy.monitorChannel(NotificationManager.IMPORTANCE_MIN).state
+        )
+    }
+
+    @Test
     fun availableProtectionChannelIsVerified() {
         assertEquals(
             SetupState.VERIFIED,
