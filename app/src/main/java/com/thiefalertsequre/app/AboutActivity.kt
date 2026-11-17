@@ -2,6 +2,7 @@ package com.thiefalertsequre.app
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
 import android.content.Intent
 import android.content.pm.PackageInfo
@@ -234,29 +235,35 @@ class AboutActivity : FragmentActivity() {
         }
         var colorCycle = 0
         var lastStep = -1
-        developerGlowAnimator = ValueAnimator.ofInt(0, activeLetters.lastIndex).apply {
+        val colorEvaluator = ArgbEvaluator()
+        developerGlowAnimator = ValueAnimator.ofFloat(0f, activeLetters.lastIndex.toFloat()).apply {
             duration = activeLetters.size * 260L
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.RESTART
             interpolator = LinearInterpolator()
             addUpdateListener { animation ->
-                val step = animation.animatedValue as Int
+                val progress = animation.animatedValue as Float
+                val step = progress.toInt().coerceIn(0, activeLetters.lastIndex)
+                val stageIndex = step % 7 // A through G, then repeat.
+                val nextStageIndex = (stageIndex + 1) % 7
+                val startColor = lightColors[(colorCycle * 7 + stageIndex) % lightColors.size]
+                val endColor = lightColors[(colorCycle * 7 + nextStageIndex) % lightColors.size]
+                val fraction = (progress - step).coerceIn(0f, 1f)
+                val glowColor = colorEvaluator.evaluate(fraction, startColor, endColor) as Int
                 if (step != lastStep) {
                     lastStep = step
-                    val stageIndex = step % 7 // A through G, then repeat.
-                    val color = lightColors[(colorCycle * 7 + stageIndex) % lightColors.size]
                     val letterIndex = activeLetters[step]
                     val styled = SpannableString(developerCreditText).apply {
                         setSpan(
-                            ForegroundColorSpan(color),
+                            ForegroundColorSpan(glowColor),
                             letterIndex,
                             letterIndex + 1,
                             Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
                         )
                     }
                     developerCredit.text = styled
-                    developerCredit.setShadowLayer(dp(12).toFloat(), 0f, 0f, color)
                 }
+                developerCredit.setShadowLayer(dp(12).toFloat(), 0f, 0f, glowColor)
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationRepeat(animation: Animator) {
