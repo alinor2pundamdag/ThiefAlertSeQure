@@ -25,7 +25,11 @@ object LocalTamperHistory {
             is PreferenceRead.Corrupt -> return
         }
         val next = LocalTamperHistoryPolicy.append(existing, line)
-        prefs.edit().putString(KEY_EVENTS, next).commit()
+        if (prefs.edit().putString(KEY_EVENTS, next).commit()) {
+            // The encrypted archive is secondary evidence; failure never changes
+            // the authoritative protection state or blocks alarm delivery.
+            runCatching { LocalEvidenceVault.record(context, safeEvent, safeDetail) }
+        }
     }
 
     fun read(context: Context, limit: Int = 100): List<String> =
@@ -39,7 +43,10 @@ object LocalTamperHistory {
             LocalTamperHistoryPolicy.newestFirst(value, limit)
         }
 
-    fun clear(context: Context): Boolean =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    fun clear(context: Context): Boolean {
+        val historyCleared = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().remove(KEY_EVENTS).commit()
+        val evidenceCleared = LocalEvidenceVault.deleteAll(context)
+        return historyCleared && evidenceCleared
+    }
 }
