@@ -37,7 +37,11 @@ object LocalEvidenceVault {
         val offset = TimeZone.getDefault().getOffset(now) / 60_000
         val entry = Entry(now, offset, safeEvent, safeDetail, digest(now, offset, safeEvent, safeDetail))
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val existing = readEntries(prefs.getString(KEY_PAYLOAD, null)) ?: return false
+        val raw = when (val stored = SafePreferences.readString(prefs, KEY_PAYLOAD, null)) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> return false
+        }
+        val existing = readEntries(raw) ?: return false
         val retained = (existing.filter { now - it.timestampEpochMs in 0..RETENTION_MS } + entry)
             .takeLast(MAX_RECORDS)
         val encoded = JSONArray().apply {
