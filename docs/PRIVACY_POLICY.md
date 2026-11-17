@@ -23,6 +23,7 @@ The app stores only the operational information needed to provide its functions:
 - The user's privacy-notice choice and the time it was recorded.
 - The previous alarm-stream volume while an alarm is active, so it can be restored after successful disarm.
 - A bounded local protection event history (up to 100 entries), which the owner can review or export as CSV.
+- A separate AES-GCM encrypted local evidence metadata vault (up to 100 records, 30-day retention). It stores app-observed event metadata and only location snapshots explicitly requested by the owner.
 - Monitor preferences such as enablement, motion sensitivity and optional battery-alert threshold.
 - Trusted Bluetooth accessory names and MAC addresses selected by the owner, plus the per-device connection-baseline and revision data used by A2. The registry payload and baselines are encrypted locally with an Android Keystore-backed AES-GCM key; identifiers are not uploaded.
 - The owner's local preference for enabling or disabling the alarm flashlight.
@@ -41,11 +42,12 @@ Depending on Android version and the user's choices, the app may use:
 - Boot-completed and charger-connected/disconnected broadcasts to recover protection state and detect charging changes.
 - Alarm scheduling; precise alarm access is a special Android setting on supported versions.
 - Notifications and foreground services while protection monitoring or an alarm is active.
-- Bluetooth Connect permission on Android 12+ when the owner selects already-paired trusted accessories for A2. The app does not scan, advertise, or request location permission for this workflow.
+- Bluetooth Connect permission on Android 12+ when the owner selects already-paired trusted accessories for A2. The app does not scan or advertise. This workflow does not use location permission.
+- Optional coarse and fine location permissions only after the owner explicitly selects “Save last-known GPS location”. The app reads one cached Android location fix, labels it recent/stale using its fix age, records reported accuracy/provider, and stores it in the encrypted local evidence vault. No background location permission, continuous tracking, geofencing, or automatic location capture is used. If no cached fix is available, nothing is saved.
 - No Android RANGING permission is requested for the optional Android 16+ capability check. The app registers only the local `RangingManager` availability callback; it does not discover peers, create a ranging session, measure distance, or access precise location. Android requires RANGING permission for session creation, but this app does not create sessions.
 - Alarm-stream volume control to temporarily raise the alarm volume and restore the previous level after successful disarm.
 - Android CameraManager torch control, enabled by default, to pulse a compatible device LED only while the alarm is latched. This API does not request CAMERA permission, open the camera for capture, or collect images/video. Flash hardware is optional and may be unavailable or temporarily busy.
-- Android's Storage Access Framework document/folder picker to read audio files explicitly selected by the owner and to write an event-history CSV only when the owner chooses an export destination.
+- Android's Storage Access Framework document/folder picker to read audio files explicitly selected by the owner and to write event/evidence CSV only when the owner chooses an export destination.
 - Internet access for an owner-initiated HTTPS request to the official ThiefAlertSeQure GitHub Releases endpoint. The app downloads the release APK and its SHA-256 checksum only after the owner taps **Check for official updates**. It verifies the checksum, package ID, version code, and pinned release signing certificate before opening Android's installer.
 - Device Owner / Lock Task APIs only if the device has been separately provisioned as a fully managed device and the user explicitly enables managed mode.
 
@@ -63,7 +65,7 @@ Operational preferences remain in the app's private storage until changed by the
 
 ## 7. User choice
 
-The first-launch notice explains local data handling, alarm behavior, optional flashlight behavior and platform limitations. The optional local ranging capability check is available separately in Device Intelligence and does not request an additional permission. The owner acknowledges the notice with “I understand & continue”; that acknowledgement is stored locally. The notice can be reviewed again from Settings.
+The first-launch notice explains local data handling, alarm behavior, optional flashlight behavior, the explicitly owner-requested cached-location snapshot, and platform limitations. The optional local ranging capability check is available separately in Device Intelligence and does not request an additional permission. The owner acknowledges the notice with “I understand & continue”; that acknowledgement is stored locally. The notice can be reviewed again from Settings.
 
 ## 8. Limitations
 
