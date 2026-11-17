@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.View
 import android.widget.LinearLayout
+import android.widget.NumberPicker
 import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
@@ -34,6 +35,8 @@ class SettingsActivity : FragmentActivity() {
     private val previewToneHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var previewToneController: AlarmToneController? = null
     private var previewToneStopRunnable: Runnable? = null
+    private var flashPreviewController: AlarmFlashController? = null
+    private var flashPreviewStopRunnable: Runnable? = null
     private var pendingUpdateInstall: AppUpdateResult.Ready? = null
     private val pickSoundFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) validateAndSaveSound(uri, soundSlot, uri)
@@ -215,6 +218,26 @@ class SettingsActivity : FragmentActivity() {
             }
             render()
         })
+        root.addView(space(6))
+        val flashSpeed = AlarmFlashPatternPolicy.speedPercent(this)
+        root.addView(action("Flash speed: $flashSpeed% (tap to cycle)") {
+            val speeds = listOf(50, 75, 100, 125, 150, 200)
+            val current = AlarmFlashPatternPolicy.speedPercent(this)
+            val next = speeds[(speeds.indexOf(current).coerceAtLeast(0) + 1) % speeds.size]
+            if (AlarmFlashPatternPolicy.saveSpeedPercent(this, next)) {
+                LocalTamperHistory.record(this, "alarm_flash_speed_changed", "Flash cadence set to $next percent")
+            }
+            render()
+        })
+        root.addView(space(6))
+        val customTiming = AlarmFlashPatternPolicy.customTimings(this)
+        root.addView(action("Custom flash timing: ON ${customTiming.first} ms / OFF ${customTiming.second} ms") {
+            showCustomFlashTimingDialog()
+        })
+        root.addView(space(6))
+        root.addView(action("Preview selected flash pattern (5 seconds)") { previewFlashPattern() })
+        root.addView(space(6))
+        root.addView(action("Check flashlight hardware availability") { checkFlashHardware() })
         root.addView(space(22))
 
         root.addView(text("SYSTEM ACCESS & PERMISSIONS", 11f, R.color.tas_primary, true))
@@ -894,6 +917,91 @@ class SettingsActivity : FragmentActivity() {
         }
     }
 
+    private fun showCustomFlashTimingDialog() {
+        val current = AlarmFlashPatternPolicy.customTimings(this)
+        val values = (2..40).map { "${it * 50} ms" }.toTypedArray()
+        val onPicker = NumberPicker(this).apply {
+            minValue = 2
+            maxValue = 40
+            displayedValues = values
+            value = (current.first / 50L).toInt().coerceIn(2, 40)
+            wrapSelectorWheel = false
+            contentDescription = "Custom flash ON duration"
+        }
+        val offPicker = NumberPicker(this).apply {
+            minValue = 2
+            maxValue = 40
+            displayedValues = values
+            value = (current.second / 50L).toInt().coerceIn(2, 40)
+            wrapSelectorWheel = false
+            contentDescription = "Custom flash OFF duration"
+        }
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(20), dp(8), dp(20), dp(8))
+            addView(onPicker, LinearLayout.LayoutParams(0, dp(150), 1f))
+            addView(offPicker, LinearLayout.LayoutParams(0, dp(150), 1f))
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Custom flash cadence")
+            .setMessage("Choose independent ON and OFF durations. Values are stored locally and applied on the next alarm start.")
+            .setView(layout)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Save") { _, _ ->
+                val saved = AlarmFlashPatternPolicy.saveCustomTimings(
+                    this, onPicker.value * 50L, offPicker.value * 50L
+                )
+                android.widget.Toast.makeText(
+                    this,
+                    if (saved) "Custom flash timing saved." else "Could not save custom flash timing.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                if (saved) {
+                    AlarmFlashPatternPolicy.save(this, AlarmFlashPattern.CUSTOM)
+                    render()
+                }
+            }
+            .showThemed(this)
+    }
+
+    private fun previewFlashPattern() {
+        if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+            android.widget.Toast.makeText(this, "Flash preview is unavailable during an active alarm; the alarm owns the torch.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        stopFlashPreview()
+        val controller = AlarmFlashController(this, previewToneHandler) { _, _ -> }
+        if (!controller.hasFlashHardware()) {
+            android.widget.Toast.makeText(this, "No compatible flashlight hardware is available on this device.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        if (!controller.start()) {
+            android.widget.Toast.makeText(this, "Android could not start the flashlight. Another camera app, thermal limit, or OEM policy may be using it.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        flashPreviewController = controller
+        val stop = Runnable { stopFlashPreview() }
+        flashPreviewStopRunnable = stop
+        previewToneHandler.postDelayed(stop, 5_000L)
+    }
+
+    private fun checkFlashHardware() {
+        val available = AlarmFlashController(this, previewToneHandler) { _, _ -> }.hasFlashHardware()
+        android.widget.Toast.makeText(
+            this,
+            if (available) "A compatible camera LED / torch was detected. Actual access can still be denied while another app or thermal policy owns it."
+            else "No compatible camera LED / torch was detected.",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+    }
+
+    private fun stopFlashPreview() {
+        flashPreviewStopRunnable?.let(previewToneHandler::removeCallbacks)
+        flashPreviewStopRunnable = null
+        flashPreviewController?.stop()
+        flashPreviewController = null
+    }
+
     private fun previewSound(slot: String) {
         if (slot == AlarmSoundStore.ALARM && AlarmSoundStore.uri(this, slot) == null) {
             val preset = AlarmSoundStore.selectedBuiltInPreset(this)
@@ -971,11 +1079,13 @@ class SettingsActivity : FragmentActivity() {
 
     override fun onPause() {
         stopPreview()
+        stopFlashPreview()
         super.onPause()
     }
 
     override fun onDestroy() {
         stopPreview()
+        stopFlashPreview()
         ioExecutor.shutdown()
         super.onDestroy()
     }
@@ -1002,7 +1112,7 @@ class SettingsActivity : FragmentActivity() {
         val device = AndroidDeviceCompatibility.deviceSummary(
             Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.VERSION.RELEASE, Build.VERSION.SDK_INT
         )
-        return "$device\n$alarm\n$notifications\n$batteryUnrestricted\nMinimum supported Android: 6.0 (API 23)"
+        return "$device\n$alarm\n$notifications\n$batteryUnrestricted\nMinimum supported Android: 8.0 (API 26)"
     }
 
 
