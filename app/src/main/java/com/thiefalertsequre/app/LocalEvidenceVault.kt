@@ -117,6 +117,16 @@ object LocalEvidenceVault {
         }.getOrDefault(false)
     }
 
+    /** Read-only integrity check that distinguishes an empty vault from a corrupt one. */
+    fun verifyIntegrity(context: Context): Boolean {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val raw = when (val value = SafePreferences.readString(prefs, KEY_PAYLOAD, null)) {
+            is PreferenceRead.Value -> value.value
+            is PreferenceRead.Corrupt -> return false
+        }
+        return raw == null || readEntries(raw) != null
+    }
+
     fun read(context: Context, limit: Int = MAX_RECORDS): List<Entry> {
         require(limit in 1..MAX_RECORDS)
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
