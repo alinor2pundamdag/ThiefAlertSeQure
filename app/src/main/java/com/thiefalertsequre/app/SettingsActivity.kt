@@ -521,6 +521,11 @@ class SettingsActivity : FragmentActivity() {
             listOf("No recorded protection events yet.")
         }.joinToString("\n")
         root.addView(text(historyText, 12f, R.color.tas_text))
+        root.addView(space(6))
+        root.addView(text(
+            "This readable event list is a convenience log. Integrity-checked encrypted event metadata is stored separately in the evidence vault below.",
+            11f, R.color.tas_muted
+        ))
         root.addView(space(8))
         root.addView(action("Export local event history (CSV)") {
             exportEvents.launch("thiefalertsequre-events.csv")
@@ -604,10 +609,31 @@ class SettingsActivity : FragmentActivity() {
         })
         root.addView(space(8))
         val evidenceEntries = LocalEvidenceVault.read(this, 100)
+        val localEvidenceIntegrity = runCatching {
+            LocalEvidenceVault.verifyIntegrity(this)
+        }.getOrDefault(false)
         root.addView(text(
-            "${evidenceEntries.size} encrypted local event records • 30-day retention • no cloud upload",
+            "${evidenceEntries.size} encrypted local event records • 30-day retention • AES-GCM integrity ${if (localEvidenceIntegrity) "VERIFIED" else "FAILED / UNKNOWN"} • no cloud upload",
             12f, R.color.tas_muted
         ))
+        root.addView(space(6))
+        root.addView(action("Verify local evidence integrity now") {
+            val eventIntegrity = runCatching {
+                LocalEvidenceVault.verifyIntegrity(this)
+            }.getOrDefault(false)
+            val photoIntegrity = runCatching {
+                CameraEvidenceVault.verifyIntegrity(this)
+            }.getOrDefault(false)
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Local evidence integrity")
+                .setMessage(
+                    "Encrypted event archive: ${if (eventIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}\n" +
+                    "Encrypted photo vault: ${if (photoIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}\n\n" +
+                    "A failed or unknown result means the affected archive should not be treated as verified. This check does not change protection or alarm state."
+                )
+                .setPositiveButton("Close", null)
+                .showThemed(this)
+        })
         root.addView(space(6))
         root.addView(action("Review encrypted evidence records") {
             val entries = LocalEvidenceVault.read(this, 100)
