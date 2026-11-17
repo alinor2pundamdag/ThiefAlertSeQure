@@ -304,8 +304,55 @@ class SettingsActivity : FragmentActivity() {
         root.addView(action("Preview selected secondary alert") { previewSound(AlarmSoundStore.ALERT) })
         root.addView(action("Stop audio preview") { stopPreview() })
         root.addView(space(6))
+        val secondaryEnabled = AlarmSoundStore.isSecondaryAlarmEnabled(this)
+        root.addView(action("Persistent secondary theft alarm: ${if (secondaryEnabled) "ON" else "OFF"}") {
+            val enable = !AlarmSoundStore.isSecondaryAlarmEnabled(this)
+            if (enable && AlarmSoundStore.uri(this, AlarmSoundStore.ALERT) == null) {
+                android.widget.Toast.makeText(this, "Choose a secondary alert audio file before enabling the persistent secondary alarm.", android.widget.Toast.LENGTH_LONG).show()
+            } else if (AlarmSoundStore.setSecondaryAlarmEnabled(this, enable)) {
+                if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                    runCatching {
+                        ContextCompat.startForegroundService(
+                            this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_REFRESH_OUTPUTS)
+                        )
+                    }
+                }
+                render()
+            } else {
+                android.widget.Toast.makeText(this, "Could not save the secondary alarm setting.", android.widget.Toast.LENGTH_LONG).show()
+            }
+        })
+        root.addView(space(6))
+        val hapticsEnabled = AlarmHapticsPolicy.isEnabled(this)
+        root.addView(action("Independent repeating vibration: ${if (hapticsEnabled) "ON" else "OFF"}") {
+            val enabled = !AlarmHapticsPolicy.isEnabled(this)
+            if (AlarmHapticsPolicy.setEnabled(this, enabled)) {
+                if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                    runCatching {
+                        ContextCompat.startForegroundService(
+                            this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_REFRESH_OUTPUTS)
+                        )
+                    }
+                }
+                render()
+            }
+        })
+        root.addView(space(6))
+        val hapticPattern = AlarmHapticsPolicy.readPattern(this)
+        root.addView(action("Vibration pattern: ${hapticPattern.label} (tap to cycle)") {
+            val next = AlarmHapticsPolicy.nextPattern(this)
+            if (next != hapticPattern && ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                runCatching {
+                    ContextCompat.startForegroundService(
+                        this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_REFRESH_OUTPUTS)
+                    )
+                }
+            }
+            render()
+        })
+        root.addView(space(6))
         root.addView(text(
-            "The main alarm selection is used for theft alarms. The secondary alert selection is used for the optional battery-threshold alert.",
+            "The main alarm selection drives the primary theft alarm. When enabled and configured, the secondary selection loops independently until the alarm is stopped. It is also used for the optional battery-threshold alert. Vibration has its own independent enable and pattern controls.",
             12f, R.color.tas_muted
         ))
         root.addView(space(18))
