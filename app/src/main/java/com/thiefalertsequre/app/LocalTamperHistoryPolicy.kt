@@ -20,10 +20,10 @@ internal object LocalTamperHistoryPolicy {
     }
 
     /** Export only the event code; never include free-form details in redacted diagnostics. */
-    fun eventCodeFromLine(line: String): String =
-        line.substringAfter("|", "").trim().substringBefore("|")
-            .filter { it.isLetterOrDigit() || it in "_- ." }
-            .take(48)
+    fun eventCodeFromLine(line: String): String {
+        val candidate = line.substringAfter("|", "").trim().substringBefore("|").trim()
+        return candidate.takeIf { it.matches(Regex("[A-Za-z0-9_-]{1,48}")) } ?: "unknown_event"
+    }
 
     fun newestFirst(existing: String, limit: Int = MAX_EVENTS): List<String> {
         val boundedLimit = limit.coerceIn(1, MAX_EVENTS)
