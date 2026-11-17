@@ -30,6 +30,10 @@ checks = {
         "AlarmFlashPatternPolicy.delayMs" in flash_controller and "AlarmFlashPatternPolicy.nextTorchState" in flash_controller,
     "optional flash failure remains independent of audio alarm":
         "Failure to access a flash unit never blocks or stops alarm audio" in alarm,
+    "severe thermal status suppresses flash while preserving alarm audio":
+        "THERMAL_STATUS_SEVERE" in alarm and "alarm_flash_thermal_suppressed" in alarm and "audio alarm continues" in alarm,
+    "built-in alarm tone preview is owner-initiated and time-bounded":
+        "previewBuiltInAlarmTone" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8") and "postDelayed(stop, 5_000L)" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8"),
     "encrypted evidence vault uses Android Keystore AES-GCM and bounded retention":
         "LocalPreferenceCipher.encrypt(PURPOSE" in vault and "MAX_RECORDS = 100" in vault and "RETENTION_MS" in vault,
     "event evidence writes are bounded asynchronous work":
