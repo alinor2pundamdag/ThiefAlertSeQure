@@ -394,7 +394,26 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             val notifications = NotificationManagerCompat.from(this).areNotificationsEnabled()
             val exactAlarm = Build.VERSION.SDK_INT < 31 || runCatching { alarmManager.canScheduleExactAlarms() }.getOrDefault(false)
             val secureLock = getSystemService(KeyguardManager::class.java).isDeviceSecure
-            val state = ProtectionStore(this).read()
+            val protectionStore = ProtectionStore(this)
+            val state = protectionStore.read()
+            val storeIntegrity = protectionStore.integritySnapshot()
+            val evidenceIntegrity = LocalEvidenceVault.verifyIntegrity(this)
+            val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+            val monitorProcessRunning = runCatching {
+                getSystemService(ActivityManager::class.java).getRunningServices(100)
+                    .any { it.service.className == ProtectionMonitorService::class.java.name }
+            }.getOrDefault(false)
+            val integritySignals = listOf(
+                IntegritySignal("Protection state storage", if (storeIntegrity.protectionStateHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 3),
+                IntegritySignal("Authentication throttle storage", if (storeIntegrity.authenticationThrottleHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
+                IntegritySignal("Encrypted evidence vault", if (evidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
+                IntegritySignal("Protection monitor runtime", when {
+                    !monitorEnabled -> IntegrityStatus.UNSUPPORTED
+                    monitorProcessRunning -> IntegrityStatus.VERIFIED
+                    else -> IntegrityStatus.FAILED
+                }, 2)
+            )
+            val integrityScore = ProtectionIntegrityPolicy.calculate(integritySignals)
             JSONObject().apply {
                 put("schemaVersion", 1)
                 put("generatedAtEpochMs", System.currentTimeMillis())
@@ -406,7 +425,14 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                 put("apiLevel", Build.VERSION.SDK_INT)
                 put("targetSdk", applicationInfo.targetSdkVersion)
                 put("protectionMode", state.mode.name)
-                put("monitorEnabled", SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED))
+                put("protectionStateStoreHealthy", storeIntegrity.protectionStateHealthy)
+                put("authenticationThrottleHealthy", storeIntegrity.authenticationThrottleHealthy)
+                put("evidenceVaultIntegrityHealthy", evidenceIntegrity)
+                put("monitorProcessCurrentlyConfirmed", monitorProcessRunning)
+                put("protectionIntegrityScorePercent", integrityScore.percent)
+                put("protectionIntegrityScorePoints", "${integrityScore.earnedPoints}/${integrityScore.possiblePoints}")
+                put("permissionChangeMonitoring", "Android permission and special-access snapshots are compared when the app resumes")
+                put("monitorEnabled", monitorEnabled)
                 put("monitorLastRecordedRunning", SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_RUNNING, false))
                 put("notificationsEnabled", notifications)
                 put("exactAlarmAvailable", exactAlarm)
