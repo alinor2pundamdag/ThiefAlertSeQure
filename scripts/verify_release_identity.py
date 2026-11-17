@@ -16,7 +16,7 @@ def capture(pattern: str, source: str, label: str) -> str:
     return match.group(1)
 
 gradle_package = capture(r'applicationId\s*=\s*"([^"]+)"', gradle, "Gradle applicationId")
-version_name = capture(r'^val appVersionName = "([^"]+)"
+version_name = capture(r'val appVersionName = "([^"]+)"', gradle, "Gradle appVersionName")
 policy_package = capture(r'EXPECTED_PACKAGE\s*=\s*"([^"]+)"', policy, "updater package constant")
 release_package = "com.thiefalertsequre.app"
 policy_cert = capture(r'EXPECTED_CERT_SHA256\s*=\s*"([0-9a-fA-F]{64})"', policy, "updater certificate")
