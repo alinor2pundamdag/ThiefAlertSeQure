@@ -36,6 +36,8 @@ checks = {
     "managed lockdown reads back all restrictions before reporting configured":
         "managedRestrictions.all { key -> isRestrictionApplied(dpm, admin, key) }" in managed
         and "Android did not confirm every managed user restriction" in managed,
+    "managed rollback verifies exact saved policies and emergency navigation by readback":
+        "snapshotReadbackMatches" in managed and "emergencyReadbackMatches" in managed,
     "seven named plus one custom flash pattern exist":
         all(f"{name}(" in flash for name in ("STEADY", "SLOW", "NORMAL", "FAST", "BURST", "SOS", "ALTERNATING", "CUSTOM")),
     "flash speed and custom ON/OFF cadence are persisted and applied by the torch controller":
