@@ -142,16 +142,20 @@ internal object CameraEvidenceCapture {
             if (entry == null) {
                 finish("camera_evidence_storage_failed", "Encrypted front-camera evidence could not be committed to local storage")
             } else {
-                LocalEvidenceVault.recordAsync(
-                    app,
-                    "front_camera_evidence_saved",
-                    "id=${entry.id}; sha256=${entry.sha256}; bytes=${entry.sizeBytes}; trigger=successful_owner_authentication"
-                )
-                LocalTamperHistory.record(
-                    app,
-                    "front_camera_evidence_saved",
-                    "Encrypted front-camera photo saved after successful owner authentication; id=${entry.id}; sha256=${entry.sha256}"
-                )
+                runCatching {
+                    LocalEvidenceVault.recordAsync(
+                        app,
+                        "front_camera_evidence_saved",
+                        "id=${entry.id}; sha256=${entry.sha256}; bytes=${entry.sizeBytes}; trigger=successful_owner_authentication"
+                    )
+                }
+                runCatching {
+                    LocalTamperHistory.record(
+                        app,
+                        "front_camera_evidence_saved",
+                        "Encrypted front-camera photo saved after successful owner authentication; id=${entry.id}; sha256=${entry.sha256}"
+                    )
+                }
                 notifyOwner(app, "Front-camera evidence saved securely.")
                 finish()
             }
