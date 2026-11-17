@@ -90,11 +90,11 @@ internal class AlarmFlashController(
         customTimings = AlarmFlashPatternPolicy.customTimings(context)
         pulseStep = 0
         return try {
-            cameraManager.registerTorchCallback(torchCallback, handler)
-            torchCallbackRegistered = true
             cameraManager.setTorchMode(selectedCamera, true)
             torchOn = true
             running = true
+            cameraManager.registerTorchCallback(torchCallback, handler)
+            torchCallbackRegistered = true
             handler.postDelayed(pulse, AlarmFlashSettings.ON_DURATION_MS)
             report("alarm_flash_started", "Camera LED pulsing while the theft alarm is latched")
             true
