@@ -114,9 +114,13 @@ checks = {
         "AES/GCM/NoPadding" in camera_vault and "AndroidKeyStore" in camera_vault
         and "sha256(plaintext) != entry.sha256" in camera_vault
         and "MAX_IMAGES = 20" in camera_policy and "RETENTION_MS = 30L" in camera_policy,
-    "front-camera photos can be viewed, exported and deleted":
+    "front-camera photos can be viewed, exported, deleted and integrity-checked":
         "showCameraEvidenceArchive" in settings and "exportCameraEvidence.launch" in settings
-        and "CameraEvidenceVault.delete(this, entry.id)" in settings and "CameraEvidenceVault.deleteAll(this)" in settings,
+        and "CameraEvidenceVault.delete(this, entry.id)" in settings and "CameraEvidenceVault.deleteAll(this)" in settings
+        and "CameraEvidenceVault.verifyIntegrity(this)" in settings,
+    "emergency recovery guide explains camera evidence failure boundaries":
+        "front-camera evidence is not saved" in diagnostics
+        and "camera failure never reverses alarm disarm" in diagnostics,
     "dashboard keeps the enlarged fixed-color shield above compact swipeable tabs":
         "dp(136), dp(136)" in dashboard and "val navigationScroll = HorizontalScrollView" in dashboard
         and dashboard.index("LIVE PROTECTION STATUS") < dashboard.index("val navigationScroll")
