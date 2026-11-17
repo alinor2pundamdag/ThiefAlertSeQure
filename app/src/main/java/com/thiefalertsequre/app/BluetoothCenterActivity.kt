@@ -1,0 +1,484 @@
+package com.thiefalertsequre.app
+
+import android.Manifest
+import android.app.ActivityManager
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
+import android.provider.Settings
+import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.fragment.app.FragmentActivity
+import androidx.core.content.ContextCompat
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import java.util.concurrent.Executors
+
+/** Dedicated, categorized Bluetooth capability center. Inspection is local and read-only. */
+class BluetoothCenterActivity : FragmentActivity() {
+    private lateinit var root: LinearLayout
+    private val ioExecutor = Executors.newSingleThreadExecutor()
+    private var enableAfterPermission = false
+    private var stopRangingQuery: (() -> Unit)? = null
+    private val connectPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            if (enableAfterPermission) enableA2() else showTrustedDevicePicker()
+        } else render()
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); render() }
+
+    override fun onResume() {
+        super.onResume()
+        // Re-read adapter, permission and trusted-device runtime state after Android Settings.
+        if (::root.isInitialized) render()
+    }
+
+    private fun render() {
+        val scroll = ScrollView(this).apply { isFillViewport = true; setBackgroundColor(getColor(R.color.tas_background)) }
+        root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(22), dp(20), dp(30)) }
+        scroll.addView(root)
+        root.addView(button("‹  Back") { finish() }, matchWrap())
+        root.addView(space(18))
+        root.addView(label("DEVICE CAPABILITY CENTER", 11f, R.color.tas_primary, true), matchWrap())
+        root.addView(space(6))
+        root.addView(label("Bluetooth", 30f, R.color.tas_text, true).markAsPageHeading(), matchWrap())
+        root.addView(space(8))
+        root.addView(label("Local controller inspection, Android API availability, peer requirements, and app implementation status. Opening this page does not scan, pair, stream, or modify anything.", 14f, R.color.tas_muted, false), matchWrap())
+        root.addView(space(16))
+
+        val snapshot = BluetoothCapabilityCatalog.snapshot(this)
+        val adapterState = when {
+            !snapshot.adapterAvailable -> "NO ADAPTER"
+            !snapshot.connectPermissionGranted -> "CONNECT PERMISSION REQUIRED"
+            snapshot.adapterEnabled == true -> "ADAPTER ON"
+            snapshot.adapterEnabled == false -> "ADAPTER OFF"
+            else -> "STATUS UNKNOWN"
+        }
+        addCard("THIS DEVICE", listOf(
+            "Android ${Build.VERSION.RELEASE} • API ${Build.VERSION.SDK_INT}",
+            "Bluetooth Classic: ${if (snapshot.classicHardware) "Detected" else "Not detected"}",
+            "Bluetooth LE: ${if (snapshot.bleHardware) "Detected" else "Not detected"}",
+            adapterState,
+            "Paired devices: ${snapshot.bondedDeviceCount?.toString() ?: "Not checked"}",
+            "Controller probes supported: ${snapshot.supportedCount} • Unknown: ${snapshot.unknownCount}"
+        ))
+        addTrustedDeviceSection()
+        if (!snapshot.connectPermissionGranted && Build.VERSION.SDK_INT >= 31) {
+            root.addView(button("Grant Bluetooth Connect permission") { connectPermission.launch(Manifest.permission.BLUETOOTH_CONNECT) }, matchWrap())
+            root.addView(space(8))
+        }
+        root.addView(button("Open Android Bluetooth settings") { AndroidDeviceCompatibility.open(this, Intent(Settings.ACTION_BLUETOOTH_SETTINGS), Intent(Settings.ACTION_SETTINGS)) }, matchWrap())
+        root.addView(space(8))
+        root.addView(button("Refresh device capabilities") { render() }, matchWrap())
+        root.addView(space(18))
+
+        val groups = listOf(
+            "Radio and connection" to snapshot.items.filter { it.name in listOf("Bluetooth Classic (BR/EDR)", "Bluetooth Low Energy (BLE)", "Bluetooth adapter", "Paired-device inventory", "Trusted-device ACL separation alert (A2)") },
+            "Controller and radio features" to snapshot.items.filter { it.name.startsWith("LE ") || it.name.startsWith("Multiple BLE") || it.name.startsWith("BLE offloaded") },
+            "Profiles and data transports" to snapshot.items.filter { it.name in listOf("GATT client", "GATT server", "RFCOMM / Serial Port Profile (SPP)", "LE L2CAP Connection-oriented Channels", "A2DP audio profile", "AVRCP media controls", "HFP / HSP hands-free", "HID keyboard / mouse", "PBAP / MAP / OPP / PAN") },
+            "Ranging and proximity" to snapshot.items.filter { it.name.contains("RSSI") || it.name.contains("Sounding") || it.name.contains("Direction Finding") || it.name.startsWith("UWB") || it.name.startsWith("Wi-Fi") },
+            "Root and restricted operations" to snapshot.items.filter { it.name.startsWith("Root ") || it.name.startsWith("Bluetooth firmware") || it.name.startsWith("Bluetooth profile data") }
+        )
+        groups.forEach { (title, items) ->
+            if (items.isNotEmpty()) {
+                root.addView(sectionTitle(title), matchWrap())
+                root.addView(space(8))
+                items.forEach { addCapabilityItem(it) }
+                root.addView(space(12))
+            }
+        }
+        if (Build.VERSION.SDK_INT >= 36) {
+            root.addView(sectionTitle("ADVANCED RANGING CHECK"), matchWrap())
+            root.addView(space(8))
+            addCard("Platform capability check", listOf(
+                "Android Ranging API is available from API 36. A platform query can report BLE Channel Sounding, BLE RSSI ranging, UWB, and Wi-Fi NAN RTT.",
+                "This check does not start a ranging session or measure distance. A compatible peer, setup, permissions, and hardware are still required."
+            ))
+            root.addView(button("Check actual ranging hardware capabilities") { checkRangingCapabilities() }, matchWrap())
+            root.addView(space(14))
+        }
+        root.addView(sectionTitle("ROOT-AWARE DIAGNOSTICS"), matchWrap())
+        root.addView(space(8))
+        val passive = RootCapabilityInspector.inspectPassive()
+        addCard("Passive root indicators", listOf(
+            when (passive.status) {
+                RootCapabilityInspector.RootStatus.NOT_INDICATED -> "No common indicators found (not proof of unrooted)"
+                RootCapabilityInspector.RootStatus.ROOT_INDICATORS_FOUND -> "Possible root indicators found; authorization not verified"
+                else -> passive.status.name
+            },
+            passive.detail,
+            "Root is optional. Diagnostics require an explicit action and remain read-only."
+        ))
+        root.addView(button("Verify root and collect read-only Bluetooth diagnostics") { confirmRootDiagnostics() }, matchWrap())
+        root.addView(space(18))
+        root.addView(label("Capability labels are conservative. SUPPORTED means the local device/controller reported support; it does not mean ThiefAlertSeQure has implemented a complete user workflow. Peer-dependent profiles require compatible accessories. Unsupported hardware cannot be enabled by software or root.", 12f, R.color.tas_muted, false), matchWrap())
+        setContentView(scroll)
+        AndroidDeviceCompatibility.applySystemBarInsets(scroll)
+        ThemeRuntime.apply(this, scroll)
+    }
+
+    private fun addTrustedDeviceSection() {
+        val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+        val registryRead = TrustedBluetoothRegistry.readResult(prefs)
+        val registryReadable = registryRead is PreferenceRead.Value
+        val devices = when (registryRead) {
+            is PreferenceRead.Value -> registryRead.value
+            is PreferenceRead.Corrupt -> emptyList()
+        }
+        val enabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+        val baselineCount = devices.count { TrustedBluetoothRegistry.isBaselineConnected(prefs, it.address) }
+        val baselineSummary = if (registryReadable) {
+            "Connection baselines confirmed: $baselineCount / ${devices.size}"
+        } else {
+            "Connection baselines: UNKNOWN"
+        }
+        val monitorEnabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        val monitorRunning = runCatching {
+            getSystemService(ActivityManager::class.java).getRunningServices(100)
+                .any { it.service.className == ProtectionMonitorService::class.java.name }
+        }.getOrDefault(false)
+        val protectionMode = ProtectionStore(this).read().mode
+        addCard("TRUSTED ACCESSORY SEPARATION ALERT (A2)", listOf(
+            "Feature: ${when {
+                !registryReadable && enabled -> "UNAVAILABLE — saved trust data unreadable"
+                enabled -> "ON"
+                else -> "OFF"
+            }}",
+            "Stored trusted-device data: ${if (registryReadable) "Readable" else "UNREADABLE — original data retained"}",
+            "Registered trusted accessories: ${devices.size}",
+            baselineSummary,
+            "Monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled by owner"}",
+            "Monitor runtime: ${if (monitorRunning) "Running" else "Not confirmed running"}",
+            "Protection state: $protectionMode",
+            "Monitoring runs only while A2 is ON and the protection monitor setting is enabled. The foreground service handles live ACL events; a manifest receiver covers ACL connect/disconnect events while its process is absent. Each registered accessory needs a fresh connection baseline; disconnect starts an 8-second grace period, and reconnect cancels its pending alert. Exact-alarm access improves the process-death deadline; without it Android uses an inexact fallback that may be delayed in Doze.",
+            "Unregistering removes only this app's trust. Android pairing remains unchanged.",
+            if (registryReadable) "" else "The encrypted trusted-device registry could not be read. Do not clear app data or re-register devices; resolve the storage/key issue first. A2 cannot be enabled safely."
+        ).filter { it.isNotBlank() })
+        root.addView(button("Add trusted paired device") { requestTrustedDevicePicker() }.apply {
+            isEnabled = registryReadable
+        }, matchWrap())
+        devices.forEach { device ->
+            root.addView(space(6))
+            root.addView(button("Unregister: ${device.name}") { confirmUnregister(device) }, matchWrap())
+        }
+        root.addView(space(7))
+        root.addView(button(if (enabled) "Disable trusted-device separation alert" else "Enable trusted-device separation alert") { toggleA2() }.apply {
+            isEnabled = registryReadable || enabled
+        }, matchWrap())
+        root.addView(space(14))
+    }
+
+    private fun confirmUnregister(device: TrustedBluetoothDevice) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Unregister trusted accessory?")
+            .setMessage("${device.name} will no longer be trusted by A2. It will remain paired in Android Bluetooth settings.")
+            .setNegativeButton("Keep registered", null)
+            .setPositiveButton("Unregister") { _, _ ->
+                val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+                val removed = runCatching {
+                    TrustedBluetoothRegistry.remove(prefs, device.address)
+                }.getOrDefault(false)
+                if (removed) {
+                    val deadlineCancelled = A2DisconnectScheduler.cancel(this, device.address)
+                    A2BluetoothReceiverController.sync(this)
+                    if (deadlineCancelled) {
+                        showResult("Accessory unregistered", "${device.name} is no longer trusted by A2. Android pairing was not changed.")
+                    } else {
+                        showResult("Accessory unregistered; cleanup needs attention", "${device.name} is no longer trusted. Its per-device revision invalidates any old deadline, but Android did not confirm that the stored deadline record was cleared.")
+                    }
+                } else {
+                    showResult("Unregister failed", "The trust record was not confirmed as removed. The existing record has been left unchanged where possible.")
+                }
+                render()
+            }
+            .showThemed(this)
+    }
+
+    private fun requestTrustedDevicePicker() {
+        if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            enableAfterPermission = false
+            connectPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+        } else showTrustedDevicePicker()
+    }
+
+    @Suppress("MissingPermission", "DEPRECATION")
+    private fun showTrustedDevicePicker() {
+        val adapter = getSystemService(BluetoothManager::class.java)?.adapter
+        if (adapter == null) {
+            showResult("Bluetooth unavailable", "This device does not expose a Bluetooth adapter.")
+            return
+        }
+        val enabled = runCatching { adapter.isEnabled }.getOrDefault(false)
+        if (!enabled) {
+            showResult("Turn on Bluetooth", "Turn on Bluetooth and pair your trusted accessory in Android Settings, then return here.")
+            AndroidDeviceCompatibility.open(this, Intent(Settings.ACTION_BLUETOOTH_SETTINGS), Intent(Settings.ACTION_SETTINGS))
+            return
+        }
+        val devices = runCatching { adapter.bondedDevices.toList().sortedBy { it.name ?: it.address } }.getOrDefault(emptyList())
+        if (devices.isEmpty()) {
+            showResult("No paired accessories", "Pair a watch, earbuds, or another trusted Bluetooth accessory in Android Settings first.")
+            AndroidDeviceCompatibility.open(this, Intent(Settings.ACTION_BLUETOOTH_SETTINGS), Intent(Settings.ACTION_SETTINGS))
+            return
+        }
+        val labels = devices.map { it.name?.takeIf { name -> name.isNotBlank() } ?: "Bluetooth accessory" }.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Select trusted paired accessory")
+            .setItems(labels) { _, which ->
+                val selected = devices[which]
+                val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+                val added = runCatching {
+                    TrustedBluetoothRegistry.add(
+                        prefs,
+                        selected.address,
+                        selected.name ?: "Bluetooth accessory"
+                    )
+                }.getOrDefault(false)
+                if (added) {
+                    showResult("Accessory registered", "${selected.name ?: "Bluetooth accessory"} was saved as an A2 trusted device. Reconnect it to establish a fresh connection baseline.")
+                } else {
+                    showResult("Registration failed", "The trusted-device record could not be saved. No success was reported.")
+                }
+                render()
+            }
+            .setNegativeButton("Cancel", null)
+            .showThemed(this)
+    }
+
+    private fun toggleA2() {
+        val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+        if (SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)) {
+            if (!prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).commit()) {
+                showResult("Could not disable A2", "Android did not confirm the preference change. The previous setting is retained.")
+                return
+            }
+            val deadlinesCleared = A2DisconnectScheduler.clearAll(this)
+            val baselinesCleared = runCatching {
+                TrustedBluetoothRegistry.clearBaselines(prefs)
+                true
+            }.getOrDefault(false)
+            A2BluetoothReceiverController.sync(this)
+            if (!baselinesCleared || !deadlinesCleared) {
+                showResult(
+                    "A2 disabled; cleanup needs attention",
+                    "The OFF setting was saved. " +
+                        if (!baselinesCleared && !deadlinesCleared) "The connection baseline and pending deadlines could not both be confirmed as cleared; source data was retained."
+                        else if (!baselinesCleared) "The connection baseline could not be cleared; source data was retained."
+                        else "Pending deadline cleanup could not be confirmed; callbacks still check the OFF setting and revision guards."
+                )
+            } else {
+                showResult("A2 disabled", "Trusted-device separation alerts are now off.")
+            }
+            render()
+            return
+        }
+        when (val registry = TrustedBluetoothRegistry.readResult(prefs)) {
+            is PreferenceRead.Corrupt -> {
+                showResult("Trusted-device data unavailable", "The encrypted registry could not be read. Its source was preserved. Do not clear app data; A2 remains OFF until the stored data can be recovered.")
+                return
+            }
+            is PreferenceRead.Value -> if (registry.value.isEmpty()) {
+                requestTrustedDevicePicker()
+                return
+            }
+        }
+        if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            enableAfterPermission = true
+            connectPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+            return
+        }
+        enableA2()
+    }
+
+    private fun enableA2() {
+        enableAfterPermission = false
+        val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+        when (val registry = TrustedBluetoothRegistry.readResult(prefs)) {
+            is PreferenceRead.Corrupt -> {
+                showResult("Trusted-device data unavailable", "The encrypted registry could not be read. Its source was preserved. Do not clear app data; A2 remains OFF until the stored data can be recovered.")
+                return
+            }
+            is PreferenceRead.Value -> if (registry.value.isEmpty()) {
+                showTrustedDevicePicker()
+                return
+            }
+        }
+        if (!SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
+            showResult("Protection monitor is disabled", "Enable the protection monitor from the main dashboard first. This Bluetooth alert uses the existing user-visible monitor and will not silently turn it back on.")
+            return
+        }
+        if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+            showResult("Alarm is active", "Do not change Bluetooth alert configuration while the theft alarm is active.")
+            return
+        }
+        if (!A2DisconnectScheduler.clearAll(this)) {
+            showResult("Could not enable A2", "Existing trusted-device deadlines could not be safely cleared. A2 remains OFF; resolve the stored schedule before retrying.")
+            return
+        }
+        if (!prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, true).commit()) {
+            showResult("Could not enable A2", "Android did not confirm that the ON setting was saved.")
+            return
+        }
+        val baselinesCleared = runCatching {
+            TrustedBluetoothRegistry.clearBaselines(prefs)
+            true
+        }.getOrDefault(false)
+        if (!baselinesCleared) {
+            val rolledBack = prefs.edit()
+                .putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+                .commit()
+            showResult(
+                "Could not enable A2",
+                "The trusted-device baseline could not be reset." +
+                    if (rolledBack) " A2 was rolled back to OFF." else " WARNING: the OFF rollback could not be saved; verify the setting before leaving this screen."
+            )
+            render()
+            return
+        }
+        if (!A2BluetoothReceiverController.sync(this)) {
+            val rolledBack = prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).commit()
+            A2BluetoothReceiverController.sync(this)
+            showResult("Could not enable A2", if (rolledBack) "The background Bluetooth receiver could not be enabled; A2 was rolled back to OFF." else "The Bluetooth receiver could not be enabled and the OFF rollback was not confirmed.")
+            render()
+            return
+        }
+        val started = runCatching {
+            ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
+            true
+        }.getOrElse {
+            val rolledBack = prefs.edit()
+                .putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+                .commit()
+            showResult(
+                "Could not start monitoring",
+                "${it.javaClass.simpleName}: ${it.message ?: "Android blocked the foreground service."}" +
+                    if (rolledBack) "\nA2 was rolled back to OFF." else "\nWARNING: the OFF rollback could not be saved."
+            )
+            A2BluetoothReceiverController.sync(this)
+            false
+        }
+        if (started) {
+            showResult("A2 enabled", "The ON setting was saved and service startup was requested. Check the runtime status shown on this screen; Android may still stop a foreground service.")
+        }
+        render()
+    }
+
+    private fun addCapabilityItem(item: BluetoothCapabilityCatalog.Item) {
+        val card = MaterialCardView(this).apply {
+            radius = dp(14).toFloat(); cardElevation = 0f; strokeWidth = dp(1)
+            strokeColor = getColor(R.color.tas_surface_variant); setCardBackgroundColor(getColor(R.color.tas_surface))
+        }
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(12), dp(14), dp(12)) }
+        content.addView(label(item.name, 15f, R.color.tas_text, true), matchWrap())
+        content.addView(space(5))
+        content.addView(label(stateLabel(item.state), 10f, stateColor(item.state), true), matchWrap())
+        content.addView(space(5))
+        content.addView(label(item.detail, 12f, R.color.tas_muted, false), matchWrap())
+        card.addView(content); root.addView(card, matchWrap()); root.addView(space(7))
+    }
+
+    private fun stateLabel(state: BluetoothCapabilityCatalog.State): String = when (state) {
+        BluetoothCapabilityCatalog.State.SUPPORTED_ON_DEVICE -> "SUPPORTED ON THIS DEVICE"
+        BluetoothCapabilityCatalog.State.API_PRESENT_CHECK_REQUIRED -> "API PRESENT • HARDWARE / SESSION CHECK REQUIRED"
+        BluetoothCapabilityCatalog.State.PEER_REQUIRED -> "COMPATIBLE PEER OR CONNECTION REQUIRED"
+        BluetoothCapabilityCatalog.State.PERMISSION_REQUIRED -> "PERMISSION REQUIRED"
+        BluetoothCapabilityCatalog.State.ADAPTER_OFF -> "BLUETOOTH ADAPTER IS OFF"
+        BluetoothCapabilityCatalog.State.HARDWARE_REQUIRED -> "SPECIAL CONTROLLER / ANTENNA HARDWARE REQUIRED"
+        BluetoothCapabilityCatalog.State.ROOT_ONLY -> "OWNER-AUTHORIZED ROOT DIAGNOSTICS ONLY"
+        BluetoothCapabilityCatalog.State.NOT_SUPPORTED -> "NOT SUPPORTED OR NOT DETECTED"
+        BluetoothCapabilityCatalog.State.NOT_IMPLEMENTED -> "NOT IMPLEMENTED BY THIS APP"
+        BluetoothCapabilityCatalog.State.UNKNOWN -> "UNKNOWN • COULD NOT VERIFY"
+    }
+    private fun stateColor(state: BluetoothCapabilityCatalog.State): Int = when (state) {
+        BluetoothCapabilityCatalog.State.SUPPORTED_ON_DEVICE -> R.color.tas_primary
+        BluetoothCapabilityCatalog.State.PERMISSION_REQUIRED, BluetoothCapabilityCatalog.State.ADAPTER_OFF, BluetoothCapabilityCatalog.State.UNKNOWN -> R.color.tas_warning
+        else -> R.color.tas_muted
+    }
+
+    private fun checkRangingCapabilities() {
+        if (Build.VERSION.SDK_INT < 36) {
+            showResult("Ranging unavailable", "The Android Ranging capability API requires Android 16 (API 36) or newer.")
+            return
+        }
+        queryRangingCapabilities()
+    }
+
+    @androidx.annotation.RequiresApi(36)
+    private fun queryRangingCapabilities() {
+        val query = RangingCapabilityQuery(this) { result ->
+            if (!isFinishing && !isDestroyed &&
+                lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+            ) {
+                showResult("Ranging capability results", result)
+            }
+        }
+        stopRangingQuery = { query.stop() }
+        if (!query.start()) stopRangingQuery = null
+    }
+
+    private fun confirmRootDiagnostics() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Run read-only root diagnostics?")
+            .setMessage("This runs 'su -c id' only after your confirmation. Your root manager may ask for approval. If authorized, the app reads Bluetooth service and system-property diagnostics. It will not change firmware, pairing, radio power, or system files.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Continue") { _, _ ->
+                ioExecutor.execute {
+                    val report = RootCapabilityInspector.verifyRootAuthorization()
+                    val diagnostics = if (report.isRootAuthorized) RootCapabilityInspector.collectBluetoothDiagnostics() else report.detail
+                    val output = buildString {
+                        append("Root status: ${report.status}\n${report.detail}")
+                        if (report.indicators.isNotEmpty()) append("\n\nIndicators:\n${report.indicators.joinToString("\n")}")
+                        append("\n\nREAD-ONLY BLUETOOTH DIAGNOSTICS\n$diagnostics")
+                    }.take(24000)
+                    runOnUiThread { if (!isFinishing && !isDestroyed && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) showResult("Device diagnostics", output) }
+                }
+            }.showThemed(this)
+    }
+
+    private fun showResult(title: String, message: String) {
+        val body = TextView(this).apply { text = message; textSize = 13f; setTextColor(getColor(R.color.tas_text)); setPadding(dp(18), dp(12), dp(18), dp(12)) }
+        val scroll = ScrollView(this).apply { addView(body) }
+        MaterialAlertDialogBuilder(this).setTitle(title).setView(scroll).setPositiveButton("Close", null).showThemed(this)
+    }
+
+    private fun addCard(title: String, lines: List<String>) {
+        val card = MaterialCardView(this).apply {
+            radius = dp(16).toFloat(); cardElevation = 0f; strokeWidth = dp(1)
+            strokeColor = getColor(R.color.tas_surface_variant); setCardBackgroundColor(getColor(R.color.tas_surface))
+        }
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(15), dp(14), dp(15), dp(14)) }
+        content.addView(label(title, 14f, R.color.tas_primary, true), matchWrap())
+        lines.forEach { content.addView(space(6)); content.addView(label(it, 13f, R.color.tas_text, false), matchWrap()) }
+        card.addView(content); root.addView(card, matchWrap()); root.addView(space(10))
+    }
+    private fun sectionTitle(value: String) = label(value.uppercase(), 11f, R.color.tas_primary, true)
+    private fun label(value: String, size: Float, color: Int, bold: Boolean) = TextView(this).apply {
+        text = value; textSize = size; setTextColor(getColor(color)); if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
+        setLineSpacing(dp(3).toFloat(), 1f)
+    }
+    private fun button(value: String, action: () -> Unit) = MaterialButton(this).apply { text = value; isAllCaps = false; minHeight = dp(48); setOnClickListener { action() } }
+    private fun space(height: Int) = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dp(height)) }
+    private fun matchWrap() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+    override fun onStop() {
+        stopRangingQuery?.invoke()
+        stopRangingQuery = null
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        stopRangingQuery?.invoke()
+        stopRangingQuery = null
+        ioExecutor.shutdownNow()
+        super.onDestroy()
+    }
+}

@@ -9,21 +9,23 @@ import androidx.core.content.ContextCompat
  * One owner-authentication completion path for in-app prompts and Android lockscreen unlocks.
  * Android performs credential/biometric verification; no credential material enters this app.
  */
-object OwnerAuthenticationCoordinator {
-    fun complete(context: Context, source: String): ProtectionState? {
+internal object OwnerAuthenticationCoordinator {
+    fun complete(context: Context, proof: OwnerAuthenticationProof): ProtectionState? {
         val appContext = context.applicationContext
         val store = ProtectionStore(appContext)
         if (store.read().mode != ProtectionMode.ALARM_TRIGGERED) return null
-
-        val authenticated = store.update {
-            ProtectionEngine.authenticated(it, System.currentTimeMillis())
+        val source = proof.source
+        if (!proof.isFresh(ProtectionClock.elapsedRealtime(), ProtectionClock.bootCount(appContext))) {
+            LocalTamperHistory.record(appContext, "owner_auth_proof_rejected", "Owner authentication proof was invalid, expired, or from another boot")
+            LocalEvidenceVault.recordAsync(appContext, "owner_auth_proof_rejected", "Owner authentication proof was invalid, expired, or from another boot")
+            return null
         }
+
+        val authenticated = store.disarmAfterOwnerAuthentication(System.currentTimeMillis()) ?: return null
         if (authenticated.mode != ProtectionMode.DISARMED) return null
 
+        AlarmRecoveryCoordinator.onAlarmDisarmed(appContext)
         store.resetAuthenticationFailures()
-        runCatching { AlarmScheduler.cancel(appContext) }.onFailure {
-            LocalTamperHistory.record(appContext, "deadline_cancel_after_auth_failed", it.javaClass.simpleName + ": " + it.message)
-        }
         appContext.stopService(Intent(appContext, AlarmService::class.java))
         val volumeRestored = runCatching {
             AlarmVolumeController.restore(
@@ -44,8 +46,8 @@ object OwnerAuthenticationCoordinator {
         val monitorPrefs = appContext.getSharedPreferences(
             ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
         )
-        val monitorEnabled = monitorPrefs.getBoolean(
-            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        val monitorEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
         val next = if (monitorEnabled) {
             PowerTransitionCoordinator.resetBaselineToCurrentPower(
@@ -78,6 +80,11 @@ object OwnerAuthenticationCoordinator {
             appContext,
             "owner_authenticated_alarm_stopped",
             "Authentication source: $source; resulting protection state: ${next.mode.name}"
+        )
+        LocalEvidenceVault.recordAsync(
+            appContext,
+            "owner_authenticated_alarm_stopped",
+            "source=$source; resultingProtectionMode=${next.mode.name}; alarmDisarmed=true"
         )
         return next
     }

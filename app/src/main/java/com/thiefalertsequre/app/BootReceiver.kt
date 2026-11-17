@@ -12,6 +12,13 @@ class BootReceiver : BroadcastReceiver() {
         // BOOT_COMPLETED is authoritative even on devices where Settings.Global.BOOT_COUNT
         // is unreadable. Invalidate the previous boot's charger baseline before processing
         // any later power event; package-update and exact-alarm callbacks preserve it.
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+            A2DisconnectScheduler.clearAll(context)
+            val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+            runCatching { TrustedBluetoothRegistry.clearBaselines(monitorPrefs) }
+                .onFailure { LocalTamperHistory.record(context, "a2_boot_baseline_reset_failed", it.javaClass.simpleName + ": " + it.message) }
+            A2BluetoothReceiverController.sync(context)
+        }
         PowerTransitionCoordinator.initializeBaseline(
             context,
             forceBootReconciliation = intent.action == Intent.ACTION_BOOT_COMPLETED
@@ -76,8 +83,7 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     private fun scheduleAlarmRecovery(context: Context, reason: String) {
-        val exactScheduled = AlarmScheduler.scheduleImmediateRecovery(context)
-        if (!exactScheduled) AlarmRecoveryNotice.show(context, reason)
+        AlarmRecoveryCoordinator.onStartFailure(context, reason)
     }
 
     private fun startMonitorIfNeeded(context: Context, state: ProtectionState, source: String) {
@@ -87,19 +93,37 @@ class BootReceiver : BroadcastReceiver() {
             ContextCompat.startForegroundService(context, Intent(context, ProtectionMonitorService::class.java))
         }.onFailure {
             LocalTamperHistory.record(context, "${source}_monitor_start_failed", it.javaClass.simpleName + ": " + it.message)
-            AlarmRecoveryNotice.show(context, "Background charger monitoring could not start; open the app to restore it")
+            ProtectionMonitorRecoveryNotice.show(context, "Background charger monitoring could not start; open the app to restore it")
         }
     }
 
     private fun enforceMonitorOptOut(context: Context): ProtectionState {
         if (monitorEnabled(context)) return ProtectionStore(context).read()
-        return ProtectionStore(context).update { current ->
-            if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
-            else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+        A2DisconnectScheduler.clearAll(context)
+        val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        runCatching { TrustedBluetoothRegistry.clearBaselines(monitorPrefs) }
+        A2BluetoothReceiverController.sync(context)
+        // Preserve the previous opt-out contract even when Android's sticky
+        // battery snapshot is temporarily unavailable.
+        val store = ProtectionStore(context)
+        val update = store.updatePersisted { current ->
+            ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
         }
+        if (!update.persisted) {
+            LocalTamperHistory.record(
+                context, "boot_monitor_opt_out_state_persist_failed",
+                "Monitor is disabled, but the protection state was not durably disarmed; the prior deadline and state remain authoritative"
+            )
+            return update.state
+        }
+        PowerTransitionCoordinator.resetBaselineToCurrentPower(context, "Protection monitor is disabled")
+        return store.read()
     }
 
     private fun monitorEnabled(context: Context): Boolean =
-        context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
-            .getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        SafePreferences.boolean(
+            context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE),
+            ProtectionMonitorService.KEY_ENABLED,
+            ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
 }

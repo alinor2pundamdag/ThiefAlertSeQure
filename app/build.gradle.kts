@@ -3,8 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val appVersionCode = 5
-val appVersionName = "1.1.3"
+val appVersionCode = 6
+val appVersionName = "1.1.4"
 
 val releaseSigningReady = listOf(
     "ANDROID_KEYSTORE_PATH",
@@ -23,7 +23,6 @@ android {
         // Increase this for every distributable update. Never reset it between releases.
         versionCode = appVersionCode
         versionName = appVersionName
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
         create("release") {
@@ -39,10 +38,17 @@ android {
         // Keep CI/device-test APKs side-by-side with the production installation.
         // This prevents debug builds from replacing the production package.
         getByName("debug") {
-            applicationIdSuffix = ".v113test"
+            applicationIdSuffix = ".v114test"
+
         }
         getByName("release") {
-            isMinifyEnabled = false
+            // Harden every distributable release build.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             // A release APK is signed only with the persistent owner-controlled key.
             if (releaseSigningReady) {
                 signingConfig = signingConfigs.getByName("release")
@@ -55,9 +61,21 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     androidResources { noCompress += "opus" }
-    testOptions { unitTests.isReturnDefaultValues = true }
+    testOptions {
+        testBuildType = "release"
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
+
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        variant.outputs.forEach { output ->
+            output.versionCode.set(6)
+            output.versionName.set("1.1.4-test")
+        }
+    }
+}
 
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
