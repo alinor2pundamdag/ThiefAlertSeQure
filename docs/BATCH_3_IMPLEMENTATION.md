@@ -42,7 +42,7 @@ This document records the implementation scope and integration boundaries for Ba
 - **There is no Skip Intro button or skip path.** Back navigation is consumed while the first-launch cinematic is active; it cannot silently bypass the intro or privacy acknowledgement.
 - Existing reduced-motion preference receives a short, static fallback. Existing optional audio/haptic preferences remain opt-in and do not gate the visual sequence.
 - First-launch completion is committed before navigating to the existing privacy-acceptance flow. A failed completion write is retried and never falsely marks the intro complete.
-- The intro is deferred while protection is armed, counting down, or alarm-triggered. It must never delay an active protection countdown or owner authentication.
+- The intro is deferred while protection is armed, counting down, or alarm-triggered. It must never delay an active protection countdown or owner authentication. If an alarm is already latched before privacy acknowledgement, the owner-authentication dashboard takes priority; the privacy notice remains mandatory for normal use but cannot cover alarm recovery.
 
 ## Cross-phase integration and invariants
 
