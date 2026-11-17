@@ -12,6 +12,7 @@ on:
   pull_request:
     branches:
       - main
+      - "work/**"
   schedule:
     - cron: "23 2 * * 1"
   workflow_dispatch:
