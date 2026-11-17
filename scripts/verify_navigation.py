@@ -114,11 +114,13 @@ settings_activity = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
 
 about_activity = (APP / "AboutActivity.kt").read_text(encoding="utf-8")
 for required in (
-    'developerCreditText = "Developed by Alinor Pundandag"',
+    'developerCreditText = "Developed by Alinor Pundamdag"',
     "setCardBackgroundColor(0xFF070B14.toInt())",
     "IntArray(20)",
     "ArgbEvaluator()",
     "stageIndex = step % 7",
+    "activeLetters.size * 1_000L",
+    "developerCredit.text = SpannableString(developerCreditText)",
     "repeatCount = ValueAnimator.INFINITE",
     "AppearanceStudioStore.reduceMotion(this)",
     "developerCredit.setShadowLayer(0f",
@@ -129,6 +131,26 @@ for required in (
 ):
     if required not in about_activity:
         errors.append("AboutActivity missing Batch Four developer/version/legal contract: " + required)
+
+intro_activity = (APP / "SeismicGenesisIntroActivity.kt").read_text(encoding="utf-8")
+for required in (
+    "ComposeView(this)", "SeismicGenesisIntroContent", "INTRO_DURATION_MS = 9_000",
+    "Alinor Pundamdag", "Developed By:", "Color(0xFFFF5252)",
+    "0xFF121212", "Matrix().apply", "GenesisFractureCanvas",
+    "repeatOnLifecycle(Lifecycle.State.RESUMED)"
+):
+    if required not in intro_activity:
+        errors.append("SeismicGenesisIntroActivity missing original cinematic intro contract: " + required)
+if "Skip intro" in intro_activity or "Skip the introduction" in intro_activity:
+    errors.append("SeismicGenesisIntroActivity must not contain an unrequested Skip Intro path")
+if "id(\"org.jetbrains.kotlin.plugin.compose\")" not in (ROOT / "app" / "build.gradle.kts").read_text(encoding="utf-8"):
+    errors.append("Seismic Genesis must use the requested Jetpack Compose implementation")
+for screen in ("ProtectionMonitorService.kt", "AlarmService.kt"):
+    source = (APP / screen).read_text(encoding="utf-8")
+    if ".setSmallIcon(R.drawable.ic_notification_shield)" not in source:
+        errors.append(screen + " must retain the dedicated monochrome status-bar shield icon")
+    if ".setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)" not in source:
+        errors.append(screen + " must request immediate foreground notification visibility")
 
 if (
     "LocalEvidenceVault.verifyIntegrity(this@SettingsActivity)" not in settings_activity
