@@ -44,6 +44,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        PermissionChangeMonitor.check(this)
         // Re-read permissions, platform capabilities and service status after Android Settings.
         if (::root.isInitialized) render()
     }
