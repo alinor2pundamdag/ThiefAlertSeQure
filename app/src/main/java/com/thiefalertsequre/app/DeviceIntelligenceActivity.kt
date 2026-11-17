@@ -7,6 +7,8 @@ import android.app.usage.UsageStatsManager
 import android.app.KeyguardManager
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
+import android.provider.Settings
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorManager
@@ -197,7 +199,12 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
         val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         val monitorRunning = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_RUNNING, false)
-        val protectionMode = ProtectionStore(this).read().mode
+        val monitorProcessRunning = runCatching {
+            getSystemService(ActivityManager::class.java).getRunningServices(100)
+                .any { it.service.className == ProtectionMonitorService::class.java.name }
+        }.getOrDefault(false)
+        val protectionStore = ProtectionStore(this)
+        val protectionMode = protectionStore.read().mode
         val btConnect = Build.VERSION.SDK_INT < 31 || checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
         val a2Enabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
         val dashboardEnabled = SafePreferences.boolean(getSharedPreferences(MainActivity.ALARM_DISPLAY_PREFS, MODE_PRIVATE), MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
@@ -251,6 +258,69 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             else "Needs attention: ${readinessScore.missing.joinToString("; ")}",
             "This is a transparent setup-readiness indicator, not a theft-prevention, security-integrity, or hardware reliability guarantee."
         ))
+        val storeIntegrity = protectionStore.integritySnapshot()
+        val evidenceIntegrity = LocalEvidenceVault.verifyIntegrity(this)
+        val integritySignals = listOf(
+            IntegritySignal("Protection state storage", if (storeIntegrity.protectionStateHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 3),
+            IntegritySignal("Owner-authentication throttle storage", if (storeIntegrity.authenticationThrottleHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
+            IntegritySignal("Encrypted evidence vault", if (evidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
+            IntegritySignal(
+                "Protection monitor runtime",
+                when {
+                    !monitorEnabled -> IntegrityStatus.UNSUPPORTED
+                    monitorProcessRunning -> IntegrityStatus.VERIFIED
+                    else -> IntegrityStatus.FAILED
+                }, 2
+            ),
+            IntegritySignal(
+                "Exact alarm access",
+                when {
+                    !monitorEnabled || Build.VERSION.SDK_INT < 31 -> IntegrityStatus.UNSUPPORTED
+                    exactAlarm -> IntegrityStatus.VERIFIED
+                    else -> IntegrityStatus.FAILED
+                }, 1
+            ),
+            IntegritySignal("Alarm notifications", if (notifications) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 1)
+        )
+        val integrityScore = ProtectionIntegrityPolicy.calculate(integritySignals)
+        addCard("PROTECTION INTEGRITY SCORE — ${integrityScore.percent}%", listOf(
+            "${integrityScore.earnedPoints} / ${integrityScore.possiblePoints} verified-component points",
+            "${integrityScore.verifiedCount} verified • ${integrityScore.failed.size} failed • ${integrityScore.unconfirmed.size} unconfirmed • ${integrityScore.unsupported.size} unsupported",
+            if (integrityScore.failed.isEmpty()) "No failed supported integrity checks were detected."
+            else "Failed: ${integrityScore.failed.joinToString("; ")}",
+            if (integrityScore.unconfirmed.isEmpty()) "No supported checks remain unconfirmed."
+            else "Unconfirmed: ${integrityScore.unconfirmed.joinToString("; ")}",
+            "Unsupported checks: ${integrityScore.unsupported.joinToString("; ").ifBlank { "None" }}",
+            "This score only reflects the listed checks the app can verify; it is not proof against tampering, root access, OEM restrictions, or hardware attacks."
+        ))
+        val a2Dependency = when {
+            !a2Enabled -> "OPTIONAL OFF"
+            !btConnect -> "ACTION REQUIRED — Bluetooth Connect permission"
+            else -> "OWNER ENABLED — trusted device and fresh baseline must remain verified"
+        }
+        val monitorDependency = when {
+            !monitorEnabled -> "OWNER DISABLED"
+            monitorProcessRunning -> "OPERATIONAL — process currently confirmed"
+            else -> "FAILED / NOT CONFIRMED — monitor process not found"
+        }
+        val gpsDependency = when {
+            !EvidenceLocationCapture.hasPermission(this) -> "OPTIONAL OFF — owner permission not granted"
+            else -> "AVAILABLE — owner-initiated one-shot location only"
+        }
+        val flashDependency = if (pm.hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)) {
+            "HARDWARE DECLARED — runtime torch access can still be interrupted by camera contention or thermal policy"
+        } else "UNSUPPORTED — no camera flash feature declared"
+        val dependencyMap = listOf(
+            "Charger protection → foreground monitor + power broadcasts + exact scheduling + notifications: $monitorDependency",
+            "Bluetooth separation (A2) → owner opt-in + paired trusted device + Bluetooth Connect + fresh baseline: $a2Dependency",
+            "Primary alarm → latched protection state + Android alarm audio; optional secondary audio and haptics have independent controls",
+            "Flash alert → camera torch hardware + Android torch service + thermal availability: $flashDependency",
+            "Evidence vault → Android Keystore AES-GCM + local storage + integrity-checked records: ${if (evidenceIntegrity) "OPERATIONAL" else "FAILED"}",
+            "GPS evidence → explicit owner action + coarse/fine location permission + one-shot provider fix: $gpsDependency",
+            "Managed hardening → Device Owner enrollment + Lock Task policy: ${if (ManagedProtectionController.isDeviceOwner(this)) "DEVICE OWNER PRESENT" else "OPTIONAL / NOT ENROLLED"}",
+            "Camera photo evidence → NOT ENABLED under the current no-camera-permission privacy boundary"
+        )
+        addCard("FEATURE DEPENDENCY MAP", dependencyMap)
         if (Build.VERSION.SDK_INT >= 36) {
             root.addView(button("Check Android ranging capabilities (optional)") { requestRangingCapabilityCheck() }, matchWrap())
             root.addView(space(6))
@@ -278,6 +348,8 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         ))
         rootButtonRow()
 
+        root.addView(button("Open emergency recovery guide") { showEmergencyRecoveryGuide() }, matchWrap())
+        root.addView(space(6))
         root.addView(button("Refresh device intelligence") { render() }, matchWrap())
         root.addView(space(8))
         root.addView(button("Export redacted diagnostics report (JSON)") {
@@ -290,6 +362,30 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         ThemeRuntime.apply(this, scroll)
     }
 
+
+    private fun showEmergencyRecoveryGuide() {
+        val guidance = listOf(
+            "1. If charger monitoring is not running: open Android App info, allow notifications, review battery/background restrictions, then reopen this app and refresh status.",
+            "2. If exact alarm access is unavailable: open Alarms & reminders for this app. Android may still delay alarms under OEM restrictions.",
+            "3. If an alarm is latched: only fresh Android owner authentication can disarm it. Do not clear app data or uninstall while evidence is needed.",
+            "4. If optional Device Owner lockdown is active: use the in-app managed-lockdown recovery action while the enrolled Device Owner remains available. Keep the original recovery snapshot intact.",
+            "5. If evidence or settings must be moved: restore the separate password-protected evidence backup or configuration backup. Configuration backup does not contain authentication secrets or permission grants.",
+            "6. If Android access changes: return to the app; permission-change snapshots are compared on resume and recorded locally.",
+            "7. Never assume a standard app can prevent hardware-forced shutdown, battery removal, bootloader/recovery controls, or factory reset."
+        ).joinToString("\n\n")
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Emergency recovery guide")
+            .setMessage(guidance)
+            .setNegativeButton("Close", null)
+            .setPositiveButton("Open App info") { _, _ ->
+                AndroidDeviceCompatibility.open(
+                    this,
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")),
+                    Intent(Settings.ACTION_SETTINGS)
+                )
+            }
+            .showThemed(this)
+    }
 
     private fun writeDiagnosticsReport(uri: android.net.Uri) {
         val report = runCatching {
