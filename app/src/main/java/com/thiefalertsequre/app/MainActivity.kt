@@ -431,7 +431,12 @@ class MainActivity : FragmentActivity() {
         reconcileCharging()
         ManagedProtectionController.startIfConfigured(this)
         if (!::status.isInitialized) {
-            if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) buildDashboard()
+            if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                buildDashboard()
+            } else {
+                window.decorView.removeCallbacks(privacyRecoveryPoll)
+                window.decorView.postDelayed(privacyRecoveryPoll, 500L)
+            }
             return
         }
         requestNotificationPermissionIfNeeded()
@@ -454,6 +459,7 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onPause() {
+        window.decorView.removeCallbacks(privacyRecoveryPoll)
         if (::status.isInitialized) status.removeCallbacks(ticker)
         super.onPause()
     }
