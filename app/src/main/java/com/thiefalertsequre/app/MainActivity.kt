@@ -66,7 +66,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         applyAlarmWindowPolicy()
 
-        val privacyDecision = SafePreferences.string(getSharedPreferences("privacy_notice_v4", MODE_PRIVATE), "decision", null)
+        val privacyDecision = SafePreferences.string(getSharedPreferences("privacy_notice_v5", MODE_PRIVATE), "decision", null)
         // Require acknowledgement of this updated notice on every existing
         // install once; it now discloses the optional alarm flashlight and its safety toggle.
         if (privacyDecision != "acknowledged") {
@@ -110,7 +110,7 @@ class MainActivity : FragmentActivity() {
         body.addView(label("Data and privacy", 18f, getColor(R.color.tas_text), true), matchWrap())
         body.addView(space(8))
         body.addView(label(
-            "The app does not require an account, analytics, advertising, or a cloud backend. Internet access is used only when you manually check for an official GitHub release and download its APK. The app does not upload protection state, event history, evidence, location, credentials, or other personal data. GitHub receives ordinary network request metadata, such as your request IP address, when you check for updates. Protection state, biometric-failure cooldown counters, a bounded local event history, monitor preferences, and an AES-GCM encrypted local evidence metadata vault are stored on this device. A cached location fix or one bounded current GPS/network location request (20-second timeout) is saved only after you explicitly request it and grant location permission. The encrypted evidence vault can be exported or restored only through a password-protected file you choose; the backup password is not stored. Selected audio remains with its Android document provider; the app retains only the access grant and URI. Your PIN, pattern, password, and biometric templates are never collected or stored by this app; Android performs verification.",
+            "The app does not require an account, analytics, advertising, or a cloud backend. Internet access is used only when you manually check for an official GitHub release and download its APK. The app does not upload protection state, event history, evidence, location, credentials, photos, or other personal data. GitHub receives ordinary network request metadata, such as your request IP address, when you check for updates. Protection state, biometric-failure cooldown counters, a bounded local event history, monitor preferences, and AES-GCM encrypted local evidence metadata are stored on this device. Optional front-camera photos are stored separately in an AES-GCM encrypted local vault only after explicit owner opt-in and successful Android owner authentication that disarms a latched alarm while this app is visible. A cached location fix or one bounded current GPS/network location request (20-second timeout) is saved only after you explicitly request it and grant location permission. The metadata evidence vault can be exported or restored only through a password-protected file you choose; camera photos can be exported individually. Backup passwords are not stored. Selected audio remains with its Android document provider; the app retains only the access grant and URI. Your PIN, pattern, password, and biometric templates are never collected or stored by this app; Android performs verification.",
             14f, getColor(R.color.tas_muted), false
         ), matchWrap())
         body.addView(space(16))
@@ -124,14 +124,14 @@ class MainActivity : FragmentActivity() {
         body.addView(label("Acknowledgement", 18f, getColor(R.color.tas_text), true), matchWrap())
         body.addView(space(6))
         body.addView(label(
-            "Review this notice before continuing. Tapping the button below records that you have acknowledged local event evidence, optional owner-requested location, password-protected backup, alarm behavior, optional flashlight alert, and Android platform limitations. You can review this notice again later in Settings.",
+            "Review this notice before continuing. Tapping the button below records that you have acknowledged local event evidence, optional owner-requested location, optional front-camera photo evidence after successful owner authentication, password-protected backup, alarm behavior, optional flashlight alert, and Android platform limitations. You can review this notice again later in Settings.",
             13f, getColor(R.color.tas_muted), false
         ), matchWrap())
         notice.addView(body)
         root.addView(notice, matchWrap())
         root.addView(space(22))
         root.addView(button("I understand & continue") {
-            getSharedPreferences("privacy_notice_v4", MODE_PRIVATE).edit()
+            getSharedPreferences("privacy_notice_v5", MODE_PRIVATE).edit()
                 .putString("decision", "acknowledged").putLong("decision_at", System.currentTimeMillis()).apply()
             buildDashboard()
         }, matchWrap())
