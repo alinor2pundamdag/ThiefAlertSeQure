@@ -14,7 +14,7 @@ import android.os.Handler
  * deliberately independent from this controller.
  */
 internal class AlarmFlashController(
-    context: Context,
+    private val context: Context,
     private val handler: Handler,
     private val onEvent: (String, String) -> Unit
 ) {
