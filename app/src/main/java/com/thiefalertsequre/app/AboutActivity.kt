@@ -309,7 +309,7 @@ class AboutActivity : FragmentActivity() {
         }
         val digests = signatures.orEmpty().map { signature ->
             MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
-                .joinToString("") { byte -> "%02x".format(byte) }
+                .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
         }
         val actual = digests.joinToString("\n") { formatFingerprint(it) }.ifBlank { "Unavailable" }
         val status = when {
