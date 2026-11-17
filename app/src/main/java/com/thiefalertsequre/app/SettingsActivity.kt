@@ -79,6 +79,12 @@ class SettingsActivity : FragmentActivity() {
         render()
     }
 
+    override fun onResume() {
+        super.onResume()
+        PermissionChangeMonitor.check(this)
+        if (::root.isInitialized) renderStatus()
+    }
+
     private fun render() {
         val scroll = ScrollView(this).apply {
             isFillViewport = true
