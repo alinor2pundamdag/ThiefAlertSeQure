@@ -44,6 +44,10 @@ checks = {
         and "AlarmHapticPattern.entries" in (APP / "AlarmHapticsPolicy.kt").read_text(encoding="utf-8"),
     "flash pattern policy drives the torch controller":
         "AlarmFlashPatternPolicy.delayMs" in flash_controller and "AlarmFlashPatternPolicy.nextTorchState" in flash_controller,
+    "torch output monitoring detects external interruptions and unavailable hardware":
+        "CameraManager.TorchCallback" in flash_controller
+        and "alarm_flash_external_interruption" in flash_controller
+        and "alarm_flash_output_unavailable" in flash_controller,
     "optional flash failure remains independent of audio alarm":
         "Failure to access a flash unit never blocks or stops alarm audio" in alarm,
     "severe thermal status suppresses flash while preserving alarm audio":
