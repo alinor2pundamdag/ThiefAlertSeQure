@@ -78,7 +78,7 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
             setTextColor(0xFFFFFFFF.toInt())
             gravity = Gravity.CENTER
             setTypeface(typeface, android.graphics.Typeface.BOLD)
-        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
+        }.markAsPageHeading(), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
         overlay.addView(Button(this).apply {
             text = if (replay) "Close intro" else "Skip intro"
             contentDescription = "Skip the introduction and continue to the privacy notice"

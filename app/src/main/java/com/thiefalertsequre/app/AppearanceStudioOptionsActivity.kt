@@ -48,7 +48,7 @@ class AppearanceStudioOptionsActivity : FragmentActivity() {
             textSize = 28f
             setTextColor(palette.text)
             setTypeface(typeface, android.graphics.Typeface.BOLD)
-        }, params(4))
+        }.markAsPageHeading(), params(4))
         root.addView(TextView(this).apply {
             text = "Selections are saved locally. Protection state, alarm behavior and owner authentication are never changed by appearance controls."
             textSize = 13f

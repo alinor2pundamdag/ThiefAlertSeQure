@@ -39,7 +39,10 @@ abstract class BaseProtectionWidgetProvider : AppWidgetProvider() {
             ProtectionMode.DISARMED -> "Protection is disarmed"
             ProtectionMode.ARMED -> if (monitor) "Local protection monitor is confirmed running" else "Protection is armed; monitor is not confirmed"
             ProtectionMode.COUNTDOWN -> {
-                val seconds = ((state.deadlineEpochMs - now + 999L) / 1_000L).coerceAtLeast(0L)
+                val remainingMs = ProtectionEngine.remainingMs(
+                    state, now, ProtectionClock.elapsedRealtime(), ProtectionClock.bootCount(context)
+                )
+                val seconds = ((remainingMs + 999L) / 1_000L).coerceAtLeast(0L)
                 "Removal grace period • ${seconds}s remaining"
             }
             ProtectionMode.ALARM_TRIGGERED -> "Owner authentication required"

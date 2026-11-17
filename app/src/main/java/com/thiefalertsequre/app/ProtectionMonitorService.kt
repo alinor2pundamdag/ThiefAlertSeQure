@@ -753,6 +753,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         isRunning = false
         prefs.edit().putBoolean(KEY_RUNNING, false).apply()
         LocalTamperHistory.record(this, "monitor_stopped")
+        BatchThreeUiBridge.refresh(this)
         super.onDestroy()
     }
 

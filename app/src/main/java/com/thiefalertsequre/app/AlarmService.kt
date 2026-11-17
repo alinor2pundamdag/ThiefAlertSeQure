@@ -513,6 +513,7 @@ class AlarmService : Service() {
         }
         thermalFlashController = null
         stopAlarm()
+        BatchThreeUiBridge.refresh(this)
         super.onDestroy()
     }
 
