@@ -227,6 +227,13 @@ class SettingsActivity : FragmentActivity() {
             13f, R.color.tas_muted
         ))
         root.addView(space(8))
+        root.addView(text("Built-in alarm tone: " + AlarmSoundStore.selectedBuiltInPreset(this).label, 13f, R.color.tas_text))
+        root.addView(action("Change built-in alarm tone (5 presets + packaged default)") {
+            val selected = AlarmSoundStore.selectNextBuiltInPreset(this)
+            android.widget.Toast.makeText(this, "Built-in alarm tone: " + selected.label + ". Applies to the next alarm.", android.widget.Toast.LENGTH_LONG).show()
+            render()
+        })
+        root.addView(text("A custom main alarm file takes priority over this built-in tone selection. Clear the custom file to use the selected built-in tone.", 12f, R.color.tas_muted))
         root.addView(text("Main alarm: " + AlarmSoundStore.displayName(this, AlarmSoundStore.ALARM), 13f, R.color.tas_text))
         root.addView(action("Use built-in default alarm (clear custom override)") {
             val cleared = AlarmSoundStore.clear(this, AlarmSoundStore.ALARM)
