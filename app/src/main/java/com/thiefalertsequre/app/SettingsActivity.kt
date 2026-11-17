@@ -542,8 +542,9 @@ class SettingsActivity : FragmentActivity() {
         val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
         val cameraPermissionGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(this).size }.getOrDefault(0)
+        val cameraEvidenceIntegrity = runCatching { CameraEvidenceVault.verifyIntegrity(this) }.getOrDefault(false)
         root.addView(text(
-            "Front-camera photo evidence: ${when { cameraEvidenceEnabled && cameraPermissionGranted -> "ON"; cameraEvidenceEnabled -> "NEEDS CAMERA PERMISSION"; else -> "OFF" }} • $cameraEvidenceCount encrypted photos",
+            "Front-camera photo evidence: ${when { cameraEvidenceEnabled && cameraPermissionGranted -> "ON"; cameraEvidenceEnabled -> "NEEDS CAMERA PERMISSION"; else -> "OFF" }} • $cameraEvidenceCount encrypted photos • integrity ${if (cameraEvidenceIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}",
             12f, R.color.tas_muted
         ))
         root.addView(action("Front-camera evidence after successful owner authentication: ${if (cameraEvidenceEnabled && cameraPermissionGranted) "ON" else "OFF / NEEDS SETUP"}") {
@@ -1115,9 +1116,14 @@ class SettingsActivity : FragmentActivity() {
     private fun showCameraEvidenceArchive() {
         val entries = runCatching { CameraEvidenceVault.entries(this) }.getOrDefault(emptyList())
         if (entries.isEmpty()) {
+            val integrityHealthy = runCatching { CameraEvidenceVault.verifyIntegrity(this) }.getOrDefault(false)
             MaterialAlertDialogBuilder(this)
                 .setTitle("Front-camera evidence")
-                .setMessage("No front-camera photos are stored. Enable the optional feature to capture one photo after successful owner authentication that disarms a latched alarm.")
+                .setMessage(if (integrityHealthy) {
+                    "No front-camera photos are stored. Enable the optional feature to capture one photo after successful owner authentication that disarms a latched alarm."
+                } else {
+                    "The encrypted photo vault failed its integrity check. No photo is being displayed or exported. Review local tamper history and preserve the app data for diagnosis."
+                })
                 .setPositiveButton("Close", null)
                 .showThemed(this)
             return
