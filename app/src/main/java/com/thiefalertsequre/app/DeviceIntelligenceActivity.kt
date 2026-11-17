@@ -289,7 +289,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                 put("notificationsEnabled", notifications)
                 put("exactAlarmAvailable", exactAlarm)
                 put("secureLockConfigured", secureLock)
-                put("recentEventCodes", org.json.JSONArray(LocalTamperHistory.read(this, 20).map { it.substringAfter("|").trim().substringBefore("|").take(48) }))
+                put("recentEventCodes", org.json.JSONArray(LocalTamperHistory.read(this@DeviceIntelligenceActivity, 20).map { it.substringAfter("|").trim().substringBefore("|").take(48) }))
                 put("privacyNote", "Redacted local diagnostics only. No location, camera, microphone, credentials, serial, IMEI, MAC, or build fingerprint.")
             }
         }.getOrElse {
