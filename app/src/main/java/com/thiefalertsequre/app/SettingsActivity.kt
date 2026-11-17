@@ -77,9 +77,14 @@ class SettingsActivity : FragmentActivity() {
     private val requestCameraEvidencePermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted && CameraEvidenceCapture.setEnabled(this, true)) {
-            LocalTamperHistory.record(this, "camera_evidence_opted_in", "Owner enabled front-camera photo evidence after successful alarm authentication")
-            android.widget.Toast.makeText(this, "Front-camera evidence enabled. A photo is taken only after successful owner authentication.", android.widget.Toast.LENGTH_LONG).show()
+        if (granted) {
+            if (CameraEvidenceCapture.setEnabled(this, true)) {
+                LocalTamperHistory.record(this, "camera_evidence_opted_in", "Owner enabled front-camera photo evidence after successful alarm authentication")
+                android.widget.Toast.makeText(this, "Front-camera evidence enabled. A photo is taken only after successful owner authentication.", android.widget.Toast.LENGTH_LONG).show()
+            } else {
+                CameraEvidenceCapture.setEnabled(this, false)
+                android.widget.Toast.makeText(this, "Android permission was granted, but the app could not save the evidence setting. The feature remains OFF.", android.widget.Toast.LENGTH_LONG).show()
+            }
         } else {
             CameraEvidenceCapture.setEnabled(this, false)
             LocalTamperHistory.record(this, "camera_evidence_permission_denied", "Front-camera evidence remains disabled because CAMERA permission was not granted")
