@@ -187,6 +187,11 @@ if (
 main_activity = (APP / "MainActivity.kt").read_text(encoding="utf-8")
 if "protectionModeAtLaunch != ProtectionMode.ALARM_TRIGGERED" not in main_activity:
     errors.append("Privacy acknowledgement must not block the active alarm owner-authentication recovery screen")
+permission_request = re.search(r"private fun requestNotificationPermissionIfNeeded\\(\\).*?\\n    }", main_activity, re.S)
+if not permission_request or "ProtectionMode.ALARM_TRIGGERED" not in permission_request.group(0):
+    errors.append("Notification permission must be deferred during active alarm recovery and requested afterward")
+if "requestNotificationPermissionIfNeeded()" not in main_activity:
+    errors.append("Dashboard and resume lifecycle must re-check notification permission readiness")
 if "device_credential_launch_failed" not in main_activity:
     errors.append("Device credential launch failures must be handled without terminating the active alarm")
 if "Android access not granted" not in settings_activity or "Open access settings" not in settings_activity:
