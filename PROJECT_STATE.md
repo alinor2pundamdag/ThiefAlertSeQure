@@ -157,12 +157,22 @@ This section supersedes earlier candidate snapshots and pending-verification not
 
 ## Final exact-head verification — 2026-11-17
 
-- Documentation-reconciled branch head at verification: `d70f79f5d66e30765eba39e0ce58cc4e651ccc63`.
-- Android workflow [#44009392497](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44009392497): **SUCCESS**. All steps passed, including the instrumentation-disabled guard, 30 JVM unit-test files, source-contract guards, lint, assets, debug APK build, minified release metadata, package/version/signer verification and artifact upload.
-- CodeQL workflow [#44009392512](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44009392512): **SUCCESS**. Java/Kotlin and Actions analysis completed; SARIF results uploaded successfully.
+- Documentation-reconciled branch head at verification: `e97817903976689f02cba8bb485fc160a7122fd3`.
+- Android workflow [#44010766603](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010766603): **SUCCESS**. All steps passed, including the instrumentation-disabled guard, 30 JVM unit-test files, source-contract guards, lint, assets, debug APK build, minified release metadata, package/version/signer verification and artifact upload.
+- CodeQL workflow [#44010774991](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010774991): **SUCCESS**. Java/Kotlin and Actions analysis completed; SARIF results uploaded successfully.
 - Artifact: `ThiefAlertSeQure-debug-apk`, 6,616,246 bytes; development-only.
 - Current branch compare: 530 ahead / 0 behind; 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 is draft/open/unmerged and GitHub reports mergeable.
 - One inline PR review thread is resolved. CodeQL alert #8's underlying active/closed state remains **NOT VERIFIED**; green CodeQL execution and a resolved review thread do not prove alert closure.
 - Permanent production signing-secret presence and a production-signed APK remain **NOT VERIFIED**.
 - Automated source inventory/pattern sweeps covered all 64 production Kotlin source files; targeted manual review covered high-risk flows. This is not a claim of exhaustive line-by-line formal verification.
 - No instrumentation compilation/execution, emulator, physical-device test, merge, rebase, tag, publication or production release was performed.
+
+
+## Final verified candidate snapshot — 2026-11-17
+
+- Exact code/documentation candidate `e97817903976689f02cba8bb485fc160a7122fd3` passed Android [#44010766603](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010766603) and CodeQL [#44010774991](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010774991).
+- All Android workflow steps succeeded: instrumentation-disabled guard, 30 JVM unit-test files, source-contract checks, lint, asset validation, debug APK packaging/metadata, minified release metadata, package/version/signer verification and artifact upload.
+- Development artifact `ThiefAlertSeQure-debug-apk`: 6,616,246 bytes; not a production release.
+- All changes after source commit `a1a567bf53f97189be2547ccf872ae665c30a54b` through `e97817903976689f02cba8bb485fc160a7122fd3` are limited to five documentation files; no app source/build/manifest/workflow code changed.
+- Branch compare immediately before this final docs refresh: 530 ahead / 0 behind; this one commit makes it 531 ahead / 0 behind. Changed paths remain 131 (90 added, 41 modified, 0 deleted).
+- Alert #8 closure and permanent production signing-secret availability remain not verified.

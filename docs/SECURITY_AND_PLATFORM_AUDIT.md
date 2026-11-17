@@ -161,9 +161,19 @@ No failure details were supplied. These results clear the reported HONOR 200 Pro
 
 ## Exact-head software verification closeout — 2026-11-17
 
-- Android run [#44009392497](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44009392497) and CodeQL run [#44009392512](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44009392512) passed on `d70f79f5d66e30765eba39e0ce58cc4e651ccc63`.
+- Android run [#44010766603](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010766603) and CodeQL run [#44010774991](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010774991) passed on `e97817903976689f02cba8bb485fc160a7122fd3`.
 - CodeQL completed Java/Kotlin and Actions analysis and uploaded SARIF successfully. This is not evidence that alert #8 is closed; the alert's active/closed state remains not verified through the available connector.
 - Android CI passed the 30-file JVM unit suite, instrumentation-disabled guard, source checks, lint, asset checks, APK assembly and package/version/signer metadata checks.
 - Branch comparison: 530 ahead / 0 behind, 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 is draft/open/unmerged and mergeable.
 - Permanent production signing-secret availability and production-signed APK availability remain not verified.
+- No instrumentation compilation/execution, emulator or physical-device testing was performed.
+
+
+## Final verified candidate snapshot — 2026-11-17
+
+- Android [#44010766603 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010766603) and CodeQL [#44010774991 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010774991) passed on `e97817903976689f02cba8bb485fc160a7122fd3`.
+- CodeQL Java/Kotlin and Actions analysis completed; SARIF upload succeeded. This does not prove alert #8 is closed; alert state remains not verified.
+- Android workflow passed 30 JVM unit tests, instrumentation-disabled guard, source checks, lint, assets, APK build, metadata/package/version/signer checks and artifact upload.
+- Branch comparison before this one docs-only refresh: 530 ahead / 0 behind; after it: 531 ahead / 0 behind; 131 changed paths and no deletions.
+- Production signing-secret presence and production-signed APK availability remain not verified.
 - No instrumentation compilation/execution, emulator or physical-device testing was performed.

@@ -219,9 +219,18 @@ The CodeQL gate passed after the APK-installer suppression comments were moved t
 
 ## Exact-head verification closeout — 2026-11-17
 
-- Android [#44009392497 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44009392497) and CodeQL [#44009392512 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44009392512) on `d70f79f5d66e30765eba39e0ce58cc4e651ccc63`.
+- Android [#44010766603 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010766603) and CodeQL [#44010774991 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010774991) on `e97817903976689f02cba8bb485fc160a7122fd3`.
 - 30 JVM unit-test source files; all passed in the Android workflow. Fifteen dormant `androidTest` source files were not compiled or executed.
 - Android lint, manifest/preferences/navigation/state-ownership checks, asset validation, release workflow YAML validation, release identity check, debug APK metadata, minified release metadata, package/version/signer checks and artifact upload all passed.
 - Branch comparison is 530 ahead / 0 behind, 131 changed files (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged and mergeable.
 - CodeQL alert #8 closure and permanent release signing-secret availability remain unverified; neither is inferred from workflow success.
 - No physical-device, emulator or instrumentation test was performed.
+
+
+## Final verified candidate snapshot — 2026-11-17
+
+- Exact candidate `e97817903976689f02cba8bb485fc160a7122fd3`: Android [#44010766603 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010766603), CodeQL [#44010774991 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010774991).
+- 30 JVM unit-test source files passed; 15 dormant instrumentation source files were not compiled or executed.
+- Source checks, lint, asset validation, release workflow YAML, release identity, APK metadata/package/version/signer checks and artifact upload passed.
+- Branch comparison before this one documentation-only refresh: 530 ahead / 0 behind; after it: 531 ahead / 0 behind. PR #7 remains draft/open/unmerged.
+- Alert #8 closure and permanent production signing-secret availability remain unverified.
