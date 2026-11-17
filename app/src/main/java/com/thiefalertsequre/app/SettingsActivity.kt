@@ -609,13 +609,13 @@ class SettingsActivity : FragmentActivity() {
             }
         })
         root.addView(space(8))
-        val evidenceEntries = LocalEvidenceVault.read(this, 100)
         val integrityStatus = text(
-            "${evidenceEntries.size} encrypted local event records • 30-day retention • AES-GCM integrity CHECKING… • no cloud upload",
+            "Encrypted local event archive • checking integrity… • no cloud upload",
             12f, R.color.tas_muted
         )
         root.addView(integrityStatus)
         ioExecutor.execute {
+            val evidenceEntries = LocalEvidenceVault.read(this@SettingsActivity, 100)
             val integrity = runCatching {
                 LocalEvidenceVault.verifyIntegrity(this@SettingsActivity)
             }.getOrDefault(false)
@@ -653,17 +653,24 @@ class SettingsActivity : FragmentActivity() {
         })
         root.addView(space(6))
         root.addView(action("Review encrypted evidence records") {
-            val entries = LocalEvidenceVault.read(this, 100)
-            val summary = entries.take(20).joinToString("\n\n") { entry ->
-                val date = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
-                    .format(java.util.Date(entry.timestampEpochMs))
-                "$date (UTC offset ${entry.timezoneOffsetMinutes}m)\n${entry.event}\n${entry.detail}\nSHA-256: ${entry.integritySha256.take(16)}…"
-            }.ifBlank { "No encrypted evidence records are available." }
-            MaterialAlertDialogBuilder(this)
-                .setTitle("Encrypted evidence archive")
-                .setMessage(summary)
-                .setPositiveButton("Close", null)
-                .showThemed(this)
+            Toast.makeText(this, "Loading encrypted evidence records…", Toast.LENGTH_SHORT).show()
+            ioExecutor.execute {
+                val entries = LocalEvidenceVault.read(this@SettingsActivity, 100)
+                val summary = entries.take(20).joinToString("\n\n") { entry ->
+                    val date = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                        .format(java.util.Date(entry.timestampEpochMs))
+                    "$date (UTC offset ${entry.timezoneOffsetMinutes}m)\n${entry.event}\n${entry.detail}\nSHA-256: ${entry.integritySha256.take(16)}…"
+                }.ifBlank { "No encrypted evidence records are available." }
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) {
+                        MaterialAlertDialogBuilder(this@SettingsActivity)
+                            .setTitle("Encrypted evidence archive")
+                            .setMessage(summary)
+                            .setPositiveButton("Close", null)
+                            .showThemed(this@SettingsActivity)
+                    }
+                }
+            }
         })
         root.addView(action("Export encrypted evidence backup") {
             exportEvidenceBackup.launch("ThiefAlertSeQure-evidence-backup.tasbackup")
