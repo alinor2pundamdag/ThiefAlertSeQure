@@ -30,11 +30,17 @@ object NotificationSetupStatusPolicy {
                 SetupState.ACTION_REQUIRED,
                 "Android reports that the persistent protection notification channel is blocked. The status-bar shield cannot appear until it is enabled."
             )
+            importance == NotificationManager.IMPORTANCE_MIN -> SetupItem(
+                "monitor_channel",
+                "Protection notification channel",
+                SetupState.ACTION_REQUIRED,
+                "Android set this foreground channel to minimum importance; its notification is not shown in the status bar. Raise it to Low or Default in Android settings."
+            )
             else -> SetupItem(
                 "monitor_channel",
                 "Protection notification channel",
                 SetupState.VERIFIED,
-                "Android reports that the persistent protection notification channel is available."
+                "The channel is available. Android may still hide silent Low-importance icons according to the device's status-bar notification preference."
             )
         }
 
