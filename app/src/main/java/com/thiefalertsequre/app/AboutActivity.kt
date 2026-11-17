@@ -51,8 +51,11 @@ class AboutActivity : FragmentActivity() {
 
         val info = packageInfo()
         val versionName = info?.versionName ?: "Unavailable"
-        val versionCode = if (info == null) "Unavailable" else {
-            if (Build.VERSION.SDK_INT >= 28) info.longVersionCode.toString() else @Suppress("DEPRECATION") info.versionCode.toString()
+        @Suppress("DEPRECATION")
+        val versionCode = if (info == null) "Unavailable" else if (Build.VERSION.SDK_INT >= 28) {
+            info.longVersionCode.toString()
+        } else {
+            info.versionCode.toString()
         }
         val card = MaterialCardView(this).apply {
             radius = dp(18).toFloat()
