@@ -250,8 +250,6 @@ class MainActivity : FragmentActivity() {
         root.addView(navigationScroll, matchWrap())
         root.addView(space(16))
 
-        root.addView(space(20))
-
         root.addView(sectionTitle("DEVICE INTELLIGENCE"), matchWrap())
         root.addView(space(10))
         val intelligenceCard = card()
