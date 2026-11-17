@@ -260,10 +260,10 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         ))
         val storeIntegrity = protectionStore.integritySnapshot()
         val evidenceIntegrity = LocalEvidenceVault.verifyIntegrity(this)
-        val cameraEvidenceIntegrity = CameraEvidenceVault.verifyIntegrity(this)
+        val cameraEvidenceIntegrity = runCatching { CameraEvidenceVault.verifyIntegrity(this) }.getOrDefault(false)
         val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
         val cameraPermissionGranted = checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        val cameraEvidenceCount = CameraEvidenceVault.entries(this).size
+        val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(this).size }.getOrDefault(0)
         val integritySignals = listOf(
             IntegritySignal("Protection state storage", if (storeIntegrity.protectionStateHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 3),
             IntegritySignal("Owner-authentication throttle storage", if (storeIntegrity.authenticationThrottleHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
