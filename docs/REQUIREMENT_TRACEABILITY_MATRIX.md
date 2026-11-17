@@ -243,3 +243,15 @@ The CodeQL gate passed after the APK-installer suppression comments were moved t
 - The artifact is development-only; production signing is not verified. CodeQL alert #8's active/closed status is not verified.
 - Branch comparison: 531 ahead / 0 behind; 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged.
 - No instrumentation compilation/execution, emulator or physical-device testing was performed.
+
+
+## Bypass Charging integration — product roadmap Phase 4
+
+| ID | Requirement | Source / evidence | Status |
+|---|---|---|---|
+| BYPASS-01 | Per-device OEM adapter must explicitly probe hardware support; manufacturer/model name alone is not proof | BypassChargingController.kt, BypassChargingAdapterRegistry, BypassChargingControllerTest | Framework implemented; registry intentionally empty pending certified OEM interface |
+| BYPASS-02 | ON/OFF command requires explicit authorization and a readable initial state | BypassChargingController.kt, JVM tests | Unit-covered policy |
+| BYPASS-03 | Actual mode must be read back after every command; no optimistic green state | BypassChargingController.kt, JVM tests | Unit-covered policy |
+| BYPASS-04 | UI must not offer a functional toggle without a verified adapter; unknown must not be labelled OFF | SettingsActivity.kt, source guard | Implemented; switch remains disabled on current devices |
+| BYPASS-05 | Do not add hidden/privileged permissions, arbitrary shell, sysfs, hidden APIs, Accessibility workarounds or privilege escalation | Manifest review, verify_bypass_charging_contract.py | Source guard added; no new permission |
+| BYPASS-06 | OEM persistence/reboot behavior and physical charging path must be certified per model/firmware | docs/BYPASS_CHARGING_INTEGRATION.md | Not verified; requires authorized OEM interface and separate device acceptance |

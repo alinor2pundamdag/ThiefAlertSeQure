@@ -403,6 +403,48 @@ class SettingsActivity : FragmentActivity() {
         ThemeRuntime.apply(this, scroll)
     }
 
+
+    private fun addBypassChargingSection() {
+        val device = BypassChargingDevice(Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.VERSION.SDK_INT)
+        val controller = BypassChargingController(BypassChargingAdapterRegistry.forDevice(device))
+        val snapshot = controller.inspect()
+        root.addView(text("BYPASS CHARGING", 11f, R.color.tas_primary, true))
+        root.addView(space(8))
+        root.addView(text("Actual mode: ${snapshot.modeLabel} • ${snapshot.statusLabel}",13f,R.color.tas_text,true))
+        root.addView(space(6))
+        val control = Switch(this).apply {
+            text = "Bypass Charging ON/OFF"
+            isChecked = snapshot.mode == BypassChargingMode.ENABLED
+            isEnabled = snapshot.canToggle
+            contentDescription = "Bypass Charging ON/OFF; unavailable until OEM interface and actual state are verified"
+            setOnCheckedChangeListener { _, enabled ->
+                val result = controller.setEnabled(enabled)
+                LocalTamperHistory.record(this@SettingsActivity,"bypass_charging_control",result.status.name + ": " + result.detail)
+                val message = if(result.isVerified) "Bypass Charging ${if(enabled) "ON" else "OFF"} verified by OEM read-back."
+                    else result.statusLabel + ". " + result.detail
+                android.widget.Toast.makeText(this@SettingsActivity,message,android.widget.Toast.LENGTH_LONG).show()
+                render()
+            }
+        }
+        root.addView(control,matchWrap())
+        root.addView(space(6))
+        root.addView(text(
+            if(snapshot.canToggle) "The ON/OFF switch is enabled only because an authorized OEM interface and readable state are verified."
+            else "ON/OFF control is unavailable. The switch is intentionally disabled; UNKNOWN does not mean OFF. A normal app cannot grant itself OEM/system privileges.",
+            12f,R.color.tas_muted
+        ))
+        root.addView(space(8))
+        root.addView(text(BypassChargingGuidance.instructions(device),12f,R.color.tas_muted))
+        root.addView(space(8))
+        root.addView(action("Open Android battery and charging settings") {
+            val opened=runCatching { startActivity(Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS)); true }.getOrElse {
+                runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)); true }.getOrDefault(false)
+            }
+            if(!opened) android.widget.Toast.makeText(this,"Android Settings could not be opened.",android.widget.Toast.LENGTH_LONG).show()
+        })
+        root.addView(space(22))
+    }
+
     private fun isSafeForAppUpdate(): Boolean {
         val state = ProtectionStore(this).read()
         return AppUpdatePolicy.canUpdateWhileProtectionDisarmed(state.mode)

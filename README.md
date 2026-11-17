@@ -164,6 +164,10 @@ See the full [Android Device Compatibility Matrix](docs/ANDROID_DEVICE_COMPATIBI
 
 No ordinary app can use one universal setting to override every manufacturer's power manager.
 
+### Bypass Charging integration status
+
+The development branch includes a guarded integration framework and a Settings entry for Bypass Charging. Direct ON/OFF control is **not available yet** because Android exposes no universal public app API and no model/firmware-specific OEM control adapter has been certified for this project. The control remains disabled and the actual mode remains UNKNOWN until an authorized OEM interface can be read back successfully. Owners can still use any Bypass Charging option exposed by their phone's own Settings or gaming tools. See [Bypass Charging Integration](docs/BYPASS_CHARGING_INTEGRATION.md).
+
 ### Important Android system requirements
 
 Some capabilities depend on system permissions and settings:

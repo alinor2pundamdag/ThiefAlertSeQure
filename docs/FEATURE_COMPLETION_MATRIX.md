@@ -70,6 +70,19 @@ The production baseline remains v1.1.3. The current feature branch contains the 
 | Managed rollback | In-app recovery restores the saved pre-enable policy; damaged/legacy snapshots trigger emergency navigation defaults and retain a retry path if any DPM call fails |
 | Unit tests | Protection state machine, authentication throttle, and recognized OEM-family guidance including safe generic fallbacks |
 
+## Bypass Charging integration — product roadmap Phase 4
+
+| Feature | Implementation / verification |
+|---|---|
+| Device-specific adapter contract | Implemented; adapters must prove hardware support and authorization |
+| ON/OFF command verification | Implemented in controller policy; actual state must be read back after every command |
+| Safe Settings UI | Implemented; switch stays disabled and actual mode shows UNKNOWN until a reviewed adapter is registered |
+| OEM adapters | Not available; no public model/firmware-specific third-party control API has been certified |
+| Persistence and reboot restoration | Not enabled until an OEM adapter documents safe persistence/recovery behavior |
+| Physical charging-path behavior | Not verified; excluded from current non-physical-device work |
+
+A built-in OEM feature is not proof that a third-party APK can control it. See [Bypass Charging Integration](BYPASS_CHARGING_INTEGRATION.md).
+
 ## Authentication boundary
 The five-failure / 30-second app cooldown applies to biometric failures reported through AndroidX BiometricPrompt. Device PIN/pattern/password remains available during that app cooldown; Android Keyguard independently enforces credential lockout. Android does not disclose incorrect device PIN/pattern/password attempts to ordinary apps. Android Keyguard enforces its own credential lockout. The app never collects, stores, logs or transmits device credentials. `ACTION_USER_PRESENT`, `isDeviceSecure`, and keyguard dismissal are not accepted as proof of a fresh credential; the owner must complete the explicit app-launched credential or strong-biometric prompt.
 

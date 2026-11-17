@@ -49,6 +49,8 @@ Depending on Android version and the user's choices, the app may use:
 - Internet access for an owner-initiated HTTPS request to the official ThiefAlertSeQure GitHub Releases endpoint. The app downloads the release APK and its SHA-256 checksum only after the owner taps **Check for official updates**. It verifies the checksum, package ID, version code, and pinned release signing certificate before opening Android's installer.
 - Device Owner / Lock Task APIs only if the device has been separately provisioned as a fully managed device and the user explicitly enables managed mode.
 
+The optional Bypass Charging Settings entry opens Android's own battery/settings page and displays model-specific guidance. This build does not read or change the OEM bypass-charging mode because no verified control adapter is registered; it requests no additional permission and sends no charging-mode or device data to a server.
+
 Android settings, manufacturer power-management behavior, notification controls, exact-alarm access, and DND policies remain under Android/device-owner control.
 
 ## 5. Sharing and third parties

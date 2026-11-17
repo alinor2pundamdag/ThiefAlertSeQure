@@ -190,3 +190,13 @@ This entry supersedes earlier candidate SHAs and run IDs above.
 - CodeQL alert #8 closure and permanent production signing-secret presence remain not verified. The resolved inline review thread and successful CodeQL scan do not prove the alert is closed.
 - Phases 0–10 implementation/permitted software checks are passed as recorded; Phase 11 has the two external verification gaps; Phase 12 physical-device acceptance is excluded and untested.
 - No instrumentation, emulator, Codespaces, physical-device test, merge, rebase, tag, publication or production release was performed.
+
+
+## Product roadmap Batch 1 — Phases 0–4 (2026-11-17)
+
+- Owner authorized implementation of product-roadmap Batch 1: Phase 0 baseline preservation, Phase 1 security architecture/persistent state, Phase 2 permission/capability readiness, Phase 3 charger and trusted Bluetooth protection, and Phase 4 Bypass Charging integration.
+- Phases 0–3 were already implemented on the branch and were preserved rather than duplicated. Exact pre-batch head d174669ec522a77ab24b95999c0cf0ece606c9f1 passed Android CI [#44013936060](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44013936060) and CodeQL [#44013936266](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44013936266).
+- Phase 4 adds a model-specific adapter contract, fail-closed registry, explicit authorization gate, post-command state read-back, Settings status/control UI, local event audit for attempted operations, JVM regression tests, and a CI privilege-boundary guard.
+- No OEM adapter is registered because no verified public third-party ON/OFF API has been certified. The ON/OFF switch remains disabled and actual mode is UNKNOWN until a model/firmware-specific authorized adapter is added. This does not claim that the phone's OEM feature is absent.
+- No new permission, service, backend, telemetry, shell command, root path, hidden API, or manifest component was added. No charging preference is replayed at boot without a certified OEM persistence contract.
+- Batch 1 exact-head completion is pending Android workflow and CodeQL results for the new commit. Instrumentation, emulator, Codespaces, and physical-device testing remain prohibited. PR #7 remains draft/open/unmerged; no merge, tag, APK publication or release was performed.
