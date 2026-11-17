@@ -8,6 +8,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
@@ -141,4 +144,54 @@ class A2DisconnectSchedulerInstrumentationTest {
             A2DisconnectScheduler.clearAll(context)
         }
     }
+    @Test fun concurrentDisconnectEventsPreserveEveryAccessoryDeadline() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, 0)
+        val key = "trusted_bluetooth_pending_disconnects_v1"
+        val addresses = (0 until 8).map { index ->
+            "02:00:00:00:01:${"%02X".format(index)}"
+        }
+        assertTrue(A2DisconnectScheduler.clearAll(context))
+        val ready = CountDownLatch(addresses.size)
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(addresses.size)
+        try {
+            val nowEpoch = System.currentTimeMillis()
+            val nowElapsed = SystemClock.elapsedRealtime()
+            val boot = ProtectionClock.bootCount(context)
+            val futures = addresses.mapIndexed { index, address ->
+                executor.submit<Boolean> {
+                    ready.countDown()
+                    if (!start.await(10, TimeUnit.SECONDS)) return@submit false
+                    A2DisconnectScheduler.schedule(
+                        context,
+                        A2DisconnectScheduler.Pending(
+                            address, nowEpoch, nowElapsed, boot, 30L, index.toLong() + 1L
+                        )
+                    )
+                }
+            }
+            assertTrue("All scheduling workers should reach the start barrier",
+                ready.await(10, TimeUnit.SECONDS))
+            start.countDown()
+            futures.forEach { future ->
+                assertTrue("Every accessory deadline should be accepted",
+                    future.get(30, TimeUnit.SECONDS))
+            }
+            val encrypted = prefs.getString(key, null)
+            assertNotNull("Concurrent scheduling must leave a durable deadline store", encrypted)
+            val stored = LocalPreferenceCipher.decrypt(key, encrypted!!)
+            val records = stored.lineSequence().filter { it.isNotBlank() }.toList()
+            assertEquals("No concurrent read-modify-write may drop an accessory",
+                addresses.size, records.size)
+            addresses.forEach { address ->
+                assertTrue("Missing persisted deadline for $address", stored.contains(address))
+            }
+        } finally {
+            start.countDown()
+            executor.shutdownNow()
+            A2DisconnectScheduler.clearAll(context)
+        }
+    }
+
 }

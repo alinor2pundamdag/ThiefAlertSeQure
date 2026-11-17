@@ -56,7 +56,33 @@ retry_adb() {
     return 1
 }
 
+retry_boot_probe() {
+    local attempt output
+    for attempt in {1..180}; do
+        if output="$("$REAL_ADB" "$@" 2>&1)"; then
+            printf '%s\n' "$output"
+            return 0
+        fi
+        if [[ "$output" != *offline* && "$output" != *"not found"* &&
+              "$output" != *"cannot connect"* && "$output" != *closed* ]]; then
+            printf '%s\n' "$output" >&2
+            return 1
+        fi
+        echo "ADB transport is not ready for the emulator boot probe (attempt $attempt/180): $output" >&2
+        "$REAL_ADB" reconnect offline >/dev/null 2>&1 || true
+        sleep 2
+    done
+    echo "ADB transport did not recover for sys.boot_completed after 360 seconds" >&2
+    return 1
+}
+
 case "$*" in
+    *"shell getprop sys.boot_completed"*)
+        # android-emulator-runner polls this before invoking our test script.
+        # Retry only transient offline/transport failures so cold API images can boot.
+        retry_boot_probe "$@" || exit 1
+        exit 0
+        ;;
     *"shell input keyevent 82"*)
         # sys.boot_completed can precede InputManager readiness on cold API 30+ images.
         for attempt in {1..90}; do

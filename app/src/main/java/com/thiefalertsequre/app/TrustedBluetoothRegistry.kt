@@ -20,9 +20,11 @@ object TrustedBluetoothRegistry {
     private const val TAG = "TrustedBluetoothRegistry"
 
     fun read(prefs: SharedPreferences): List<TrustedBluetoothDevice> =
-        when (val result = readStrict(prefs)) {
-            is PreferenceRead.Value -> result.value
-            is PreferenceRead.Corrupt -> emptyList()
+        A2DisconnectStateLock.withLock {
+            when (val result = readStrict(prefs)) {
+                is PreferenceRead.Value -> result.value
+                is PreferenceRead.Corrupt -> emptyList()
+            }
         }
 
     private fun readStrict(prefs: SharedPreferences): PreferenceRead<List<TrustedBluetoothDevice>> {
@@ -89,7 +91,7 @@ object TrustedBluetoothRegistry {
             PreferenceRead.Corrupt(KEY_DEVICES)
         }
     }
-    fun add(prefs: SharedPreferences, address: String, name: String): Boolean {
+    fun add(prefs: SharedPreferences, address: String, name: String): Boolean = A2DisconnectStateLock.withLock {
         if (!isValidAddress(address)) return false
         val normalizedAddress = address.trim().uppercase()
         val current = when (val stored = readStrict(prefs)) {
@@ -112,7 +114,7 @@ object TrustedBluetoothRegistry {
     }
 
     /** Removes only the app's trust relationship. Android pairing is never modified. */
-    fun remove(prefs: SharedPreferences, address: String): Boolean {
+    fun remove(prefs: SharedPreferences, address: String): Boolean = A2DisconnectStateLock.withLock {
         if (!isValidAddress(address)) return false
         val normalizedAddress = address.trim().uppercase()
         val current = when (val stored = readStrict(prefs)) {
@@ -141,19 +143,23 @@ object TrustedBluetoothRegistry {
     }
 
     fun isTrusted(prefs: SharedPreferences, address: String): Boolean =
-        isValidAddress(address) && when (val stored = readStrict(prefs)) {
-            is PreferenceRead.Value -> stored.value.any { it.address.equals(address.trim(), ignoreCase = true) }
-            is PreferenceRead.Corrupt -> false
+        A2DisconnectStateLock.withLock {
+            isValidAddress(address) && when (val stored = readStrict(prefs)) {
+                is PreferenceRead.Value -> stored.value.any { it.address.equals(address.trim(), ignoreCase = true) }
+                is PreferenceRead.Corrupt -> false
+            }
         }
 
     fun revision(prefs: SharedPreferences): Long =
-        when (val stored = SafePreferences.readLong(prefs, KEY_REVISION, 0L)) {
-            is PreferenceRead.Value -> stored.value
-            is PreferenceRead.Corrupt -> Long.MIN_VALUE
+        A2DisconnectStateLock.withLock {
+            when (val stored = SafePreferences.readLong(prefs, KEY_REVISION, 0L)) {
+                is PreferenceRead.Value -> stored.value
+                is PreferenceRead.Corrupt -> Long.MIN_VALUE
+            }
         }
 
     /** Per-address generation prevents unrelated registry edits from canceling another device's timer. */
-    fun deviceRevision(prefs: SharedPreferences, address: String): Long {
+    fun deviceRevision(prefs: SharedPreferences, address: String): Long = A2DisconnectStateLock.withLock {
         val key = deviceRevisionKey(address)
         if (prefs.contains(key)) {
             return when (val stored = SafePreferences.readLong(prefs, key, 0L)) {
@@ -202,9 +208,11 @@ object TrustedBluetoothRegistry {
     }
 
     fun isBaselineConnected(prefs: SharedPreferences, address: String): Boolean =
-        isValidAddress(address) && baselineAddresses(prefs).any { it.equals(address.trim(), ignoreCase = true) }
+        A2DisconnectStateLock.withLock {
+            isValidAddress(address) && baselineAddresses(prefs).any { it.equals(address.trim(), ignoreCase = true) }
+        }
 
-    fun markConnected(prefs: SharedPreferences, address: String, connected: Boolean): Boolean {
+    fun markConnected(prefs: SharedPreferences, address: String, connected: Boolean): Boolean = A2DisconnectStateLock.withLock {
         if (!isValidAddress(address)) return false
         val normalizedAddress = address.trim().uppercase()
         val old = when (val stored = readBaselineAddresses(prefs)) {
@@ -220,7 +228,7 @@ object TrustedBluetoothRegistry {
         return committed && hadBaseline
     }
 
-    fun clearBaselines(prefs: SharedPreferences) {
+    fun clearBaselines(prefs: SharedPreferences) = A2DisconnectStateLock.withLock {
         when (val baseline = readBaselineAddresses(prefs)) {
             is PreferenceRead.Value -> Unit
             is PreferenceRead.Corrupt -> throw IllegalStateException("Corrupt Bluetooth baselines retained; refusing to overwrite them.")

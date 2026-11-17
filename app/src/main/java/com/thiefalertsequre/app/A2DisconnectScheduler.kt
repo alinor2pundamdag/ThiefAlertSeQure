@@ -31,91 +31,91 @@ internal object A2DisconnectScheduler {
             )
     }
 
-    fun schedule(context: Context, pending: Pending): Boolean {
+    fun schedule(context: Context, pending: Pending): Boolean = A2DisconnectStateLock.withLock {
         if (!TrustedBluetoothRegistry.isValidAddress(pending.address) ||
             pending.eventEpochMs <= 0L || pending.eventElapsedRealtimeMs <= 0L ||
             pending.eventElapsedRealtimeMs > android.os.SystemClock.elapsedRealtime() ||
             pending.bootCount < -1 || pending.monitorRevision < 0L || pending.deviceRevision < 0L
         ) {
             LocalTamperHistory.record(context, "a2_deadline_metadata_rejected", "Invalid trusted-device deadline metadata was rejected")
-            return false
+            return@withLock false
         }
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
         val records = read(prefs) ?: run {
             LocalTamperHistory.record(context, "a2_deadline_store_unreadable", "Existing encrypted A2 deadlines are unreadable; source retained")
-            return false
+            return@withLock false
         }
-        val updated = records.filterNot { it.address.equals(pending.address, true) } + pending
+        val updated = mergePending(records, pending)
         if (!write(prefs, updated)) {
             LocalTamperHistory.record(context, "a2_deadline_persist_failed", "Encrypted A2 disconnect deadline could not be committed")
-            return false
+            return@withLock false
         }
         val scheduled = scheduleCallbacks(context, pending)
         if (!scheduled) cancel(context, pending.address, pending.eventElapsedRealtimeMs)
-        return scheduled
+        scheduled
     }
 
     /** Reinstall persisted callbacks after exact-alarm access is granted or the APK is replaced. */
-    fun rescheduleAll(context: Context): Boolean {
+    fun rescheduleAll(context: Context): Boolean = A2DisconnectStateLock.withLock {
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
         val records = read(prefs) ?: run {
             LocalTamperHistory.record(context, "a2_deadline_reschedule_store_unreadable", "Persisted A2 deadlines could not be read for rescheduling; source retained")
-            return false
+            return@withLock false
         }
         var allScheduled = true
         records.forEach { if (!scheduleCallbacks(context, it)) allScheduled = false }
-        return allScheduled
+        allScheduled
     }
 
-    fun find(context: Context, token: String): Pending? {
+    fun find(context: Context, token: String): Pending? = A2DisconnectStateLock.withLock {
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
         val records = read(prefs) ?: run {
             LocalTamperHistory.record(context, "a2_deadline_read_failed", "A2 deadline callback could not read the encrypted schedule; source retained")
-            return null
+            return@withLock null
         }
-        val pending = records.firstOrNull { tokenFor(it.address) == token } ?: return null
+        val pending = records.firstOrNull { tokenFor(it.address) == token } ?: return@withLock null
         if (pending.eventElapsedRealtimeMs > android.os.SystemClock.elapsedRealtime()) {
             LocalTamperHistory.record(context, "a2_future_deadline_rejected", "Future-dated A2 deadline metadata was rejected")
-            return null
+            return@withLock null
         }
-        return pending
+        pending
     }
 
-    fun cancel(context: Context, address: String, expectedEventElapsedMs: Long? = null): Boolean {
+    fun cancel(context: Context, address: String, expectedEventElapsedMs: Long? = null): Boolean = A2DisconnectStateLock.withLock {
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
         val records = read(prefs) ?: run {
             LocalTamperHistory.record(context, "a2_deadline_cancel_store_unreadable", "A2 deadline cancellation could not read the encrypted schedule; source retained")
-            return false
+            return@withLock false
         }
         val matching = records.firstOrNull { it.address.equals(address, true) }
         if (matching == null) {
             cancelCallbacks(context, address)
-            return true
+            return@withLock true
         }
         if (expectedEventElapsedMs != null && matching.eventElapsedRealtimeMs != expectedEventElapsedMs) {
             // A stale callback must not cancel a newer disconnect for the same accessory.
-            return true
+            return@withLock true
         }
         cancelCallbacks(context, address)
         val removed = write(prefs, records.filterNot { it.address.equals(address, true) })
         if (!removed) {
             LocalTamperHistory.record(context, "a2_deadline_cancel_persist_failed", "Reconnect cancellation removed the AlarmManager callback but could not commit the updated encrypted deadline list")
         }
-        return removed
+        removed
     }
 
-    fun clearAll(context: Context): Boolean {
+    fun clearAll(context: Context): Boolean = A2DisconnectStateLock.withLock {
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
         val records = read(prefs) ?: run {
             LocalTamperHistory.record(context, "a2_pending_clear_store_unreadable", "A2 deadline cleanup could not read the encrypted schedule; source retained")
-            return false
+            return@withLock false
         }
         records.forEach { cancelCallbacks(context, it.address) }
         val cleared = prefs.edit().remove(KEY_PENDING).commit()
         if (!cleared) {
             LocalTamperHistory.record(context, "a2_pending_clear_failed", "Pending trusted-device deadlines could not be cleared")
         }
-        return cleared
+        cleared
     }
 
     private fun read(prefs: android.content.SharedPreferences): List<Pending>? {
@@ -161,6 +161,9 @@ internal object A2DisconnectScheduler {
             prefs.edit().putString(KEY_PENDING, LocalPreferenceCipher.encrypt(KEY_PENDING, raw)).commit()
         }.getOrDefault(false)
     }
+
+    internal fun mergePending(records: List<Pending>, pending: Pending): List<Pending> =
+        records.filterNot { it.address.equals(pending.address, ignoreCase = true) } + pending
 
     private fun tokenFor(address: String): String = MessageDigest.getInstance("SHA-256")
         .digest(address.trim().uppercase().toByteArray(StandardCharsets.UTF_8))
@@ -233,20 +236,21 @@ internal object A2DisconnectScheduler {
         )
     }
 
-    internal fun hasPendingIntent(context: Context, address: String, fallback: Boolean): Boolean {
-        if (!TrustedBluetoothRegistry.isValidAddress(address)) return false
-        val token = tokenFor(address)
-        val intent = Intent(context, AlarmDeadlineReceiver::class.java)
-            .setAction(if (fallback) ACTION_FALLBACK else ACTION)
-            .setData(Uri.parse(URI_PREFIX + token))
-        val flags = PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-        return PendingIntent.getBroadcast(
-            context,
-            REQUEST_BASE + (token.take(7).toLong(16) % 1_000_000L).toInt(),
-            intent,
-            flags
-        ) != null
-    }
+    internal fun hasPendingIntent(context: Context, address: String, fallback: Boolean): Boolean =
+        A2DisconnectStateLock.withLock {
+            if (!TrustedBluetoothRegistry.isValidAddress(address)) return@withLock false
+            val token = tokenFor(address)
+            val intent = Intent(context, AlarmDeadlineReceiver::class.java)
+                .setAction(if (fallback) ACTION_FALLBACK else ACTION)
+                .setData(Uri.parse(URI_PREFIX + token))
+            val flags = PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.getBroadcast(
+                context,
+                REQUEST_BASE + (token.take(7).toLong(16) % 1_000_000L).toInt(),
+                intent,
+                flags
+            ) != null
+        }
 
     fun isDeadlineAction(action: String?): Boolean =
         action == ACTION || action == ACTION_FALLBACK

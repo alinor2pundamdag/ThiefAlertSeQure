@@ -13,6 +13,10 @@ object A2DisconnectPolicy {
     fun shouldScheduleExactAlarm(apiLevel: Int, canScheduleExactAlarms: Boolean): Boolean =
         apiLevel < 31 || canScheduleExactAlarms
 
+    /** Bluetooth ACL monitoring requires CONNECT permission from API 31 onward. */
+    fun hasBluetoothConnectPermission(apiLevel: Int, permissionGranted: Boolean): Boolean =
+        apiLevel < 31 || permissionGranted
+
     /** Rejects stale timers after reboot, including OEMs where BOOT_COUNT is unreadable. */
     fun isSameBoot(
         storedBootCount: Int,

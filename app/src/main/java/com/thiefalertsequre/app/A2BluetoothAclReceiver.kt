@@ -51,7 +51,9 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         Thread {
             try {
-                val app = context.applicationContext
+                A2DisconnectStateLock.withLock {
+                    if (ProtectionMonitorService.isBluetoothReceiverRegistered) return@withLock
+                    val app = context.applicationContext
                 val prefs = app.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
                 if (!SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED) ||
                     !SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
@@ -99,6 +101,7 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
                             }
                         }
                     }
+                }
                 }
             } catch (error: Exception) {
                 LocalTamperHistory.record(

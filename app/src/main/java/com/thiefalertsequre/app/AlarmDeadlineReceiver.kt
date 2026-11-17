@@ -3,6 +3,8 @@ package com.thiefalertsequre.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.core.content.ContextCompat
 
 class AlarmDeadlineReceiver : BroadcastReceiver() {
@@ -40,6 +42,12 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
     }
 
     private fun handleA2DisconnectDeadline(context: Context, intent: Intent) {
+        A2DisconnectStateLock.withLock {
+            handleA2DisconnectDeadlineLocked(context, intent)
+        }
+    }
+
+    private fun handleA2DisconnectDeadlineLocked(context: Context, intent: Intent) {
         val token = intent.data?.lastPathSegment ?: return
         val pending = A2DisconnectScheduler.find(context, token) ?: return
         if (ProtectionStore(context).read().mode == ProtectionMode.ALARM_TRIGGERED) {
@@ -57,14 +65,34 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             LocalTamperHistory.record(context, "a2_deadline_old_boot_rejected", "A2 deadline belonged to a different or unverifiable boot")
             return
         }
+
+        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        val monitorEnabled = SafePreferences.boolean(
+            prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
+        val alertEnabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+        val permissionGranted = A2DisconnectPolicy.hasBluetoothConnectPermission(
+            Build.VERSION.SDK_INT,
+            ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.BLUETOOTH_CONNECT
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+        if (!monitorEnabled || !alertEnabled) {
+            A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+            LocalTamperHistory.record(context, "a2_deadline_monitor_disabled", "A2 deadline was cancelled because the protection monitor or A2 setting is OFF")
+            return
+        }
+        if (!permissionGranted) {
+            A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+            LocalTamperHistory.record(context, "a2_deadline_bluetooth_permission_revoked", "Bluetooth Connect permission was revoked; pending separation deadline was cancelled")
+            return
+        }
         if (nowElapsed < pending.deadlineElapsedRealtimeMs) {
             A2DisconnectScheduler.schedule(context, pending)
             return
         }
 
-        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
-        val valid = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false) &&
-            TrustedBluetoothRegistry.isTrusted(prefs, pending.address) &&
+        val valid = TrustedBluetoothRegistry.isTrusted(prefs, pending.address) &&
             A2DisconnectPolicy.isPendingDisconnectCurrent(
                 pending.monitorRevision,
                 TrustedBluetoothRegistry.revision(prefs),
