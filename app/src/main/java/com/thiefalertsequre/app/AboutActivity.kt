@@ -2,15 +2,21 @@ package com.thiefalertsequre.app
 
 import android.content.Intent
 import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.os.Bundle
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.fragment.app.FragmentActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import java.security.MessageDigest
 
 /** Local product identity and owner-facing information; no account or network request is made here. */
 class AboutActivity : FragmentActivity() {
@@ -79,6 +85,26 @@ class AboutActivity : FragmentActivity() {
         details.addView(text("Minimum API 26 • target API 36 • running API ${Build.VERSION.SDK_INT}", 13f, R.color.tas_text))
         card.addView(details)
         root.addView(card)
+        root.addView(space(12))
+        root.addView(button("Open Android App Info") { openAndroidAppInfo() })
+        root.addView(space(6))
+        root.addView(text(
+            "Opens Android's own App Info page for this installed package. This does not change your device settings.",
+            12f, R.color.tas_muted
+        ))
+        root.addView(space(18))
+
+        val signing = signingSnapshot()
+        root.addView(text("RELEASE AUTHENTICITY", 11f, R.color.tas_primary, true))
+        root.addView(space(6))
+        root.addView(text(signing.status, 13f, R.color.tas_text, true))
+        root.addView(space(6))
+        root.addView(text("Installed signer SHA-256\n${signing.actualFingerprint}", 11f, R.color.tas_muted))
+        root.addView(space(6))
+        root.addView(text(
+            "Pinned official release SHA-256\n${formatFingerprint(AppUpdatePolicy.EXPECTED_CERT_SHA256)}",
+            11f, R.color.tas_muted
+        ))
         root.addView(space(18))
 
         root.addView(text("PRIVACY BY DESIGN", 11f, R.color.tas_primary, true))
@@ -102,11 +128,114 @@ class AboutActivity : FragmentActivity() {
             startActivity(Intent(this, SettingsActivity::class.java)
                 .putExtra(SettingsActivity.EXTRA_SECTION, SettingsActivity.SECTION_UPDATES))
         })
+        root.addView(space(22))
+        root.addView(text("OPEN-SOURCE LICENSE ACKNOWLEDGMENTS", 11f, R.color.tas_primary, true))
+        root.addView(space(6))
+        root.addView(text(
+            "ThiefAlertSeQure and its declared direct dependencies include open-source software. Review the dependency and license acknowledgments before redistribution.",
+            13f, R.color.tas_muted
+        ))
+        root.addView(space(8))
+        root.addView(outlinedButton("View third-party license acknowledgments") {
+            showThirdPartyLicenses()
+        })
         root.addView(space(18))
         root.addView(text("Android controls system-level permissions, device-management enrollment, hardware access and manufacturer-specific behavior. No ordinary app can guarantee protection against force-stop, hardware shutdown, recovery reset or every OEM restriction.", 12f, R.color.tas_muted))
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
         ThemeRuntime.apply(this, root)
+    }
+
+    private data class SigningSnapshot(
+        val status: String,
+        val actualFingerprint: String
+    )
+
+    private fun signingSnapshot(): SigningSnapshot {
+        val flags = if (Build.VERSION.SDK_INT >= 28) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            @Suppress("DEPRECATION")
+            PackageManager.GET_SIGNATURES
+        }
+        val info = runCatching {
+            if (Build.VERSION.SDK_INT >= 33) {
+                packageManager.getPackageInfo(
+                    packageName,
+                    PackageManager.PackageInfoFlags.of(flags.toLong())
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, flags)
+            }
+        }.getOrNull() ?: return SigningSnapshot(
+            "UNKNOWN — Android did not provide the installed signing certificate.",
+            "Unavailable"
+        )
+        val signatures = if (Build.VERSION.SDK_INT >= 28) {
+            info.signingInfo?.apkContentsSigners
+        } else {
+            @Suppress("DEPRECATION")
+            info.signatures
+        }
+        val digests = signatures.orEmpty().map { signature ->
+            MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
+                .joinToString("") { byte -> "%02x".format(byte) }
+        }
+        val actual = digests.joinToString("\n") { formatFingerprint(it) }.ifBlank { "Unavailable" }
+        val status = when {
+            packageName != AppUpdatePolicy.EXPECTED_PACKAGE ->
+                "DEVELOPMENT / TEST BUILD — this separate package is not an official production update."
+            digests.isEmpty() ->
+                "UNKNOWN — no readable signing certificate was returned by Android."
+            AppUpdatePolicy.hasOfficialSigner(digests) ->
+                "VERIFIED — the installed production package matches the pinned official release certificate."
+            else ->
+                "WARNING — the installed production package does not match the pinned official release certificate."
+        }
+        return SigningSnapshot(status, actual)
+    }
+
+    private fun formatFingerprint(value: String): String =
+        value.chunked(2).joinToString(":")
+
+    private fun openAndroidAppInfo() {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", packageName, null)
+        }
+        runCatching { startActivity(intent) }.onFailure {
+            Toast.makeText(this, "Android could not open this app's App Info page.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun showThirdPartyLicenses() {
+        val message = """
+            Direct runtime dependencies:
+            • AndroidX Core KTX 1.15.0 — Apache License 2.0
+            • AndroidX Activity KTX 1.10.0 — Apache License 2.0
+            • AndroidX Fragment KTX 1.8.5 — Apache License 2.0
+            • AndroidX Biometric 1.1.0 — Apache License 2.0
+            • AndroidX Lifecycle Runtime KTX 2.8.7 — Apache License 2.0
+            • AndroidX DocumentFile 1.0.1 — Apache License 2.0
+            • Material Components for Android 1.12.0 — Apache License 2.0
+
+            Test dependency:
+            • JUnit 4.13.2 — Eclipse Public License 1.0
+
+            Project source license:
+            • Apache License 2.0 (see the repository LICENSE file)
+
+            License texts:
+            https://www.apache.org/licenses/LICENSE-2.0
+            https://www.eclipse.org/legal/epl-v10.html
+
+            This in-app list identifies direct declared dependencies. Transitive dependencies retain their respective upstream license terms and notices.
+        """.trimIndent()
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Open-source acknowledgments")
+            .setMessage(message)
+            .setPositiveButton("Close", null)
+            .showThemed(this)
     }
 
     private fun packageInfo(): PackageInfo? = runCatching {
