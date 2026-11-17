@@ -809,7 +809,7 @@ class SettingsActivity : FragmentActivity() {
                 val entries = EvidenceVaultBackup.decrypt(bytes, password)
                 require(LocalEvidenceVault.replaceAll(this, entries)) { "The validated evidence archive could not be stored." }
                 entries.size
-            }
+            }.also { password.fill('\u0000') }
             runOnUiThread {
                 android.widget.Toast.makeText(
                     this,
