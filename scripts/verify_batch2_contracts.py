@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+"""Cross-file contract checks for the implemented Batch 2 foundations."""
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+APP = ROOT / "app/src/main/java/com/thiefalertsequre/app"
+monitor = (APP / "ProtectionMonitorService.kt").read_text(encoding="utf-8")
+managed = (APP / "ManagedProtectionController.kt").read_text(encoding="utf-8")
+flash = (APP / "AlarmFlashPatternPolicy.kt").read_text(encoding="utf-8")
+flash_controller = (APP / "AlarmFlashController.kt").read_text(encoding="utf-8")
+alarm = (APP / "AlarmService.kt").read_text(encoding="utf-8")
+vault = (APP / "LocalEvidenceVault.kt").read_text(encoding="utf-8")
+location = (APP / "EvidenceLocationCapture.kt").read_text(encoding="utf-8")
+diagnostics = (APP / "DeviceIntelligenceActivity.kt").read_text(encoding="utf-8")
+score = (APP / "ReadinessScorePolicy.kt").read_text(encoding="utf-8")
+dashboard = (APP / "MainActivity.kt").read_text(encoding="utf-8")
+engine = (APP / "ProtectionEngine.kt").read_text(encoding="utf-8")
+
+checks = {
+    "orderly shutdown is observed only through the dynamically registered system receiver":
+        "Intent.ACTION_SHUTDOWN" in monitor and "ContextCompat.registerReceiver(this, systemReceiver" in monitor,
+    "shutdown event is diagnostic and does not claim to block system shutdown":
+        "orderly_shutdown_observed" in monitor and "cannot block shutdown" in monitor,
+    "managed shutdown hardening remains Device Owner gated":
+        "isDeviceOwner(activity)" in managed and "setLockTaskFeatures" in managed,
+    "seven explicit flash patterns exist":
+        all(f"{name}(" in flash for name in ("STEADY", "SLOW", "NORMAL", "FAST", "BURST", "SOS", "ALTERNATING")),
+    "flash pattern policy drives the torch controller":
+        "AlarmFlashPatternPolicy.delayMs" in flash_controller and "AlarmFlashPatternPolicy.nextTorchState" in flash_controller,
+    "optional flash failure remains independent of audio alarm":
+        "Failure to access a flash unit never blocks or stops alarm audio" in alarm,
+    "encrypted evidence vault uses Android Keystore AES-GCM and bounded retention":
+        "LocalPreferenceCipher.encrypt(PURPOSE" in vault and "MAX_RECORDS = 100" in vault and "RETENTION_MS" in vault,
+    "location evidence is owner-requested and cached-only":
+        "getLastKnownLocation" in location and "getCurrentLocation" not in location and "requestLocationUpdates" not in location,
+    "diagnostics export is user initiated":
+        "Export redacted diagnostics report (JSON)" in diagnostics and "CreateDocument" in diagnostics,
+    "readiness score labels itself as non-guarantee":
+        "not a security/integrity guarantee" in score and "PROTECTION READINESS SCORE" in diagnostics,
+    "dashboard has a double-size shield and horizontal navigation":
+        "dp(136), dp(136)" in dashboard and "HorizontalScrollView" in dashboard and "navigationRow" in dashboard,
+    "charger countdown remains exactly ten seconds":
+        "const val COUNTDOWN_MS = 10_000L" in engine,
+}
+for description, passed in checks.items():
+    if not passed:
+        raise SystemExit("Batch 2 contract failed: " + description)
+
+print("Verified Batch 2 cross-file shutdown, managed-mode, flash, evidence, diagnostics, readiness, dashboard, and core-timing contracts.")
