@@ -60,7 +60,11 @@ internal object CameraEvidenceCapture {
             return
         }
 
-        val manager = app.getSystemService(CameraManager::class.java)
+        val manager = app.getSystemService(CameraManager::class.java) ?: run {
+            inFlight.set(false)
+            recordFailure(app, "camera_evidence_camera_service_missing", "Android did not expose the camera system service")
+            return
+        }
         val cameraId = runCatching {
             manager.cameraIdList.firstOrNull { id ->
                 manager.getCameraCharacteristics(id)
@@ -132,7 +136,7 @@ internal object CameraEvidenceCapture {
                 finish("camera_evidence_image_rejected", "JPEG could not be compressed below the 2 MiB evidence size limit")
                 return@setOnImageAvailableListener
             }
-            val entry = CameraEvidenceVault.save(app, boundedJpeg)
+            val entry = runCatching { CameraEvidenceVault.save(app, boundedJpeg) }.getOrNull()
             if (entry == null) {
                 finish("camera_evidence_storage_failed", "Encrypted front-camera evidence could not be committed to local storage")
             } else {
@@ -274,7 +278,7 @@ internal object CameraEvidenceCapture {
             (android.os.Build.VERSION.SDK_INT < 17 || !activity.isDestroyed)
 
     private fun recordFailure(context: Context, event: String, detail: String) {
-        LocalEvidenceVault.recordAsync(context, event, detail)
-        LocalTamperHistory.record(context, event, detail)
+        runCatching { LocalEvidenceVault.recordAsync(context, event, detail) }
+        runCatching { LocalTamperHistory.record(context, event, detail) }
     }
 }
