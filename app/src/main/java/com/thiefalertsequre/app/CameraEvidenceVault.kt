@@ -105,8 +105,14 @@ internal object CameraEvidenceVault {
         val app = context.applicationContext
         val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (!prefs.edit().remove(KEY_INDEX).commit()) return false
-        evidenceDirectory(app).listFiles()?.forEach { file -> file.delete() }
-        return true
+        val files = evidenceDirectory(app).listFiles().orEmpty()
+        val allDeleted = files.all { file -> file.delete() || !file.exists() }
+        if (allDeleted) {
+            runCatching {
+                KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
+            }
+        }
+        return allDeleted
     }
 
     fun verifyIntegrity(context: Context): Boolean {
