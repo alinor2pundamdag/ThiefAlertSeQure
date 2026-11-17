@@ -3,6 +3,7 @@ package com.thiefalertsequre.app
 import android.app.ActivityManager
 import android.app.AlarmManager
 import android.app.NotificationManager
+import android.app.usage.UsageStatsManager
 import android.app.KeyguardManager
 import android.content.Intent
 import android.content.IntentFilter
@@ -106,6 +107,30 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             "BatteryManager capacity reading: ${if (capacity in 0..100) "$capacity%" else "Unavailable"}",
             "Battery Saver: ${if (power.isPowerSaveMode) "ON" else "OFF"} • Thermal status: $thermal",
             "App battery optimization exemption: ${if (Build.VERSION.SDK_INT >= 23 && power.isIgnoringBatteryOptimizations(packageName)) "Granted" else "Not granted / not exempt"}"
+        ))
+
+        val backgroundRestricted = if (Build.VERSION.SDK_INT >= 28) {
+            runCatching { getSystemService(ActivityManager::class.java).isBackgroundRestricted }.getOrNull()
+        } else null
+        val standbyBucket = if (Build.VERSION.SDK_INT >= 28) {
+            runCatching { getSystemService(UsageStatsManager::class.java).appStandbyBucket }.getOrNull()
+        } else null
+        val backgroundState = when (backgroundRestricted) {
+            true -> "Restricted by Android"
+            false -> "Not marked restricted by Android"
+            null -> "Not exposed on this Android version"
+        }
+        val standbyState = if (Build.VERSION.SDK_INT >= 28) {
+            standbyBucket?.let(::standbyBucketLabel) ?: "Unavailable"
+        } else "Not exposed before API 28"
+        addCard("OEM AND BACKGROUND EXECUTION", listOf(
+            "Manufacturer compatibility family: $family",
+            "Background execution restriction: $backgroundState",
+            "Device idle / Doze state: ${if (power.isDeviceIdleMode) "Idle" else "Not idle"}",
+            "App standby bucket: $standbyState",
+            "Battery optimization exemption: ${if (power.isIgnoringBatteryOptimizations(packageName)) "Granted" else "Not granted"}",
+            "OEM guidance: ${AndroidDeviceCompatibility.backgroundSettingsGuide(manufacturer, brand)}",
+            "These are read-only Android-reported states; OEM firmware may apply additional policies that Android does not expose."
         ))
 
         val display = windowManager.defaultDisplay
@@ -289,6 +314,13 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                 put("notificationsEnabled", notifications)
                 put("exactAlarmAvailable", exactAlarm)
                 put("secureLockConfigured", secureLock)
+                put("backgroundRestricted", if (Build.VERSION.SDK_INT >= 28) {
+                    runCatching { getSystemService(ActivityManager::class.java).isBackgroundRestricted }.getOrNull()
+                } else JSONObject.NULL)
+                put("deviceIdleMode", runCatching { getSystemService(PowerManager::class.java).isDeviceIdleMode }.getOrDefault(false))
+                put("appStandbyBucket", if (Build.VERSION.SDK_INT >= 28) {
+                    runCatching { standbyBucketLabel(getSystemService(UsageStatsManager::class.java).appStandbyBucket) }.getOrDefault("Unavailable")
+                } else "Not exposed before API 28")
                 put("recentEventCodes", org.json.JSONArray(LocalTamperHistory.read(this@DeviceIntelligenceActivity, 20).map { it.substringAfter("|").trim().substringBefore("|").take(48) }))
                 put("privacyNote", "Redacted local diagnostics only. No location, camera, microphone, credentials, serial, IMEI, MAC, or build fingerprint.")
             }
@@ -392,6 +424,18 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         val code = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
         "${info.versionName ?: "unknown"} ($code)"
     }.getOrDefault("unknown")
+
+    private fun standbyBucketLabel(bucket: Int): String = when (bucket) {
+        UsageStatsManager.STANDBY_BUCKET_ACTIVE -> "Active"
+        UsageStatsManager.STANDBY_BUCKET_WORKING_SET -> "Working set"
+        UsageStatsManager.STANDBY_BUCKET_FREQUENT -> "Frequent"
+        UsageStatsManager.STANDBY_BUCKET_RARE -> "Rare"
+        else -> if (Build.VERSION.SDK_INT >= 30 && bucket == UsageStatsManager.STANDBY_BUCKET_RESTRICTED) {
+            "Restricted"
+        } else {
+            "Other / platform-defined ($bucket)"
+        }
+    }
 
     private fun thermalLabel(status: Int): String = when (status) {
         PowerManager.THERMAL_STATUS_NONE -> "Normal"
