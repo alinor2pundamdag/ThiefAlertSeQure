@@ -278,6 +278,7 @@ private fun SeismicGenesisIntroContent(
         label = "twenty-light-colors"
     )
     val developerName = "Alinor Pundamdag"
+    val concreteName = buildAnnotatedString { append(developerName) }
     val coloredName = buildAnnotatedString {
         developerName.forEachIndexed { index, character ->
             if (character.isWhitespace()) {
@@ -299,6 +300,8 @@ private fun SeismicGenesisIntroContent(
             .fillMaxSize()
             .background(Color.Black)
     ) {
+        // Capture BoxWithConstraints dimensions before entering nested layout scopes.
+        val containerHeight = maxHeight
         val p = progress.value
         val shakeEnvelope = when {
             p in 0.245f..0.278333f -> sin(((p - 0.245f) / 0.033333f) * 6f * PI).toFloat() * 15f
@@ -341,7 +344,7 @@ private fun SeismicGenesisIntroContent(
                     text = "Developed By:",
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .offset(y = maxHeight * (-0.55f * (1f - drop)))
+                        .offset(y = containerHeight * (-0.55f * (1f - drop)))
                         .graphicsLayer {
                             translationX = shake
                             rotationZ = shake / 16f
@@ -368,10 +371,10 @@ private fun SeismicGenesisIntroContent(
                 )
                 val initialConcrete = p < 0.47f
                 Text(
-                    text = if (initialConcrete) developerName else coloredName,
+                    text = if (initialConcrete) concreteName else coloredName,
                     modifier = Modifier
                         .align(targetAlignment)
-                        .offset(y = if (p >= 0.82f) maxHeight * (-0.06f * finalFall) else maxHeight * (-0.55f * (1f - nameDrop)))
+                        .offset(y = if (p >= 0.82f) containerHeight * (-0.06f * finalFall) else containerHeight * (-0.55f * (1f - nameDrop)))
                         .graphicsLayer {
                             translationX = if (p in 0.405f..0.455f) shakeEnvelope else 0f
                             rotationZ = if (p < 0.48f) -4f * (1f - nameDrop) else 0f
