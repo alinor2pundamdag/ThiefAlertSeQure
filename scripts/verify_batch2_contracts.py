@@ -54,6 +54,13 @@ checks = {
         "not a security/integrity guarantee" in score and "PROTECTION READINESS SCORE" in diagnostics,
     "dashboard has a double-size shield and horizontal navigation":
         "dp(136), dp(136)" in dashboard and "HorizontalScrollView" in dashboard and "navigationRow" in dashboard,
+    "four Batch 2 destinations appear between the local-security header and live shield":
+        dashboard.index("LOCAL SECURITY  •  NO ACCOUNT  •  NO BACKEND") <
+        dashboard.index("Hardening & Reliability") <
+        dashboard.index("LIVE PROTECTION STATUS") and
+        all(label in dashboard for label in ("Authentication & Evidence", "Device Intelligence", "More / About")),
+    "authentication and tamper evidence remain reachable from the owner-authentication section":
+        "Review authentication & tamper evidence" in dashboard and "Intent(this, SettingsActivity::class.java)" in dashboard,
     "charger countdown remains exactly ten seconds":
         "const val COUNTDOWN_MS = 10_000L" in engine,
 }
