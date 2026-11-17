@@ -17,6 +17,7 @@ import android.widget.NumberPicker
 import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationManagerCompat
@@ -609,30 +610,46 @@ class SettingsActivity : FragmentActivity() {
         })
         root.addView(space(8))
         val evidenceEntries = LocalEvidenceVault.read(this, 100)
-        val localEvidenceIntegrity = runCatching {
-            LocalEvidenceVault.verifyIntegrity(this)
-        }.getOrDefault(false)
-        root.addView(text(
-            "${evidenceEntries.size} encrypted local event records • 30-day retention • AES-GCM integrity ${if (localEvidenceIntegrity) "VERIFIED" else "FAILED / UNKNOWN"} • no cloud upload",
+        val integrityStatus = text(
+            "${evidenceEntries.size} encrypted local event records • 30-day retention • AES-GCM integrity CHECKING… • no cloud upload",
             12f, R.color.tas_muted
-        ))
+        )
+        root.addView(integrityStatus)
+        ioExecutor.execute {
+            val integrity = runCatching {
+                LocalEvidenceVault.verifyIntegrity(this@SettingsActivity)
+            }.getOrDefault(false)
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) {
+                    integrityStatus.text =
+                        "${evidenceEntries.size} encrypted local event records • 30-day retention • AES-GCM integrity ${if (integrity) "VERIFIED" else "FAILED / UNKNOWN"} • no cloud upload"
+                }
+            }
+        }
         root.addView(space(6))
         root.addView(action("Verify local evidence integrity now") {
-            val eventIntegrity = runCatching {
-                LocalEvidenceVault.verifyIntegrity(this)
-            }.getOrDefault(false)
-            val photoIntegrity = runCatching {
-                CameraEvidenceVault.verifyIntegrity(this)
-            }.getOrDefault(false)
-            MaterialAlertDialogBuilder(this)
-                .setTitle("Local evidence integrity")
-                .setMessage(
-                    "Encrypted event archive: ${if (eventIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}\n" +
-                    "Encrypted photo vault: ${if (photoIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}\n\n" +
-                    "A failed or unknown result means the affected archive should not be treated as verified. This check does not change protection or alarm state."
-                )
-                .setPositiveButton("Close", null)
-                .showThemed(this)
+            Toast.makeText(this, "Checking local evidence integrity…", Toast.LENGTH_SHORT).show()
+            ioExecutor.execute {
+                val eventIntegrity = runCatching {
+                    LocalEvidenceVault.verifyIntegrity(this@SettingsActivity)
+                }.getOrDefault(false)
+                val photoIntegrity = runCatching {
+                    CameraEvidenceVault.verifyIntegrity(this@SettingsActivity)
+                }.getOrDefault(false)
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) {
+                        MaterialAlertDialogBuilder(this@SettingsActivity)
+                            .setTitle("Local evidence integrity")
+                            .setMessage(
+                                "Encrypted event archive: ${if (eventIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}\n" +
+                                "Encrypted photo vault: ${if (photoIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}\n\n" +
+                                "A failed or unknown result means the affected archive should not be treated as verified. This check does not change protection or alarm state."
+                            )
+                            .setPositiveButton("Close", null)
+                            .showThemed(this@SettingsActivity)
+                    }
+                }
+            }
         })
         root.addView(space(6))
         root.addView(action("Review encrypted evidence records") {
