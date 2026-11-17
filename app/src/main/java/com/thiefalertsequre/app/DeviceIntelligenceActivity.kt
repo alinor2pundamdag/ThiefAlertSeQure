@@ -393,7 +393,8 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             "4. If optional Device Owner lockdown is active: use the in-app managed-lockdown recovery action while the enrolled Device Owner remains available. Keep the original recovery snapshot intact.",
             "5. If evidence or settings must be moved: restore the separate password-protected evidence backup or configuration backup. Configuration backup does not contain authentication secrets or permission grants.",
             "6. If Android access changes: return to the app; permission-change snapshots are compared on resume and recorded locally.",
-            "7. Never assume a standard app can prevent hardware-forced shutdown, battery removal, bootloader/recovery controls, or factory reset."
+            "7. If optional front-camera evidence is not saved: confirm the Settings opt-in, CAMERA permission, front-facing camera availability, and that successful owner authentication returned to the visible app. Review the local event history; a camera failure never reverses alarm disarm.",
+            "8. Never assume a standard app can prevent hardware-forced shutdown, battery removal, bootloader/recovery controls, or factory reset."
         ).joinToString("\n\n")
         MaterialAlertDialogBuilder(this)
             .setTitle("Emergency recovery guide")
