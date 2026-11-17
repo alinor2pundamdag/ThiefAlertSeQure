@@ -120,7 +120,8 @@ internal object CameraEvidenceVault {
         val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (!prefs.edit().remove(KEY_INDEX).commit()) return false
         val files = evidenceDirectory(app).listFiles().orEmpty()
-        val allDeleted = files.all { file -> file.delete() || !file.exists() }
+        files.forEach { file -> runCatching { file.delete() } }
+        val allDeleted = files.none { it.exists() }
         if (allDeleted) {
             runCatching {
                 synchronized(keyLock) {
