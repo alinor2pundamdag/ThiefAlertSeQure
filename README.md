@@ -120,7 +120,7 @@ The app keeps the operational data it needs in its private app storage, includin
 - Biometric failure counter and temporary cooldown deadline.
 - Your recorded privacy-notice choice.
 - Alarm-volume value needed for restoration after successful disarm.
-- A bounded local protection-event history and a separate AES-GCM encrypted evidence metadata vault (up to 100 records, 30-day retention). The vault includes only events and location snapshots the owner explicitly requests.
+- A bounded local protection-event history and a separate AES-GCM encrypted evidence metadata vault (up to 100 records, 30-day retention). The vault includes only events and location snapshots the owner explicitly requests; the owner can export/restore the vault through a separate password-encrypted backup file.
 - Monitor preferences, such as motion sensitivity and optional battery-alert threshold.
 - References and Android access grants for audio files you explicitly select.
 
