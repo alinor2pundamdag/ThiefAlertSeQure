@@ -198,6 +198,15 @@ internal object CameraEvidenceCapture {
                                         val request = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE).apply {
                                             addTarget(reader.surface)
                                             set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+                                            val afModes = characteristics.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES)
+                                            if (afModes?.contains(CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE) == true) {
+                                                set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+                                            }
+                                            val aeModes = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES)
+                                            if (aeModes?.contains(CaptureRequest.CONTROL_AE_MODE_ON) == true) {
+                                                set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                                            }
+                                            set(CaptureRequest.JPEG_QUALITY, 85.toByte())
                                             val sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
                                             val rotation = when (activity.windowManager.defaultDisplay.rotation) {
                                                 Surface.ROTATION_90 -> 90
