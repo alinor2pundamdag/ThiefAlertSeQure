@@ -25,12 +25,15 @@ for description, passed in required.items():
 
 if "android.permission.RANGING" in manifest or "Manifest.permission.RANGING" in all_kotlin or '"android.permission.RANGING"' in all_kotlin:
     raise SystemExit("Local capability inspection must not declare or request the dangerous RANGING permission.")
-for forbidden in ("android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_BACKGROUND_LOCATION"):
-    if forbidden in manifest:
-        raise SystemExit(f"Ranging capability inspection must not add location permission: {forbidden}")
-for forbidden in ("Manifest.permission.ACCESS_FINE_LOCATION", "Manifest.permission.ACCESS_COARSE_LOCATION", "Manifest.permission.ACCESS_BACKGROUND_LOCATION"):
-    if forbidden in all_kotlin:
-        raise SystemExit(f"Ranging capability inspection must not request location permission: {forbidden}")
+# Location permissions are separately used by the explicit Evidence Vault snapshot
+# flow. The ranging capability check itself must remain location-independent.
+for forbidden in ("ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "ACCESS_BACKGROUND_LOCATION"):
+    if forbidden in query:
+        raise SystemExit(f"Ranging capability inspection must not use location: {forbidden}")
+for screen in (activity, (ROOT / "app/src/main/java/com/thiefalertsequre/app/BluetoothCenterActivity.kt").read_text(encoding="utf-8")):
+    for forbidden in ("Manifest.permission.ACCESS_FINE_LOCATION", "Manifest.permission.ACCESS_COARSE_LOCATION", "Manifest.permission.ACCESS_BACKGROUND_LOCATION"):
+        if forbidden in screen:
+            raise SystemExit(f"Ranging capability screens must not request location permission: {forbidden}")
 if "createRangingSession(" in all_kotlin:
     raise SystemExit("Ranging capability inspection must not start a peer ranging session.")
 
