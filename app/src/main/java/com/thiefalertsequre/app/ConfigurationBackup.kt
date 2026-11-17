@@ -83,6 +83,9 @@ internal object ConfigurationBackup {
     fun decryptAndRestore(context: Context, bytes: ByteArray, password: CharArray): Int {
         try {
             require(password.size >= 12) { "Configuration backup password must contain at least 12 characters." }
+            require(ProtectionStore(context).read().mode != ProtectionMode.ALARM_TRIGGERED) {
+                "Configuration restore is blocked while protection is latched. Complete fresh owner authentication first."
+            }
             val payload = decryptPayload(bytes, password)
             val imported = parse(payload)
             // Validate current values before changing any settings and retain a rollback snapshot.
