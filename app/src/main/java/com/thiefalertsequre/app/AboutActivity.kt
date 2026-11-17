@@ -85,7 +85,6 @@ class AboutActivity : FragmentActivity() {
             strokeWidth = dp(1)
             strokeColor = 0xFF2B3548.toInt()
             setCardBackgroundColor(0xFF070B14.toInt())
-            contentDescription = "Developer signature card"
         }
         developerCredit = TextView(this).apply {
             text = developerCreditText
