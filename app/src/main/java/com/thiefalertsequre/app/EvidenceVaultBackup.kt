@@ -27,38 +27,41 @@ internal object EvidenceVaultBackup {
     private const val MAX_RECORDS = 100
 
     fun encrypt(entries: List<LocalEvidenceVault.Entry>, password: CharArray): ByteArray {
-        require(password.size >= 12) { "Backup password must contain at least 12 characters." }
-        require(entries.size <= MAX_RECORDS) { "Evidence archive exceeds the record limit." }
-        val json = JSONArray().apply {
-            entries.forEach { entry ->
-                put(JSONObject().apply {
-                    put("at", entry.timestampEpochMs)
-                    put("tz", entry.timezoneOffsetMinutes)
-                    put("event", entry.event)
-                    put("detail", entry.detail)
-                    put("sha256", entry.integritySha256)
-                })
+        try {
+            require(password.size >= 12) { "Backup password must contain at least 12 characters." }
+            require(entries.size <= MAX_RECORDS) { "Evidence archive exceeds the record limit." }
+            val json = JSONArray().apply {
+                entries.forEach { entry ->
+                    put(JSONObject().apply {
+                        put("at", entry.timestampEpochMs)
+                        put("tz", entry.timezoneOffsetMinutes)
+                        put("event", entry.event)
+                        put("detail", entry.detail)
+                        put("sha256", entry.integritySha256)
+                    })
+                }
+            }.toString().toByteArray(Charsets.UTF_8)
+            val salt = ByteArray(SALT_BYTES).also(SecureRandom()::nextBytes)
+            val iv = ByteArray(IV_BYTES).also(SecureRandom()::nextBytes)
+            val key = deriveKey(password, salt, ITERATIONS)
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
+            cipher.updateAAD(AAD)
+            val encrypted = cipher.doFinal(json)
+            val output = ByteArrayOutputStream()
+            DataOutputStream(output).use { data ->
+                data.write(MAGIC)
+                data.writeInt(ITERATIONS)
+                data.write(salt)
+                data.write(iv)
+                data.writeInt(encrypted.size)
+                data.write(encrypted)
             }
-        }.toString().toByteArray(Charsets.UTF_8)
-        val salt = ByteArray(SALT_BYTES).also(SecureRandom()::nextBytes)
-        val iv = ByteArray(IV_BYTES).also(SecureRandom()::nextBytes)
-        val key = deriveKey(password, salt, ITERATIONS)
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
-        cipher.updateAAD(AAD)
-        val encrypted = cipher.doFinal(json)
-        val output = ByteArrayOutputStream()
-        DataOutputStream(output).use { data ->
-            data.write(MAGIC)
-            data.writeInt(ITERATIONS)
-            data.write(salt)
-            data.write(iv)
-            data.writeInt(encrypted.size)
-            data.write(encrypted)
+            require(output.size() <= MAX_BACKUP_BYTES) { "Encrypted backup is too large." }
+            return output.toByteArray()
+        } finally {
+            password.fill('\u0000')
         }
-        password.fill('\u0000')
-        require(output.size() <= MAX_BACKUP_BYTES) { "Encrypted backup is too large." }
-        return output.toByteArray()
     }
 
     fun decrypt(bytes: ByteArray, password: CharArray): List<LocalEvidenceVault.Entry> {
