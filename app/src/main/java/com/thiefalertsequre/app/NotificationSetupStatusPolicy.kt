@@ -16,6 +16,28 @@ object NotificationSetupStatusPolicy {
             }
         )
 
+    fun monitorChannel(importance: Int?): SetupItem =
+        when {
+            importance == null -> SetupItem(
+                "monitor_channel",
+                "Protection notification channel",
+                SetupState.UNKNOWN,
+                "Android has not created the protection-monitor channel yet; it is created when the monitor service starts."
+            )
+            importance == NotificationManager.IMPORTANCE_NONE -> SetupItem(
+                "monitor_channel",
+                "Protection notification channel",
+                SetupState.ACTION_REQUIRED,
+                "Android reports that the persistent protection notification channel is blocked. The status-bar shield cannot appear until it is enabled."
+            )
+            else -> SetupItem(
+                "monitor_channel",
+                "Protection notification channel",
+                SetupState.VERIFIED,
+                "Android reports that the persistent protection notification channel is available."
+            )
+        }
+
     fun alarmChannel(importance: Int?): SetupItem =
         when {
             importance == null -> SetupItem(
