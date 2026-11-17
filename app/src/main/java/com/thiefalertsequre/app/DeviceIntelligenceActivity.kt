@@ -19,12 +19,14 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.FragmentActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.util.Locale
+import org.json.JSONObject
 import java.util.concurrent.Executors
 
 /** Read-only, on-device capability and readiness report. No hardware identifiers are collected. */
@@ -34,6 +36,9 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     private val rootCheckExecutor = Executors.newSingleThreadExecutor()
     private var rangingStatus: String? = null
     private var stopRangingQuery: (() -> Unit)? = null
+    private val exportDiagnostics = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> if (uri != null) writeDiagnosticsReport(uri) }
     override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); render() }
 
     override fun onResume() {
@@ -248,6 +253,10 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         rootButtonRow()
 
         root.addView(button("Refresh device intelligence") { render() }, matchWrap())
+        root.addView(space(8))
+        root.addView(button("Export redacted diagnostics report (JSON)") {
+            exportDiagnostics.launch("thiefalertsequre-diagnostics.json")
+        }, matchWrap())
         root.addView(space(12))
         root.addView(label("Privacy boundary: this report reads public local Android APIs and hardware feature flags. It does not read IMEI, serial number, MAC address, Wi-Fi identifiers, contacts, messages, files, microphone, camera content, or precise location. Results stay on this device.", 12f, R.color.tas_muted, false), matchWrap())
         setContentView(scroll)
@@ -255,6 +264,48 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         ThemeRuntime.apply(this, scroll)
     }
 
+
+    private fun writeDiagnosticsReport(uri: android.net.Uri) {
+        val report = runCatching {
+            val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+            val alarmManager = getSystemService(AlarmManager::class.java)
+            val notifications = NotificationManagerCompat.from(this).areNotificationsEnabled()
+            val exactAlarm = Build.VERSION.SDK_INT < 31 || runCatching { alarmManager.canScheduleExactAlarms() }.getOrDefault(false)
+            val secureLock = getSystemService(KeyguardManager::class.java).isDeviceSecure
+            val state = ProtectionStore(this).read()
+            JSONObject().apply {
+                put("schemaVersion", 1)
+                put("generatedAtEpochMs", System.currentTimeMillis())
+                put("appVersion", appVersion())
+                put("manufacturer", Build.MANUFACTURER)
+                put("brand", Build.BRAND)
+                put("model", Build.MODEL)
+                put("androidRelease", Build.VERSION.RELEASE)
+                put("apiLevel", Build.VERSION.SDK_INT)
+                put("targetSdk", applicationInfo.targetSdkVersion)
+                put("protectionMode", state.mode.name)
+                put("monitorEnabled", SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED))
+                put("monitorLastRecordedRunning", SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_RUNNING, false))
+                put("notificationsEnabled", notifications)
+                put("exactAlarmAvailable", exactAlarm)
+                put("secureLockConfigured", secureLock)
+                put("recentEventCodes", org.json.JSONArray(LocalTamperHistory.read(this, 20).map { it.substringAfter("|").trim().substringBefore("|").take(48) }))
+                put("privacyNote", "Redacted local diagnostics only. No location, camera, microphone, credentials, serial, IMEI, MAC, or build fingerprint.")
+            }
+        }.getOrElse {
+            android.widget.Toast.makeText(this, "Could not build diagnostics: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        runCatching {
+            contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(report.toString(2)) }
+                ?: error("Android could not open the selected export destination.")
+        }.onSuccess {
+            LocalTamperHistory.record(this, "diagnostics_exported", "Owner exported a redacted local diagnostics JSON report")
+            android.widget.Toast.makeText(this, "Redacted diagnostics report exported.", android.widget.Toast.LENGTH_LONG).show()
+        }.onFailure {
+            android.widget.Toast.makeText(this, "Diagnostics export failed: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
 
     private fun requestRangingCapabilityCheck() {
         if (Build.VERSION.SDK_INT < 36) {
