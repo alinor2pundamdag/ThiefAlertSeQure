@@ -29,6 +29,8 @@ class AlarmService : Service() {
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var vibrator: Vibrator? = null
+    private var hapticsActive = false
+    private var activeHapticPattern: AlarmHapticPattern? = null
     private var flashController: AlarmFlashController? = null
     private var thermalFlashSuppressed = false
     private var thermalFlashController: ThermalFlashController? = null
@@ -104,6 +106,7 @@ class AlarmService : Service() {
         if (player == null && toneController == null) startAlarmAudio()
         syncAlarmFlash()
         syncSecondaryAlarm()
+        syncAlarmHaptics()
         volumeHandler.removeCallbacks(volumeEnforcement)
         volumeHandler.post(volumeEnforcement)
         return START_STICKY
@@ -326,23 +329,49 @@ class AlarmService : Service() {
         }
     }
 
-    private fun startVibrationFallback() {
-        val deviceVibrator = getSystemService(Vibrator::class.java) ?: return
-        if (!deviceVibrator.hasVibrator()) {
-            LocalTamperHistory.record(this, "alarm_no_output_available", "Selected audio unavailable and device has no vibrator")
+    private fun syncAlarmHaptics() {
+        val shouldRun = ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED &&
+            AlarmHapticsPolicy.isEnabled(this)
+        if (!shouldRun) {
+            runCatching { vibrator?.cancel() }
+            vibrator = null
+            hapticsActive = false
+            activeHapticPattern = null
             return
         }
-        vibrator = deviceVibrator
+        val selectedPattern = AlarmHapticsPolicy.readPattern(this)
+        if (hapticsActive && activeHapticPattern == selectedPattern) return
+        runCatching { vibrator?.cancel() }
+        val deviceVibrator = getSystemService(Vibrator::class.java)
+        if (deviceVibrator == null || !deviceVibrator.hasVibrator()) {
+            LocalTamperHistory.record(this, "alarm_haptics_unavailable", "Selected vibration output is not available; audio alarm remains active")
+            vibrator = null
+            hapticsActive = false
+            activeHapticPattern = null
+            return
+        }
         runCatching {
-            if (Build.VERSION.SDK_INT >= 26) {
-                deviceVibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 700, 250, 700, 250), 0))
-            } else {
-                @Suppress("DEPRECATION")
-                deviceVibrator.vibrate(longArrayOf(0, 700, 250, 700, 250), 0)
-            }
-            LocalTamperHistory.record(this, "alarm_vibration_fallback", "Vibration active because selected audio could not play")
+            deviceVibrator.vibrate(VibrationEffect.createWaveform(AlarmHapticsPolicy.waveform(selectedPattern), 0))
+            vibrator = deviceVibrator
+            hapticsActive = true
+            activeHapticPattern = selectedPattern
+            LocalTamperHistory.record(this, "alarm_haptics_started", "Independent repeating haptic pattern active: ${selectedPattern.name}")
         }.onFailure {
-            LocalTamperHistory.record(this, "alarm_vibration_failed", it.javaClass.simpleName + ": " + it.message)
+            vibrator = null
+            hapticsActive = false
+            activeHapticPattern = null
+            LocalTamperHistory.record(this, "alarm_haptics_failed", it.javaClass.simpleName + ": " + it.message)
+        }
+    }
+
+    private fun startVibrationFallback() {
+        if (!AlarmHapticsPolicy.isEnabled(this)) {
+            LocalTamperHistory.record(this, "alarm_haptics_disabled", "Audio fallback vibration is disabled by the owner")
+            return
+        }
+        syncAlarmHaptics()
+        if (!hapticsActive) {
+            LocalTamperHistory.record(this, "alarm_no_output_available", "Selected audio failed and no usable vibration output was confirmed")
         }
     }
 
@@ -430,6 +459,8 @@ class AlarmService : Service() {
         player = null
         runCatching { vibrator?.cancel() }
         vibrator = null
+        hapticsActive = false
+        activeHapticPattern = null
         audioManager?.let { manager ->
             if (Build.VERSION.SDK_INT >= 26) {
                 audioFocusRequest?.let { request -> runCatching { manager.abandonAudioFocusRequest(request) } }
