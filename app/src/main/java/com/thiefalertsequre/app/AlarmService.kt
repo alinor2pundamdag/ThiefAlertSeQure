@@ -393,7 +393,9 @@ class AlarmService : Service() {
 
     override fun onDestroy() {
         volumeHandler.removeCallbacks(volumeEnforcement)
-        thermalFlashController?.stop()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            thermalFlashController?.stop()
+        }
         thermalFlashController = null
         stopAlarm()
         super.onDestroy()
