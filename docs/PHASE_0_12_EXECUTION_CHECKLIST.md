@@ -33,7 +33,7 @@ This is the persistent source of truth for interrupted work. A phase is not comp
 | **8 — UI and accessibility** | Preserve screens, navigation, themes, readiness flows, edge-to-edge insets and accessibility semantics | **CODING/CI PASS —** navigation, themed dialogs, theme and accessibility source checks pass; TalkBack/display perception remains device-unverified |
 | **9 — Automated tests and CI** | JVM tests, source-contract checks, manifest/preferences/ownership checks, lint, assets, release build and APK identity checks | **PASS —** exact-head Android run [#44005105554](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105554) and CodeQL run [#44005105442](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105442) succeeded on `a1a567bf53f97189be2547ccf872ae665c30a54b`; JVM tests, source guards, lint, APK checks and CodeQL passed. Instrumentation/emulator execution remains excluded |
 | **10 — Documentation, Privacy & Assets** | Reconcile README, privacy policy, permissions, feature matrix, threat model, update/install docs, asset formats/integrity and user-facing capability claims | **PASS —** privacy/permission claims reconciled, optional ranging is disclosed accurately, README/API scope corrected, packaged icon/audio assets validated and static privacy guards pass |
-| **11 — Branch Integration & Release Candidate** | Review branch diff/ancestry, package/version/signer invariants, release workflow, secret references, artifact identity, update path and release gates | **SOFTWARE REVIEW IN PROGRESS —** latest compare: 519 commits ahead, 0 behind `main`, 131 changed paths (90 added, 41 modified, 0 deleted); PR #7 remains draft/open and mergeable. No merge/rebase/tag/publication/release performed. Permanent production signing-secret presence and active CodeQL alert #8 closure remain unverified |
+| **11 — Branch Integration & Release Candidate** | Review branch diff/ancestry, package/version/signer invariants, release workflow, secret references, artifact identity, update path and release gates | **SOFTWARE REVIEW IN PROGRESS —** latest compare: 524 commits ahead, 0 behind `main`, 131 changed paths (90 added, 41 modified, 0 deleted); PR #7 remains draft/open and mergeable. No merge/rebase/tag/publication/release performed. Permanent production signing-secret presence and active CodeQL alert #8 closure remain unverified |
 | **12 — Physical-device acceptance** | Physical-device execution and evidence collection | **OUT OF SCOPE —** owner explicitly excluded physical-device testing from this software/GitHub completion task; do not run it or hold code completion on it |
 
 ## Phase 10 — documentation, privacy and assets
@@ -74,7 +74,7 @@ Physical-device acceptance records and OEM scenario documents remain historical/
 - Code-bearing source commit: `475c1fa00b8c30c1280f77053d83eb91c0db7f64`
 - Android workflow: [run 43950015535 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535)
 - CodeQL: [run 43950015623 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623)
-- JVM test source files: 29; unit-test step passed.
+- JVM unit-test source files: 30; unit-test step passed. The 15 `app/src/androidTest` source files remain dormant and were not compiled or executed.
 - Instrumentation: no instrumentation task, compilation or execution; no emulator matrix.
 - Development artifact: `ThiefAlertSeQure-debug-apk`, ID `14266362844`, 6,615,813 bytes; package `com.thiefalertsequre.app.v114test`, version `1.1.4-test`, code 6, minSdk 26; APK SHA-256 `034d3cc076ca06ea3265bd468e42de8247352d3f8cf1f1882f7b4620971c641e`; CI debug signer SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`.
 - Minified release build: package `com.thiefalertsequre.app`, version `1.1.4`, code 6; build and metadata checks passed, but this CI output was unsigned because permanent release signing was not configured. It is not a production release.
@@ -133,10 +133,23 @@ This snapshot records the latest code-bearing source commit and the final docume
 - CodeQL: [run #44005105442 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105442).
 - Android job steps verified successful: instrumentation-disabled guard, JVM unit tests, navigation/preferences/manifest/state-ownership checks, lint, asset validation, release workflow YAML validation, release identity check, APK assembly, APK metadata/package/signer checks, artifact upload.
 - CodeQL Java/Kotlin source build and both Java/Kotlin and Actions analysis jobs completed successfully.
-- Recursive Git tree inspection: 222 entries, 64 production Kotlin source files under `app/src/main/java`; no tree truncation.
+- Recursive Git tree inspection: 222 entries, 64 production Kotlin source files under `app/src/main/java`; no tree truncation. Automated marker/pattern sweeps and focused manual review covered the production source set; this is not represented as exhaustive line-by-line formal verification.
 - PR review threads: 1 thread, resolved by repository owner; it references the APK installer CodeQL finding. This does **not** independently prove the underlying code-scanning alert is closed.
 - The connector does not expose the repository Code Scanning Alerts endpoint or security alert page in this session. Alert #8 state is therefore **NOT VERIFIED**; do not infer closure from green CodeQL workflow.
-- Latest branch comparison: 519 ahead / 0 behind; 131 changed files: 90 added, 41 modified, 0 deleted. GitHub reports PR #7 mergeable; PR remains draft/open/unmerged.
+- Latest branch comparison: 524 ahead / 0 behind; 131 changed files: 90 added, 41 modified, 0 deleted. GitHub reports PR #7 mergeable; PR remains draft/open/unmerged.
 - Production signing secrets are referenced by the protected release workflow but their presence and the availability of a production-signed APK are **NOT VERIFIED**. Current CI development artifact is not a production release.
 - No instrumentation source was compiled or executed, no emulator was used, and no physical-device test was run.
 - `main` remains untouched. No merge, rebase, tag, publication or release was performed.
+
+
+## Final branch snapshot after documentation reconciliation — 2026-11-17
+
+- PR #7 head at this snapshot: `d70f79f5d66e30765eba39e0ce58cc4e651ccc63`.
+- Exact-head Android workflow [#44009392497](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44009392497): **SUCCESS**.
+- Exact-head CodeQL workflow [#44009392512](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44009392512): **SUCCESS**.
+- Android steps passed: instrumentation-disabled guard, 30-file JVM unit suite, navigation/preferences/manifest/state-ownership guards, lint, asset validation, release workflow YAML, release identity, debug APK assembly/metadata, minified release metadata, package/version/signer checks and artifact upload.
+- Development artifact: `ThiefAlertSeQure-debug-apk`, 6,616,246 bytes. It is a development-only artifact, not a production release.
+- Branch comparison: 524 ahead / 0 behind; 131 files (90 added, 41 modified, 0 deleted); PR #7 mergeable, draft/open/unmerged.
+- One PR inline review thread is resolved. The underlying CodeQL alert #8 active/closed state remains not verified because the available connector cannot read the repository Code Scanning Alerts page/API.
+- Production signing-secret availability and production-signed APK availability remain not verified.
+- No instrumentation/emulator/physical-device testing, merge, rebase, tag, APK publication or release was performed.
