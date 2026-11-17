@@ -16,6 +16,8 @@ for forbidden in ("ProcessBuilder(","Runtime.getRuntime().exec","WRITE_SECURE_SE
                   "DEVICE_POWER","setprop ","sysfs","service call"):
     assert forbidden not in controller,f"Unsafe undocumented control path: {forbidden}"
 assert "isEnabled = snapshot.canToggle" in settings
+assert settings.count("addBypassChargingSection()") >= 2, "Bypass Charging section must be connected to Settings rendering."
+assert "Settings.ACTION_SETTINGS" in settings
 assert "BypassChargingGuidance.instructions" in settings
 assert tests.is_file()
 for permission in ("android.permission.WRITE_SECURE_SETTINGS",
