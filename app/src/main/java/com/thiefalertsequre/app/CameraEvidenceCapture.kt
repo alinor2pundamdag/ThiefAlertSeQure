@@ -45,10 +45,7 @@ internal object CameraEvidenceCapture {
         val permissionGranted = ContextCompat.checkSelfPermission(
             activity, Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
-        val visible = activity is androidx.lifecycle.LifecycleOwner &&
-            (activity as androidx.lifecycle.LifecycleOwner).lifecycle.currentState
-                .isAtLeast(Lifecycle.State.STARTED) &&
-            !activity.isFinishing && (android.os.Build.VERSION.SDK_INT < 17 || !activity.isDestroyed)
+        val visible = isActivityVisible(activity)
         if (!CameraEvidencePolicy.shouldCapture(true, permissionGranted, true, visible)) {
             recordFailure(app, if (!permissionGranted) "camera_evidence_permission_missing"
                 else "camera_evidence_activity_not_visible",
@@ -157,6 +154,10 @@ internal object CameraEvidenceCapture {
                         device.close()
                         return
                     }
+                    if (!isActivityVisible(activity)) {
+                        finish("camera_evidence_activity_not_visible", "App left the visible state before the front-camera device opened")
+                        return
+                    }
                     try {
                         device.createCaptureSession(
                             listOf(reader.surface),
@@ -165,6 +166,10 @@ internal object CameraEvidenceCapture {
                                     session = configured
                                     if (finished.get()) {
                                         configured.close()
+                                        return
+                                    }
+                                    if (!isActivityVisible(activity)) {
+                                        finish("camera_evidence_activity_not_visible", "App left the visible state before the front-camera photo was captured")
                                         return
                                     }
                                     try {
@@ -223,6 +228,13 @@ internal object CameraEvidenceCapture {
             finish("camera_evidence_start_failed", error.javaClass.simpleName + ": " + error.message)
         }
     }
+
+    private fun isActivityVisible(activity: Activity): Boolean =
+        activity is androidx.lifecycle.LifecycleOwner &&
+            (activity as androidx.lifecycle.LifecycleOwner).lifecycle.currentState
+                .isAtLeast(Lifecycle.State.STARTED) &&
+            !activity.isFinishing &&
+            (android.os.Build.VERSION.SDK_INT < 17 || !activity.isDestroyed)
 
     private fun recordFailure(context: Context, event: String, detail: String) {
         LocalEvidenceVault.recordAsync(context, event, detail)
