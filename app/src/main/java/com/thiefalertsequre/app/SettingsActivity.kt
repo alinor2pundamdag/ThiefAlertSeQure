@@ -79,12 +79,6 @@ class SettingsActivity : FragmentActivity() {
         render()
     }
 
-    override fun onResume() {
-        super.onResume()
-        PermissionChangeMonitor.check(this)
-        if (::root.isInitialized) renderStatus()
-    }
-
     private fun render() {
         val scroll = ScrollView(this).apply {
             isFillViewport = true
@@ -765,6 +759,7 @@ class SettingsActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        PermissionChangeMonitor.check(this)
         // Re-read Android permission, channel, battery and service state after
         // returning from system Settings instead of showing stale readiness.
         if (::root.isInitialized) render()
