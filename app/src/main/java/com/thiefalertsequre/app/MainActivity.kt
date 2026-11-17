@@ -1067,6 +1067,11 @@ class MainActivity : FragmentActivity() {
             } else {
                 "Owner authenticated. Alarm stopped. Protection remains disarmed until the charger is reconnected."
             }
+            if (CameraEvidenceCapture.isEnabled(this) &&
+                checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+            ) {
+                details.append(" Front-camera evidence capture is starting.")
+            }
             // Optional photo evidence runs only after a fresh successful proof and while this Activity is visible.
             runCatching { CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this) }
                 .onFailure {
