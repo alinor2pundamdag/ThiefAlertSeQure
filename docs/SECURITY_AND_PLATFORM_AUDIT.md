@@ -145,3 +145,15 @@ No failure details were supplied. These results clear the reported HONOR 200 Pro
 - The `java/android/arbitrary-apk-installation` CodeQL finding was traced to the explicit Android Package Installer handoff. The updater verifies the app-private cached APK's SHA-256, production package ID, increasing versionCode and pinned release signer before the system installer is opened. The in-source suppression is placed at the exact `setDataAndType` sink, not at the Intent constructor. The PR CodeQL gate passed after this correction; the full Java/Kotlin and Actions analysis jobs also completed successfully.
 - Manual signed release preflight is restricted to `main` only, consistent with the release policy. Manual preflight never publishes a release.
 - Current task excludes emulator, instrumentation and physical-device testing. Non-instrumentation JVM/static/lint/build/APK checks are the required software verification.
+
+
+## Current software verification snapshot — 2026-11-17
+
+- Exact branch head `a1a567bf53f97189be2547ccf872ae665c30a54b`: Android workflow [#44005105554](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105554) and CodeQL workflow [#44005105442](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105442) both completed successfully.
+- The Android workflow passed its instrumentation-disabled guard, JVM unit tests, source-contract checks, lint, APK assembly and package/version/signer metadata checks.
+- The CodeQL Java/Kotlin source build and Actions analysis completed successfully. This verifies scan execution, not the absence or closure of every alert.
+- The PR's single inline review thread referring to APK installation alert #8 is resolved. The underlying repository Code Scanning alert state could not be read through the available connector and remains **NOT VERIFIED**.
+- The updater still revalidates its private-cache APK against SHA-256, production package ID, higher versionCode and pinned signer before Android installer handoff. The two sink suppressions are located immediately before the `setDataAndType` calls.
+- Current branch comparison: 519 ahead / 0 behind; 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged.
+- Permanent production signing secret availability and a production-signed APK are **NOT VERIFIED**. No secret values were accessed or exposed.
+- No instrumentation compilation/execution, emulator testing or physical-device testing was performed.
