@@ -79,9 +79,13 @@ checks = {
         and "AES/GCM/NoPadding" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "authentication secrets" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "Export encrypted app configuration" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8"),
-    "permission changes are detected on resume and recorded locally":
+    "permission changes are detected on primary screens and recorded locally":
         "PermissionChangeMonitor.check(this)" in (APP / "MainActivity.kt").read_text(encoding="utf-8")
+        and "PermissionChangeMonitor.check(this)" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
         and "LocalTamperHistory.record" in (APP / "PermissionChangeMonitor.kt").read_text(encoding="utf-8"),
+    "alarm output diagnostics record focus and expose recent output events":
+        "alarm_audio_focus_changed" in (APP / "AlarmService.kt").read_text(encoding="utf-8")
+        and "ALARM OUTPUT MONITOR" in diagnostics and "recentAlarmOutputEvents" in diagnostics,
     "protection integrity score uses verified stores and evidence integrity":
         "ProtectionIntegrityPolicy.calculate" in diagnostics
         and "integritySnapshot()" in diagnostics and "verifyIntegrity(this)" in diagnostics,
