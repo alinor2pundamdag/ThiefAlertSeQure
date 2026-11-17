@@ -35,8 +35,10 @@ object LocalEvidenceVault {
         val submittedGeneration = generation.get()
         runCatching {
             writer.execute {
-                if (generation.get() == submittedGeneration) {
-                    runCatching { record(context, event, detail) }
+                synchronized(this) {
+                    if (generation.get() == submittedGeneration) {
+                        runCatching { record(context, event, detail) }
+                    }
                 }
             }
         }
