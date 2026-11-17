@@ -24,6 +24,7 @@ import androidx.core.content.ContextCompat
 
 class AlarmService : Service() {
     private var player: MediaPlayer? = null
+    private var secondaryPlayer: MediaPlayer? = null
     private var toneController: AlarmToneController? = null
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
@@ -102,6 +103,7 @@ class AlarmService : Service() {
         }
         if (player == null && toneController == null) startAlarmAudio()
         syncAlarmFlash()
+        syncSecondaryAlarm()
         volumeHandler.removeCallbacks(volumeEnforcement)
         volumeHandler.post(volumeEnforcement)
         return START_STICKY
@@ -122,6 +124,68 @@ class AlarmService : Service() {
             flashController?.stop()
             flashController = null
         }
+    }
+
+    /** Optional looping secondary alarm; it never replaces or gates the primary alarm. */
+    private fun syncSecondaryAlarm() {
+        val shouldRun = ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED &&
+            AlarmSoundStore.isSecondaryAlarmEnabled(this)
+        if (!shouldRun) {
+            stopSecondaryAlarm()
+            return
+        }
+        if (secondaryPlayer != null) return
+        val uri = AlarmSoundStore.uri(this, AlarmSoundStore.ALERT)
+        if (uri == null) {
+            LocalTamperHistory.record(this, "secondary_alarm_unavailable", "Secondary alarm is enabled but no owner-selected alert sound is available")
+            return
+        }
+        val media = MediaPlayer()
+        secondaryPlayer = media
+        try {
+            media.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            media.setDataSource(this, uri)
+            media.setWakeMode(this, android.os.PowerManager.PARTIAL_WAKE_LOCK)
+            media.isLooping = true
+            media.setOnPreparedListener { prepared ->
+                if (secondaryPlayer === prepared &&
+                    ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED &&
+                    AlarmSoundStore.isSecondaryAlarmEnabled(this)
+                ) {
+                    runCatching {
+                        prepared.start()
+                        LocalTamperHistory.record(this, "secondary_alarm_started", "Owner-enabled secondary alarm is looping independently")
+                    }.onFailure {
+                        LocalTamperHistory.record(this, "secondary_alarm_start_failed", it.javaClass.simpleName + ": " + it.message)
+                        stopSecondaryAlarm()
+                    }
+                } else {
+                    stopSecondaryAlarm()
+                }
+            }
+            media.setOnErrorListener { failed, what, extra ->
+                LocalTamperHistory.record(this, "secondary_alarm_playback_failed", "Secondary MediaPlayer error $what/$extra; primary alarm remains active")
+                if (secondaryPlayer === failed) stopSecondaryAlarm()
+                true
+            }
+            media.prepareAsync()
+            LocalTamperHistory.record(this, "secondary_alarm_preparing", "Preparing independent owner-selected secondary alarm")
+        } catch (error: Exception) {
+            LocalTamperHistory.record(this, "secondary_alarm_open_failed", error.javaClass.simpleName + ": " + error.message)
+            stopSecondaryAlarm()
+        }
+    }
+
+    private fun stopSecondaryAlarm() {
+        val active = secondaryPlayer
+        secondaryPlayer = null
+        runCatching { active?.stop() }
+        runCatching { active?.release() }
     }
 
     private fun requestToneAudioFocus() {
@@ -358,6 +422,7 @@ class AlarmService : Service() {
     }
 
     private fun stopAlarm() {
+        stopSecondaryAlarm()
         flashController?.stop()
         flashController = null
         runCatching { player?.stop() }
@@ -409,6 +474,7 @@ class AlarmService : Service() {
         const val ACTION_START = "com.thiefalertsequre.START"
         const val ACTION_STOP_IF_AUTHENTICATED = "com.thiefalertsequre.STOP_AUTH"
         const val ACTION_REFRESH_FLASH = "com.thiefalertsequre.REFRESH_ALARM_FLASH"
+        const val ACTION_REFRESH_OUTPUTS = "com.thiefalertsequre.REFRESH_ALARM_OUTPUTS"
         private const val VOLUME_ENFORCEMENT_INTERVAL_MS = 500L
         private const val KEY_LOCK_REQUESTED_FOR_ALARM_AT = "lock_requested_for_alarm_started_at"
     }
