@@ -106,7 +106,7 @@
 - JVM unit tests for pure state, policy, crypto, preference-decoding and compatibility logic; source-contract checks for manifest, permissions, state ownership, navigation and release identity; Android lint; debug/release APK packaging and metadata/signer verification; CodeQL.
 - Android instrumentation tests and emulator matrices are excluded by owner direction. Do not compile or execute `app/src/androidTest` sources.
 - Physical OEM acceptance remains a separate real-device gate for process lifecycle, alarm delivery/audio, Bluetooth accessories, Keyguard, Device Owner, permissions, TalkBack and manufacturer battery policies.
-- Static checks: lint, manifest/permission audit (confirm no CAMERA permission and optional camera/flash hardware features), dependency audit, packaged asset integrity, APK package/version/signer verification.
+- Static checks: lint, manifest/permission audit (confirm CAMERA is declared but requested only after explicit owner opt-in, no camera FGS or microphone/background-location permission), dependency audit, packaged asset integrity, APK package/version/signer verification.
 - Alarm flashlight unit checks for ALARM_TRIGGERED-only gating and slow pulse cadence; physical test must confirm LED pulses with audio and turns off after successful authentication.
 
 ### Physical OEM acceptance
