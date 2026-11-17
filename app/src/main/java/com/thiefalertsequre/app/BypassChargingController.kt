@@ -130,7 +130,10 @@ class BypassChargingController(
 
 /** Intentionally empty until a documented, authorized model/firmware adapter is verified. */
 object BypassChargingAdapterRegistry {
-    fun forDevice(device:BypassChargingDevice):List<BypassChargingAdapter> = emptyList()
+    fun forDevice(device:BypassChargingDevice):List<BypassChargingAdapter> {
+        // Do not infer an OEM control interface from a brand or model string.
+        return emptyList()
+    }
 }
 
 object BypassChargingGuidance {
