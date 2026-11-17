@@ -31,6 +31,9 @@ class SettingsActivity : FragmentActivity() {
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private var soundSlot = AlarmSoundStore.ALARM
     private var previewPlayer: MediaPlayer? = null
+    private val previewToneHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var previewToneController: AlarmToneController? = null
+    private var previewToneStopRunnable: Runnable? = null
     private var pendingUpdateInstall: AppUpdateResult.Ready? = null
     private val pickSoundFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) validateAndSaveSound(uri, soundSlot, uri)
@@ -892,6 +895,13 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun previewSound(slot: String) {
+        if (slot == AlarmSoundStore.ALARM && AlarmSoundStore.uri(this, slot) == null) {
+            val preset = AlarmSoundStore.selectedBuiltInPreset(this)
+            if (preset != AlarmTonePreset.DEFAULT_AUDIO) {
+                previewBuiltInAlarmTone(preset)
+                return
+            }
+        }
         val uri = AlarmSoundStore.effectiveUri(this, slot)
         if (uri == null) {
             android.widget.Toast.makeText(this, "No sound is configured for this slot.", android.widget.Toast.LENGTH_LONG).show()
@@ -927,7 +937,33 @@ class SettingsActivity : FragmentActivity() {
         }
     }
 
+    private fun previewBuiltInAlarmTone(preset: AlarmTonePreset) {
+        stopPreview()
+        val controller = AlarmToneController(previewToneHandler, preset) { error ->
+            runOnUiThread {
+                android.widget.Toast.makeText(
+                    this,
+                    "Built-in tone preview failed: ${error.message}",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+        previewToneController = controller
+        if (!controller.start()) {
+            previewToneController = null
+            android.widget.Toast.makeText(this, "Android could not start this tone. The packaged alarm remains available.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        val stop = Runnable { stopPreview() }
+        previewToneStopRunnable = stop
+        previewToneHandler.postDelayed(stop, 5_000L)
+    }
+
     private fun stopPreview() {
+        previewToneStopRunnable?.let(previewToneHandler::removeCallbacks)
+        previewToneStopRunnable = null
+        previewToneController?.stop()
+        previewToneController = null
         runCatching { previewPlayer?.stop() }
         runCatching { previewPlayer?.release() }
         previewPlayer = null
