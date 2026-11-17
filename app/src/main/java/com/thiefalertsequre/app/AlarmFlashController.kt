@@ -26,6 +26,33 @@ internal class AlarmFlashController(
     private var pattern = AlarmFlashPattern.SLOW
     private var speedPercent = 100
     private var customTimings = 700L to 700L
+    private var torchCallbackRegistered = false
+
+    private val torchCallback = object : CameraManager.TorchCallback() {
+        override fun onTorchModeChanged(changedCameraId: String, enabled: Boolean) {
+            if (changedCameraId != cameraId || !running) return
+            if (torchOn && !enabled) {
+                torchOn = false
+                report("alarm_flash_external_interruption", "Android reported that another camera resource or app turned the torch off")
+                stop()
+            } else {
+                torchOn = enabled
+            }
+        }
+
+        override fun onTorchModeUnavailable(unavailableCameraId: String) {
+            if (unavailableCameraId != cameraId || !running) return
+            report("alarm_flash_output_unavailable", "Android camera service reported the torch unavailable; audio and haptics continue")
+            running = false
+            handler.removeCallbacks(pulse)
+            torchOn = false
+            cameraId = null
+            if (torchCallbackRegistered) {
+                runCatching { cameraManager.unregisterTorchCallback(this) }
+                torchCallbackRegistered = false
+            }
+        }
+    }
 
     private val pulse = object : Runnable {
         override fun run() {
@@ -63,6 +90,8 @@ internal class AlarmFlashController(
         customTimings = AlarmFlashPatternPolicy.customTimings(context)
         pulseStep = 0
         return try {
+            cameraManager.registerTorchCallback(torchCallback, handler)
+            torchCallbackRegistered = true
             cameraManager.setTorchMode(selectedCamera, true)
             torchOn = true
             running = true
@@ -83,6 +112,10 @@ internal class AlarmFlashController(
         if (id != null && torchOn) {
             runCatching { cameraManager.setTorchMode(id, false) }
                 .onFailure { report("alarm_flash_stop_failed", it.javaClass.simpleName + ": " + it.message) }
+        }
+        if (torchCallbackRegistered) {
+            runCatching { cameraManager.unregisterTorchCallback(torchCallback) }
+            torchCallbackRegistered = false
         }
         val hadState = cameraId != null || torchOn
         torchOn = false
