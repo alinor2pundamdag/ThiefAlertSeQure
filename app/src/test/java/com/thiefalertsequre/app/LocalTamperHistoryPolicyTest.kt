@@ -5,6 +5,16 @@ import org.junit.Test
 
 class LocalTamperHistoryPolicyTest {
     @Test
+    fun redactedDiagnosticExportKeepsOnlyEventCode() {
+        assertEquals(
+            "alarm_audio_open_failed",
+            LocalTamperHistoryPolicy.eventCodeFromLine(
+                "2026-11-17 12:00:00 | alarm_audio_open_failed | content://private.provider/user-selected-audio"
+            )
+        )
+    }
+
+    @Test
     fun eventNameRemovesLineBreaksAndUnsupportedCharacters() {
         assertEquals("alarm_triggered", LocalTamperHistoryPolicy.sanitizeEvent("alarm\n_triggered!"))
     }
