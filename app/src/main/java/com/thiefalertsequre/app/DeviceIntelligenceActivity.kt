@@ -204,6 +204,22 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             "Background guidance family: $family"
         )
         addCard("THIEFALERTSEQuRE READINESS", appReadiness)
+        val readinessSignals = buildList {
+            add(ReadinessSignal("Protection monitor enabled and last recorded running", monitorEnabled && monitorRunning, 25))
+            add(ReadinessSignal("Alarm notifications enabled", notifications, 15))
+            add(ReadinessSignal("Secure Android screen lock configured", secureLock, 15))
+            if (monitorEnabled) add(ReadinessSignal("Exact alarm scheduling available", exactAlarm, 15))
+            if (dashboardEnabled) add(ReadinessSignal("Optional full-screen alarm access available", fullScreenIntent, 10))
+            if (a2Enabled) add(ReadinessSignal("Optional Bluetooth Connect permission available", btConnect, 10))
+            add(ReadinessSignal("Battery optimization exemption", power.isIgnoringBatteryOptimizations(packageName), 10))
+        }
+        val readinessScore = ReadinessScorePolicy.calculate(readinessSignals)
+        addCard("PROTECTION READINESS SCORE — ${readinessScore.percent}%", listOf(
+            "${readinessScore.points} / ${readinessScore.possiblePoints} applicable points",
+            if (readinessScore.missing.isEmpty()) "All applicable readiness checks are satisfied."
+            else "Needs attention: ${readinessScore.missing.joinToString("; ")}",
+            "This is a transparent setup-readiness indicator, not a theft-prevention, security-integrity, or hardware reliability guarantee."
+        ))
         if (Build.VERSION.SDK_INT >= 36) {
             root.addView(button("Check Android ranging capabilities (optional)") { requestRangingCapabilityCheck() }, matchWrap())
             root.addView(space(6))
