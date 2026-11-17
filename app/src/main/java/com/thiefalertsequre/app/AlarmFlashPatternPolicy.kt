@@ -19,8 +19,8 @@ object AlarmFlashPatternPolicy {
     private val patterns = AlarmFlashPattern.entries
 
     fun read(context: Context): AlarmFlashPattern {
-        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_PATTERN, AlarmFlashPattern.SLOW.name)
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val raw = SafePreferences.string(prefs, KEY_PATTERN, AlarmFlashPattern.SLOW.name)
         return runCatching { AlarmFlashPattern.valueOf(raw ?: AlarmFlashPattern.SLOW.name) }
             .getOrDefault(AlarmFlashPattern.SLOW)
     }
