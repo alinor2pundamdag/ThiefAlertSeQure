@@ -362,6 +362,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        PermissionChangeMonitor.check(this)
         applyAlarmWindowPolicy()
         reconcileCharging()
         ManagedProtectionController.startIfConfigured(this)
