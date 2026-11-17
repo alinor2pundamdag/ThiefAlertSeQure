@@ -1061,7 +1061,11 @@ class MainActivity : FragmentActivity() {
                 "Owner authenticated. Alarm stopped. Protection remains disarmed until the charger is reconnected."
             }
             // Optional photo evidence runs only after a fresh successful proof and while this Activity is visible.
-            CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this)
+            runCatching { CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this) }
+                .onFailure {
+                    LocalEvidenceVault.recordAsync(this, "camera_evidence_capture_failed", "Optional camera evidence failed safely: ${it.javaClass.simpleName}")
+                    LocalTamperHistory.record(this, "camera_evidence_capture_failed", "Optional camera evidence failed safely: ${it.javaClass.simpleName}")
+                }
         } else {
             syncProtectionMonitor(ProtectionStore(this).read())
         }
