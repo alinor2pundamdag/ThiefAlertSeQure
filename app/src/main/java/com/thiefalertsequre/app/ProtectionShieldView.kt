@@ -40,22 +40,20 @@ class ProtectionShieldView @JvmOverloads constructor(
         canvas.translate((width - side) / 2f, (height - side) / 2f)
         canvas.scale(side, side)
 
-        val color = when (protectionMode) {
+        // The shield silhouette keeps one stable brand color in every state;
+        // the inner state glyph and adjacent status text carry the live state.
+        val shieldColor = Color.rgb(64, 177, 224)
+        val statusColor = when (protectionMode) {
             ProtectionMode.DISARMED -> Color.rgb(139, 157, 178)
             ProtectionMode.ARMED -> if (monitorReady) Color.rgb(55, 213, 132) else Color.rgb(139, 157, 178)
             ProtectionMode.COUNTDOWN -> Color.rgb(255, 190, 55)
             ProtectionMode.ALARM_TRIGGERED -> Color.rgb(255, 67, 82)
         }
-        val fill = when (protectionMode) {
-            ProtectionMode.DISARMED -> Color.rgb(25, 43, 62)
-            ProtectionMode.ARMED -> if (monitorReady) Color.rgb(13, 75, 53) else Color.rgb(25, 43, 62)
-            ProtectionMode.COUNTDOWN -> Color.rgb(88, 61, 15)
-            ProtectionMode.ALARM_TRIGGERED -> Color.rgb(91, 24, 34)
-        }
+        val fill = Color.rgb(25, 43, 62)
 
         // Subtle halo and a bold shield silhouette sized for the dashboard.
         paint.style = Paint.Style.FILL
-        paint.color = color
+        paint.color = shieldColor
         paint.alpha = 28
         canvas.drawCircle(0.5f, 0.49f, 0.48f, paint)
         paint.alpha = 255
@@ -74,15 +72,15 @@ class ProtectionShieldView @JvmOverloads constructor(
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 0.035f
         paint.strokeJoin = Paint.Join.ROUND
-        paint.color = color
+        paint.color = shieldColor
         canvas.drawPath(shield, paint)
         paint.style = Paint.Style.FILL
 
         when (protectionMode) {
-            ProtectionMode.ARMED -> if (monitorReady) drawCheck(canvas, color) else drawDot(canvas, color)
-            ProtectionMode.COUNTDOWN -> drawCountdown(canvas, color)
-            ProtectionMode.ALARM_TRIGGERED -> drawThief(canvas, color)
-            ProtectionMode.DISARMED -> drawDot(canvas, color)
+            ProtectionMode.ARMED -> if (monitorReady) drawCheck(canvas, statusColor) else drawDot(canvas, statusColor)
+            ProtectionMode.COUNTDOWN -> drawCountdown(canvas, statusColor)
+            ProtectionMode.ALARM_TRIGGERED -> drawThief(canvas, statusColor)
+            ProtectionMode.DISARMED -> drawDot(canvas, statusColor)
         }
         canvas.restoreToCount(save)
     }
