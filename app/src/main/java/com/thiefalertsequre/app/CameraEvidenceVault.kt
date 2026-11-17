@@ -103,7 +103,15 @@ internal object CameraEvidenceVault {
         val next = entries.filterNot { it.id == id }
         if (!writeIndex(app, next)) return false
         val file = evidenceDirectory(app).resolve("$id.aesgcm")
-        return file.delete() || !file.exists()
+        val deleted = file.delete() || !file.exists()
+        if (deleted && next.isEmpty()) {
+            runCatching {
+                synchronized(keyLock) {
+                    KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
+                }
+            }
+        }
+        return deleted
     }
 
     @Synchronized
