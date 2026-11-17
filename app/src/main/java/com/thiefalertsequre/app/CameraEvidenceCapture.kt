@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCaptureSession
@@ -17,6 +19,7 @@ import android.os.HandlerThread
 import android.view.Surface
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** One still front-camera capture, initiated only after successful owner authentication in a visible Activity. */
@@ -124,11 +127,12 @@ internal object CameraEvidenceCapture {
                 return@setOnImageAvailableListener
             }
             image.close()
-            if (!CameraEvidencePolicy.isValidImageSize(jpeg.size)) {
-                finish("camera_evidence_image_rejected", "JPEG exceeded the 2 MiB evidence size limit")
+            val boundedJpeg = boundJpeg(jpeg)
+            if (boundedJpeg == null) {
+                finish("camera_evidence_image_rejected", "JPEG could not be compressed below the 2 MiB evidence size limit")
                 return@setOnImageAvailableListener
             }
-            val entry = CameraEvidenceVault.save(app, jpeg)
+            val entry = CameraEvidenceVault.save(app, boundedJpeg)
             if (entry == null) {
                 finish("camera_evidence_storage_failed", "Encrypted front-camera evidence could not be committed to local storage")
             } else {
@@ -226,6 +230,39 @@ internal object CameraEvidenceCapture {
             finish("camera_evidence_access_error", "Android camera access failed: ${error.reason}")
         } catch (error: Exception) {
             finish("camera_evidence_start_failed", error.javaClass.simpleName + ": " + error.message)
+        }
+    }
+
+    private fun boundJpeg(source: ByteArray): ByteArray? {
+        if (CameraEvidencePolicy.isValidImageSize(source.size)) return source
+        val bitmap = runCatching { BitmapFactory.decodeByteArray(source, 0, source.size) }.getOrNull() ?: return null
+        return try {
+            val scale = minOf(
+                1f,
+                1280f / bitmap.width.coerceAtLeast(1),
+                720f / bitmap.height.coerceAtLeast(1)
+            )
+            val resized = if (scale < 1f) {
+                Bitmap.createScaledBitmap(
+                    bitmap,
+                    (bitmap.width * scale).toInt().coerceAtLeast(1),
+                    (bitmap.height * scale).toInt().coerceAtLeast(1),
+                    true
+                )
+            } else bitmap
+            try {
+                for (quality in listOf(85, 75, 65, 55)) {
+                    val output = ByteArrayOutputStream()
+                    if (!resized.compress(Bitmap.CompressFormat.JPEG, quality, output)) continue
+                    val bytes = output.toByteArray()
+                    if (CameraEvidencePolicy.isValidImageSize(bytes.size)) return bytes
+                }
+                null
+            } finally {
+                if (resized !== bitmap) resized.recycle()
+            }
+        } finally {
+            bitmap.recycle()
         }
     }
 
