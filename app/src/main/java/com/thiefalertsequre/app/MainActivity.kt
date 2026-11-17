@@ -939,6 +939,11 @@ class MainActivity : FragmentActivity() {
                     val failedElapsed = ProtectionClock.elapsedRealtime()
                     val failedBoot = ProtectionClock.bootCount(this@MainActivity)
                     val next = store.recordAuthenticationFailure(failedAt, failedElapsed, failedBoot)
+                    LocalEvidenceVault.recordAsync(
+                        this@MainActivity,
+                        "owner_biometric_failed",
+                        "failedAttempts=${next.failedAttempts}; cooldownActive=${AuthenticationThrottle.remainingMs(next, failedAt, failedElapsed, failedBoot) > 0L}"
+                    )
                     if (AuthenticationThrottle.remainingMs(next, failedAt, failedElapsed, failedBoot) > 0L) {
                         biometricPrompt?.cancelAuthentication()
                         biometricPrompt = null
