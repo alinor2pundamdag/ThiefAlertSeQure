@@ -167,13 +167,16 @@ class AlarmService : Service() {
                         LocalTamperHistory.record(this, "secondary_alarm_start_failed", it.javaClass.simpleName + ": " + it.message)
                         stopSecondaryAlarm()
                     }
-                } else {
+                } else if (secondaryPlayer === prepared) {
                     stopSecondaryAlarm()
+                } else {
+                    runCatching { prepared.release() }
                 }
             }
             media.setOnErrorListener { failed, what, extra ->
                 LocalTamperHistory.record(this, "secondary_alarm_playback_failed", "Secondary MediaPlayer error $what/$extra; primary alarm remains active")
-                if (secondaryPlayer === failed) stopSecondaryAlarm()
+                if (secondaryPlayer === failed) secondaryPlayer = null
+                runCatching { failed.release() }
                 true
             }
             media.prepareAsync()
