@@ -74,6 +74,19 @@ checks = {
     "device intelligence reports OEM/background restriction, Doze, and standby bucket states":
         "OEM AND BACKGROUND EXECUTION" in diagnostics and "isBackgroundRestricted" in diagnostics
         and "isDeviceIdleMode" in diagnostics and "appStandbyBucket" in diagnostics,
+    "encrypted configuration backup uses PBKDF2 AES-GCM and excludes authentication secrets":
+        "PBKDF2WithHmacSHA256" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
+        and "AES/GCM/NoPadding" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
+        and "authentication secrets" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
+        and "Export encrypted app configuration" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8"),
+    "permission changes are detected on resume and recorded locally":
+        "PermissionChangeMonitor.check(this)" in (APP / "MainActivity.kt").read_text(encoding="utf-8")
+        and "LocalTamperHistory.record" in (APP / "PermissionChangeMonitor.kt").read_text(encoding="utf-8"),
+    "protection integrity score uses verified stores and evidence integrity":
+        "ProtectionIntegrityPolicy.calculate" in diagnostics
+        and "integritySnapshot()" in diagnostics and "verifyIntegrity(this)" in diagnostics,
+    "dependency map and emergency recovery guide are available":
+        "FEATURE DEPENDENCY MAP" in diagnostics and "showEmergencyRecoveryGuide" in diagnostics,
     "dashboard has a double-size shield and horizontal navigation":
         "dp(136), dp(136)" in dashboard and "HorizontalScrollView" in dashboard and "navigationRow" in dashboard,
     "four Batch 2 destinations appear between the local-security header and live shield":
