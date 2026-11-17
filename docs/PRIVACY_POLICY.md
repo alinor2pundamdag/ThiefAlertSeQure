@@ -65,7 +65,7 @@ Operational preferences remain in the app's private storage until changed by the
 
 ## 7. User choice
 
-The first-launch notice explains local data handling, alarm behavior, optional flashlight behavior, the explicitly owner-requested cached-location snapshot, and platform limitations. The optional local ranging capability check is available separately in Device Intelligence and does not request an additional permission. The owner acknowledges the notice with “I understand & continue”; that acknowledgement is stored locally. The notice can be reviewed again from Settings.
+The first-launch notice explains local data handling, alarm behavior, optional flashlight behavior, explicitly owner-requested location snapshots, and platform limitations. The optional local ranging capability check is available separately in Device Intelligence and does not request an additional permission. The owner acknowledges the notice with “I understand & continue”; that acknowledgement is stored locally. The notice can be reviewed again from Settings.
 
 ## 8. Limitations
 
