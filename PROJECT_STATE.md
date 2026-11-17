@@ -202,3 +202,22 @@ This entry supersedes earlier candidate SHAs and run IDs above.
 - Non-physical verification passed on code-bearing commit e8aabcb4dc42df7817b4ec4c2fb7e7c1ac392523: Android workflow #44048497535 SUCCESS and CodeQL #44048497474 SUCCESS. JVM unit tests, Bypass Charging privilege/state guard, instrumentation-disabled guard, existing source guards, Android lint, manifest/protection invariants, debug APK assembly/metadata/signer checks, and minified release APK metadata checks all passed.
 - CI debug artifact ID 14312886783, SHA-256 628cd98ceab0e24af26d29f0502862456ed4e3d2f8615cc85130084a2b19a945, expires 2026-12-01. It is a development debug artifact (applicationId com.thiefalertsequre.app.v114test, versionName 1.1.4-test). The minified release variant verified package com.thiefalertsequre.app, versionCode 6, versionName 1.1.4, compileSdk 36, minSdk 26, but is unsigned because permanent owner signing secrets are not configured; it is not a production-distributable APK.
 - Batch 1 non-physical implementation and CI verification are complete for the available software scope. Direct OEM Bypass Charging ON/OFF control, exact model/firmware certification, persistent hardware mode restoration, and physical charging-path behavior remain unimplemented/unverified until a documented, authorized OEM interface is available. Instrumentation, emulator, Codespaces, and physical-device testing remain prohibited. PR #7 remains draft/open/unmerged; no merge, tag, APK publication or production release was performed.
+
+## Current four-batch roadmap (supersedes the older Phase 0–12 sequencing)
+
+The active roadmap is **17 phases numbered Phase 0 through Phase 16**, organized into four batches. The older `docs/PHASE_0_12_EXECUTION_CHECKLIST.md` remains a historical implementation checklist and must not be used to renumber the active four-batch roadmap.
+
+| Batch | Phases | Active scope |
+|---|---:|---|
+| Batch 1 | 0–4 | Baseline and Preservation; Security Architecture and Persistent State; Permission Center and Device Capability; Charger and Bluetooth Protection; Bypass Charging Integration Framework |
+| Batch 2 | 5–9 | Power-menu and Shutdown Interruption; Alarms, Sounds, Flash and Haptics; Authentication, Evidence and GPS; Device Intelligence and Diagnostics; Dashboard and Navigation |
+| Batch 3 | 10–13 | Notification Shield and Controls; Widgets; Appearance Studio; Seismic Genesis Intro |
+| Batch 4 | 14–16 | About, Version, Legal and Privacy; Integration, Quality and Release Readiness; Local Tamper History and Final Verification |
+
+**Batch 2 completion gate:** all Phase 5–9 implementation, privacy boundaries, UI/UX, error handling, static contract checks, JVM unit tests, Android lint/build and CodeQL must pass on the exact current branch HEAD. Hardware/OEM behavior remains explicitly unverified until physical-device validation; no claim of universal shutdown/torch/camera control is permitted.
+
+**Phase 7 camera evidence boundary:** optional and OFF by default. CAMERA permission is requested only after an explicit Settings opt-in. One front-camera still is attempted only after successful owner PIN/password or supported strong-biometric authentication disarms a latched alarm while the authentication Activity is visible. Images are Android Keystore AES-GCM encrypted, locally retained with bounded limits, and owner-viewable/exportable/deletable. No background camera service, video, microphone capture, or cloud upload is allowed. Camera failure must never reverse successful authentication or alarm disarm.
+
+**Phase 9 dashboard boundary:** the fixed-color 136dp main shield stays above a compact, horizontally swipeable nine-destination tab strip (Bluetooth Settings; Device Hardening & Reliability; Sounds & Flash Alert; Authentication Evidence; Device Intelligence; Appearance Studio; Local Tamper History; More; About). The tab strip uses accessible 48dp touch targets and destination-specific navigation.
+
+**Workflow constraints remain:** no GitHub Codespaces; no instrumentation/emulator tests during the agreed non-physical implementation pass; do not merge PR #7 or modify `main` without explicit owner approval. Batch 3 must not begin until Batch 2's exact-head completion gate is green.
