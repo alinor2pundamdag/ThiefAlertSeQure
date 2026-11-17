@@ -360,17 +360,16 @@ object ManagedProtectionController {
         restrictions.forEach { key ->
             runCatching { dpm.clearUserRestriction(admin, key) }.onFailure(failures::add)
         }
+        val emergencyFeatures =
+            DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS or
+                DevicePolicyManager.LOCK_TASK_FEATURE_HOME or
+                DevicePolicyManager.LOCK_TASK_FEATURE_OVERVIEW or
+                DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS or
+                DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO or
+                DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD
         if (Build.VERSION.SDK_INT >= 28) {
             runCatching {
-                dpm.setLockTaskFeatures(
-                    admin,
-                    DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS or
-                        DevicePolicyManager.LOCK_TASK_FEATURE_HOME or
-                        DevicePolicyManager.LOCK_TASK_FEATURE_OVERVIEW or
-                        DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS or
-                        DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO or
-                        DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD
-                )
+                dpm.setLockTaskFeatures(admin, emergencyFeatures)
             }.onFailure(failures::add)
         }
         runCatching { dpm.setLockTaskPackages(admin, emptyArray()) }.onFailure(failures::add)
@@ -385,8 +384,7 @@ object ManagedProtectionController {
             restrictions.all { key ->
                 !local.getBoolean(key, false) && !global.getBoolean(key, false)
             } && dpm.getLockTaskPackages(admin).isEmpty() &&
-                (Build.VERSION.SDK_INT < 28 ||
-                    (dpm.getLockTaskFeatures(admin) and DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS) != 0)
+                (Build.VERSION.SDK_INT < 28 || dpm.getLockTaskFeatures(admin) == emergencyFeatures)
         }.getOrDefault(false)
         if (!emergencyReadbackMatches) {
             failures += IllegalStateException(
