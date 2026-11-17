@@ -39,11 +39,15 @@ required_permissions = {
 for permission in sorted(required_permissions - permissions):
     errors.append("Required permission missing: " + permission)
 
-# These are optional, owner-requested one-shot evidence snapshot permissions.
-# They are not required for the core alarm, and background location is forbidden.
-for permission in ("android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"):
+# These are optional, owner-requested evidence permissions. They are not
+# requested at first launch and are not required for the core alarm.
+for permission in (
+    "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.CAMERA",
+):
     if permission not in permissions:
-        errors.append("Optional Evidence Vault location permission declaration missing: " + permission)
+        errors.append("Optional owner-consented evidence permission declaration missing: " + permission)
 
 features = {
     item.get(ANDROID + "name"): item
@@ -54,6 +58,7 @@ for feature in (
     "android.hardware.bluetooth_le",
     "android.hardware.sensor.accelerometer",
     "android.hardware.camera",
+    "android.hardware.camera.front",
     "android.hardware.camera.flash",
     "android.hardware.fingerprint",
 ):
@@ -65,11 +70,11 @@ for permission in (
     # RANGING is only required to create sessions; this app performs local capability
     # inspection only and deliberately does not request that dangerous permission.
     "android.permission.RANGING",
-    "android.permission.CAMERA",
     "android.permission.ACCESS_BACKGROUND_LOCATION",
     "android.permission.BLUETOOTH_SCAN",
     "android.permission.BLUETOOTH_ADVERTISE",
     "android.permission.RECORD_AUDIO",
+    "android.permission.FOREGROUND_SERVICE_CAMERA",
     "android.permission.READ_CONTACTS",
     "android.permission.SEND_SMS",
     "android.permission.READ_SMS",
@@ -114,7 +119,7 @@ main = component("activity", "MainActivity")
 if main is not None and main.get(ANDROID + "exported") != "true":
     errors.append("MainActivity must remain exported for the launcher")
 
-for name in ("SettingsActivity", "BluetoothCenterActivity", "DeviceIntelligenceActivity", "ThemeActivity", "SetupStatusActivity"):
+for name in ("SettingsActivity", "BluetoothCenterActivity", "DeviceIntelligenceActivity", "ThemeActivity", "SetupStatusActivity", "AboutActivity"):
     item = component("activity", name)
     if item is not None and item.get(ANDROID + "exported") != "false":
         errors.append(name + " must remain non-exported")
@@ -148,6 +153,15 @@ if monitor is not None:
     if subtype is None or subtype.get(ANDROID + "name") != "android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE":
         errors.append("ProtectionMonitorService must document its special-use FGS subtype")
 
+# Camera evidence is one still photo from a visible Activity after explicit
+# opt-in and successful owner authentication; no camera foreground service is used.
+front_camera = features.get("android.hardware.camera.front")
+if front_camera is None or front_camera.get(ANDROID + "required") != "false":
+    errors.append("Front camera must remain optional for devices without front-facing hardware")
+for (tag, name), item in components.items():
+    if tag == "service" and "camera" in (item.get(ANDROID + "foregroundServiceType") or "").lower():
+        errors.append("Camera foreground service is forbidden; photo capture must remain visible-Activity-only")
+
 provider = component("provider", "androidx.core.content.FileProvider")
 if provider is not None:
     if provider.get(ANDROID + "exported") != "false" or provider.get(ANDROID + "grantUriPermissions") != "true":
@@ -178,6 +192,6 @@ if errors:
 
 print(
     f"Verified {len(required_permissions)} required permissions, sensitive-permission exclusions, "
-    "component export boundaries, foreground-service declarations, package identity, SDK levels, "
-    "and 10s/8s protection timing invariants."
+    "explicit owner-consented camera permission and visible-Activity capture boundary, component export boundaries, "
+    "foreground-service declarations, package identity, SDK levels, and 10s/8s protection timing invariants."
 )
