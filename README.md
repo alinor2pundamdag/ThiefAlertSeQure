@@ -17,7 +17,7 @@
     </a>
     <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" alt="Android 8.0 and newer" />
     <img src="https://img.shields.io/badge/Privacy-On--device-2D6CDF" alt="On-device privacy" />
-    <img src="https://img.shields.io/badge/Version-1.1.4-1677D2" alt="Version 1.1.3" />
+    <img src="https://img.shields.io/badge/Version-1.1.4__Developer__Alinor-1677D2" alt="Version 1.1.4_Developer_Alinor" />
     <img src="https://img.shields.io/badge/Owner%20device%20tests-11%2F11%20PASS-2E8B57" alt="Owner-reported 11 of 11 physical test scenarios passed" />
     <img src="https://img.shields.io/badge/Updates-Owner--initiated%20GitHub%20releases-2D6CDF" alt="Owner initiated GitHub updates" />
     <img src="https://img.shields.io/badge/License-See%20LICENSE-lightgrey" alt="License information" />
