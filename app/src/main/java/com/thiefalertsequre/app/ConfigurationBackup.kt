@@ -206,7 +206,7 @@ internal object ConfigurationBackup {
         return true
     }
 
-    private fun encryptPayload(payload: ByteArray, password: CharArray): ByteArray {
+    internal fun encryptPayload(payload: ByteArray, password: CharArray): ByteArray {
         require(payload.size <= MAX_BACKUP_BYTES) { "Configuration backup is too large." }
         val salt = ByteArray(SALT_BYTES).also(SecureRandom()::nextBytes)
         val iv = ByteArray(IV_BYTES).also(SecureRandom()::nextBytes)
@@ -227,7 +227,7 @@ internal object ConfigurationBackup {
         return output.toByteArray()
     }
 
-    private fun decryptPayload(bytes: ByteArray, password: CharArray): ByteArray {
+    internal fun decryptPayload(bytes: ByteArray, password: CharArray): ByteArray {
         require(bytes.size in (MAGIC.size + 4 + SALT_BYTES + IV_BYTES + 4 + 16)..MAX_BACKUP_BYTES) {
             "Configuration backup file size is invalid."
         }
