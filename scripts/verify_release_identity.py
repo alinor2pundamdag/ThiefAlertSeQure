@@ -16,6 +16,26 @@ def capture(pattern: str, source: str, label: str) -> str:
     return match.group(1)
 
 gradle_package = capture(r'applicationId\s*=\s*"([^"]+)"', gradle, "Gradle applicationId")
+version_name = capture(r'^val appVersionName = "([^"]+)"
+policy_package = capture(r'EXPECTED_PACKAGE\s*=\s*"([^"]+)"', policy, "updater package constant")
+release_package = "com.thiefalertsequre.app"
+policy_cert = capture(r'EXPECTED_CERT_SHA256\s*=\s*"([0-9a-fA-F]{64})"', policy, "updater certificate")
+release_cert = capture(r'EXPECTED_CERT="([0-9a-fA-F]{64})"', release, "release workflow certificate")
+assert gradle_package == policy_package == release_package, (
+    f"Production package drift: Gradle={gradle_package}, updater={policy_package}, release={release_package}"
+)
+assert policy_cert.lower() == release_cert.lower(), (
+    f"Signing certificate drift: updater={policy_cert}, release workflow={release_cert}"
+)
+assert "AppUpdatePolicy.requireInstalledPackage(context.packageName)" in updater
+assert "AppUpdatePolicy.requireNewerVersionCode" in updater
+assert "AppUpdatePolicy.hasOfficialSigner" in updater
+assert 'applicationIdSuffix = ".v114test"' in gradle
+print(f"Production identity consistent: {gradle_package}; signer SHA-256 {policy_cert.lower()}")
+, gradle, "Gradle appVersionName")
+assert re.fullmatch(r"[0-9]+(?:\.[0-9]+){1,3}_Developer_Alinor", version_name), (
+    f"Official versionName must retain the _Developer_Alinor suffix: {version_name}"
+)
 policy_package = capture(r'EXPECTED_PACKAGE\s*=\s*"([^"]+)"', policy, "updater package constant")
 release_package = "com.thiefalertsequre.app"
 policy_cert = capture(r'EXPECTED_CERT_SHA256\s*=\s*"([0-9a-fA-F]{64})"', policy, "updater certificate")
