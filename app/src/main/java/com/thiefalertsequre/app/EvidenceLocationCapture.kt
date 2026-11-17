@@ -3,10 +3,17 @@ package com.thiefalertsequre.app
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.location.Location\nimport android.location.LocationListener\nimport android.location.LocationManager\nimport android.os.Build\nimport android.os.CancellationSignal\nimport android.os.Handler\nimport android.os.Looper
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.os.Build
+import android.os.CancellationSignal
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
-import java.util.concurrent.TimeUnit\nimport java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** One-shot, owner-requested location snapshot. No background tracking or polling. */
 object EvidenceLocationCapture {
@@ -61,7 +68,10 @@ object EvidenceLocationCapture {
             onResult(null)
             return
         }
-        val manager = context.getSystemService(LocationManager::class.java)
+        val manager = context.getSystemService(LocationManager::class.java) ?: run {
+            onResult(null)
+            return
+        }
         val provider = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
             .firstOrNull { candidate -> runCatching { manager.isProviderEnabled(candidate) }.getOrDefault(false) }
         if (provider == null) {
@@ -72,17 +82,18 @@ object EvidenceLocationCapture {
         val completed = AtomicBoolean(false)
         var listener: LocationListener? = null
         var cancellation: CancellationSignal? = null
-        lateinit var timeout: Runnable
+        var timeout: Runnable? = null
         fun finish(location: Location?) {
             if (!completed.compareAndSet(false, true)) return
-            handler.removeCallbacks(timeout)
+            timeout?.let(handler::removeCallbacks)
             listener?.let { runCatching { manager.removeUpdates(it) } }
             runCatching { cancellation?.cancel() }
             onResult(location?.let { snapshot(it, "CURRENT_REQUEST_RESULT") })
         }
-        timeout = Runnable { finish(null) }
+        val timeoutRunnable = Runnable { finish(null) }
+        timeout = timeoutRunnable
         try {
-            handler.postDelayed(timeout, CURRENT_LOCATION_TIMEOUT_MS)
+            handler.postDelayed(timeoutRunnable, CURRENT_LOCATION_TIMEOUT_MS)
             if (Build.VERSION.SDK_INT >= 30) {
                 cancellation = CancellationSignal()
                 manager.getCurrentLocation(provider, cancellation, context.mainExecutor) { location ->
@@ -117,7 +128,8 @@ object EvidenceLocationCapture {
     }
 
     const val CURRENT_LOCATION_TIMEOUT_MS = 20_000L
-\n    const val RECENT_FIX_MAX_AGE_MS = 120_000L
+
+    const val RECENT_FIX_MAX_AGE_MS = 120_000L
 
     fun classifyFixAge(ageMs: Long): String =
         if (ageMs in 0..RECENT_FIX_MAX_AGE_MS) "RECENT_CACHED_FIX" else "STALE_CACHED_FIX"
