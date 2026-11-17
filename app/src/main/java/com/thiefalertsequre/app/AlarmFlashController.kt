@@ -95,7 +95,11 @@ internal class AlarmFlashController(
             running = true
             cameraManager.registerTorchCallback(torchCallback, handler)
             torchCallbackRegistered = true
-            handler.postDelayed(pulse, AlarmFlashSettings.ON_DURATION_MS)
+            val initialDelay = AlarmFlashPatternPolicy.delayMs(
+                pattern, 0, speedPercent, customTimings.first, customTimings.second
+            )
+            pulseStep = 1
+            handler.postDelayed(pulse, initialDelay)
             report("alarm_flash_started", "Camera LED pulsing while the theft alarm is latched")
             true
         } catch (error: Exception) {
