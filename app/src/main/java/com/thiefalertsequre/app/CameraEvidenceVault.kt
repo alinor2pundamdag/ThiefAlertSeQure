@@ -246,7 +246,18 @@ internal object CameraEvidenceVault {
         val now = System.currentTimeMillis()
         val retained = entries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
         val indexReady = retained.size == entries.size || writeIndex(context, retained)
-        if (indexReady) removeUnreferencedFiles(context, retained)
+        if (indexReady) {
+            removeUnreferencedFiles(context, retained)
+            val noPhotoFilesRemain = evidenceDirectory(context).listFiles().orEmpty()
+                .none { it.name.endsWith(".aesgcm") || it.name.endsWith(".tmp") }
+            if (retained.isEmpty() && noPhotoFilesRemain) {
+                runCatching {
+                    synchronized(keyLock) {
+                        KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
+                    }
+                }
+            }
+        }
     }
 
     private fun evidenceDirectory(context: Context): File =
