@@ -23,7 +23,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 
 class AlarmService : Service() {
-    private var player: MediaPlayer? = null
+    private var player: MediaPlayer? = null\n    private var toneController: AlarmToneController? = null
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var vibrator: Vibrator? = null
@@ -82,7 +82,7 @@ class AlarmService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        if (player == null) startAlarmAudio()
+        if (player == null && toneController == null) startAlarmAudio()
         syncAlarmFlash()
         volumeHandler.removeCallbacks(volumeEnforcement)
         volumeHandler.post(volumeEnforcement)
@@ -109,6 +109,20 @@ class AlarmService : Service() {
     private fun startAlarmAudio() {
         val defaultUri = Uri.parse("android.resource://$packageName/${R.raw.default_alarm}")
         val selectedUri = AlarmSoundStore.uri(this, AlarmSoundStore.ALARM)
+        if (selectedUri == null) {
+            val preset = AlarmSoundStore.selectedBuiltInPreset(this)
+            if (preset != AlarmTonePreset.DEFAULT_AUDIO) {
+                val controller = AlarmToneController(volumeHandler, preset) { error ->
+                    LocalTamperHistory.record(this, "alarm_tone_preset_failed", error.javaClass.simpleName + ": " + error.message)
+                }
+                toneController = controller
+                if (controller.start()) {
+                    LocalTamperHistory.record(this, "alarm_tone_preset_started", "Built-in alarm tone preset active: ${preset.name}")
+                    return
+                }
+                toneController = null
+            }
+        }
         startAlarmAudio(selectedUri ?: defaultUri, selectedUri == null, defaultUri)
     }
 
