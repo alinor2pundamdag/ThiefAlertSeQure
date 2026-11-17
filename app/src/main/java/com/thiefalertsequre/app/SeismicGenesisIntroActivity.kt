@@ -343,8 +343,8 @@ private fun SeismicGenesisIntroContent(
                 Text(
                     text = "Developed By:",
                     modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .offset(y = maxHeight * (0.30f * drop - 0.18f))
+                        .align(Alignment.Center)
+                        .offset(y = maxHeight * (-0.55f * (1f - drop)))
                         .graphicsLayer {
                             translationX = shake
                             rotationZ = shake / 16f
@@ -374,7 +374,7 @@ private fun SeismicGenesisIntroContent(
                     text = if (initialConcrete) developerName else coloredName,
                     modifier = Modifier
                         .align(targetAlignment)
-                        .offset(y = if (p >= 0.82f) maxHeight * (-0.10f * finalFall) else maxHeight * (0.18f * (1f - nameDrop)))
+                        .offset(y = if (p >= 0.82f) maxHeight * (-0.06f * finalFall) else maxHeight * (-0.55f * (1f - nameDrop)))
                         .graphicsLayer {
                             translationX = if (p in 0.405f..0.455f) shakeEnvelope else 0f
                             rotationZ = if (p < 0.48f) -4f * (1f - nameDrop) else 0f
