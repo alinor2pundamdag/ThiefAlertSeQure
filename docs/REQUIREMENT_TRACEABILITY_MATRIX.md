@@ -209,7 +209,7 @@ The CodeQL gate passed after the APK-installer suppression comments were moved t
 - Exact working-branch HEAD: `a1a567bf53f97189be2547ccf872ae665c30a54b`.
 - Android/JVM/static/lint/APK workflow: [#44005105554 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105554).
 - CodeQL Java/Kotlin and Actions analysis: [#44005105442 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105442).
-- Branch comparison: 524 ahead / 0 behind; 131 changed files (90 added, 41 modified, 0 deleted).
+- Branch comparison: 530 ahead / 0 behind; 131 changed files (90 added, 41 modified, 0 deleted).
 - Recursive tree: 64 production Kotlin source files; no truncation. Automated marker/pattern sweeps covered the source set, with focused manual review of high-risk paths; this is not claimed as exhaustive line-by-line formal verification.
 - PR #7 has one resolved inline review thread. The thread references CodeQL alert #8, but the alert's actual active/closed state could not be retrieved through the available GitHub connector. Alert closure remains **NOT VERIFIED**.
 - Permanent release signing-secret presence and production-signed APK availability remain **NOT VERIFIED**. Release workflow is fail-closed and production publication remains unauthorized.
@@ -222,6 +222,6 @@ The CodeQL gate passed after the APK-installer suppression comments were moved t
 - Android [#44009392497 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44009392497) and CodeQL [#44009392512 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44009392512) on `d70f79f5d66e30765eba39e0ce58cc4e651ccc63`.
 - 30 JVM unit-test source files; all passed in the Android workflow. Fifteen dormant `androidTest` source files were not compiled or executed.
 - Android lint, manifest/preferences/navigation/state-ownership checks, asset validation, release workflow YAML validation, release identity check, debug APK metadata, minified release metadata, package/version/signer checks and artifact upload all passed.
-- Branch comparison is 524 ahead / 0 behind, 131 changed files (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged and mergeable.
+- Branch comparison is 530 ahead / 0 behind, 131 changed files (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged and mergeable.
 - CodeQL alert #8 closure and permanent release signing-secret availability remain unverified; neither is inferred from workflow success.
 - No physical-device, emulator or instrumentation test was performed.
