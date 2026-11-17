@@ -178,34 +178,7 @@ class MainActivity : FragmentActivity() {
         var hardeningAnchor: View? = null
         var authenticationEvidenceAnchor: View? = null
 
-        // The four roadmap destinations sit between the local-security header
-        // and the live shield, keeping the primary protection state immediately
-        // below the navigation while retaining native horizontal swipe access.
-        val navigationScroll = HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-        }
-        val navigationRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        navigationRow.addView(outlinedButton("Hardening & Reliability") {
-            hardeningAnchor?.let { scroll.smoothScrollTo(0, it.top) }
-        })
-        navigationRow.addView(horizontalSpace(6))
-        navigationRow.addView(outlinedButton("Authentication & Evidence") {
-            authenticationEvidenceAnchor?.let { scroll.smoothScrollTo(0, it.top) }
-        })
-        navigationRow.addView(horizontalSpace(6))
-        navigationRow.addView(outlinedButton("Device Intelligence") {
-            startActivity(Intent(this, DeviceIntelligenceActivity::class.java))
-        })
-        navigationRow.addView(horizontalSpace(6))
-        navigationRow.addView(outlinedButton("More / About") {
-            startActivity(Intent(this, SettingsActivity::class.java))
-        })
-        navigationScroll.addView(navigationRow)
-        root.addView(navigationScroll, matchWrap())
-        root.addView(space(16))
+        var reliabilityAnchor: View? = null
 
         val statusCard = card()
         val statusContent = column()
@@ -227,7 +200,55 @@ class MainActivity : FragmentActivity() {
         statusContent.addView(setupSummary, matchWrap())
         statusCard.addView(statusContent)
         root.addView(statusCard, matchWrap())
-        root.addView(space(12))
+        root.addView(space(10))
+
+        // Compact, horizontally swipeable section tabs sit BELOW the live shield,
+        // so navigation never pushes the primary protection indicator down.
+        val navigationScroll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            contentDescription = "Swipe left or right to browse dashboard sections"
+        }
+        val navigationRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        fun addTab(label: String, description: String, action: () -> Unit) {
+            navigationRow.addView(navigationTab(label, description, action))
+            navigationRow.addView(horizontalSpace(5))
+        }
+        addTab("Bluetooth", "Bluetooth Settings") {
+            startActivity(Intent(this, BluetoothCenterActivity::class.java))
+        }
+        addTab("Hardening", "Device Hardening and Reliability") {
+            hardeningAnchor?.let { scroll.smoothScrollTo(0, it.top) }
+        }
+        addTab("Sounds / Flash", "Sounds and Flash Alert") {
+            startActivity(Intent(this, SettingsActivity::class.java)
+                .putExtra(SettingsActivity.EXTRA_SECTION, SettingsActivity.SECTION_SOUNDS_FLASH))
+        }
+        addTab("Auth / Evidence", "Authentication Evidence") {
+            authenticationEvidenceAnchor?.let { scroll.smoothScrollTo(0, it.top) }
+        }
+        addTab("Device Info", "Device Intelligence") {
+            startActivity(Intent(this, DeviceIntelligenceActivity::class.java))
+        }
+        addTab("Appearance", "Appearance Studio") {
+            startActivity(Intent(this, ThemeActivity::class.java))
+        }
+        addTab("Tamper History", "Local Tamper History") {
+            startActivity(Intent(this, SettingsActivity::class.java)
+                .putExtra(SettingsActivity.EXTRA_SECTION, SettingsActivity.SECTION_TAMPER_HISTORY))
+        }
+        addTab("More", "More Settings") {
+            startActivity(Intent(this, SettingsActivity::class.java)
+                .putExtra(SettingsActivity.EXTRA_SECTION, SettingsActivity.SECTION_MORE))
+        }
+        addTab("About", "About ThiefAlertSeQure") {
+            startActivity(Intent(this, AboutActivity::class.java))
+        }
+        navigationScroll.addView(navigationRow)
+        root.addView(navigationScroll, matchWrap())
+        root.addView(space(16))
 
         root.addView(space(20))
 
@@ -306,7 +327,9 @@ class MainActivity : FragmentActivity() {
         root.addView(hardeningCard, matchWrap())
         root.addView(space(20))
 
-        root.addView(sectionTitle("RELIABILITY & SYSTEM ACCESS"), matchWrap())
+        val reliabilityTitle = sectionTitle("RELIABILITY & SYSTEM ACCESS")
+        reliabilityAnchor = reliabilityTitle
+        root.addView(reliabilityTitle, matchWrap())
         root.addView(space(10))
         root.addView(systemSettingRow("Enable precise 10-second alarm timing", "Exact alarms",
             "Android 12 (API 31)+ requires special Alarms & reminders access for exact scheduling. Allow ThiefAlertSeQure if listed. Android 8–11 has no separate exact-alarm access page; timing uses the platform's available alarm behavior.") { requestExactAlarmAccess() }, matchWrap())
@@ -1081,6 +1104,24 @@ class MainActivity : FragmentActivity() {
         cornerRadius = dp(16)
         minHeight = dp(54)
         setTextSize(14f)
+        setOnClickListener { action() }
+    }
+
+    private fun navigationTab(value: String, description: String, action: () -> Unit) = MaterialButton(this).apply {
+        text = value
+        contentDescription = "Open $description"
+        isAllCaps = false
+        cornerRadius = dp(13)
+        minHeight = dp(48)
+        minWidth = dp(48)
+        insetTop = 0
+        insetBottom = 0
+        setPadding(dp(11), 0, dp(11), 0)
+        setTextSize(12f)
+        strokeWidth = dp(1)
+        strokeColor = android.content.res.ColorStateList.valueOf(getColor(R.color.tas_primary))
+        backgroundTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.tas_surface))
+        setTextColor(getColor(R.color.tas_text))
         setOnClickListener { action() }
     }
 
