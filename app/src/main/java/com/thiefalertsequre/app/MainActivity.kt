@@ -70,7 +70,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (!getSharedPreferences("batch_three_intro_v1", MODE_PRIVATE).getBoolean("completed", false)) {
+        val introPrefs = getSharedPreferences("batch_three_intro_v1", MODE_PRIVATE)
+        if (!SafePreferences.boolean(introPrefs, "completed", false)) {
             startActivity(Intent(this, SeismicGenesisIntroActivity::class.java))
             finish()
             return

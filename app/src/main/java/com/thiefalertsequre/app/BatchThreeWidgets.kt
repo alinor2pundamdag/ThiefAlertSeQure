@@ -38,7 +38,7 @@ abstract class BaseProtectionWidgetProvider : AppWidgetProvider() {
         }
         val now = System.currentTimeMillis()
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val previousUpdate = prefs.getLong(KEY_LAST_UPDATE, 0L)
+        val previousUpdate = SafePreferences.long(prefs, KEY_LAST_UPDATE, 0L)
         val stale = previousUpdate > 0L && now - previousUpdate > STALE_AFTER_MS
         val committed = prefs.edit().putLong(KEY_LAST_UPDATE, now).commit()
         val views = RemoteViews(context.packageName, R.layout.widget_protection_status)

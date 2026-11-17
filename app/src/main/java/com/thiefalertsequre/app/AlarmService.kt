@@ -100,6 +100,7 @@ class AlarmService : Service() {
             // Promote immediately before locking the device; lockNow() may
             // turn the display off and must not delay the FGS startup deadline.
             startForeground(NOTIFICATION_ID, notification())
+            BatchThreeUiBridge.refresh(this)
             AlarmRecoveryCoordinator.onServiceStarted(this)
             val alarmStartedAt = ProtectionStore(this).read().changedAtEpochMs
             lockDeviceIfAdminEnabled(alarmStartedAt)
@@ -405,6 +406,9 @@ class AlarmService : Service() {
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle("ThiefAlertSeQure — Alarm active")
             .setContentText("Open to authenticate with your device lock or supported biometric.")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(
+                "The theft alarm is latched. Verify with the existing Android device credential or an enrolled supported strong biometric. Notification actions cannot disarm the alarm."
+            ))
             .setContentIntent(contentIntent)
             .setColor(ThemeStore.get(this).danger)
             .addAction(android.R.drawable.ic_menu_view, "Open owner verification", contentIntent)

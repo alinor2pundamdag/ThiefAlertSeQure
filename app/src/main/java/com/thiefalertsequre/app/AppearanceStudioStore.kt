@@ -1,6 +1,13 @@
 package com.thiefalertsequre.app
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.ColorFilter
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PixelFormat
+import android.graphics.RectF
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.view.MotionEvent
 import android.view.View
@@ -26,12 +33,12 @@ object AppearanceStudioStore {
     val iconGlyphs = listOf("⬟", "♜", "⬢", "◈", "▣", "ϟ", "◉", "✦", "⬡", "T", "◎", "◇", "➤", "盾", "●")
 
     private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    fun iconIndex(context: Context) = prefs(context).getInt(KEY_ICON, 0).coerceIn(0, icons.lastIndex)
-    fun backgroundIndex(context: Context) = prefs(context).getInt(KEY_BACKGROUND, 0).coerceIn(0, backgrounds.lastIndex)
-    fun animationIndex(context: Context) = prefs(context).getInt(KEY_ANIMATION, 1).coerceIn(0, animations.lastIndex)
-    fun reduceMotion(context: Context) = prefs(context).getBoolean(KEY_REDUCE_MOTION, false)
-    fun haptics(context: Context) = prefs(context).getBoolean(KEY_HAPTICS, false)
-    fun audio(context: Context) = prefs(context).getBoolean(KEY_AUDIO, false)
+    fun iconIndex(context: Context) = SafePreferences.int(prefs(context), KEY_ICON, 0).coerceIn(0, icons.lastIndex)
+    fun backgroundIndex(context: Context) = SafePreferences.int(prefs(context), KEY_BACKGROUND, 0).coerceIn(0, backgrounds.lastIndex)
+    fun animationIndex(context: Context) = SafePreferences.int(prefs(context), KEY_ANIMATION, 1).coerceIn(0, animations.lastIndex)
+    fun reduceMotion(context: Context) = SafePreferences.boolean(prefs(context), KEY_REDUCE_MOTION, false)
+    fun haptics(context: Context) = SafePreferences.boolean(prefs(context), KEY_HAPTICS, false)
+    fun audio(context: Context) = SafePreferences.boolean(prefs(context), KEY_AUDIO, false)
 
     fun saveIcon(context: Context, index: Int) = index in icons.indices && prefs(context).edit().putInt(KEY_ICON, index).commit()
     fun saveBackground(context: Context, index: Int) = index in backgrounds.indices && prefs(context).edit().putInt(KEY_BACKGROUND, index).commit()
@@ -42,13 +49,17 @@ object AppearanceStudioStore {
 
     fun backgroundDrawable(context: Context, palette: ThemePalette): GradientDrawable {
         val colors = when (backgroundIndex(context)) {
-            1 -> intArrayOf(palette.background, blend(palette.background, palette.primary, 0.16f), palette.surface)
-            2 -> intArrayOf(0xFF071A24.toInt(), blend(palette.background, 0xFF286B68.toInt(), 0.30f), palette.background)
-            3 -> intArrayOf(0xFF24130F.toInt(), blend(palette.background, 0xFF9A4C2A.toInt(), 0.28f), palette.background)
-            4 -> intArrayOf(0xFF090C10.toInt(), 0xFF252B33.toInt(), palette.background)
-            5 -> intArrayOf(0xFFF7F5F0.toInt(), 0xFFECE8DF.toInt(), 0xFFFFFFFF.toInt())
-            6 -> intArrayOf(0xFF0B241D.toInt(), 0xFF1A5140.toInt(), palette.background)
-            7 -> intArrayOf(0xFF101112.toInt(), 0xFF292D32.toInt(), 0xFF101112.toInt())
+            1 -> intArrayOf(palette.background, blend(palette.background, palette.primary, 0.10f), palette.surface)
+            2 -> intArrayOf(palette.background, blend(palette.background, palette.success, 0.10f), palette.background)
+            3 -> intArrayOf(palette.background, blend(palette.background, palette.warning, 0.08f), palette.surface)
+            4 -> intArrayOf(palette.background, palette.variant, palette.surface)
+            5 -> if (palette.mode == "Light")
+                intArrayOf(0xFFF7F5F0.toInt(), 0xFFECE8DF.toInt(), 0xFFFFFFFF.toInt())
+            else intArrayOf(0xFF211F1A.toInt(), 0xFF302D26.toInt(), palette.background)
+            6 -> if (palette.mode == "Light")
+                intArrayOf(0xFFE8F4EE.toInt(), 0xFFD8EDE2.toInt(), palette.background)
+            else intArrayOf(0xFF0B241D.toInt(), 0xFF1A5140.toInt(), palette.background)
+            7 -> intArrayOf(palette.background, blend(palette.background, palette.muted, 0.08f), palette.background)
             else -> intArrayOf(palette.background, palette.background)
         }
         return GradientDrawable(GradientDrawable.Orientation.TL_BR, colors).apply { cornerRadius = 0f }
@@ -75,18 +86,99 @@ object AppearanceStudioStore {
 
     fun applyIconPreview(context: Context, image: ImageView, palette: ThemePalette) {
         val index = iconIndex(context)
-        image.setImageDrawable(GradientDrawable().apply {
-            shape = when (index % 4) {
-                0 -> GradientDrawable.OVAL
-                1 -> GradientDrawable.RECTANGLE
-                2 -> GradientDrawable.RING
-                else -> GradientDrawable.RECTANGLE
-            }
-            cornerRadius = if (index % 4 == 3) 100f else 16f
-            setColor(palette.surface)
-            setStroke(3, palette.primary)
-        })
+        image.setImageDrawable(AppearanceMarkDrawable(index, palette))
         image.contentDescription = "Selected app mark: ${icons[index]}"
+    }
+
+    private class AppearanceMarkDrawable(
+        private val variant: Int,
+        private val palette: ThemePalette
+    ) : Drawable() {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        override fun draw(canvas: Canvas) {
+            val b = bounds
+            val side = minOf(b.width(), b.height()).toFloat()
+            if (side <= 0f) return
+            val save = canvas.save()
+            canvas.translate(b.left + (b.width() - side) / 2f, b.top + (b.height() - side) / 2f)
+            canvas.scale(side / 100f, side / 100f)
+            paint.style = Paint.Style.FILL
+            paint.color = palette.surface
+            canvas.drawRoundRect(RectF(2f, 2f, 98f, 98f), 22f, 22f, paint)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 5f
+            paint.strokeCap = Paint.Cap.ROUND
+            paint.strokeJoin = Paint.Join.ROUND
+            paint.color = palette.primary
+            val path = Path()
+            when (variant) {
+                0, 13 -> { // Shield / classic shield
+                    path.moveTo(50f, 10f); path.lineTo(84f, 23f); path.lineTo(80f, 59f)
+                    path.cubicTo(77f, 76f, 62f, 86f, 50f, 92f)
+                    path.cubicTo(38f, 86f, 23f, 76f, 20f, 59f); path.lineTo(16f, 23f); path.close()
+                    canvas.drawPath(path, paint)
+                    if (variant == 13) { path.reset(); path.moveTo(33f, 51f); path.lineTo(45f, 63f); path.lineTo(68f, 39f); canvas.drawPath(path, paint) }
+                }
+                1 -> { // Crest
+                    path.moveTo(18f, 30f); path.lineTo(30f, 38f); path.lineTo(38f, 20f)
+                    path.lineTo(50f, 36f); path.lineTo(62f, 20f); path.lineTo(70f, 38f); path.lineTo(82f, 30f)
+                    path.lineTo(76f, 75f); path.lineTo(24f, 75f); path.close(); canvas.drawPath(path, paint)
+                }
+                2 -> { // Hexagon
+                    for (i in 0..5) { val a = Math.PI / 3.0 * i - Math.PI / 6.0; val x=50f+34f*kotlin.math.cos(a).toFloat(); val y=50f+34f*kotlin.math.sin(a).toFloat(); if(i==0) path.moveTo(x,y) else path.lineTo(x,y) }
+                    path.close(); canvas.drawPath(path, paint)
+                }
+                3, 7 -> { // Sentinel / guardian eye
+                    canvas.drawCircle(50f, 50f, 31f, paint)
+                    canvas.drawCircle(50f, 50f, 10f, paint)
+                    if (variant == 3) canvas.drawLine(50f, 8f, 50f, 25f, paint)
+                }
+                4 -> { // Fortress
+                    canvas.drawRect(22f, 35f, 78f, 82f, paint)
+                    canvas.drawRect(16f, 22f, 34f, 43f, paint)
+                    canvas.drawRect(43f, 14f, 57f, 35f, paint)
+                    canvas.drawRect(66f, 22f, 84f, 43f, paint)
+                }
+                5 -> { // Pulse
+                    path.moveTo(12f, 52f); path.lineTo(31f, 52f); path.lineTo(41f, 29f)
+                    path.lineTo(54f, 73f); path.lineTo(65f, 44f); path.lineTo(74f, 52f); path.lineTo(88f, 52f)
+                    canvas.drawPath(path, paint)
+                }
+                6 -> { // Beacon
+                    canvas.drawCircle(50f, 58f, 15f, paint)
+                    canvas.drawLine(50f, 10f, 50f, 29f, paint)
+                    canvas.drawLine(20f, 26f, 33f, 38f, paint)
+                    canvas.drawLine(80f, 26f, 67f, 38f, paint)
+                }
+                8 -> { // Aegis diamond
+                    path.moveTo(50f, 10f); path.lineTo(86f, 50f); path.lineTo(50f, 90f); path.lineTo(14f, 50f); path.close(); canvas.drawPath(path, paint)
+                }
+                9 -> { // Monogram T
+                    paint.textSize = 68f; paint.textAlign = Paint.Align.CENTER; paint.style = Paint.Style.FILL
+                    canvas.drawText("T", 50f, 74f, paint); paint.style = Paint.Style.STROKE
+                }
+                10 -> { // Orbit
+                    canvas.drawCircle(50f, 50f, 26f, paint); canvas.drawOval(12f, 34f, 88f, 66f, paint)
+                    paint.style = Paint.Style.FILL; canvas.drawCircle(76f, 30f, 7f, paint); paint.style = Paint.Style.STROKE
+                }
+                11 -> { // Prism
+                    path.moveTo(50f, 12f); path.lineTo(86f, 80f); path.lineTo(14f, 80f); path.close()
+                    canvas.drawPath(path, paint); canvas.drawLine(50f, 12f, 50f, 80f, paint)
+                }
+                12 -> { // Vector
+                    path.moveTo(16f, 50f); path.lineTo(68f, 50f); path.moveTo(52f, 32f); path.lineTo(72f, 50f); path.lineTo(52f, 68f)
+                    canvas.drawPath(path, paint)
+                }
+                else -> { // Minimal
+                    paint.style = Paint.Style.FILL; canvas.drawCircle(50f, 50f, 22f, paint)
+                }
+            }
+            canvas.restoreToCount(save)
+        }
+        override fun setAlpha(alpha: Int) { paint.alpha = alpha }
+        override fun setColorFilter(colorFilter: ColorFilter?) { paint.colorFilter = colorFilter }
+        @Deprecated("Deprecated in Android graphics API")
+        override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
     }
 
     private fun blend(first: Int, second: Int, amount: Float): Int {

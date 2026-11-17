@@ -34,7 +34,9 @@ class ProtectionQuickSettingsTile : TileService() {
             ProtectionMode.DISARMED -> "Not armed"
             null -> "Status unknown"
         }
-        tile.contentDescription = "ThiefAlertSeQure protection status: ${tile.label}. Tap to open the app."
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            tile.contentDescription = "ThiefAlertSeQure protection status: ${tile.label}. Tap to open the app."
+        }
         tile.updateTile()
     }
 }

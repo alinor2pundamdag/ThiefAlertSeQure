@@ -379,6 +379,12 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private fun refreshProtectionState() {
         BatchThreeUiBridge.refresh(this)
         val state = ProtectionStore(this).read()
+        if (isRunning) {
+            runCatching {
+                getSystemService(NotificationManager::class.java)
+                    .notify(NOTIFICATION_ID, buildNotification())
+            }
+        }
         if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
             startTheftAlarm()
             return
@@ -715,6 +721,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             .setColor(statusColor)
             .setContentTitle("ThiefAlertSeQure • " + mode.name.replace('_', ' '))
             .setContentText(statusText)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(
+                statusText + ". Charger monitoring is local. Motion and trusted Bluetooth alerts remain optional."
+            ))
             .setContentIntent(open)
             .addAction(android.R.drawable.ic_media_pause, "Stop monitoring", stop)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)

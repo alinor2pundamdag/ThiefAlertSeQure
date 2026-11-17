@@ -33,18 +33,21 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
     private var animator: ValueAnimator? = null
     private var toneGenerator: ToneGenerator? = null
     private var progress = 0f
+    private var destroying = false
     private lateinit var artwork: GenesisCanvas
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val replay = intent.getBooleanExtra(EXTRA_REPLAY, false)
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-        if (!replay && prefs.getBoolean(KEY_COMPLETED, false)) {
+        if (!replay && SafePreferences.boolean(prefs, KEY_COMPLETED, false)) {
             openMain()
             return
         }
         val root = FrameLayout(this)
-        artwork = GenesisCanvas(this)
+        artwork = GenesisCanvas(this).apply {
+            contentDescription = "Seismic Genesis animated shield with four stages and twenty-color spectrum"
+        }
         root.addView(artwork, FrameLayout.LayoutParams(-1, -1))
         val overlay = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -120,7 +123,7 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
-                    if (!isFinishing) complete()
+                    if (!destroying && !isFinishing) complete()
                 }
             })
             start()
@@ -145,6 +148,7 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
     }
 
     override fun onDestroy() {
+        destroying = true
         animator?.cancel()
         animator = null
         runCatching { toneGenerator?.release() }
