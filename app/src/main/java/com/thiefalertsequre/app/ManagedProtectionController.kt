@@ -66,9 +66,25 @@ object ManagedProtectionController {
         if (Build.VERSION.SDK_INT < 28 || !isDeviceOwner(context)) return false
         val dpm = context.getSystemService(DevicePolicyManager::class.java)
         val admin = admin(context)
-        return context.packageName in dpm.getLockTaskPackages(admin) &&
-            (dpm.getLockTaskFeatures(admin) and DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS) == 0
+        return runCatching {
+            context.packageName in dpm.getLockTaskPackages(admin) &&
+                (dpm.getLockTaskFeatures(admin) and DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS) == 0 &&
+                managedRestrictions.all { key -> isRestrictionApplied(dpm, admin, key) }
+        }.getOrDefault(false)
     }
+
+    private fun isRestrictionApplied(
+        dpm: DevicePolicyManager,
+        admin: ComponentName,
+        key: String
+    ): Boolean = runCatching {
+        val applied = if (ManagedRestrictionPolicy.useGlobalRestriction(Build.VERSION.SDK_INT, key)) {
+            dpm.getUserRestrictionsGlobally()
+        } else {
+            dpm.getUserRestrictions(admin)
+        }
+        applied.getBoolean(key, false)
+    }.getOrDefault(false)
 
     fun enable(activity: Activity): Boolean {
         if (Build.VERSION.SDK_INT < 28) return false
@@ -126,6 +142,10 @@ object ManagedProtectionController {
                     // not in the API 34+ addUserRestrictionGlobally key allowlist.
                     dpm.addUserRestriction(admin, key)
                 }
+            }
+
+            check(managedRestrictions.all { key -> isRestrictionApplied(dpm, admin, key) }) {
+                "Android did not confirm every managed user restriction; rollback will be attempted."
             }
 
             check(dpm.isLockTaskPermitted(activity.packageName)) {
