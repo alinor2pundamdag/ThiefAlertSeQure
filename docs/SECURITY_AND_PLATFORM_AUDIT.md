@@ -65,7 +65,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 
 ## Visual alarm flashlight
 - AlarmService starts the optional LED output only after ProtectionStore confirms ALARM_TRIGGERED; countdown and ARMED states never pulse the LED.
-- The implementation uses CameraManager.setTorchMode, which controls the torch without opening a camera capture session. No CAMERA permission, camera foreground-service type, photo, video, microphone or network access is added.
+- The alarm flashlight uses CameraManager.setTorchMode without CAMERA permission or a camera capture session. Separately, optional front-camera photo evidence requests CAMERA permission only after explicit owner opt-in; it captures one still only after successful owner authentication while the authentication Activity is visible. Photos are Android Keystore AES-GCM encrypted, bounded to 20 images / 30 days / 2 MiB each, and individually viewable/exportable/deletable. No camera foreground-service type, background camera capture, video, microphone capture or cloud upload is used.
 - Flash hardware is declared optional in the manifest so Play does not require a flash unit for installation. Audio alarm remains the primary output and is not gated by flash availability.
 - The default pulse is 700 ms on / 700 ms off (about 0.71 cycles per second), not a rapid strobe. Photosensitive users can disable it in Settings.
 - Torch access is best-effort: camera contention, an unavailable camera service, thermal management, OEM policy or process termination can stop light output. stopAlarm() explicitly turns the torch off on authenticated disarm and service teardown. Android also may turn it off when the client exits.
