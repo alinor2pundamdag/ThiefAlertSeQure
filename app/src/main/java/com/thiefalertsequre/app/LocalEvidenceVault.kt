@@ -15,7 +15,9 @@ import java.util.concurrent.atomic.AtomicLong
  *
  * It stores app-observed protection/authentication event metadata and optional
  * cached location snapshots only after an explicit owner action and permission.
- * It never captures camera or microphone content or stores credentials/biometrics.
+ * Optional front-camera photos live separately in CameraEvidenceVault and are
+ * captured only after successful owner authentication and explicit opt-in.
+ * No microphone content or credentials/biometrics are stored.
  */
 object LocalEvidenceVault {
     private const val PREFS = "local_evidence_vault_v1"
