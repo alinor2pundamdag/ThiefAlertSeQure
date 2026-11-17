@@ -41,6 +41,8 @@ class SettingsActivity : FragmentActivity() {
     private var flashPreviewStopRunnable: Runnable? = null
     private var pendingUpdateInstall: AppUpdateResult.Ready? = null
     private var pendingCameraEvidenceExportId: String? = null
+    private var requestedSection: String? = null
+    private val sectionAnchors = mutableMapOf<String, View>()
     private val pickSoundFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) validateAndSaveSound(uri, soundSlot, uri)
     }
@@ -104,10 +106,12 @@ class SettingsActivity : FragmentActivity() {
     ) { renderStatus() }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedSection = intent.getStringExtra(EXTRA_SECTION)
         render()
     }
 
     private fun render() {
+        sectionAnchors.clear()
         val scroll = ScrollView(this).apply {
             isFillViewport = true
             setBackgroundColor(getColor(R.color.tas_background))
@@ -162,7 +166,9 @@ class SettingsActivity : FragmentActivity() {
         })
         root.addView(space(22))
 
-        root.addView(text("OFFICIAL APP UPDATES", 11f, R.color.tas_primary, true))
+        val updatesHeading = text("OFFICIAL APP UPDATES", 11f, R.color.tas_primary, true)
+        sectionAnchors[SECTION_UPDATES] = updatesHeading
+        root.addView(updatesHeading)
         root.addView(space(8))
         root.addView(text(
             "Check GitHub only when you choose. ThiefAlertSeQure downloads the published release APK, verifies its SHA-256 checksum, application ID, version and pinned signing certificate, then opens Android's installer. Android confirmation is required; a matching official update installs over the existing app and keeps its private app data.",
@@ -222,7 +228,9 @@ class SettingsActivity : FragmentActivity() {
             render()
         })
         root.addView(space(10))
-        root.addView(text("ALARM FLASH ALERT", 11f, R.color.tas_primary, true))
+        val soundsFlashHeading = text("ALARM FLASH ALERT", 11f, R.color.tas_primary, true)
+        sectionAnchors[SECTION_SOUNDS_FLASH] = soundsFlashHeading
+        root.addView(soundsFlashHeading)
         root.addView(space(6))
         root.addView(text(
             "Enabled by default, the rear camera LED pulses slowly only while the theft alarm is latched. It uses Android's torch API without camera permission and never captures photos or video. Flash hardware and availability vary by device; the sound alarm remains independent. Disable this option if flashing light is unsuitable for you.",
@@ -274,7 +282,9 @@ class SettingsActivity : FragmentActivity() {
         root.addView(action("Check flashlight hardware availability") { checkFlashHardware() })
         root.addView(space(22))
 
-        root.addView(text("SYSTEM ACCESS & PERMISSIONS", 11f, R.color.tas_primary, true))
+        val moreHeading = text("SYSTEM ACCESS & PERMISSIONS", 11f, R.color.tas_primary, true)
+        sectionAnchors[SECTION_MORE] = moreHeading
+        root.addView(moreHeading)
         root.addView(space(10))
         addSystemSettingAction("Grant notifications permission", "Notifications", "Android 13 (API 33)+ asks for notification permission at runtime. If denied, open App info → Notifications and enable it. Android 8–12 uses per-app notification controls without this runtime prompt. Verify the Anti-theft alarm channel is enabled and allowed to appear on the lock screen.") { requestNotifications() }
         addSystemSettingAction("Alarms & reminders / exact alarm access", "Exact alarms", "Android 12 (API 31)+ exposes special Alarms & reminders access. Allow ThiefAlertSeQure if listed. Android 8–11 does not expose this special access. Without it, countdown delivery may use fallback scheduling and can be delayed.") { openExactAlarmSettings() }
@@ -503,7 +513,9 @@ class SettingsActivity : FragmentActivity() {
         })
         root.addView(space(22))
 
-        root.addView(text("LOCAL TAMPER HISTORY", 11f, R.color.tas_primary, true))
+        val tamperHeading = text("LOCAL TAMPER HISTORY", 11f, R.color.tas_primary, true)
+        sectionAnchors[SECTION_TAMPER_HISTORY] = tamperHeading
+        root.addView(tamperHeading)
         root.addView(space(8))
         val historyText = LocalTamperHistory.read(this, 20).ifEmpty {
             listOf("No recorded protection events yet.")
@@ -668,7 +680,9 @@ class SettingsActivity : FragmentActivity() {
         ))
         root.addView(space(22))
 
-        root.addView(text("PRIVACY & DATA", 11f, R.color.tas_primary, true))
+        val privacyHeading = text("PRIVACY & DATA", 11f, R.color.tas_primary, true)
+        sectionAnchors[SECTION_PRIVACY] = privacyHeading
+        root.addView(privacyHeading)
         root.addView(space(10))
         root.addView(text(
             "No account, analytics, advertising SDK, or app backend is used. Internet access is used only when you manually check for an official GitHub release and download its APK; protection state and personal data are not uploaded. The optional alarm flashlight uses Android's torch API without opening the camera. Separately, optional front-camera photo evidence requires an explicit Settings opt-in and CAMERA permission; it captures one photo only after successful owner authentication while this app is visible, shows Android's camera privacy indicator, encrypts photos locally, and never uploads them. Device credentials and biometric templates are handled by Android and are not read by the app.",
@@ -685,6 +699,11 @@ class SettingsActivity : FragmentActivity() {
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
         ThemeRuntime.apply(this, scroll)
+        requestedSection?.let { section ->
+            sectionAnchors[section]?.let { target ->
+                scroll.post { scroll.smoothScrollTo(0, target.top) }
+            }
+        }
     }
 
 
@@ -1700,6 +1719,15 @@ class SettingsActivity : FragmentActivity() {
         }
         row.addView(launch); row.addView(info, LinearLayout.LayoutParams(dp(48), dp(52)))
         root.addView(row, matchWrap())
+    }
+
+    companion object {
+        const val EXTRA_SECTION = "com.thiefalertsequre.settings.SECTION"
+        const val SECTION_SOUNDS_FLASH = "sounds_flash"
+        const val SECTION_TAMPER_HISTORY = "tamper_history"
+        const val SECTION_MORE = "more"
+        const val SECTION_UPDATES = "updates"
+        const val SECTION_PRIVACY = "privacy"
     }
 
     private fun open(primary: Intent, fallback: Intent? = null) {
