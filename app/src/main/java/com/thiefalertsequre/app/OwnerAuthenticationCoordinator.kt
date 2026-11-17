@@ -17,6 +17,7 @@ internal object OwnerAuthenticationCoordinator {
         val source = proof.source
         if (!proof.isFresh(ProtectionClock.elapsedRealtime(), ProtectionClock.bootCount(appContext))) {
             LocalTamperHistory.record(appContext, "owner_auth_proof_rejected", "Owner authentication proof was invalid, expired, or from another boot")
+            LocalEvidenceVault.recordAsync(appContext, "owner_auth_proof_rejected", "Owner authentication proof was invalid, expired, or from another boot")
             return null
         }
 
@@ -79,6 +80,11 @@ internal object OwnerAuthenticationCoordinator {
             appContext,
             "owner_authenticated_alarm_stopped",
             "Authentication source: $source; resulting protection state: ${next.mode.name}"
+        )
+        LocalEvidenceVault.recordAsync(
+            appContext,
+            "owner_authenticated_alarm_stopped",
+            "source=$source; resultingProtectionMode=${next.mode.name}; alarmDisarmed=true"
         )
         return next
     }
