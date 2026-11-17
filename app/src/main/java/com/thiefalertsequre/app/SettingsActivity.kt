@@ -185,6 +185,15 @@ class SettingsActivity : FragmentActivity() {
             }
             render()
         })
+        root.addView(space(6))
+        val flashPattern = AlarmFlashPatternPolicy.read(this)
+        root.addView(action("Flash pattern: ${flashPattern.label} (tap to cycle)") {
+            val next = AlarmFlashPatternPolicy.next(this)
+            if (next != flashPattern) {
+                LocalTamperHistory.record(this, "alarm_flash_pattern_changed", "Selected ${next.label}; applies on the next alarm start")
+            }
+            render()
+        })
         root.addView(space(22))
 
         root.addView(text("SYSTEM ACCESS & PERMISSIONS", 11f, R.color.tas_primary, true))
