@@ -3,7 +3,6 @@ package com.thiefalertsequre.app
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.location.Location
 import android.location.LocationManager
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
@@ -47,9 +46,12 @@ object EvidenceLocationCapture {
             accuracyMeters = accuracy,
             provider = best.provider ?: "unknown",
             fixAgeMs = ageMs,
-            classification = if (ageMs <= RECENT_FIX_MAX_AGE_MS) "RECENT_CACHED_FIX" else "STALE_CACHED_FIX"
+            classification = classifyFixAge(ageMs)
         )
     }
 
     const val RECENT_FIX_MAX_AGE_MS = 120_000L
+
+    fun classifyFixAge(ageMs: Long): String =
+        if (ageMs in 0..RECENT_FIX_MAX_AGE_MS) "RECENT_CACHED_FIX" else "STALE_CACHED_FIX"
 }
