@@ -221,6 +221,7 @@ class AboutActivity : FragmentActivity() {
 
             Test dependency:
             • JUnit 4.13.2 — Eclipse Public License 1.0
+            • Hamcrest Core 1.3 (JUnit test transitive dependency) — New BSD License
 
             Project source license:
             • Apache License 2.0 (see the repository LICENSE file)
@@ -228,8 +229,9 @@ class AboutActivity : FragmentActivity() {
             License texts:
             https://www.apache.org/licenses/LICENSE-2.0
             https://www.eclipse.org/legal/epl-v10.html
+            https://opensource.org/license/bsd-3-clause/
 
-            This in-app list identifies direct declared dependencies. Transitive dependencies retain their respective upstream license terms and notices.
+            This in-app list identifies the direct declared dependencies and known JUnit test transitive dependency. Other resolved transitive dependencies retain their respective upstream license terms and notices.
         """.trimIndent()
         MaterialAlertDialogBuilder(this)
             .setTitle("Open-source acknowledgments")
