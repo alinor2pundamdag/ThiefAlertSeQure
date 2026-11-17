@@ -30,9 +30,9 @@ This record distinguishes existing capabilities reused by Batch Four from the ad
 
 The Batch Three baseline did not contain the previously planned top developer credit, so Batch Four adds it exactly once inside the existing `AboutActivity` (no second About screen or duplicate branding module):
 
-- Exact credit: `Developed by Alinor Pundandag`.
+- Exact credit: `Developed by Alinor Pundamdag`.
 - Fixed dark/black card at the top of About, immediately after the back navigation control.
-- Twenty light-spectrum colors with a smooth, continuous letter-by-letter glow.
+- Twenty light-spectrum colors; a true frame-by-frame smooth letter-by-letter sweep, with one-second color progression and the repeating A–G stage cycle.
 - Seven A–G animation stages cycle through the credit; the palette continues across loops.
 - Reuses the existing `AppearanceStudioStore.reduceMotion` preference. Reduced-motion mode renders a stable high-contrast static credit with no animation.
 - Animation is cancelled while the Activity is paused or destroyed and restarts on resume.
@@ -63,6 +63,12 @@ The Batch Three baseline did not contain the previously planned top developer cr
 - Settings now explicitly distinguishes the readable convenience event log from the separate encrypted evidence archive.
 - Settings displays the encrypted metadata archive integrity result and provides an owner-triggered check for both encrypted event metadata and encrypted photo evidence.
 - Failed or unknown integrity results are not represented as verified. The check does not modify protection state or alarm state.
+
+## Owner-directed implementation audit corrections
+
+A source-to-original-plan audit found that the earlier Phase 13 implementation did not match the owner's cinematic brief: it rendered only expanding circles, added an unrequested `Skip intro` control, and omitted the requested title drops, seismic shake, concrete fractures, particle disintegration, cement-textured name reveal, dark-gray background reveal, and digital-wind exit. The Phase 13 plan above is corrected to the original specification, and the intro implementation is being replaced with the requested Compose/Canvas sequence. The About developer credit also had a spelling error and only updated its text color once per letter step; it is corrected to the owner's exact spelling and frame-by-frame color interpolation.
+
+The foreground monitor and alarm already had a monochrome shield small icon, but their notifications used the default foreground-service visibility policy. They now request immediate foreground-notification visibility and update silently once posted. The OS still controls whether a status-bar icon is shown: notifications must be allowed, the corresponding foreground service must be running, and Android/OEM notification settings must permit it. The app does not and cannot draw system-owned 4G/VoLTE, headset, vibration, or battery indicators.
 
 ## Explicitly unchanged
 
