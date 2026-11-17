@@ -17,6 +17,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -183,7 +184,7 @@ class MainActivity : FragmentActivity() {
         statusContent.addView(space(4))
         val shieldRow = LinearLayout(this).apply { gravity = Gravity.CENTER }
         shield = ProtectionShieldView(this)
-        shieldRow.addView(shield, LinearLayout.LayoutParams(dp(68), dp(68)))
+        shieldRow.addView(shield, LinearLayout.LayoutParams(dp(136), dp(136)))
         statusContent.addView(shieldRow, matchWrap())
         statusContent.addView(space(8))
         status = label("Checking device…", 24f, getColor(R.color.tas_text), true)
@@ -196,6 +197,36 @@ class MainActivity : FragmentActivity() {
         statusContent.addView(setupSummary, matchWrap())
         statusCard.addView(statusContent)
         root.addView(statusCard, matchWrap())
+        root.addView(space(12))
+
+        // Compact, horizontally swipeable destinations keep the primary
+        // protection dashboard focused while exposing the major app areas.
+        val navigationScroll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+        }
+        val navigationRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        navigationRow.addView(outlinedButton("Protection") { scroll.smoothScrollTo(0, 0) })
+        navigationRow.addView(space(6))
+        navigationRow.addView(outlinedButton("Bluetooth") {
+            startActivity(Intent(this, BluetoothCenterActivity::class.java))
+        })
+        navigationRow.addView(space(6))
+        navigationRow.addView(outlinedButton("Device") {
+            startActivity(Intent(this, DeviceIntelligenceActivity::class.java))
+        })
+        navigationRow.addView(space(6))
+        navigationRow.addView(outlinedButton("Settings") {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        })
+        navigationRow.addView(space(6))
+        navigationRow.addView(outlinedButton("Theme") {
+            startActivity(Intent(this, ThemeActivity::class.java))
+        })
+        navigationScroll.addView(navigationRow)
+        root.addView(navigationScroll, matchWrap())
         root.addView(space(20))
 
         root.addView(sectionTitle("DEVICE INTELLIGENCE"), matchWrap())
