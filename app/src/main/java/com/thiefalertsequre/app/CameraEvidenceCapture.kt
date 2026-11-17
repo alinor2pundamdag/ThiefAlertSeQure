@@ -16,7 +16,9 @@ import android.hardware.camera2.CaptureRequest
 import android.media.ImageReader
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Looper
 import android.view.Surface
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import java.io.ByteArrayOutputStream
@@ -150,6 +152,7 @@ internal object CameraEvidenceCapture {
                     "front_camera_evidence_saved",
                     "Encrypted front-camera photo saved after successful owner authentication; id=${entry.id}; sha256=${entry.sha256}"
                 )
+                notifyOwner(app, "Front-camera evidence saved securely.")
                 finish()
             }
         }, handler)
@@ -280,5 +283,14 @@ internal object CameraEvidenceCapture {
     private fun recordFailure(context: Context, event: String, detail: String) {
         runCatching { LocalEvidenceVault.recordAsync(context, event, detail) }
         runCatching { LocalTamperHistory.record(context, event, detail) }
+        notifyOwner(context, "Front-camera evidence was not saved. Owner authentication and alarm state were not changed.")
+    }
+
+    private fun notifyOwner(context: Context, message: String) {
+        Handler(Looper.getMainLooper()).post {
+            runCatching {
+                Toast.makeText(context.applicationContext, message, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 }
