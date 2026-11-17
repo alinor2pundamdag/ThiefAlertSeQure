@@ -33,6 +33,9 @@ checks = {
         "ManagedRestrictionPolicy.useGlobalRestriction" in managed
         and "key != UserManager.DISALLOW_ADD_USER" in managed
         and "ManagedRestrictionPolicyTest" in (ROOT / "app/src/test/java/com/thiefalertsequre/app/ManagedRestrictionPolicyTest.kt").read_text(encoding="utf-8"),
+    "managed lockdown reads back all restrictions before reporting configured":
+        "managedRestrictions.all { key -> isRestrictionApplied(dpm, admin, key) }" in managed
+        and "Android did not confirm every managed user restriction" in managed,
     "seven named plus one custom flash pattern exist":
         all(f"{name}(" in flash for name in ("STEADY", "SLOW", "NORMAL", "FAST", "BURST", "SOS", "ALTERNATING", "CUSTOM")),
     "flash speed and custom ON/OFF cadence are persisted and applied by the torch controller":
