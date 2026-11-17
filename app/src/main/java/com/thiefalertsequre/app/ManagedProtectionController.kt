@@ -78,7 +78,9 @@ object ManagedProtectionController {
         admin: ComponentName,
         key: String
     ): Boolean = runCatching {
-        val applied = if (ManagedRestrictionPolicy.useGlobalRestriction(Build.VERSION.SDK_INT, key)) {
+        val applied = if (Build.VERSION.SDK_INT >= 34 &&
+            ManagedRestrictionPolicy.useGlobalRestriction(Build.VERSION.SDK_INT, key)
+        ) {
             dpm.getUserRestrictionsGlobally()
         } else {
             dpm.getUserRestrictions(admin)
@@ -135,7 +137,9 @@ object ManagedProtectionController {
             dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD)
 
             managedRestrictions.forEach { key ->
-                if (ManagedRestrictionPolicy.useGlobalRestriction(Build.VERSION.SDK_INT, key)) {
+                if (Build.VERSION.SDK_INT >= 34 &&
+                    ManagedRestrictionPolicy.useGlobalRestriction(Build.VERSION.SDK_INT, key)
+                ) {
                     dpm.addUserRestrictionGlobally(key)
                 } else {
                     // DISALLOW_ADD_USER is supported by addUserRestriction but is
