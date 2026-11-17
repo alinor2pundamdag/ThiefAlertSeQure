@@ -14,6 +14,18 @@ object AlarmSoundStore {
     const val ALERT = "alert"
     private const val PREFS = "user_alarm_sounds_v1"
     private const val KEY_BUILT_IN_PRESET = "built_in_alarm_preset"
+    private const val KEY_SECONDARY_ENABLED = "secondary_alarm_enabled"
+
+    fun isSecondaryAlarmEnabled(context: Context): Boolean =
+        SafePreferences.boolean(
+            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE),
+            KEY_SECONDARY_ENABLED,
+            false
+        )
+
+    fun setSecondaryAlarmEnabled(context: Context, enabled: Boolean): Boolean =
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_SECONDARY_ENABLED, enabled).commit()
 
     fun selectedBuiltInPreset(context: Context): AlarmTonePreset {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
