@@ -5,11 +5,13 @@ import android.app.AlarmManager
 import android.content.Intent
 import android.media.MediaPlayer
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.NumberPicker
 import android.widget.ScrollView
@@ -38,6 +40,7 @@ class SettingsActivity : FragmentActivity() {
     private var flashPreviewController: AlarmFlashController? = null
     private var flashPreviewStopRunnable: Runnable? = null
     private var pendingUpdateInstall: AppUpdateResult.Ready? = null
+    private var pendingCameraEvidenceExportId: String? = null
     private val pickSoundFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) validateAndSaveSound(uri, soundSlot, uri)
     }
@@ -70,6 +73,26 @@ class SettingsActivity : FragmentActivity() {
     ) { grants ->
         if (grants.values.any { it }) requestFreshEvidenceLocation()
         else android.widget.Toast.makeText(this, "Location permission was not granted; no current location was requested.", android.widget.Toast.LENGTH_LONG).show()
+    }
+    private val requestCameraEvidencePermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted && CameraEvidenceCapture.setEnabled(this, true)) {
+            LocalTamperHistory.record(this, "camera_evidence_opted_in", "Owner enabled front-camera photo evidence after successful alarm authentication")
+            android.widget.Toast.makeText(this, "Front-camera evidence enabled. A photo is taken only after successful owner authentication.", android.widget.Toast.LENGTH_LONG).show()
+        } else {
+            CameraEvidenceCapture.setEnabled(this, false)
+            LocalTamperHistory.record(this, "camera_evidence_permission_denied", "Front-camera evidence remains disabled because CAMERA permission was not granted")
+            android.widget.Toast.makeText(this, "Camera permission was not granted; front-camera evidence remains OFF.", android.widget.Toast.LENGTH_LONG).show()
+        }
+        render()
+    }
+    private val exportCameraEvidence = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("image/jpeg")
+    ) { uri ->
+        val id = pendingCameraEvidenceExportId
+        pendingCameraEvidenceExportId = null
+        if (uri != null && id != null) writeCameraEvidenceExport(uri, id)
     }
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -250,7 +273,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(10))
         addSystemSettingAction("Grant notifications permission", "Notifications", "Android 13 (API 33)+ asks for notification permission at runtime. If denied, open App info → Notifications and enable it. Android 8–12 uses per-app notification controls without this runtime prompt. Verify the Anti-theft alarm channel is enabled and allowed to appear on the lock screen.") { requestNotifications() }
         addSystemSettingAction("Alarms & reminders / exact alarm access", "Exact alarms", "Android 12 (API 31)+ exposes special Alarms & reminders access. Allow ThiefAlertSeQure if listed. Android 8–11 does not expose this special access. Without it, countdown delivery may use fallback scheduling and can be delayed.") { openExactAlarmSettings() }
-        addSystemSettingAction("All app permissions and app information", "App permissions", "Open App info → Permissions and review only permissions requested by this build. The local charger-alarm core does not need contacts, microphone, camera permission, or SMS. Optional coarse/fine location permission is requested only after you explicitly choose to save one cached location fix in the encrypted evidence vault; no background tracking is used. The optional trusted Bluetooth separation alert requests Bluetooth Connect access only when you choose a paired device; it does not scan for nearby devices. Internet access is used only when you manually check for official GitHub updates; the app does not upload protection data. The optional flashlight uses Android's torch API without camera permission and does not capture images or video. Do not grant unrelated permissions.") { openAppInfo() }
+        addSystemSettingAction("All app permissions and app information", "App permissions", "Open App info → Permissions and review only permissions requested by this build. The local charger-alarm core does not need contacts, microphone, or SMS. Optional CAMERA permission is requested only after you explicitly enable front-camera photo evidence; one photo is taken only after successful owner authentication that disarms a latched alarm while the app is visible. Android shows its camera privacy indicator. The optional flashlight uses Android's torch API without opening the camera and does not capture images. Optional coarse/fine location permission is requested only after you explicitly choose a one-shot location snapshot; no background tracking is used. The optional trusted Bluetooth separation alert requests Bluetooth Connect access only when you choose a paired device; it does not scan for nearby devices. Internet access is used only when you manually check for official GitHub updates; the app does not upload protection data. Do not grant unrelated permissions.") { openAppInfo() }
         addSystemSettingAction("App notification channels and settings", "App notifications", "This opens ThiefAlertSeQure's own notification settings. Enable app notifications and the Anti-theft alarm channel. Android 8+ uses channels; Android 13+ also requires app-level notification permission.") { open(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)) }
         addSystemSettingAction("Battery and background restrictions", "Background activity", "Review ThiefAlertSeQure battery usage and select Unrestricted / Allow background activity where available. Android 8+ applies background execution limits; Android 9+ adds stricter standby behavior; Android 12+ exposes additional battery controls; Android 13–15 may apply OEM restrictions. Keep the persistent protection notification enabled. No setting overrides Force stop.") { openBatterySettings() }
         addSystemSettingAction("Do Not Disturb settings", "Do Not Disturb", "Review DND mode, schedules, and permitted alarm interruptions. The alarm uses Android alarm audio usage, but DND policy, silent mode, and OEM behavior can still affect audible output. Allow alarms during DND if you require alarm audio to remain audible.") { openDndSettings() }
@@ -499,6 +522,61 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(10))
         root.addView(text("ENCRYPTED EVIDENCE VAULT", 11f, R.color.tas_primary, true))
         root.addView(space(6))
+        val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
+        val cameraPermissionGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        val cameraEvidenceCount = CameraEvidenceVault.entries(this).size
+        root.addView(text(
+            "Front-camera photo evidence: ${when { cameraEvidenceEnabled && cameraPermissionGranted -> "ON"; cameraEvidenceEnabled -> "NEEDS CAMERA PERMISSION"; else -> "OFF" }} • $cameraEvidenceCount encrypted photos",
+            12f, R.color.tas_muted
+        ))
+        root.addView(action("Front-camera evidence after successful owner authentication: ${if (cameraEvidenceEnabled && cameraPermissionGranted) "ON" else "OFF / NEEDS SETUP"}") {
+            if (cameraEvidenceEnabled && cameraPermissionGranted) {
+                MaterialAlertDialogBuilder(this)
+                    .setTitle("Disable front-camera evidence?")
+                    .setMessage("No new photo will be captured after successful alarm authentication. Existing encrypted photos remain until you delete them.")
+                    .setNegativeButton("Keep enabled", null)
+                    .setPositiveButton("Disable") { _, _ ->
+                        CameraEvidenceCapture.setEnabled(this, false)
+                        LocalTamperHistory.record(this, "camera_evidence_opt_out", "Owner disabled front-camera photo evidence")
+                        render()
+                    }.showThemed(this)
+            } else {
+                MaterialAlertDialogBuilder(this)
+                    .setTitle("Enable front-camera photo evidence?")
+                    .setMessage("After a successful owner PIN/password or supported strong-biometric verification disarms a latched alarm, ThiefAlertSeQure will take one still photo using the FRONT camera while this app is visible. Android will show its camera privacy indicator. CAMERA permission is requested only after you choose Enable. Photos are encrypted with an Android Keystore AES-GCM key, stored only on this device for up to 30 days (maximum 20 photos, 2 MiB each), and can be viewed, exported or deleted. No photo is taken on failed/cancelled authentication; no background camera service, microphone, or cloud upload is used. If camera access is unavailable, alarm disarming still succeeds.")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Enable") { _, _ ->
+                        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                            if (CameraEvidenceCapture.setEnabled(this, true)) {
+                                LocalTamperHistory.record(this, "camera_evidence_opted_in", "Owner enabled front-camera photo evidence")
+                            }
+                            render()
+                        } else {
+                            requestCameraEvidencePermission.launch(Manifest.permission.CAMERA)
+                        }
+                    }.showThemed(this)
+            }
+        })
+        root.addView(action("Review / view / export front-camera photos ($cameraEvidenceCount)") {
+            showCameraEvidenceArchive()
+        })
+        root.addView(action("Delete all front-camera photos") {
+            if (cameraEvidenceCount == 0) {
+                android.widget.Toast.makeText(this, "No front-camera photos are stored.", android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                MaterialAlertDialogBuilder(this)
+                    .setTitle("Delete all front-camera photos?")
+                    .setMessage("This permanently deletes every encrypted front-camera photo stored by ThiefAlertSeQure. It does not change the owner-authentication setting or event metadata.")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Delete all") { _, _ ->
+                        val deleted = CameraEvidenceVault.deleteAll(this)
+                        LocalEvidenceVault.recordAsync(this, "camera_evidence_deleted", "Owner deleted all front-camera photo evidence; success=$deleted")
+                        android.widget.Toast.makeText(this, if (deleted) "Front-camera photos deleted." else "Photo deletion could not be confirmed.", android.widget.Toast.LENGTH_LONG).show()
+                        render()
+                    }.showThemed(this)
+            }
+        })
+        root.addView(space(8))
         val evidenceEntries = LocalEvidenceVault.read(this, 100)
         root.addView(text(
             "${evidenceEntries.size} encrypted local event records • 30-day retention • no cloud upload",
@@ -580,7 +658,7 @@ class SettingsActivity : FragmentActivity() {
                 }.showThemed(this)
         })
         root.addView(text(
-            "The archive contains app-observed event metadata and only the location snapshots you explicitly request. It does not contain camera images, microphone recordings, PINs, passwords, or biometric material.",
+            "The encrypted archive contains app-observed event metadata and only the location snapshots you explicitly request. Optional front-camera photos are stored separately in an AES-GCM encrypted local vault only after successful owner authentication and explicit opt-in. No microphone recordings, PINs, passwords, or biometric material are stored.",
             12f, R.color.tas_muted
         ))
         root.addView(space(22))
@@ -588,7 +666,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(text("PRIVACY & DATA", 11f, R.color.tas_primary, true))
         root.addView(space(10))
         root.addView(text(
-            "No account, analytics, advertising SDK, or app backend is used. Internet access is used only when you manually check for an official GitHub release and download its APK; protection state and personal data are not uploaded. The optional alarm flashlight uses Android's torch API without camera permission and does not capture images or video. Device credentials and biometric templates are handled by Android and are not read by this app.",
+            "No account, analytics, advertising SDK, or app backend is used. Internet access is used only when you manually check for an official GitHub release and download its APK; protection state and personal data are not uploaded. The optional alarm flashlight uses Android's torch API without opening the camera. Separately, optional front-camera photo evidence requires an explicit Settings opt-in and CAMERA permission; it captures one photo only after successful owner authentication while this app is visible, shows Android's camera privacy indicator, encrypts photos locally, and never uploads them. Device credentials and biometric templates are handled by Android and are not read by the app.",
             13f, R.color.tas_muted
         ))
         root.addView(space(10))
@@ -1003,6 +1081,82 @@ class SettingsActivity : FragmentActivity() {
             }
         }
         if (::root.isInitialized) ThemeRuntime.apply(this, root)
+    }
+
+    private fun showCameraEvidenceArchive() {
+        val entries = CameraEvidenceVault.entries(this)
+        if (entries.isEmpty()) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Front-camera evidence")
+                .setMessage("No front-camera photos are stored. Enable the optional feature to capture one photo after successful owner authentication that disarms a latched alarm.")
+                .setPositiveButton("Close", null)
+                .showThemed(this)
+            return
+        }
+        val formatter = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+        val labels = entries.map { entry ->
+            "${formatter.format(java.util.Date(entry.timestampEpochMs))} • ${entry.sizeBytes} bytes • SHA-256 ${entry.sha256.take(16)}…"
+        }.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Encrypted front-camera photos")
+            .setItems(labels) { _, index ->
+                val entry = entries[index]
+                ioExecutor.execute {
+                    val bytes = CameraEvidenceVault.read(this, entry.id)
+                    runOnUiThread {
+                        if (bytes == null) {
+                            android.widget.Toast.makeText(this, "Photo failed its integrity check or is unavailable.", android.widget.Toast.LENGTH_LONG).show()
+                            return@runOnUiThread
+                        }
+                        val image = ImageView(this).apply {
+                            setImageBitmap(BitmapFactory.decodeByteArray(bytes, 0, bytes.size))
+                            adjustViewBounds = true
+                            maxHeight = dp(440)
+                            scaleType = ImageView.ScaleType.FIT_CENTER
+                            setPadding(dp(8), dp(8), dp(8), dp(8))
+                        }
+                        MaterialAlertDialogBuilder(this)
+                            .setTitle("Verified encrypted photo")
+                            .setMessage("Captured after successful owner authentication. SHA-256: ${entry.sha256}")
+                            .setView(image)
+                            .setNeutralButton("Export") { _, _ ->
+                                pendingCameraEvidenceExportId = entry.id
+                                exportCameraEvidence.launch("ThiefAlertSeQure-front-camera-${entry.timestampEpochMs}.jpg")
+                            }
+                            .setNegativeButton("Delete") { _, _ ->
+                                val deleted = CameraEvidenceVault.delete(this, entry.id)
+                                LocalEvidenceVault.recordAsync(this, "camera_evidence_deleted", "Owner deleted photo id=${entry.id}; success=$deleted")
+                                android.widget.Toast.makeText(this, if (deleted) "Photo deleted." else "Photo deletion could not be confirmed.", android.widget.Toast.LENGTH_LONG).show()
+                                render()
+                            }
+                            .setPositiveButton("Close", null)
+                            .showThemed(this)
+                    }
+                }
+            }
+            .setNegativeButton("Close", null)
+            .showThemed(this)
+    }
+
+    private fun writeCameraEvidenceExport(uri: Uri, id: String) {
+        ioExecutor.execute {
+            val result = runCatching {
+                val bytes = CameraEvidenceVault.read(this, id)
+                    ?: throw IllegalStateException("Photo is missing or failed its integrity check.")
+                contentResolver.openOutputStream(uri)?.use { output ->
+                    output.write(bytes)
+                    output.flush()
+                } ?: throw IllegalStateException("Android could not open the selected export destination.")
+                bytes.size
+            }
+            runOnUiThread {
+                android.widget.Toast.makeText(
+                    this,
+                    result.fold({ "Photo exported as JPEG (${it} bytes)." }, { "Photo export failed: ${it.message}" }),
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+        }
     }
 
     private fun requestFreshEvidenceLocation() {
