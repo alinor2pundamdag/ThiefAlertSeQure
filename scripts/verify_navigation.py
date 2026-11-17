@@ -131,8 +131,9 @@ for required in (
         errors.append("AboutActivity missing Batch Four developer/version/legal contract: " + required)
 
 if (
-    "LocalEvidenceVault.verifyIntegrity(this)" not in settings_activity
-    or "CameraEvidenceVault.verifyIntegrity(this)" not in settings_activity
+    "LocalEvidenceVault.verifyIntegrity(this@SettingsActivity)" not in settings_activity
+    or "CameraEvidenceVault.verifyIntegrity(this@SettingsActivity)" not in settings_activity
+    or "ioExecutor.execute {" not in settings_activity
     or "Verify local evidence integrity now" not in settings_activity
     or "convenience log" not in settings_activity
 ):
