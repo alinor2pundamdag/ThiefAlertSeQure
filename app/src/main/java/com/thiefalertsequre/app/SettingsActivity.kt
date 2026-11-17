@@ -776,10 +776,12 @@ class SettingsActivity : FragmentActivity() {
             val result = runCatching {
                 val entries = LocalEvidenceVault.read(this, 100)
                 val bytes = EvidenceVaultBackup.encrypt(entries, password)
-                contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
-                    ?: error("Android could not open the selected backup destination.")
+                contentResolver.openOutputStream(uri)?.use { stream ->
+                    stream.write(bytes)
+                    stream.flush()
+                } ?: error("Android could not open the selected backup destination.")
                 bytes.size
-            }
+            }.also { password.fill('\u0000') }
             runOnUiThread {
                 android.widget.Toast.makeText(
                     this,
@@ -794,9 +796,15 @@ class SettingsActivity : FragmentActivity() {
         ioExecutor.execute {
             val result = runCatching {
                 val bytes = contentResolver.openInputStream(uri)?.use { input ->
-                    val data = input.readBytes()
-                    require(data.size <= 1_000_000) { "Backup file is too large." }
-                    data
+                    val output = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(8_192)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        require(output.size() + count <= 1_000_000) { "Backup file is too large." }
+                        output.write(buffer, 0, count)
+                    }
+                    output.toByteArray()
                 } ?: error("Android could not open the selected backup file.")
                 val entries = EvidenceVaultBackup.decrypt(bytes, password)
                 require(LocalEvidenceVault.replaceAll(this, entries)) { "The validated evidence archive could not be stored." }
