@@ -321,6 +321,17 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             "Camera photo evidence → NOT ENABLED under the current no-camera-permission privacy boundary"
         )
         addCard("FEATURE DEPENDENCY MAP", dependencyMap)
+        val recentOutputEvents = LocalTamperHistory.read(this, 100)
+            .filter { line ->
+                listOf("alarm_audio_", "alarm_audio_focus_", "secondary_alarm_", "alarm_haptics_", "alarm_flash_")
+                    .any(line::contains)
+            }.takeLast(8).map { it.take(180) }
+        addCard("ALARM OUTPUT MONITOR", listOf(
+            "Primary audio, audio-focus changes, secondary alarm, haptics, torch interruptions, and thermal suppression are recorded locally.",
+            "A secondary-output failure does not stop the primary alarm. A successful start event is not proof of audible sound at the speaker.",
+            if (recentOutputEvents.isEmpty()) "No recent alarm-output events have been recorded."
+            else "Recent output events:\\n${recentOutputEvents.joinToString("\\n")}"
+        ))
         if (Build.VERSION.SDK_INT >= 36) {
             root.addView(button("Check Android ranging capabilities (optional)") { requestRangingCapabilityCheck() }, matchWrap())
             root.addView(space(6))
@@ -432,6 +443,11 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                 put("protectionIntegrityScorePercent", integrityScore.percent)
                 put("protectionIntegrityScorePoints", "${integrityScore.earnedPoints}/${integrityScore.possiblePoints}")
                 put("permissionChangeMonitoring", "Android permission and special-access snapshots are compared when the app resumes")
+                put("recentAlarmOutputEvents", org.json.JSONArray(
+                    LocalTamperHistory.read(this@DeviceIntelligenceActivity, 100)
+                        .filter { line -> listOf("alarm_audio_", "alarm_audio_focus_", "secondary_alarm_", "alarm_haptics_", "alarm_flash_").any(line::contains) }
+                        .takeLast(20).map { it.take(180) }
+                ))
                 put("monitorEnabled", monitorEnabled)
                 put("monitorLastRecordedRunning", SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_RUNNING, false))
                 put("notificationsEnabled", notifications)
