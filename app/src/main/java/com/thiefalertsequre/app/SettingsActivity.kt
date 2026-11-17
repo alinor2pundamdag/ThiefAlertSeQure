@@ -729,12 +729,20 @@ class SettingsActivity : FragmentActivity() {
             val output = contentResolver.openOutputStream(uri)
                 ?: error("Android could not open the selected export destination.")
             output.bufferedWriter(Charsets.UTF_8).use { writer ->
-                writer.appendLine("event")
+                fun csv(value: String) = "\"" + value.replace("\"", "\"\"") + "\""
+                writer.appendLine("record_type,event,timestamp_epoch_ms,timezone_offset_minutes,detail,integrity_sha256")
                 LocalTamperHistory.read(this, 100).asReversed().forEach { event ->
-                    writer.append('"')
-                    writer.append(event.replace("\"", "\"\""))
-                    writer.append('"')
-                    writer.appendLine()
+                    writer.appendLine(listOf("event_history", event, "", "", "", "").joinToString(",") { csv(it) })
+                }
+                LocalEvidenceVault.read(this, 100).asReversed().forEach { entry ->
+                    writer.appendLine(listOf(
+                        "encrypted_evidence",
+                        entry.event,
+                        entry.timestampEpochMs.toString(),
+                        entry.timezoneOffsetMinutes.toString(),
+                        entry.detail,
+                        entry.integritySha256
+                    ).joinToString(",") { csv(it) })
                 }
             }
         }.onSuccess {
