@@ -34,7 +34,16 @@ class AlarmService : Service() {
     private var flashController: AlarmFlashController? = null
     private var thermalFlashSuppressed = false
     private var thermalFlashController: ThermalFlashController? = null
-    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { }
+    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { change ->
+        val label = when (change) {
+            AudioManager.AUDIOFOCUS_GAIN -> "GAIN"
+            AudioManager.AUDIOFOCUS_LOSS -> "LOSS"
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> "LOSS_TRANSIENT"
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> "LOSS_TRANSIENT_CAN_DUCK"
+            else -> "UNKNOWN($change)"
+        }
+        LocalTamperHistory.record(this, "alarm_audio_focus_changed", "Android reported audio focus $label; alarm output remains independently managed")
+    }
     private val channelId = CHANNEL_ID
     private val volumeHandler = Handler(Looper.getMainLooper())
     private val volumeEnforcement = object : Runnable {
