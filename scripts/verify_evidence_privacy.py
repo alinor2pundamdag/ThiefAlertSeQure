@@ -44,7 +44,9 @@ required = {
         and "Export encrypted evidence backup" in settings and "Restore encrypted evidence backup" in settings,
     "camera permission is optional and declared only for the front-camera evidence feature":
         "android.permission.CAMERA" in permissions
-        and 'android:name="android.hardware.camera.front" android:required="false"' in (ROOT / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8"),
+        and 'android:name="android.hardware.camera.front" android:required="false"' in (ROOT / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+        and "android.permission.FOREGROUND_SERVICE_CAMERA" not in permissions
+        and 'android:foregroundServiceType="camera"' not in (ROOT / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8"),
     "camera permission is requested only after explicit owner opt-in":
         "Enable front-camera photo evidence?" in settings
         and "requestCameraEvidencePermission.launch(Manifest.permission.CAMERA)" in settings
@@ -66,7 +68,8 @@ required = {
         and "CameraEvidenceVault.delete(this, entry.id)" in settings and "CameraEvidenceVault.deleteAll(this)" in settings,
     "camera privacy notice and policy explain the opt-in capture boundary":
         "front-camera photo evidence" in main and "CAMERA permission is requested only after that choice" in main
-        and "explicitly enables front-camera photo evidence" in privacy,
+        and "explicitly enables front-camera photo evidence" in privacy
+        and "camera_permission" in (ROOT / "app/src/main/java/com/thiefalertsequre/app/PermissionChangeMonitor.kt").read_text(encoding="utf-8"),
 }
 for description, passed in required.items():
     if not passed:
