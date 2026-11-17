@@ -112,6 +112,7 @@ object EvidenceLocationCapture {
         handler.postDelayed(timeoutRunnable, CURRENT_LOCATION_TIMEOUT_MS)
 
         providers.forEach { provider ->
+            if (completed.get()) return@forEach
             try {
                 if (Build.VERSION.SDK_INT >= 30) {
                     val cancellation = CancellationSignal()
