@@ -128,6 +128,18 @@ class AlarmService : Service() {
         }
     }
 
+    private fun handleTonePresetFailure(error: Throwable) {
+        LocalTamperHistory.record(this, "alarm_tone_preset_failed", error.javaClass.simpleName + ": " + error.message)
+        volumeHandler.post {
+            toneController?.stop()
+            toneController = null
+            if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED && player == null) {
+                val defaultUri = Uri.parse("android.resource://$packageName/${R.raw.default_alarm}")
+                startAlarmAudio(defaultUri, true, defaultUri)
+            }
+        }
+    }
+
     private fun startAlarmAudio() {
         val defaultUri = Uri.parse("android.resource://$packageName/${R.raw.default_alarm}")
         val selectedUri = AlarmSoundStore.uri(this, AlarmSoundStore.ALARM)
@@ -135,7 +147,7 @@ class AlarmService : Service() {
             val preset = AlarmSoundStore.selectedBuiltInPreset(this)
             if (preset != AlarmTonePreset.DEFAULT_AUDIO) {
                 val controller = AlarmToneController(volumeHandler, preset) { error ->
-                    LocalTamperHistory.record(this, "alarm_tone_preset_failed", error.javaClass.simpleName + ": " + error.message)
+                    handleTonePresetFailure(error)
                 }
                 requestToneAudioFocus()
                 toneController = controller
