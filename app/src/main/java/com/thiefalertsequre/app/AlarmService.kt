@@ -106,6 +106,27 @@ class AlarmService : Service() {
         }
     }
 
+    private fun requestToneAudioFocus() {
+        val audio = getSystemService(AudioManager::class.java)
+        audioManager = audio
+        val attributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        if (Build.VERSION.SDK_INT >= 26) {
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(attributes)
+                .setOnAudioFocusChangeListener(audioFocusListener)
+                .setWillPauseWhenDucked(false)
+                .build()
+            audioFocusRequest = request
+            runCatching { audio.requestAudioFocus(request) }
+        } else {
+            @Suppress("DEPRECATION")
+            runCatching { audio.requestAudioFocus(audioFocusListener, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN) }
+        }
+    }
+
     private fun startAlarmAudio() {
         val defaultUri = Uri.parse("android.resource://$packageName/${R.raw.default_alarm}")
         val selectedUri = AlarmSoundStore.uri(this, AlarmSoundStore.ALARM)
@@ -115,6 +136,7 @@ class AlarmService : Service() {
                 val controller = AlarmToneController(volumeHandler, preset) { error ->
                     LocalTamperHistory.record(this, "alarm_tone_preset_failed", error.javaClass.simpleName + ": " + error.message)
                 }
+                requestToneAudioFocus()
                 toneController = controller
                 if (controller.start()) {
                     LocalTamperHistory.record(this, "alarm_tone_preset_started", "Built-in alarm tone preset active: ${preset.name}")
