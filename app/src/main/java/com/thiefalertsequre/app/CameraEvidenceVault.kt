@@ -115,7 +115,9 @@ internal object CameraEvidenceVault {
         val allDeleted = files.all { file -> file.delete() || !file.exists() }
         if (allDeleted) {
             runCatching {
-                KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
+                synchronized(keyLock) {
+                    KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
+                }
             }
         }
         return allDeleted
@@ -222,9 +224,9 @@ internal object CameraEvidenceVault {
         }
     }
 
-    private fun getExistingKey(): SecretKey {
+    private fun getExistingKey(): SecretKey = synchronized(keyLock) {
         val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        return keyStore.getKey(KEY_ALIAS, null) as? SecretKey
+        keyStore.getKey(KEY_ALIAS, null) as? SecretKey
             ?: throw IllegalStateException("Camera evidence encryption key is missing; existing photos cannot be decrypted.")
     }
 
