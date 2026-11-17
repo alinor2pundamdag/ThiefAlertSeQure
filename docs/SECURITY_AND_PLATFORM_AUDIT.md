@@ -93,7 +93,7 @@ Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPl
 - Biometric availability depends on hardware, enrollment and Android strength classification.
 - Device Owner APIs and restrictions depend on Android version, provisioning state and OEM build.
 - HONOR/MagicOS, Xiaomi/HyperOS, Samsung/One UI and other OEM battery managers may require user-side background/autostart configuration. No universal public API disables all OEM power management.
-- Optional flash hardware is declared non-required; the torch is controlled without CAMERA permission, camera capture, or a camera foreground-service type.
+- Optional flash and front-camera hardware are declared non-required. Torch control does not request CAMERA permission. The separate photo-evidence feature requires explicit owner opt-in and runtime CAMERA permission, and runs only after successful owner authentication while the app is visible; no camera foreground-service type is declared.
 
 ## Source-review correction — 11 November 2026
 
