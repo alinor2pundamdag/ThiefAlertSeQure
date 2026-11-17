@@ -14,6 +14,7 @@ import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /** One-shot, owner-requested location snapshot. No background tracking or polling. */
 object EvidenceLocationCapture {
@@ -72,46 +73,73 @@ object EvidenceLocationCapture {
             onResult(null)
             return
         }
-        val provider = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-            .firstOrNull { candidate -> runCatching { manager.isProviderEnabled(candidate) }.getOrDefault(false) }
-        if (provider == null) {
+        // Try every enabled location provider. A GPS-only request can time out
+        // indoors even when the network provider could return a useful fix.
+        val providers = enabledProviders(
+            runCatching { manager.isProviderEnabled(LocationManager.GPS_PROVIDER) }.getOrDefault(false),
+            runCatching { manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) }.getOrDefault(false)
+        )
+        if (providers.isEmpty()) {
             onResult(null)
             return
         }
+
         val handler = Handler(Looper.getMainLooper())
         val completed = AtomicBoolean(false)
-        var listener: LocationListener? = null
-        var cancellation: CancellationSignal? = null
+        val pendingProviders = AtomicInteger(providers.size)
+        val listeners = mutableListOf<LocationListener>()
+        val cancellations = mutableListOf<CancellationSignal>()
         var timeout: Runnable? = null
+
         fun finish(location: Location?) {
             if (!completed.compareAndSet(false, true)) return
             timeout?.let(handler::removeCallbacks)
-            listener?.let { runCatching { manager.removeUpdates(it) } }
-            runCatching { cancellation?.cancel() }
+            listeners.forEach { listener -> runCatching { manager.removeUpdates(listener) } }
+            cancellations.forEach { signal -> runCatching { signal.cancel() } }
             onResult(location?.let { snapshot(it, "CURRENT_REQUEST_RESULT") })
         }
+
+        fun providerFinished(location: Location?) {
+            if (location != null) {
+                finish(location)
+            } else if (pendingProviders.decrementAndGet() == 0) {
+                finish(null)
+            }
+        }
+
         val timeoutRunnable = Runnable { finish(null) }
         timeout = timeoutRunnable
-        try {
-            handler.postDelayed(timeoutRunnable, CURRENT_LOCATION_TIMEOUT_MS)
-            if (Build.VERSION.SDK_INT >= 30) {
-                cancellation = CancellationSignal()
-                manager.getCurrentLocation(provider, cancellation, context.mainExecutor) { location ->
-                    finish(location)
+        handler.postDelayed(timeoutRunnable, CURRENT_LOCATION_TIMEOUT_MS)
+
+        providers.forEach { provider ->
+            try {
+                if (Build.VERSION.SDK_INT >= 30) {
+                    val cancellation = CancellationSignal()
+                    cancellations += cancellation
+                    manager.getCurrentLocation(provider, cancellation, context.mainExecutor) { location ->
+                        providerFinished(location)
+                    }
+                } else {
+                    val listener = object : LocationListener {
+                        override fun onLocationChanged(location: Location) = providerFinished(location)
+                        override fun onStatusChanged(providerName: String?, status: Int, extras: android.os.Bundle?) = Unit
+                        override fun onProviderEnabled(providerName: String) = Unit
+                        override fun onProviderDisabled(providerName: String) = Unit
+                    }
+                    listeners += listener
+                    manager.requestSingleUpdate(provider, listener, Looper.getMainLooper())
                 }
-            } else {
-                listener = object : LocationListener {
-                    override fun onLocationChanged(location: Location) = finish(location)
-                    override fun onStatusChanged(providerName: String?, status: Int, extras: android.os.Bundle?) = Unit
-                    override fun onProviderEnabled(providerName: String) = Unit
-                    override fun onProviderDisabled(providerName: String) = Unit
-                }
-                manager.requestSingleUpdate(provider, listener!!, Looper.getMainLooper())
+            } catch (_: Exception) {
+                providerFinished(null)
             }
-        } catch (_: Exception) {
-            finish(null)
         }
     }
+
+    internal fun enabledProviders(gpsEnabled: Boolean, networkEnabled: Boolean): List<String> =
+        buildList {
+            if (gpsEnabled) add(LocationManager.GPS_PROVIDER)
+            if (networkEnabled) add(LocationManager.NETWORK_PROVIDER)
+        }
 
     private fun snapshot(location: Location, source: String): Snapshot {
         val ageMs = TimeUnit.NANOSECONDS.toMillis(
