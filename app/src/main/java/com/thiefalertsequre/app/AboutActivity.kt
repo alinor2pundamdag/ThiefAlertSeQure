@@ -245,7 +245,7 @@ class AboutActivity : FragmentActivity() {
                 val progress = animation.animatedValue as Float
                 val step = progress.toInt().coerceIn(0, activeLetters.lastIndex)
                 val stageIndex = step % 7 // A → B → C → D → E → F → G → A.
-                val paletteIndex = (step + stageIndex + colorCycle * 7) % lightColors.size
+                val paletteIndex = (step + colorCycle * 7) % lightColors.size
                 val nextPaletteIndex = (paletteIndex + 1) % lightColors.size
                 val fraction = (progress - step).coerceIn(0f, 1f)
                 val glowColor = colorEvaluator.evaluate(
@@ -263,7 +263,7 @@ class AboutActivity : FragmentActivity() {
                         Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
                     )
                 }
-                val pulse = 10f + 2.5f * kotlin.math.sin(fraction * Math.PI).toFloat()
+                val pulse = 9f + stageIndex * 0.6f + 2.5f * kotlin.math.sin(fraction * Math.PI).toFloat()
                 developerCredit.setShadowLayer(dp(pulse.toInt()).toFloat(), 0f, 0f, glowColor)
             }
             addListener(object : AnimatorListenerAdapter() {
