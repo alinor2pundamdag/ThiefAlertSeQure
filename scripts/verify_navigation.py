@@ -117,6 +117,7 @@ for required in (
     'developerCreditText = "Developed by Alinor Pundandag"',
     "setCardBackgroundColor(0xFF070B14.toInt())",
     "IntArray(20)",
+    "ArgbEvaluator()",
     "stageIndex = step % 7",
     "repeatCount = ValueAnimator.INFINITE",
     "AppearanceStudioStore.reduceMotion(this)",
