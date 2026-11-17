@@ -1133,6 +1133,7 @@ class SettingsActivity : FragmentActivity() {
                             return@runOnUiThread
                         }
                         val image = ImageView(this).apply {
+                            contentDescription = "Encrypted front-camera evidence photo captured after successful owner authentication"
                             setImageBitmap(BitmapFactory.decodeByteArray(bytes, 0, bytes.size))
                             adjustViewBounds = true
                             maxHeight = dp(440)
