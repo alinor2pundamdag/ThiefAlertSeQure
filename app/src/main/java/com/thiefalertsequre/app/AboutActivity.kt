@@ -64,7 +64,7 @@ class AboutActivity : FragmentActivity() {
     private lateinit var developerCredit: TextView
     private var developerGlowAnimator: ValueAnimator? = null
 
-    private val developerCreditText = "Developed by Alinor Pundandag"
+    private val developerCreditText = "Developed by Alinor Pundamdag"
 
     private fun render() {
         val scroll = ScrollView(this).apply {
@@ -226,49 +226,51 @@ class AboutActivity : FragmentActivity() {
             return
         }
 
-        val activeLetters = developerCreditText.indices.filter {
-            developerCreditText[it].isLetter()
-        }
+        val activeLetters = developerCreditText.indices.filter { developerCreditText[it].isLetter() }
         if (activeLetters.isEmpty()) return
         val lightColors = IntArray(20) { index ->
             Color.HSVToColor(floatArrayOf((index * 18f) % 360f, 0.42f, 1f))
         }
-        var colorCycle = 0
-        var lastStep = -1
         val colorEvaluator = ArgbEvaluator()
-        developerGlowAnimator = ValueAnimator.ofFloat(0f, activeLetters.lastIndex.toFloat()).apply {
-            duration = activeLetters.size * 260L
+        var colorCycle = 0
+
+        // One letter is illuminated at a time. Every frame updates the foreground span,
+        // not just the shadow, so the color transition is genuinely continuous.
+        developerGlowAnimator = ValueAnimator.ofFloat(0f, activeLetters.size.toFloat()).apply {
+            duration = activeLetters.size * 1_000L
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.RESTART
             interpolator = LinearInterpolator()
             addUpdateListener { animation ->
                 val progress = animation.animatedValue as Float
                 val step = progress.toInt().coerceIn(0, activeLetters.lastIndex)
-                val stageIndex = step % 7 // A through G, then repeat.
-                val nextStageIndex = (stageIndex + 1) % 7
-                val startColor = lightColors[(colorCycle * 7 + stageIndex) % lightColors.size]
-                val endColor = lightColors[(colorCycle * 7 + nextStageIndex) % lightColors.size]
+                val stageIndex = step % 7 // A → B → C → D → E → F → G → A.
+                val paletteIndex = (step + colorCycle * 7) % lightColors.size
+                val nextPaletteIndex = (paletteIndex + 1) % lightColors.size
                 val fraction = (progress - step).coerceIn(0f, 1f)
-                val glowColor = colorEvaluator.evaluate(fraction, startColor, endColor) as Int
-                if (step != lastStep) {
-                    lastStep = step
-                    val letterIndex = activeLetters[step]
-                    val styled = SpannableString(developerCreditText).apply {
-                        setSpan(
-                            ForegroundColorSpan(glowColor),
-                            letterIndex,
-                            letterIndex + 1,
-                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                        )
-                    }
-                    developerCredit.text = styled
+                val glowColor = colorEvaluator.evaluate(
+                    fraction,
+                    lightColors[paletteIndex],
+                    lightColors[nextPaletteIndex]
+                ) as Int
+
+                val letterIndex = activeLetters[step]
+                developerCredit.text = SpannableString(developerCreditText).apply {
+                    setSpan(
+                        ForegroundColorSpan(glowColor),
+                        letterIndex,
+                        letterIndex + 1,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
                 }
-                developerCredit.setShadowLayer(dp(12).toFloat(), 0f, 0f, glowColor)
+                val pulse = 10f + 2.5f * kotlin.math.sin(fraction * Math.PI).toFloat()
+                developerCredit.setShadowLayer(dp(pulse.toInt()).toFloat(), 0f, 0f, glowColor)
+                developerCredit.contentDescription =
+                    "$developerCreditText. Animation stage ${'A' + stageIndex} of seven."
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationRepeat(animation: Animator) {
                     colorCycle = (colorCycle + 1) % lightColors.size
-                    lastStep = -1
                 }
             })
             start()
