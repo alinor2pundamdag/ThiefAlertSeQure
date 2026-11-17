@@ -3,10 +3,10 @@ package com.thiefalertsequre.app
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.location.LocationManager
+import android.location.Location\nimport android.location.LocationListener\nimport android.location.LocationManager\nimport android.os.Build\nimport android.os.CancellationSignal\nimport android.os.Handler\nimport android.os.Looper
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeUnit\nimport java.util.concurrent.atomic.AtomicBoolean
 
 /** One-shot, owner-requested location snapshot. No background tracking or polling. */
 object EvidenceLocationCapture {
@@ -50,7 +50,74 @@ object EvidenceLocationCapture {
         )
     }
 
-    const val RECENT_FIX_MAX_AGE_MS = 120_000L
+
+    /**
+     * One-shot current-location request from a visible owner action. The request
+     * is bounded to 20 seconds and never starts a background location service.
+     */
+    @Suppress("MissingPermission", "DEPRECATION")
+    fun requestCurrent(context: Context, onResult: (Snapshot?) -> Unit) {
+        if (!hasPermission(context)) {
+            onResult(null)
+            return
+        }
+        val manager = context.getSystemService(LocationManager::class.java)
+        val provider = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+            .firstOrNull { candidate -> runCatching { manager.isProviderEnabled(candidate) }.getOrDefault(false) }
+        if (provider == null) {
+            onResult(null)
+            return
+        }
+        val handler = Handler(Looper.getMainLooper())
+        val completed = AtomicBoolean(false)
+        var listener: LocationListener? = null
+        var cancellation: CancellationSignal? = null
+        lateinit var timeout: Runnable
+        fun finish(location: Location?) {
+            if (!completed.compareAndSet(false, true)) return
+            handler.removeCallbacks(timeout)
+            listener?.let { runCatching { manager.removeUpdates(it) } }
+            runCatching { cancellation?.cancel() }
+            onResult(location?.let { snapshot(it, "CURRENT_REQUEST_RESULT") })
+        }
+        timeout = Runnable { finish(null) }
+        try {
+            handler.postDelayed(timeout, CURRENT_LOCATION_TIMEOUT_MS)
+            if (Build.VERSION.SDK_INT >= 30) {
+                cancellation = CancellationSignal()
+                manager.getCurrentLocation(provider, cancellation, context.mainExecutor) { location ->
+                    finish(location)
+                }
+            } else {
+                listener = object : LocationListener {
+                    override fun onLocationChanged(location: Location) = finish(location)
+                    override fun onStatusChanged(providerName: String?, status: Int, extras: android.os.Bundle?) = Unit
+                    override fun onProviderEnabled(providerName: String) = Unit
+                    override fun onProviderDisabled(providerName: String) = Unit
+                }
+                manager.requestSingleUpdate(provider, listener!!, Looper.getMainLooper())
+            }
+        } catch (_: Exception) {
+            finish(null)
+        }
+    }
+
+    private fun snapshot(location: Location, source: String): Snapshot {
+        val ageMs = TimeUnit.NANOSECONDS.toMillis(
+            (SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos).coerceAtLeast(0L)
+        )
+        return Snapshot(
+            latitude = location.latitude,
+            longitude = location.longitude,
+            accuracyMeters = if (location.hasAccuracy()) location.accuracy else null,
+            provider = location.provider ?: "unknown",
+            fixAgeMs = ageMs,
+            classification = if (ageMs <= RECENT_FIX_MAX_AGE_MS) "${source}_RECENT" else "${source}_STALE"
+        )
+    }
+
+    const val CURRENT_LOCATION_TIMEOUT_MS = 20_000L
+\n    const val RECENT_FIX_MAX_AGE_MS = 120_000L
 
     fun classifyFixAge(ageMs: Long): String =
         if (ageMs in 0..RECENT_FIX_MAX_AGE_MS) "RECENT_CACHED_FIX" else "STALE_CACHED_FIX"
