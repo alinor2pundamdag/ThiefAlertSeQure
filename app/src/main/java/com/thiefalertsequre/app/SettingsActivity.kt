@@ -553,8 +553,11 @@ class SettingsActivity : FragmentActivity() {
                     .setMessage("No new photo will be captured after successful alarm authentication. Existing encrypted photos remain until you delete them.")
                     .setNegativeButton("Keep enabled", null)
                     .setPositiveButton("Disable") { _, _ ->
-                        CameraEvidenceCapture.setEnabled(this, false)
-                        LocalTamperHistory.record(this, "camera_evidence_opt_out", "Owner disabled front-camera photo evidence")
+                        if (CameraEvidenceCapture.setEnabled(this, false)) {
+                            LocalTamperHistory.record(this, "camera_evidence_opt_out", "Owner disabled front-camera photo evidence")
+                        } else {
+                            android.widget.Toast.makeText(this, "Could not save the setting; front-camera evidence may still be enabled.", android.widget.Toast.LENGTH_LONG).show()
+                        }
                         render()
                     }.showThemed(this)
             } else {
@@ -566,6 +569,8 @@ class SettingsActivity : FragmentActivity() {
                         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                             if (CameraEvidenceCapture.setEnabled(this, true)) {
                                 LocalTamperHistory.record(this, "camera_evidence_opted_in", "Owner enabled front-camera photo evidence")
+                            } else {
+                                android.widget.Toast.makeText(this, "Could not save the setting; front-camera evidence remains OFF.", android.widget.Toast.LENGTH_LONG).show()
                             }
                             render()
                         } else {
