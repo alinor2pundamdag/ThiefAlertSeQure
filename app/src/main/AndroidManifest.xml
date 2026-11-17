@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Network access is used only for owner-initiated GitHub release checks/downloads. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Optional, one-shot owner-requested evidence location; never background-tracked. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- Optional trusted Bluetooth separation alert; no scanning permission is requested. -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
