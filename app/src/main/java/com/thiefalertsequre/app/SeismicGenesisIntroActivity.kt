@@ -1,6 +1,5 @@
 package com.thiefalertsequre.app
 
-import android.animation.ValueAnimator
 import android.content.Intent
 import android.graphics.Matrix
 import android.graphics.Paint as AndroidPaint
@@ -36,9 +35,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.graphicsLayer
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
@@ -300,7 +303,7 @@ private fun SeismicGenesisIntroContent(
         val fractureReveal = ((p - 0.23f) / 0.35f).coerceIn(0f, 1f)
         val background = lerp(Color.Black, Color(0xFF121212), fractureReveal)
         val shakeEnvelope = when {
-            p in 0.245f..0.285f -> sin(((p - 0.245f) / 0.04f) * 6f * PI).toFloat() * 15f
+            p in 0.245f..0.278333f -> sin(((p - 0.245f) / 0.033333f) * 6f * PI).toFloat() * 15f
             p in 0.405f..0.455f -> sin(((p - 0.405f) / 0.05f) * 8f * PI).toFloat() * 22f
             p in 0.82f..0.87f -> sin(((p - 0.82f) / 0.05f) * 6f * PI).toFloat() * 12f
             else -> 0f
@@ -336,7 +339,7 @@ private fun SeismicGenesisIntroContent(
 
             if (p >= 0.18f && p < 0.48f) {
                 val drop = ((p - 0.18f) / 0.10f).coerceIn(0f, 1f)
-                val shake = if (p in 0.245f..0.285f) shakeEnvelope else 0f
+                val shake = if (p in 0.245f..0.278333f) shakeEnvelope else 0f
                 Text(
                     text = "Developed By:",
                     modifier = Modifier
@@ -376,6 +379,24 @@ private fun SeismicGenesisIntroContent(
                             translationX = if (p in 0.405f..0.455f) shakeEnvelope else 0f
                             rotationZ = if (p < 0.48f) -4f * (1f - nameDrop) else 0f
                             alpha = 1f
+                            if (initialConcrete) compositingStrategy = CompositingStrategy.Offscreen
+                        }
+                        .drawWithContent {
+                            drawContent()
+                            if (initialConcrete) {
+                                // Cement aggregate flecks are SRC_ATOP-clipped to the letter glyphs.
+                                repeat(72) { fleck ->
+                                    val x = ((fleck * 37) % 997) / 997f * size.width
+                                    val y = ((fleck * 71) % 991) / 991f * size.height
+                                    drawCircle(
+                                        color = if (fleck % 2 == 0) Color(0xFF40464D).copy(alpha = 0.34f)
+                                            else Color.White.copy(alpha = 0.26f),
+                                        radius = (0.35f + (fleck % 3) * 0.28f).dp.toPx(),
+                                        center = Offset(x, y),
+                                        blendMode = BlendMode.SrcAtop
+                                    )
+                                }
+                            }
                         },
                     style = TextStyle(
                         brush = if (initialConcrete) concreteBrush else null,
@@ -450,6 +471,32 @@ private fun GenesisFractureCanvas(
                 val checkpoint = native.save()
                 native.concat(matrix)
                 native.drawCircle(0f, 0f, radius, paint)
+                native.restoreToCount(checkpoint)
+            }
+        }
+
+        // The "Developed By:" title itself fractures into dust during the strongest impact.
+        val titleDustProgress = ((progress - 0.39f) / 0.17f).coerceIn(0f, 1f)
+        if (titleDustProgress > 0f) {
+            val native = drawContext.canvas.nativeCanvas
+            val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.rgb(255, 130, 130)
+                alpha = ((1f - titleDustProgress) * 190f).toInt().coerceIn(0, 190)
+                style = AndroidPaint.Style.FILL
+            }
+            val titleCenter = androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height * 0.43f)
+            repeat(88) { index ->
+                val angle = index * 2.3999632f
+                val distance = 12f + titleDustProgress * (size.maxDimension * (0.16f + (index % 6) * 0.035f))
+                val x = titleCenter.x + cos(angle) * distance
+                val y = titleCenter.y + sin(angle) * distance
+                val matrix = Matrix().apply {
+                    setTranslate(x, y)
+                    postRotate((index * 23f) % 360f, x, y)
+                }
+                val checkpoint = native.save()
+                native.concat(matrix)
+                native.drawRect(-1.2f, -1.2f, 1.2f, 1.2f, paint)
                 native.restoreToCount(checkpoint)
             }
         }
