@@ -64,6 +64,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Enforce the optional photo-vault retention window when the owner opens the app.
+        runCatching { CameraEvidenceVault.entries(this) }
         applyAlarmWindowPolicy()
 
         val privacyDecision = SafePreferences.string(getSharedPreferences("privacy_notice_v5", MODE_PRIVATE), "decision", null)
