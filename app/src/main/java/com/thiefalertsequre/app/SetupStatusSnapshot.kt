@@ -31,6 +31,8 @@ object SetupStatusSnapshot {
   x+=NotificationSetupStatusPolicy.appNotifications(notifs)
   val alarmChannel=runCatching{c.getSystemService(NotificationManager::class.java).getNotificationChannel(AlarmService.CHANNEL_ID)}.getOrNull()
   x+=NotificationSetupStatusPolicy.alarmChannel(alarmChannel?.importance)
+  val monitorChannel=runCatching{c.getSystemService(NotificationManager::class.java).getNotificationChannel(ProtectionMonitorService.CHANNEL_ID)}.getOrNull()
+  x+=NotificationSetupStatusPolicy.monitorChannel(monitorChannel?.importance)
   val dashboardEnabled=SafePreferences.boolean(c.getSharedPreferences(MainActivity.ALARM_DISPLAY_PREFS,0),MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN,false)
   val fullScreenAccess=Build.VERSION.SDK_INT<34||runCatching{c.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()}.getOrDefault(false)
   x+=FullScreenSetupStatusPolicy.evaluate(dashboardEnabled,Build.VERSION.SDK_INT,fullScreenAccess)
@@ -63,6 +65,7 @@ object SetupStatusSnapshot {
  "exact"->if(Build.VERSION.SDK_INT>=31)Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:${c.packageName}"))else null
  "notifications"->Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,c.packageName)
  "alarm_channel"->Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,c.packageName).putExtra(Settings.EXTRA_CHANNEL_ID,AlarmService.CHANNEL_ID)
+ "monitor_channel"->Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,c.packageName).putExtra(Settings.EXTRA_CHANNEL_ID,ProtectionMonitorService.CHANNEL_ID)
  "fullscreen"->if(Build.VERSION.SDK_INT>=34)Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,Uri.parse("package:${c.packageName}"))else null
  "battery"->if(Build.VERSION.SDK_INT>=23)Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:${c.packageName}"))else null
  "oem_background"->Intent(Settings.ACTION_SETTINGS)
