@@ -21,6 +21,8 @@ import android.view.Surface
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -110,6 +112,9 @@ internal object CameraEvidenceCapture {
         }
 
         val finished = AtomicBoolean(false)
+        val activityVisible = AtomicBoolean(visible)
+        val lifecycle = (activity as LifecycleOwner).lifecycle
+        var lifecycleObserver: LifecycleEventObserver? = null
         var camera: CameraDevice? = null
         var session: CameraCaptureSession? = null
 
@@ -119,10 +124,28 @@ internal object CameraEvidenceCapture {
             runCatching { session?.close() }
             runCatching { camera?.close() }
             runCatching { reader.close() }
+            lifecycleObserver?.let { observer ->
+                Handler(Looper.getMainLooper()).post {
+                    runCatching { lifecycle.removeObserver(observer) }
+                }
+            }
             if (event != null) recordFailure(app, event, detail)
             inFlight.set(false)
             thread.quitSafely()
         }
+
+        lifecycleObserver = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP || event == Lifecycle.Event.ON_DESTROY) {
+                activityVisible.set(false)
+                handler.post {
+                    finish(
+                        "camera_evidence_activity_not_visible",
+                        "App left the visible state before the front-camera evidence photo was saved"
+                    )
+                }
+            }
+        }
+        lifecycle.addObserver(lifecycleObserver!!)
 
         handler.postDelayed({
             finish("camera_evidence_capture_timeout", "Front-camera still capture did not complete within 15 seconds")
@@ -176,7 +199,7 @@ internal object CameraEvidenceCapture {
                         device.close()
                         return
                     }
-                    if (!isActivityVisible(activity)) {
+                    if (!activityVisible.get()) {
                         finish("camera_evidence_activity_not_visible", "App left the visible state before the front-camera device opened")
                         return
                     }
