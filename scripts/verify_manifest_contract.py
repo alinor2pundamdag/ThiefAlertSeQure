@@ -39,6 +39,12 @@ required_permissions = {
 for permission in sorted(required_permissions - permissions):
     errors.append("Required permission missing: " + permission)
 
+# These are optional, owner-requested one-shot evidence snapshot permissions.
+# They are not required for the core alarm, and background location is forbidden.
+for permission in ("android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"):
+    if permission not in permissions:
+        errors.append("Optional Evidence Vault location permission declaration missing: " + permission)
+
 features = {
     item.get(ANDROID + "name"): item
     for item in manifest.findall("uses-feature")
@@ -60,8 +66,6 @@ for permission in (
     # inspection only and deliberately does not request that dangerous permission.
     "android.permission.RANGING",
     "android.permission.CAMERA",
-    "android.permission.ACCESS_FINE_LOCATION",
-    "android.permission.ACCESS_COARSE_LOCATION",
     "android.permission.ACCESS_BACKGROUND_LOCATION",
     "android.permission.BLUETOOTH_SCAN",
     "android.permission.BLUETOOTH_ADVERTISE",
