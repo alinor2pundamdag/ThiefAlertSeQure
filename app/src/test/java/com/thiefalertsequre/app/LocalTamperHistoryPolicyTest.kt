@@ -15,6 +15,12 @@ class LocalTamperHistoryPolicyTest {
     }
 
     @Test
+    fun malformedDiagnosticLineDoesNotExportFreeFormText() {
+        assertEquals("unknown_event", LocalTamperHistoryPolicy.eventCodeFromLine("private path or URI"))
+        assertEquals("unknown_event", LocalTamperHistoryPolicy.eventCodeFromLine("timestamp | event details without delimiter"))
+    }
+
+    @Test
     fun eventNameRemovesLineBreaksAndUnsupportedCharacters() {
         assertEquals("alarm_triggered", LocalTamperHistoryPolicy.sanitizeEvent("alarm\n_triggered!"))
     }
