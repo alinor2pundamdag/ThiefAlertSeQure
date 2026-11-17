@@ -1,13 +1,22 @@
 package com.thiefalertsequre.app
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.Intent
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.os.Bundle
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.view.Gravity
 import android.view.View
+import android.view.animation.LinearInterpolator
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -27,10 +36,34 @@ class AboutActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (::root.isInitialized) ThemeRuntime.apply(this, root)
+        if (::root.isInitialized) {
+            ThemeRuntime.apply(this, root)
+            if (::developerSignatureCard.isInitialized) {
+                developerSignatureCard.setCardBackgroundColor(0xFF070B14.toInt())
+                developerSignatureCard.strokeColor = 0xFF2B3548.toInt()
+            }
+            if (::developerCredit.isInitialized) startDeveloperGlowAnimation()
+        }
+    }
+
+    override fun onPause() {
+        developerGlowAnimator?.cancel()
+        developerGlowAnimator = null
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        developerGlowAnimator?.cancel()
+        developerGlowAnimator = null
+        super.onDestroy()
     }
 
     private lateinit var root: LinearLayout
+    private lateinit var developerSignatureCard: MaterialCardView
+    private lateinit var developerCredit: TextView
+    private var developerGlowAnimator: ValueAnimator? = null
+
+    private val developerCreditText = "Developed by Alinor Pundandag"
 
     private fun render() {
         val scroll = ScrollView(this).apply {
@@ -44,7 +77,35 @@ class AboutActivity : FragmentActivity() {
         }
         scroll.addView(root)
         root.addView(button("‹  Back to dashboard") { finish() })
-        root.addView(space(16))
+        root.addView(space(12))
+
+        developerSignatureCard = MaterialCardView(this).apply {
+            radius = dp(18).toFloat()
+            cardElevation = 0f
+            strokeWidth = dp(1)
+            strokeColor = 0xFF2B3548.toInt()
+            setCardBackgroundColor(0xFF070B14.toInt())
+            contentDescription = "Developer signature card"
+        }
+        developerCredit = TextView(this).apply {
+            text = developerCreditText
+            textSize = 16f
+            letterSpacing = 0.025f
+            gravity = Gravity.CENTER
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setTextColor(0xFFF2F6FF.toInt())
+            contentDescription = developerCreditText
+            setPadding(dp(12), dp(14), dp(12), dp(14))
+        }
+        developerSignatureCard.addView(
+            developerCredit,
+            LinearLayout.LayoutParams(-1, -1)
+        )
+        root.addView(
+            developerSignatureCard,
+            LinearLayout.LayoutParams(-1, dp(76))
+        )
+        root.addView(space(18))
         root.addView(text("ABOUT", 11f, R.color.tas_primary, true))
         root.addView(space(6))
         root.addView(text("ThiefAlertSeQure", 30f, R.color.tas_text, true).markAsPageHeading())
@@ -149,6 +210,63 @@ class AboutActivity : FragmentActivity() {
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
         ThemeRuntime.apply(this, root)
+    }
+
+    /**
+     * Seven A–G stages advance letter-by-letter through the developer credit.
+     * The 20-color light spectrum repeats continuously unless reduced motion is enabled.
+     */
+    private fun startDeveloperGlowAnimation() {
+        developerGlowAnimator?.cancel()
+        developerGlowAnimator = null
+        developerCredit.text = developerCreditText
+        developerCredit.setTextColor(0xFFF2F6FF.toInt())
+        if (AppearanceStudioStore.reduceMotion(this)) {
+            developerCredit.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+            return
+        }
+
+        val activeLetters = developerCreditText.indices.filter {
+            developerCreditText[it].isLetter()
+        }
+        if (activeLetters.isEmpty()) return
+        val lightColors = IntArray(20) { index ->
+            Color.HSVToColor(floatArrayOf((index * 18f) % 360f, 0.42f, 1f))
+        }
+        var colorCycle = 0
+        var lastStep = -1
+        developerGlowAnimator = ValueAnimator.ofInt(0, activeLetters.lastIndex).apply {
+            duration = activeLetters.size * 260L
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.RESTART
+            interpolator = LinearInterpolator()
+            addUpdateListener { animation ->
+                val step = animation.animatedValue as Int
+                if (step != lastStep) {
+                    lastStep = step
+                    val stageIndex = step % 7 // A through G, then repeat.
+                    val color = lightColors[(colorCycle * 7 + stageIndex) % lightColors.size]
+                    val letterIndex = activeLetters[step]
+                    val styled = SpannableString(developerCreditText).apply {
+                        setSpan(
+                            ForegroundColorSpan(color),
+                            letterIndex,
+                            letterIndex + 1,
+                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                    }
+                    developerCredit.text = styled
+                    developerCredit.setShadowLayer(dp(12).toFloat(), 0f, 0f, color)
+                }
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationRepeat(animation: Animator) {
+                    colorCycle = (colorCycle + 1) % lightColors.size
+                    lastStep = -1
+                }
+            })
+            start()
+        }
     }
 
     private data class SigningSnapshot(
