@@ -23,7 +23,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 
 class AlarmService : Service() {
-    private var player: MediaPlayer? = null\n    private var toneController: AlarmToneController? = null
+    private var player: MediaPlayer? = null
+    private var toneController: AlarmToneController? = null
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var vibrator: Vibrator? = null
