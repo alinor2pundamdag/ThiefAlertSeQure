@@ -65,11 +65,11 @@ internal object EvidenceVaultBackup {
     }
 
     fun decrypt(bytes: ByteArray, password: CharArray): List<LocalEvidenceVault.Entry> {
-        require(password.size >= 12) { "Backup password must contain at least 12 characters." }
-        require(bytes.size in (MAGIC.size + 4 + SALT_BYTES + IV_BYTES + 4 + 16)..MAX_BACKUP_BYTES) {
-            "Backup file size is invalid."
-        }
         try {
+            require(password.size >= 12) { "Backup password must contain at least 12 characters." }
+            require(bytes.size in (MAGIC.size + 4 + SALT_BYTES + IV_BYTES + 4 + 16)..MAX_BACKUP_BYTES) {
+                "Backup file size is invalid."
+            }
             val input = DataInputStream(ByteArrayInputStream(bytes))
             val magic = ByteArray(MAGIC.size).also(input::readFully)
             require(magic.contentEquals(MAGIC)) { "This is not a ThiefAlertSeQure evidence backup." }
