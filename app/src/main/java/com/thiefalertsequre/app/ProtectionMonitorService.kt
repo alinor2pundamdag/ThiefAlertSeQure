@@ -718,6 +718,8 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_shield)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .setOnlyAlertOnce(true)
             .setLargeIcon(android.graphics.BitmapFactory.decodeResource(resources, R.drawable.app_logo))
             .setColor(statusColor)
             .setContentTitle("ThiefAlertSeQure • " + mode.name.replace('_', ' '))
