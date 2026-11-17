@@ -128,11 +128,14 @@ internal object CameraEvidenceVault {
         val app = context.applicationContext
         pruneExpired(app)
         val entries = readIndex(app) ?: return false
+        val directoryFiles = evidenceDirectory(app).listFiles().orEmpty()
+        val temporaryFiles = directoryFiles.filter { it.name.endsWith(".tmp") }
+        val tempCleanupSucceeded = temporaryFiles.all { it.delete() || !it.exists() }
         val indexedFiles = entries.map { "${it.id}.aesgcm" }.toSet()
-        val actualFiles = evidenceDirectory(app).listFiles().orEmpty()
+        val actualFiles = directoryFiles
             .filter { it.name.endsWith(".aesgcm") }
             .map { it.name }.toSet()
-        return indexedFiles == actualFiles && entries.all { read(app, it.id) != null }
+        return tempCleanupSucceeded && indexedFiles == actualFiles && entries.all { read(app, it.id) != null }
     }
 
     private fun readIndex(context: Context): List<Entry>? {
