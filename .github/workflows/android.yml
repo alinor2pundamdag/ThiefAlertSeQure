@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, 'dev/**', 'feat/**', 'feature/**', 'fix/**', 'fixall/**', 'security/**', 'work/**']
   pull_request:
-    branches: [main]
+    branches: [main, 'work/**']
 
 permissions:
   contents: read
