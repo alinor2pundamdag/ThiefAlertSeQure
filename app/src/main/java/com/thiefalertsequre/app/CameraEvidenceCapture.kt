@@ -83,7 +83,7 @@ internal object CameraEvidenceCapture {
 
         val characteristics = runCatching { manager.getCameraCharacteristics(cameraId) }.getOrNull()
         val map = characteristics?.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-        val sizes = map?.getOutputSizes(ImageFormat.JPEG)
+        val sizes = runCatching { map?.getOutputSizes(ImageFormat.JPEG) }.getOrNull()
         val size = sizes?.filter { it.width <= PREFERRED_WIDTH && it.height <= PREFERRED_HEIGHT }
             ?.maxByOrNull { it.width.toLong() * it.height.toLong() }
             ?: sizes?.minByOrNull { it.width.toLong() * it.height.toLong() }
