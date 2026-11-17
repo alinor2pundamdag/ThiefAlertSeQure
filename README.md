@@ -110,7 +110,7 @@ ThiefAlertSeQure is designed to do its essential work on your Android device.
 - No configured advertising SDK or analytics tracker.
 - No sale or advertising-based sharing of app-collected data.
 - No collection of your device PIN, password, pattern, fingerprint data, or face templates.
-- No location, contacts, SMS, microphone, or **camera permission** is requested. The optional flashlight uses Android's public torch API; it does not open the camera or capture photos/video. Flash hardware is optional, so devices without a usable LED can still install and use the audio alarm.
+- Contacts, SMS, microphone, and **camera permission** are not requested. Optional coarse/fine location permission is requested only after the owner explicitly chooses to save one cached location fix into the encrypted local evidence vault. No background location or continuous tracking is used. The optional flashlight uses Android's public torch API and does not capture photos/video.
 
 ### What stays on your device
 
@@ -120,11 +120,11 @@ The app keeps the operational data it needs in its private app storage, includin
 - Biometric failure counter and temporary cooldown deadline.
 - Your recorded privacy-notice choice.
 - Alarm-volume value needed for restoration after successful disarm.
-- A bounded local protection-event history.
+- A bounded local protection-event history and a separate AES-GCM encrypted evidence metadata vault (up to 100 records, 30-day retention). The vault includes only events and location snapshots the owner explicitly requests.
 - Monitor preferences, such as motion sensitivity and optional battery-alert threshold.
 - References and Android access grants for audio files you explicitly select.
 
-The event history can be exported only when you choose a destination through Android's document picker. Exported files are then handled by you and the destination you select.
+The event history and encrypted evidence metadata can be exported only when you choose a destination through Android's document picker. A location snapshot is stored only after an explicit action and permission grant; it includes the cached fix age and reported accuracy. Exported files are then handled by you and the destination you select.
 
 ### Your phone's credentials remain yours
 
