@@ -28,7 +28,7 @@ object LocalTamperHistory {
         if (prefs.edit().putString(KEY_EVENTS, next).commit()) {
             // The encrypted archive is secondary evidence; failure never changes
             // the authoritative protection state or blocks alarm delivery.
-            runCatching { LocalEvidenceVault.record(context, safeEvent, safeDetail) }
+            LocalEvidenceVault.recordAsync(context, safeEvent, safeDetail)
         }
     }
 
