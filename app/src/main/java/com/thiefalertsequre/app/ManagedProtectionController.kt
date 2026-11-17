@@ -326,7 +326,7 @@ object ManagedProtectionController {
                 local.getBoolean(key, false) == snapshot.shouldKeepLocalRestrictionEnabled(key) &&
                     global.getBoolean(key, false) == snapshot.shouldKeepGlobalRestrictionEnabled(key)
             } && dpm.getLockTaskPackages(admin).toSet() == snapshot.lockTaskPackages.toSet() &&
-                dpm.getLockTaskFeatures(admin) == snapshot.lockTaskFeatures
+                (Build.VERSION.SDK_INT < 28 || dpm.getLockTaskFeatures(admin) == snapshot.lockTaskFeatures)
         }.getOrDefault(false)
         if (!snapshotReadbackMatches) {
             failures += IllegalStateException(
@@ -382,7 +382,8 @@ object ManagedProtectionController {
             restrictions.all { key ->
                 !local.getBoolean(key, false) && !global.getBoolean(key, false)
             } && dpm.getLockTaskPackages(admin).isEmpty() &&
-                (dpm.getLockTaskFeatures(admin) and DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS) != 0
+                (Build.VERSION.SDK_INT < 28 ||
+                    (dpm.getLockTaskFeatures(admin) and DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS) != 0)
         }.getOrDefault(false)
         if (!emergencyReadbackMatches) {
             failures += IllegalStateException(
