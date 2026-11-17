@@ -315,7 +315,9 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         val flashDependency = if (pm.hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)) {
             "HARDWARE DECLARED — runtime torch access can still be interrupted by camera contention or thermal policy"
         } else "UNSUPPORTED — no camera flash feature declared"
+        val frontCameraFeatureAvailable = pm.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
         val cameraDependency = when {
+            !frontCameraFeatureAvailable -> "UNSUPPORTED — Android does not report front-facing camera hardware"
             !cameraEvidenceEnabled -> "OPTIONAL OFF — no camera permission is requested until owner opt-in"
             !cameraPermissionGranted -> "OWNER ENABLED — CAMERA permission missing; photo capture is skipped"
             cameraEvidenceIntegrity -> "OWNER ENABLED — one front-camera still after successful visible owner authentication; $cameraEvidenceCount encrypted photos retained"
@@ -459,6 +461,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                 put("cameraEvidenceVaultIntegrityHealthy", cameraEvidenceIntegrity)
                 put("cameraEvidenceEnabledByOwner", cameraEvidenceEnabled)
                 put("cameraPermissionGranted", cameraPermissionGranted)
+                put("frontCameraFeatureAvailable", frontCameraFeatureAvailable)
                 put("encryptedCameraPhotoCount", cameraEvidenceCount)
                 put("monitorProcessCurrentlyConfirmed", monitorProcessRunning)
                 put("protectionIntegrityScorePercent", integrityScore.percent)
