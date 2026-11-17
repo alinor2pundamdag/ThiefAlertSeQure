@@ -23,7 +23,7 @@ The app stores only the operational information needed to provide its functions:
 - The user's privacy-notice choice and the time it was recorded.
 - The previous alarm-stream volume while an alarm is active, so it can be restored after successful disarm.
 - A bounded local protection event history (up to 100 entries), which the owner can review or export as CSV.
-- A separate AES-GCM encrypted local evidence metadata vault (up to 100 records, 30-day retention). It stores app-observed event metadata and only location snapshots explicitly requested by the owner.
+- A separate AES-GCM encrypted local evidence metadata vault (up to 100 records, 30-day retention). It stores app-observed event metadata and only cached/current location results explicitly requested by the owner. Owner-initiated backup files are encrypted with a separate password-derived AES-GCM key; the backup password is not stored.
 - Monitor preferences such as enablement, motion sensitivity and optional battery-alert threshold.
 - Trusted Bluetooth accessory names and MAC addresses selected by the owner, plus the per-device connection-baseline and revision data used by A2. The registry payload and baselines are encrypted locally with an Android Keystore-backed AES-GCM key; identifiers are not uploaded.
 - The owner's local preference for enabling or disabling the alarm flashlight.
