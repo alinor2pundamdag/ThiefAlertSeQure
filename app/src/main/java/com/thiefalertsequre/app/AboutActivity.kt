@@ -61,7 +61,7 @@ class AboutActivity : FragmentActivity() {
             radius = dp(18).toFloat()
             cardElevation = 0f
             strokeWidth = dp(1)
-            strokeColor = getColor(R.color.tas_surface_variant)
+            strokeColor = android.content.res.ColorStateList.valueOf(getColor(R.color.tas_surface_variant))
             setCardBackgroundColor(getColor(R.color.tas_surface))
         }
         val details = LinearLayout(this).apply {
