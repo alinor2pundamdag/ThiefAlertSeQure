@@ -66,7 +66,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         applyAlarmWindowPolicy()
 
-        val privacyDecision = SafePreferences.string(getSharedPreferences("privacy_notice_v2", MODE_PRIVATE), "decision", null)
+        val privacyDecision = SafePreferences.string(getSharedPreferences("privacy_notice_v3", MODE_PRIVATE), "decision", null)
         // Require acknowledgement of this updated notice on every existing
         // install once; it now discloses the optional alarm flashlight and its safety toggle.
         if (privacyDecision != "acknowledged") {
@@ -131,7 +131,7 @@ class MainActivity : FragmentActivity() {
         root.addView(notice, matchWrap())
         root.addView(space(22))
         root.addView(button("I understand & continue") {
-            getSharedPreferences("privacy_notice_v2", MODE_PRIVATE).edit()
+            getSharedPreferences("privacy_notice_v3", MODE_PRIVATE).edit()
                 .putString("decision", "acknowledged").putLong("decision_at", System.currentTimeMillis()).apply()
             buildDashboard()
         }, matchWrap())
