@@ -101,6 +101,10 @@ checks = {
         and "OwnerAuthenticationCoordinator.complete(this, proof)" in dashboard
         and dashboard.index("OwnerAuthenticationCoordinator.complete(this, proof)") < dashboard.index("CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this)")
         and "Lifecycle.State.STARTED" in camera_capture,
+    "successful owner authentication and biometric failures enter encrypted evidence":
+        "LocalEvidenceVault.recordAsync" in (APP / "OwnerAuthenticationCoordinator.kt").read_text(encoding="utf-8")
+        and "owner_authenticated_alarm_stopped" in (APP / "OwnerAuthenticationCoordinator.kt").read_text(encoding="utf-8")
+        and "owner_biometric_failed" in dashboard,
     "front-camera capture is explicitly owner-enabled and permission-gated":
         "Enable front-camera photo evidence?" in settings
         and "requestCameraEvidencePermission.launch(Manifest.permission.CAMERA)" in settings
