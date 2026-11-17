@@ -86,7 +86,11 @@ class MainActivity : FragmentActivity() {
         val privacyDecision = SafePreferences.string(getSharedPreferences("privacy_notice_v5", MODE_PRIVATE), "decision", null)
         // Require acknowledgement of this updated notice on every existing
         // install once; it now discloses the optional alarm flashlight and its safety toggle.
-        if (privacyDecision != "acknowledged") {
+        // Privacy acknowledgement remains mandatory for normal app use, but it must
+        // never cover the active-alarm recovery UI or delay Android owner authentication.
+        if (privacyDecision != "acknowledged" &&
+            protectionModeAtLaunch != ProtectionMode.ALARM_TRIGGERED
+        ) {
             showPrivacyScreen()
             return
         }
