@@ -163,3 +163,18 @@ This snapshot records the latest code-bearing source commit and the final docume
 - The final documentation-only refresh adds one commit; no Kotlin, Java, Gradle, manifest, workflow, test, or asset source is changed by that refresh.
 - Branch comparison before this refresh: 530 ahead / 0 behind; after it: 531 ahead / 0 behind. PR #7 remains draft/open/unmerged and mergeable.
 - CodeQL alert #8 closure and permanent production signing-secret availability remain unverified.
+
+
+## Authoritative latest verification — 2026-11-17
+
+This entry supersedes earlier candidate SHAs and run IDs above.
+
+- Exact branch HEAD: `524754f683d43450c844bca05147e66c15baf3d6`.
+- Android CI [#44011669247](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44011669247): **SUCCESS** on this exact HEAD. All 53 job steps completed successfully, including the instrumentation-disabled guard, all 30 JVM unit-test source files, navigation/preferences/manifest/state-ownership checks, lint, asset validation, release workflow YAML and identity checks, debug APK assembly/metadata, minified release metadata, package/version/signer checks and artifact upload.
+- CodeQL [#44011663424](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44011663424): **SUCCESS** on this exact HEAD. Java/Kotlin build and analysis plus GitHub Actions analysis completed successfully.
+- Artifact: `ThiefAlertSeQure-debug-apk`, ID `14296523837`, 6,616,246 bytes; SHA-256 `66de655101691e40380db2de4593491d1152f453319dfb353f30f1b8ea6b00f7`; expires 2026-12-01. It is a development/debug APK, not a production-signed release.
+- Branch comparison: 531 ahead / 0 behind `main`; 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged and mergeable.
+- The single inline PR review thread concerning CodeQL alert #8 is resolved. The underlying Code Scanning alert's active/closed state remains **NOT VERIFIED**; a green scan is not proof of alert closure.
+- Presence of all four permanent production-signing secrets and availability of a production-signed APK remain **NOT VERIFIED**. Do not trigger release or expose secrets.
+- Phases 0–10: repository implementation and the permitted non-instrumentation software checks are passed to the extent recorded above; physical/OEM behavior is not implied. Phase 11 remains held on the two external verification gates above. Phase 12 physical-device acceptance remains excluded from this coding task and is not marked passed.
+- No instrumentation compilation/execution, emulator, Codespaces, physical-device test, merge, rebase, tag, APK publication or production release was performed.

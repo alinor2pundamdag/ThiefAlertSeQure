@@ -176,3 +176,17 @@ This section supersedes earlier candidate snapshots and pending-verification not
 - All changes after source commit `a1a567bf53f97189be2547ccf872ae665c30a54b` through `e97817903976689f02cba8bb485fc160a7122fd3` are limited to five documentation files; no app source/build/manifest/workflow code changed.
 - Branch compare immediately before this final docs refresh: 530 ahead / 0 behind; this one commit makes it 531 ahead / 0 behind. Changed paths remain 131 (90 added, 41 modified, 0 deleted).
 - Alert #8 closure and permanent production signing-secret availability remain not verified.
+
+
+## Authoritative latest verification — 2026-11-17
+
+This entry supersedes earlier candidate SHAs and run IDs above.
+
+- Exact working-branch HEAD: `524754f683d43450c844bca05147e66c15baf3d6`.
+- Android CI [#44011669247](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44011669247) passed on this exact HEAD; all job steps succeeded, including 30 JVM unit-test source files, instrumentation-disabled guard, source-contract checks, lint, assets, APK build/metadata, minified release metadata, package/version/signer checks and artifact upload.
+- CodeQL [#44011663424](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44011663424) passed on this exact HEAD; Java/Kotlin and Actions analysis completed.
+- Debug artifact `ThiefAlertSeQure-debug-apk`, ID `14296523837`, 6,616,246 bytes, SHA-256 `66de655101691e40380db2de4593491d1152f453319dfb353f30f1b8ea6b00f7`, expires 2026-12-01. Development-only; not production-signed.
+- Branch is 531 commits ahead / 0 behind `main`; 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged and mergeable.
+- CodeQL alert #8 closure and permanent production signing-secret presence remain not verified. The resolved inline review thread and successful CodeQL scan do not prove the alert is closed.
+- Phases 0–10 implementation/permitted software checks are passed as recorded; Phase 11 has the two external verification gaps; Phase 12 physical-device acceptance is excluded and untested.
+- No instrumentation, emulator, Codespaces, physical-device test, merge, rebase, tag, publication or production release was performed.

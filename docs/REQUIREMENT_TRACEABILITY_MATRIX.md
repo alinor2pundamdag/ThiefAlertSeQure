@@ -234,3 +234,12 @@ The CodeQL gate passed after the APK-installer suppression comments were moved t
 - Source checks, lint, asset validation, release workflow YAML, release identity, APK metadata/package/version/signer checks and artifact upload passed.
 - Branch comparison before this one documentation-only refresh: 530 ahead / 0 behind; after it: 531 ahead / 0 behind. PR #7 remains draft/open/unmerged.
 - Alert #8 closure and permanent production signing-secret availability remain unverified.
+
+
+## Authoritative latest candidate verification — 2026-11-17
+
+- Exact candidate `524754f683d43450c844bca05147e66c15baf3d6`: Android [#44011669247 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44011669247), CodeQL [#44011663424 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44011663424).
+- Android passed the 30-file JVM unit suite, instrumentation-disabled guard, source-contract checks, lint, asset validation, APK packaging/metadata, release metadata, package/version/signer checks and artifact upload. CodeQL Java/Kotlin and Actions analyses passed.
+- The artifact is development-only; production signing is not verified. CodeQL alert #8's active/closed status is not verified.
+- Branch comparison: 531 ahead / 0 behind; 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged.
+- No instrumentation compilation/execution, emulator or physical-device testing was performed.

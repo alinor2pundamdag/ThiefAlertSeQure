@@ -106,3 +106,12 @@ Strong face authentication is available only if Android reports the enrolled fac
 
 
 > **Final verified candidate:** Android run [#44010766603](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010766603) and CodeQL run [#44010774991](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010774991) both passed on `e97817903976689f02cba8bb485fc160a7122fd3`. The Android workflow passed all 30 JVM unit-test files, instrumentation-disabled guard, static/source checks, lint, assets, APK build, metadata/package/version/signer checks and artifact upload. Development artifact only. Alert #8 closure and production signing-secret availability remain unverified. This final docs-only refresh changes no application source.
+
+
+## Authoritative latest candidate status — 2026-11-17
+
+- Exact candidate `524754f683d43450c844bca05147e66c15baf3d6`: Android [#44011669247 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44011669247), CodeQL [#44011663424 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44011663424).
+- Android passed 30 JVM unit-test source files, instrumentation-disabled guard, static/source checks, lint, asset validation, APK build and metadata/package/version/signer checks. CodeQL Java/Kotlin and Actions analysis passed.
+- Artifact is a development/debug APK only; no production-signed APK or release is verified.
+- Branch comparison: 531 ahead / 0 behind; 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged.
+- CodeQL alert #8 closure and permanent production signing-secret availability remain unverified. Phase 12 device acceptance remains untested/out of scope for this software task.

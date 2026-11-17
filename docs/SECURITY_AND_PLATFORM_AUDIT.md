@@ -177,3 +177,13 @@ No failure details were supplied. These results clear the reported HONOR 200 Pro
 - Branch comparison before this one docs-only refresh: 530 ahead / 0 behind; after it: 531 ahead / 0 behind; 131 changed paths and no deletions.
 - Production signing-secret presence and production-signed APK availability remain not verified.
 - No instrumentation compilation/execution, emulator or physical-device testing was performed.
+
+
+## Authoritative latest security/build verification — 2026-11-17
+
+- Exact candidate `524754f683d43450c844bca05147e66c15baf3d6`: Android [#44011669247 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44011669247) and CodeQL [#44011663424 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44011663424).
+- CodeQL Java/Kotlin and Actions analysis completed successfully. This does not prove CodeQL alert #8 is closed; the alert record remains **NOT VERIFIED** because the available GitHub connection cannot read that alert record.
+- Android CI passed 30 JVM unit-test source files, instrumentation-disabled guard, source-contract checks, lint, assets, APK build/metadata and package/version/signer checks.
+- The uploaded debug artifact is not production-signed. Permanent signing-secret availability and a production-signed APK remain **NOT VERIFIED**.
+- Branch comparison: 531 ahead / 0 behind, 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged.
+- No instrumentation, emulator or physical-device test was performed.
