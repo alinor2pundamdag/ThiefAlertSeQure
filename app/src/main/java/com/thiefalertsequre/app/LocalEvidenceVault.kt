@@ -84,6 +84,39 @@ object LocalEvidenceVault {
         }.getOrDefault(false)
     }
 
+    /** Replace the archive only after a fully decrypted and integrity-checked owner restore. */
+    @Synchronized
+    fun replaceAll(context: Context, imported: List<Entry>): Boolean {
+        if (imported.size > MAX_RECORDS) return false
+        val now = System.currentTimeMillis()
+        val validated = imported.mapNotNull { item ->
+            val event = LocalTamperHistoryPolicy.sanitizeEvent(item.event)
+            val detail = LocalTamperHistoryPolicy.sanitizeDetail(item.detail).take(240)
+            if (item.integritySha256 != digest(item.timestampEpochMs, item.timezoneOffsetMinutes, event, detail)) {
+                return false
+            }
+            if (now - item.timestampEpochMs !in 0..RETENTION_MS) null
+            else Entry(item.timestampEpochMs, item.timezoneOffsetMinutes, event, detail, item.integritySha256)
+        }.takeLast(MAX_RECORDS)
+        val encoded = JSONArray().apply {
+            validated.forEach { item ->
+                put(JSONObject().apply {
+                    put("at", item.timestampEpochMs)
+                    put("tz", item.timezoneOffsetMinutes)
+                    put("event", item.event)
+                    put("detail", item.detail)
+                    put("sha256", item.integritySha256)
+                })
+            }
+        }.toString()
+        generation.incrementAndGet()
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        return runCatching {
+            val encrypted = LocalPreferenceCipher.encrypt(PURPOSE, encoded)
+            prefs.edit().putString(KEY_PAYLOAD, encrypted).commit()
+        }.getOrDefault(false)
+    }
+
     fun read(context: Context, limit: Int = MAX_RECORDS): List<Entry> {
         require(limit in 1..MAX_RECORDS)
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
