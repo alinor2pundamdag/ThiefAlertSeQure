@@ -32,6 +32,8 @@ checks = {
         "Failure to access a flash unit never blocks or stops alarm audio" in alarm,
     "encrypted evidence vault uses Android Keystore AES-GCM and bounded retention":
         "LocalPreferenceCipher.encrypt(PURPOSE" in vault and "MAX_RECORDS = 100" in vault and "RETENTION_MS" in vault,
+    "event evidence writes are bounded asynchronous work":
+        "recordAsync(context, safeEvent, safeDetail)" in (APP / "LocalTamperHistory.kt").read_text(encoding="utf-8") and "ArrayBlockingQueue(64)" in vault and "generation.incrementAndGet()" in vault,
     "location evidence is owner-requested and cached-only":
         "getLastKnownLocation" in location and "getCurrentLocation" not in location and "requestLocationUpdates" not in location,
     "diagnostics export is user initiated":
