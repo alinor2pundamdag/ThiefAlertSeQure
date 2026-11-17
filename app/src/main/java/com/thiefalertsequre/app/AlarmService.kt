@@ -17,7 +17,6 @@ import android.os.Build
 import android.os.IBinder
 import android.os.Handler
 import android.os.Looper
-import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.core.app.NotificationCompat
@@ -31,21 +30,7 @@ class AlarmService : Service() {
     private var vibrator: Vibrator? = null
     private var flashController: AlarmFlashController? = null
     private var thermalFlashSuppressed = false
-    private var thermalListenerRegistered = false
-    private val thermalStatusListener = PowerManager.OnThermalStatusChangedListener { status ->
-        val suppressFlash = status >= PowerManager.THERMAL_STATUS_SEVERE
-        if (suppressFlash != thermalFlashSuppressed) {
-            thermalFlashSuppressed = suppressFlash
-            if (suppressFlash) {
-                flashController?.stop()
-                flashController = null
-                LocalTamperHistory.record(this, "alarm_flash_thermal_suppressed", "Android thermal status is severe or higher; audio alarm continues")
-            } else {
-                LocalTamperHistory.record(this, "alarm_flash_thermal_resumed", "Android thermal status returned below severe; optional flash may resume")
-                syncAlarmFlash()
-            }
-        }
-    }
+    private var thermalFlashController: ThermalFlashController? = null
     private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { }
     private val channelId = CHANNEL_ID
     private val volumeHandler = Handler(Looper.getMainLooper())
@@ -60,14 +45,19 @@ class AlarmService : Service() {
     override fun onCreate() {
         super.onCreate()
         if (Build.VERSION.SDK_INT >= 29) {
-            val power = getSystemService(PowerManager::class.java)
-            thermalFlashSuppressed = runCatching {
-                power.currentThermalStatus >= PowerManager.THERMAL_STATUS_SEVERE
-            }.getOrDefault(false)
-            runCatching {
-                power.addThermalStatusListener(mainExecutor, thermalStatusListener)
-                thermalListenerRegistered = true
-            }
+            thermalFlashController = runCatching {
+                ThermalFlashController(this) { suppressFlash ->
+                    thermalFlashSuppressed = suppressFlash
+                    if (suppressFlash) {
+                        flashController?.stop()
+                        flashController = null
+                        LocalTamperHistory.record(this, "alarm_flash_thermal_suppressed", "Android thermal status is severe or higher; audio alarm continues")
+                    } else {
+                        LocalTamperHistory.record(this, "alarm_flash_thermal_resumed", "Android thermal status returned below severe; optional flash may resume")
+                        syncAlarmFlash()
+                    }
+                }.also { thermalFlashSuppressed = it.start() }
+            }.getOrNull()
         }
         val nm = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) {
@@ -400,10 +390,8 @@ class AlarmService : Service() {
 
     override fun onDestroy() {
         volumeHandler.removeCallbacks(volumeEnforcement)
-        if (Build.VERSION.SDK_INT >= 29 && thermalListenerRegistered) {
-            runCatching { getSystemService(PowerManager::class.java).removeThermalStatusListener(thermalStatusListener) }
-            thermalListenerRegistered = false
-        }
+        thermalFlashController?.stop()
+        thermalFlashController = null
         stopAlarm()
         super.onDestroy()
     }
