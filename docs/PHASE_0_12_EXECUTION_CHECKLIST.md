@@ -5,7 +5,7 @@
 **Production branch:** `main` — untouched; no merge, tag, publication or release without separate owner approval  
 **Owner direction:** Complete all repository/code/GitHub work in scope. Do not run or compile Android instrumentation tests, do not run emulator matrices, and do not perform physical-device testing. Physical-device acceptance is excluded from this software-completion task.
 
-This is the persistent source of truth for interrupted work. A phase is not complete merely because files exist or a generic build is green. Implementation, cross-file integration, failure handling, documentation and exact-head non-instrumentation verification must be satisfied. Physical-device results must never be inferred from CI.
+This is the historical source of truth for the predecessor FIXALL Phase 0–12 work only. It is not the active four-batch product roadmap; current Batch 1–4 scope and acceptance are recorded in `PROJECT_STATE.md` and `docs/FEATURE_COMPLETION_MATRIX.md`. A phase in this legacy checklist is not complete merely because files exist or a generic build is green. Physical-device results must never be inferred from CI.
 
 ## Non-negotiable invariants
 

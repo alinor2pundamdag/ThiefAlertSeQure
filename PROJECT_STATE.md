@@ -10,9 +10,9 @@
 
 ## FIXALL work completed so far
 
-The authoritative coding scope and acceptance ledger is [docs/PHASE_0_12_EXECUTION_CHECKLIST.md](docs/PHASE_0_12_EXECUTION_CHECKLIST.md). The owner has directed completion of coding for Phases 0–12. Android instrumentation tests, instrumentation compilation, and emulator test matrices are prohibited. Phase 12 physical-device acceptance is prepared in software/documentation but can only be completed with real-device evidence.
+The [docs/PHASE_0_12_EXECUTION_CHECKLIST.md](docs/PHASE_0_12_EXECUTION_CHECKLIST.md) is a historical FIXALL checklist for predecessor v1.1.4 work; its Phase 0–12 numbering is not the active product roadmap. The active approved scope is the four-batch, 17-phase product roadmap recorded below and summarized in [docs/FEATURE_COMPLETION_MATRIX.md](docs/FEATURE_COMPLETION_MATRIX.md). Current Batch 2 is Phases 5–9. Instrumentation compilation/execution and emulator matrices remain prohibited; physical-device acceptance is separate and must never be inferred from CI.
 
-The bullets below include earlier work on predecessor branches; they are project history, not a claim that every Phase 0–12 acceptance gate is complete on the current branch.
+The bullets below are predecessor FIXALL history; they are not current Batch 1–4 phase acceptance claims.
 - Created a dedicated safety/work branch from the reviewed development candidate.
 - Restored the approved minSdk 26 invariant in the build candidate and aligned compatibility documentation.
 - Hardened charger-state handling so missing battery extras remain unknown rather than being treated as unplugged.
@@ -221,3 +221,20 @@ The active roadmap is **17 phases numbered Phase 0 through Phase 16**, organized
 **Phase 9 dashboard boundary:** the fixed-color 136dp main shield stays above a compact, horizontally swipeable nine-destination tab strip (Bluetooth Settings; Device Hardening & Reliability; Sounds & Flash Alert; Authentication Evidence; Device Intelligence; Appearance Studio; Local Tamper History; More; About). The tab strip uses accessible 48dp touch targets and destination-specific navigation.
 
 **Workflow constraints remain:** no GitHub Codespaces; no instrumentation/emulator tests during the agreed non-physical implementation pass; do not merge PR #7 or modify `main` without explicit owner approval. Batch 3 must not begin until Batch 2's exact-head completion gate is green.
+
+
+## Batch 2 verification continuation — 2026-11-17
+
+- **Code-bearing source commit:** `e2c166ee37cccaa691a83eaec39fcee4231bb1e1` on `work/phase-0-12-coding`.
+- **Android CI:** [run #44080775151](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44080775151) — **SUCCESS**, all 59 job steps. This includes the instrumentation-disabled guard, Batch 2 privacy and cross-file contracts, JVM unit tests, navigation/preferences/manifest/state-ownership checks, Android lint, assets, release-workflow validation, debug APK assembly, minified release APK metadata, package/version/signer checks, and development artifact upload.
+- **CodeQL:** [run #44080775264](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44080775264) — **SUCCESS** for Java/Kotlin and GitHub Actions analysis.
+- Confirmed fixes in this Batch 2 pass:
+  - Thermal flash now fails closed when the thermal listener or initial thermal status is unavailable; alarm audio remains independent.
+  - Owner-requested current location tries every enabled GPS/network provider, with one 20-second bound and cancellation/cleanup.
+  - Android 14+ managed restrictions use the supported API scope; `DISALLOW_ADD_USER` stays on the local restriction API. Lock Task features and managed restrictions are read back before activation; rollback and emergency recovery are read back before clearing recovery metadata.
+  - Redacted diagnostics export event codes only; free-form event details and malformed lines are excluded.
+  - Front-camera evidence capture is bound to the visible authentication Activity lifecycle and is cancelled when that Activity stops or is destroyed.
+- **Batch 2 non-physical software gate: PASS** on the exact code-bearing commit. Phases 5–9 source integration, privacy/failure boundaries, JVM tests, static contracts, lint/build/APK validation and CodeQL passed. This is not a claim of physical/OEM validation.
+- **Not tested by design:** enrolled Device Owner runtime and actual power-menu behavior; real GPS/network fixes; camera and torch hardware output; OEM thermal behavior; handset-specific UI/background behavior. No instrumentation, emulator, or physical-device test was run.
+- PR #7 remains draft/open/unmerged; `main` remains untouched. No merge, tag, production signing, APK publication or release was performed. Permanent production signing-secret availability and active CodeQL alert #8 closure remain independently unverified.
+- Batch 3 has not started; wait for explicit owner direction.
