@@ -392,6 +392,32 @@ class SettingsActivity : FragmentActivity() {
                     render()
                 }.showThemed(this)
         })
+        root.addView(space(10))
+        root.addView(text("ENCRYPTED EVIDENCE VAULT", 11f, R.color.tas_primary, true))
+        root.addView(space(6))
+        val evidenceEntries = LocalEvidenceVault.read(this, 100)
+        root.addView(text(
+            "${evidenceEntries.size} encrypted local event records • 30-day retention • no cloud upload",
+            12f, R.color.tas_muted
+        ))
+        root.addView(space(6))
+        root.addView(action("Review encrypted evidence records") {
+            val entries = LocalEvidenceVault.read(this, 100)
+            val summary = entries.take(20).joinToString("\n\n") { entry ->
+                val date = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                    .format(java.util.Date(entry.timestampEpochMs))
+                "$date (UTC offset ${entry.timezoneOffsetMinutes}m)\n${entry.event}\n${entry.detail}\nSHA-256: ${entry.integritySha256.take(16)}…"
+            }.ifBlank { "No encrypted evidence records are available." }
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Encrypted evidence archive")
+                .setMessage(summary)
+                .setPositiveButton("Close", null)
+                .showThemed(this)
+        })
+        root.addView(text(
+            "This archive contains app-observed event metadata only. It does not contain camera images, GPS coordinates, microphone recordings, PINs, passwords, or biometric material.",
+            12f, R.color.tas_muted
+        ))
         root.addView(space(22))
 
         root.addView(text("PRIVACY & DATA", 11f, R.color.tas_primary, true))
