@@ -541,10 +541,11 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(6))
         val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
         val cameraPermissionGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        val frontCameraAvailable = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
         val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(this).size }.getOrDefault(0)
         val cameraEvidenceIntegrity = runCatching { CameraEvidenceVault.verifyIntegrity(this) }.getOrDefault(false)
         root.addView(text(
-            "Front-camera photo evidence: ${when { cameraEvidenceEnabled && cameraPermissionGranted -> "ON"; cameraEvidenceEnabled -> "NEEDS CAMERA PERMISSION"; else -> "OFF" }} • $cameraEvidenceCount encrypted photos • integrity ${if (cameraEvidenceIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}",
+            "Front-camera photo evidence: ${when { !frontCameraAvailable -> "UNSUPPORTED"; cameraEvidenceEnabled && cameraPermissionGranted -> "ON"; cameraEvidenceEnabled -> "NEEDS CAMERA PERMISSION"; else -> "OFF" }} • $cameraEvidenceCount encrypted photos • integrity ${if (cameraEvidenceIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}",
             12f, R.color.tas_muted
         ))
         root.addView(action("Front-camera evidence after successful owner authentication: ${if (cameraEvidenceEnabled && cameraPermissionGranted) "ON" else "OFF / NEEDS SETUP"}") {
@@ -567,7 +568,9 @@ class SettingsActivity : FragmentActivity() {
                     .setMessage("After a successful owner PIN/password or supported strong-biometric verification disarms a latched alarm, ThiefAlertSeQure will take one still photo using the FRONT camera while this app is visible. Android will show its camera privacy indicator. CAMERA permission is requested only after you choose Enable. Photos are encrypted with an Android Keystore AES-GCM key, stored only on this device for up to 30 days (maximum 20 photos, 2 MiB each), and can be viewed, exported or deleted. No photo is taken on failed/cancelled authentication; no background camera service, microphone, or cloud upload is used. If camera access is unavailable, alarm disarming still succeeds.")
                     .setNegativeButton("Cancel", null)
                     .setPositiveButton("Enable") { _, _ ->
-                        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)) {
+                            android.widget.Toast.makeText(this, "This device does not report front-facing camera hardware; no permission was requested.", android.widget.Toast.LENGTH_LONG).show()
+                        } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                             if (CameraEvidenceCapture.setEnabled(this, true)) {
                                 LocalTamperHistory.record(this, "camera_evidence_opted_in", "Owner enabled front-camera photo evidence")
                             } else {
