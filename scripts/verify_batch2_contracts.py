@@ -56,6 +56,10 @@ checks = {
         "Failure to access a flash unit never blocks or stops alarm audio" in alarm,
     "severe thermal status suppresses flash while preserving alarm audio":
         "THERMAL_STATUS_SEVERE" in thermal and "ThermalFlashController" in alarm and "alarm_flash_thermal_suppressed" in alarm and "audio alarm continues" in alarm,
+    "flash fails closed when thermal monitoring or initial status is unavailable":
+        "ThermalFlashPolicy.shouldSuppress" in thermal
+        and "!listenerRegistered || thermalStatus == null || thermalStatus >= severeThreshold" in thermal
+        and "ThermalFlashPolicyTest" in (ROOT / "app/src/test/java/com/thiefalertsequre/app/ThermalFlashPolicyTest.kt").read_text(encoding="utf-8"),
     "built-in alarm tone preview is owner-initiated and time-bounded":
         "previewBuiltInAlarmTone" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8") and "postDelayed(stop, 5_000L)" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8"),
     "encrypted evidence vault uses Android Keystore AES-GCM and bounded retention":
