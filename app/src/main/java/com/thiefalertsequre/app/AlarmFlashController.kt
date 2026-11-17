@@ -22,6 +22,8 @@ internal class AlarmFlashController(
     private var cameraId: String? = null
     private var running = false
     private var torchOn = false
+    private var pulseStep = 0
+    private var pattern = AlarmFlashPattern.SLOW
 
     private val pulse = object : Runnable {
         override fun run() {
@@ -30,14 +32,13 @@ internal class AlarmFlashController(
                 stop()
                 return
             }
-            val nextState = AlarmFlashSettings.nextTorchState(torchOn)
+            val nextState = AlarmFlashPatternPolicy.nextTorchState(pattern, torchOn)
             try {
-                cameraManager.setTorchMode(id, nextState)
+                if (nextState != torchOn) cameraManager.setTorchMode(id, nextState)
                 torchOn = nextState
-                handler.postDelayed(
-                    this,
-                    AlarmFlashSettings.delayAfter(nextState)
-                )
+                val delay = AlarmFlashPatternPolicy.delayMs(pattern, pulseStep)
+                pulseStep = (pulseStep + 1) % 64
+                handler.postDelayed(this, delay)
             } catch (error: Exception) {
                 report("alarm_flash_interrupted", error.javaClass.simpleName + ": " + error.message)
                 stop()
@@ -53,6 +54,8 @@ internal class AlarmFlashController(
             return false
         }
         cameraId = selectedCamera
+        pattern = AlarmFlashPatternPolicy.read(context)
+        pulseStep = 0
         return try {
             cameraManager.setTorchMode(selectedCamera, true)
             torchOn = true
