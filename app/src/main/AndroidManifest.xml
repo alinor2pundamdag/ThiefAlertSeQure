@@ -44,6 +44,7 @@
         <activity android:name=".DeviceIntelligenceActivity" android:exported="false" />
         <activity android:name=".ThemeActivity" android:exported="false" />
         <activity android:name=".SetupStatusActivity" android:exported="false" />
+        <activity android:name=".AboutActivity" android:exported="false" />
         <receiver android:name=".ThiefAlertAdminReceiver" android:label="ThiefAlertSeQure device management"
             android:permission="android.permission.BIND_DEVICE_ADMIN" android:exported="true">
             <meta-data android:name="android.app.device_admin" android:resource="@xml/device_admin" />
