@@ -1,6 +1,6 @@
 # FIXALL Phase 0–12 Coding and Acceptance Checklist
 
-**Project:** ThiefAlertSeQure Solo  
+**Project:** ThiefAlertSeQure  
 **Working branch:** `work/phase-0-12-coding`  
 **Production branch:** `main` — untouched; no merge, tag, publication or release without separate owner approval  
 **Owner direction:** Complete all repository/code/GitHub work in scope. Do not run or compile Android instrumentation tests, do not run emulator matrices, and do not perform physical-device testing. Physical-device acceptance is excluded from this software-completion task.
@@ -27,13 +27,13 @@ This is the persistent source of truth for interrupted work. A phase is not comp
 | **2 — Power and charger** | Event-time capture, live power validation, debounce, generation guards, reconnect cancellation, 10-second deadline and reboot recovery | **CODING/CI PASS —** implementation and JVM policy coverage pass; charger hardware/OEM behavior remains physical-device-only |
 | **3 — Data integrity** | Safe typed preference reads, synchronous commits, corruption preservation/recovery, migration and test-state isolation | **PASS —** safe preference, manifest and state-ownership source checks plus JVM tests pass; physical storage-failure behavior remains device-dependent |
 | **4 — Alarm and recovery** | Persist latch before playback; scheduler token integrity; recovery/retry; audio fallback, volume restoration, optional flashlight and authenticated disarm | **CODING/CI PASS —** policy/JVM regression checks and APK build pass; speaker/torch/Keyguard behavior remains physical-device-only |
-| **5 — Bluetooth A2** | Encrypted trusted registry, ACL receiver lifecycle, per-device revisions, reconnect invalidation, 8-second grace period and safe fallback | **CODE FIX COMMITTED / EXACT-HEAD CI PENDING —** serialized encrypted deadline read-modify-write prevents concurrent accessory events from overwriting each other's records; JVM tests cover per-device merge preservation; exact-head CI still required |
-| **6 — Authentication and security** | Ephemeral proof, Android credential/strong biometric gate, persisted throttle, anti-tampering and owner-only actions | **CODE FIX COMMITTED / EXACT-HEAD CI PENDING —** proof freshness now rejects asymmetric known/unknown boot identity; regression tests added; exact-head JVM/CI result still required |
+| **5 — Bluetooth A2** | Encrypted trusted registry, ACL receiver lifecycle, per-device revisions, reconnect invalidation, 8-second grace period and safe fallback | **PASS —** serialized encrypted deadline read-modify-write prevents concurrent accessory events from overwriting other devices' records; per-device merge regression coverage passed in exact-head JVM CI |
+| **6 — Authentication and security** | Ephemeral proof, Android credential/strong biometric gate, persisted throttle, anti-tampering and owner-only actions | **CODE/CI PASS —** proof freshness rejects asymmetric known/unknown boot identity; regression tests for known/unknown boot states passed in exact-head JVM CI. Active CodeQL alert closure is tracked separately and is not inferred from workflow success |
 | **7 — Background services and lifecycle** | Foreground-service start/stop, notification channels, boot/package-replacement recovery, process recreation and Android-version restrictions | **CODING/CI PASS —** source checks and lint pass; OEM background execution and reboot delivery remain physical-device-only |
 | **8 — UI and accessibility** | Preserve screens, navigation, themes, readiness flows, edge-to-edge insets and accessibility semantics | **CODING/CI PASS —** navigation, themed dialogs, theme and accessibility source checks pass; TalkBack/display perception remains device-unverified |
-| **9 — Automated tests and CI** | JVM tests, source-contract checks, manifest/preferences/ownership checks, lint, assets, release build and APK identity checks | **PRIOR CANDIDATE PASS / CURRENT HEAD PENDING —** commits `475c1fa` and `ffe5fda` have successful Android/CodeQL evidence listed below; later owner-scope documentation and the authentication freshness fix require exact-head non-instrumentation CI evidence. Instrumentation compilation/execution and emulator matrices remain excluded |
+| **9 — Automated tests and CI** | JVM tests, source-contract checks, manifest/preferences/ownership checks, lint, assets, release build and APK identity checks | **PASS —** exact-head Android run [#44005105554](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105554) and CodeQL run [#44005105442](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105442) succeeded on `a1a567bf53f97189be2547ccf872ae665c30a54b`; JVM tests, source guards, lint, APK checks and CodeQL passed. Instrumentation/emulator execution remains excluded |
 | **10 — Documentation, Privacy & Assets** | Reconcile README, privacy policy, permissions, feature matrix, threat model, update/install docs, asset formats/integrity and user-facing capability claims | **PASS —** privacy/permission claims reconciled, optional ranging is disclosed accurately, README/API scope corrected, packaged icon/audio assets validated and static privacy guards pass |
-| **11 — Branch Integration & Release Candidate** | Review branch diff/ancestry, package/version/signer invariants, release workflow, secret references, artifact identity, update path and release gates | **REVIEW IN PROGRESS / INTEGRATION HELD —** compare reports 500 commits ahead (API cap), 1 behind `main`, 130 changed paths, no deletions. Draft PR #7 is open and GitHub reports `mergeable=false`; no merge/rebase/tag/publication/release performed. Permanent production signing-secret presence remains unverified |
+| **11 — Branch Integration & Release Candidate** | Review branch diff/ancestry, package/version/signer invariants, release workflow, secret references, artifact identity, update path and release gates | **SOFTWARE REVIEW IN PROGRESS —** latest compare: 519 commits ahead, 0 behind `main`, 131 changed paths (90 added, 41 modified, 0 deleted); PR #7 remains draft/open and mergeable. No merge/rebase/tag/publication/release performed. Permanent production signing-secret presence and active CodeQL alert #8 closure remain unverified |
 | **12 — Physical-device acceptance** | Physical-device execution and evidence collection | **OUT OF SCOPE —** owner explicitly excluded physical-device testing from this software/GitHub completion task; do not run it or hold code completion on it |
 
 ## Phase 10 — documentation, privacy and assets
@@ -123,3 +123,20 @@ This snapshot records the latest code-bearing source commit and the final docume
 - Hardened `.github/workflows/release.yml`: manual signed preflight is allowed only from `refs/heads/main`, matching the main-branch release policy. `workflow_dispatch` remains non-publishing.
 - The Android build/unit/lint/APK workflow is being rerun for the follow-up commit; report it as complete only after the exact final branch HEAD has green results.
 - Branch readiness remains held: draft PR #7, 516 commits ahead / 1 behind `main` at the pre-follow-up snapshot, 131 changed paths and zero deletions. Do not merge, rebase, tag, publish or release without separate owner approval.
+
+
+## Latest exact-head software verification — 2026-11-17
+
+- Working branch: `work/phase-0-12-coding`
+- Exact head: `a1a567bf53f97189be2547ccf872ae665c30a54b`
+- Android build and tests: [run #44005105554 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105554).
+- CodeQL: [run #44005105442 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105442).
+- Android job steps verified successful: instrumentation-disabled guard, JVM unit tests, navigation/preferences/manifest/state-ownership checks, lint, asset validation, release workflow YAML validation, release identity check, APK assembly, APK metadata/package/signer checks, artifact upload.
+- CodeQL Java/Kotlin source build and both Java/Kotlin and Actions analysis jobs completed successfully.
+- Recursive Git tree inspection: 222 entries, 64 production Kotlin source files under `app/src/main/java`; no tree truncation.
+- PR review threads: 1 thread, resolved by repository owner; it references the APK installer CodeQL finding. This does **not** independently prove the underlying code-scanning alert is closed.
+- The connector does not expose the repository Code Scanning Alerts endpoint or security alert page in this session. Alert #8 state is therefore **NOT VERIFIED**; do not infer closure from green CodeQL workflow.
+- Latest branch comparison: 519 ahead / 0 behind; 131 changed files: 90 added, 41 modified, 0 deleted. GitHub reports PR #7 mergeable; PR remains draft/open/unmerged.
+- Production signing secrets are referenced by the protected release workflow but their presence and the availability of a production-signed APK are **NOT VERIFIED**. Current CI development artifact is not a production release.
+- No instrumentation source was compiled or executed, no emulator was used, and no physical-device test was run.
+- `main` remains untouched. No merge, rebase, tag, publication or release was performed.
