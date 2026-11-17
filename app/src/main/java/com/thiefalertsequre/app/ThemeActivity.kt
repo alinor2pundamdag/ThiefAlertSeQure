@@ -123,7 +123,13 @@ class ThemeActivity : FragmentActivity() {
             }, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(6) })
         }
         root.addView(filters, params(14))
-        root.addView(text("LIVE APP PREVIEW", 11f, p.primary, true), params(18))
+        root.addView(MaterialButton(this).apply {
+            text = "Open personalization controls • icons, backgrounds, motion, sounds"
+            isAllCaps = false
+            minHeight = dp(52)
+            setOnClickListener { startActivity(android.content.Intent(this@ThemeActivity, AppearanceStudioOptionsActivity::class.java)) }
+        }, params(14))
+        root.addView(text("120 THEMES • LIVE APP PREVIEW", 11f, p.primary, true), params(18))
 
         val dashboard = content()
         dashboard.addView(text("THIEF ALERT  /  SEQURE", 11f, p.primary, true))

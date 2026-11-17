@@ -6,9 +6,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ThemeStoreTest {
-    @Test fun hasSixteenUniqueThemes() {
-        assertEquals(16, ThemeStore.all.size)
-        assertEquals(16, ThemeStore.all.map { it.id }.toSet().size)
+    @Test fun hasOneHundredTwentyUniqueThemes() {
+        assertEquals(120, ThemeStore.all.size)
+        assertEquals(120, ThemeStore.all.map { it.id }.toSet().size)
     }
 
     @Test fun allPaletteColorsAreOpaque() {
@@ -23,9 +23,9 @@ class ThemeStoreTest {
         }
     }
 
-    @Test fun hasEightDarkAndEightLight() {
-        assertEquals(8, ThemeStore.all.count { it.mode == "Dark" })
-        assertEquals(8, ThemeStore.all.count { it.mode == "Light" })
+    @Test fun hasSixtyDarkAndSixtyLight() {
+        assertEquals(60, ThemeStore.all.count { it.mode == "Dark" })
+        assertEquals(60, ThemeStore.all.count { it.mode == "Light" })
     }
 
     @Test fun invalidIdsAreRejected() {

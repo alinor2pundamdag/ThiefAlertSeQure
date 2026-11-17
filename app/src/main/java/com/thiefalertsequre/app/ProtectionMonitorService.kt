@@ -377,6 +377,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
 
     /** Refresh sensor/deadline projections after the coordinator changes persisted state. */
     private fun refreshProtectionState() {
+        BatchThreeUiBridge.refresh(this)
         val state = ProtectionStore(this).read()
         if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
             startTheftAlarm()
@@ -696,10 +697,24 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             this, 502, Intent(this, ProtectionMonitorService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val mode = ProtectionStore(this).read().mode
+        val statusText = when (mode) {
+            ProtectionMode.DISARMED -> "Monitor available • protection is not armed"
+            ProtectionMode.ARMED -> "Protected • charger monitoring is armed"
+            ProtectionMode.COUNTDOWN -> "Warning • charger-removal countdown active"
+            ProtectionMode.ALARM_TRIGGERED -> "Alarm active • owner authentication required"
+        }
+        val statusColor = when (mode) {
+            ProtectionMode.DISARMED -> ThemeStore.get(this).muted
+            ProtectionMode.ARMED -> ThemeStore.get(this).success
+            ProtectionMode.COUNTDOWN -> ThemeStore.get(this).warning
+            ProtectionMode.ALARM_TRIGGERED -> ThemeStore.get(this).danger
+        }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("ThiefAlertSeQure protection monitor")
-            .setContentText("Charger monitoring is active; motion and trusted Bluetooth alerts are optional.")
+            .setColor(statusColor)
+            .setContentTitle("ThiefAlertSeQure • " + mode.name.replace('_', ' '))
+            .setContentText(statusText)
             .setContentIntent(open)
             .addAction(android.R.drawable.ic_media_pause, "Stop monitoring", stop)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)

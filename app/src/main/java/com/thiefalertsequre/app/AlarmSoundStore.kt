@@ -36,6 +36,12 @@ object AlarmSoundStore {
         return AlarmTonePreset.fromStored(raw)
     }
 
+    fun setBuiltInPreset(context: Context, preset: AlarmTonePreset): Boolean {
+        if (preset != AlarmTonePreset.DEFAULT_AUDIO && preset !in AlarmTonePreset.builtIns) return false
+        return context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putString(KEY_BUILT_IN_PRESET, preset.name).commit()
+    }
+
     fun selectNextBuiltInPreset(context: Context): AlarmTonePreset {
         val current = selectedBuiltInPreset(context)
         val choices = listOf(AlarmTonePreset.DEFAULT_AUDIO) + AlarmTonePreset.builtIns

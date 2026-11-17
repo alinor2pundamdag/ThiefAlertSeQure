@@ -43,6 +43,7 @@ class MainActivity : FragmentActivity() {
     private var fullScreenAccessButton: MaterialButton? = null
     private var biometricPrompt: BiometricPrompt? = null
     private var autoAuthenticationRequested = false
+    private var lastBatchThreeRefreshAt = 0L
 
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -57,6 +58,11 @@ class MainActivity : FragmentActivity() {
     private val ticker = object : Runnable {
         override fun run() {
             render()
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastBatchThreeRefreshAt >= 30_000L) {
+                BatchThreeUiBridge.refresh(this@MainActivity)
+                lastBatchThreeRefreshAt = now
+            }
             launchAutomaticOwnerAuthenticationIfNeeded()
             status.postDelayed(this, 1_000L)
         }
@@ -64,6 +70,11 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!getSharedPreferences("batch_three_intro_v1", MODE_PRIVATE).getBoolean("completed", false)) {
+            startActivity(Intent(this, SeismicGenesisIntroActivity::class.java))
+            finish()
+            return
+        }
         // Enforce the optional photo-vault retention window when the owner opens the app.
         runCatching { CameraEvidenceVault.entries(this) }
         applyAlarmWindowPolicy()
@@ -160,7 +171,7 @@ class MainActivity : FragmentActivity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         val brandIcon = ImageView(this).apply {
-            setImageResource(R.drawable.app_logo)
+            AppearanceStudioStore.applyIconPreview(this@MainActivity, this, ThemeStore.get(this@MainActivity))
             contentDescription = "ThiefAlertSeQure shield and alarm icon"
             scaleType = ImageView.ScaleType.FIT_CENTER
         }

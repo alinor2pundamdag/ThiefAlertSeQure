@@ -406,6 +406,8 @@ class AlarmService : Service() {
             .setContentTitle("ThiefAlertSeQure — Alarm active")
             .setContentText("Open to authenticate with your device lock or supported biometric.")
             .setContentIntent(contentIntent)
+            .setColor(ThemeStore.get(this).danger)
+            .addAction(android.R.drawable.ic_menu_view, "Open owner verification", contentIntent)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setOngoing(true)
