@@ -65,8 +65,6 @@ internal object ConfigurationBackup {
 
         Definition("user_alarm_sounds_v1", "built_in_alarm_preset", "string", AlarmTonePreset.DEFAULT_AUDIO.name,
             (listOf(AlarmTonePreset.DEFAULT_AUDIO) + AlarmTonePreset.builtIns).map { it.name }.toSet()),
-        Definition("user_alarm_sounds_v1", "secondary_alarm_enabled", "boolean", false),
-
         Definition("tas_theme_preferences_v1", "selected_theme_id", "string", ThemeStore.DEFAULT_ID,
             ThemeStore.all.map { it.id }.toSet()),
         Definition("alarm_display_settings_v1", "show_alarm_screen_over_lockscreen", "boolean", false)
@@ -106,6 +104,7 @@ internal object ConfigurationBackup {
         definitions.forEach { definition ->
             val prefs = context.getSharedPreferences(definition.file, Context.MODE_PRIVATE)
             val value = readValue(prefs, definition)
+            validate(definition, value)
             array.put(JSONObject().apply {
                 put("file", definition.file)
                 put("key", definition.key)
