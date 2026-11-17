@@ -315,6 +315,25 @@ object ManagedProtectionController {
             dpm.setLockTaskPackages(admin, snapshot.lockTaskPackages)
         }.onFailure(failures::add)
 
+        val snapshotReadbackMatches = runCatching {
+            val local = dpm.getUserRestrictions(admin)
+            val global = if (Build.VERSION.SDK_INT >= 34) {
+                dpm.getUserRestrictionsGlobally()
+            } else {
+                android.os.Bundle()
+            }
+            restrictions.all { key ->
+                local.getBoolean(key, false) == snapshot.shouldKeepLocalRestrictionEnabled(key) &&
+                    global.getBoolean(key, false) == snapshot.shouldKeepGlobalRestrictionEnabled(key)
+            } && dpm.getLockTaskPackages(admin).toSet() == snapshot.lockTaskPackages.toSet() &&
+                dpm.getLockTaskFeatures(admin) == snapshot.lockTaskFeatures
+        }.getOrDefault(false)
+        if (!snapshotReadbackMatches) {
+            failures += IllegalStateException(
+                "Android did not confirm the complete original managed-policy snapshot after rollback."
+            )
+        }
+
         if (failures.isNotEmpty()) {
             throw IllegalStateException(
                 "Managed-policy rollback is incomplete. The saved original policy snapshot was retained " +
@@ -352,6 +371,24 @@ object ManagedProtectionController {
             }.onFailure(failures::add)
         }
         runCatching { dpm.setLockTaskPackages(admin, emptyArray()) }.onFailure(failures::add)
+
+        val emergencyReadbackMatches = runCatching {
+            val local = dpm.getUserRestrictions(admin)
+            val global = if (Build.VERSION.SDK_INT >= 34) {
+                dpm.getUserRestrictionsGlobally()
+            } else {
+                android.os.Bundle()
+            }
+            restrictions.all { key ->
+                !local.getBoolean(key, false) && !global.getBoolean(key, false)
+            } && dpm.getLockTaskPackages(admin).isEmpty() &&
+                (dpm.getLockTaskFeatures(admin) and DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS) != 0
+        }.getOrDefault(false)
+        if (!emergencyReadbackMatches) {
+            failures += IllegalStateException(
+                "Android did not confirm emergency navigation and restriction recovery."
+            )
+        }
 
         if (failures.isNotEmpty()) {
             throw IllegalStateException(
