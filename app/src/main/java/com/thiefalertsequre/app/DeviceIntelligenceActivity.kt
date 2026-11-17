@@ -330,7 +330,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             "Primary audio, audio-focus changes, secondary alarm, haptics, torch interruptions, and thermal suppression are recorded locally.",
             "A secondary-output failure does not stop the primary alarm. A successful start event is not proof of audible sound at the speaker.",
             if (recentOutputEvents.isEmpty()) "No recent alarm-output events have been recorded."
-            else "Recent output events:\\n${recentOutputEvents.joinToString("\\n")}"
+            else "Recent output events:\n${recentOutputEvents.joinToString("\n")}"
         ))
         if (Build.VERSION.SDK_INT >= 36) {
             root.addView(button("Check Android ranging capabilities (optional)") { requestRangingCapabilityCheck() }, matchWrap())
