@@ -15,6 +15,12 @@ import android.os.UserManager
  * Lock Task getters expose resolved policy, so multi-admin attribution cannot be
  * reconstructed exactly. Rollback restores the captured DPM-visible baseline.
  */
+internal object ManagedRestrictionPolicy {
+    /** DISALLOW_ADD_USER is accepted by addUserRestriction, but not the API 34+ global API. */
+    fun useGlobalRestriction(apiLevel: Int, key: String): Boolean =
+        apiLevel >= 34 && key != UserManager.DISALLOW_ADD_USER
+}
+
 object ManagedProtectionController {
     private const val PREFS = "managed_protection_rollback"
     private const val SNAPSHOT_VERSION = 1
@@ -113,9 +119,11 @@ object ManagedProtectionController {
             dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD)
 
             managedRestrictions.forEach { key ->
-                if (Build.VERSION.SDK_INT >= 34) {
+                if (ManagedRestrictionPolicy.useGlobalRestriction(Build.VERSION.SDK_INT, key)) {
                     dpm.addUserRestrictionGlobally(key)
                 } else {
+                    // DISALLOW_ADD_USER is supported by addUserRestriction but is
+                    // not in the API 34+ addUserRestrictionGlobally key allowlist.
                     dpm.addUserRestriction(admin, key)
                 }
             }
