@@ -34,8 +34,15 @@ checks = {
         "LocalPreferenceCipher.encrypt(PURPOSE" in vault and "MAX_RECORDS = 100" in vault and "RETENTION_MS" in vault,
     "event evidence writes are bounded asynchronous work":
         "recordAsync(context, safeEvent, safeDetail)" in (APP / "LocalTamperHistory.kt").read_text(encoding="utf-8") and "ArrayBlockingQueue(64)" in vault and "generation.incrementAndGet()" in vault,
-    "location evidence is owner-requested and cached-only":
-        "getLastKnownLocation" in location and "getCurrentLocation" not in location and "requestLocationUpdates" not in location,
+    "cached and bounded current location evidence are owner-requested":
+        "getLastKnownLocation" in location and "getCurrentLocation" in location and "requestSingleUpdate" in location and "CURRENT_LOCATION_TIMEOUT_MS = 20_000L" in location,
+    "five built-in alarm tone presets are selectable and integrated":
+        "val builtIns = listOf(SIREN, PULSE, DOUBLE, URGENT, CONTINUOUS)" in (APP / "AlarmTonePreset.kt").read_text(encoding="utf-8")
+        and "AlarmToneController" in alarm and "selectNextBuiltInPreset" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8"),
+    "portable evidence backup uses password-derived AES-GCM":
+        "PBKDF2WithHmacSHA256" in (APP / "EvidenceVaultBackup.kt").read_text(encoding="utf-8")
+        and "AES/GCM/NoPadding" in (APP / "EvidenceVaultBackup.kt").read_text(encoding="utf-8")
+        and "fun replaceAll(context" in vault,
     "diagnostics export is user initiated":
         "Export redacted diagnostics report (JSON)" in diagnostics and "CreateDocument" in diagnostics,
     "readiness score labels itself as non-guarantee":
