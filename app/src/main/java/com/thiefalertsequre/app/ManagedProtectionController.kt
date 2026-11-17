@@ -68,7 +68,7 @@ object ManagedProtectionController {
         val admin = admin(context)
         return runCatching {
             context.packageName in dpm.getLockTaskPackages(admin) &&
-                (dpm.getLockTaskFeatures(admin) and DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS) == 0 &&
+                dpm.getLockTaskFeatures(admin) == DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD &&
                 managedRestrictions.all { key -> isRestrictionApplied(dpm, admin, key) }
         }.getOrDefault(false)
     }
@@ -135,6 +135,9 @@ object ManagedProtectionController {
             // Allow only this app in kiosk mode. Keep Keyguard available; omit GLOBAL_ACTIONS.
             dpm.setLockTaskPackages(admin, arrayOf(activity.packageName))
             dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD)
+            check(dpm.getLockTaskFeatures(admin) == DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD) {
+                "Android did not confirm that Keyguard remains available in Lock Task mode."
+            }
 
             managedRestrictions.forEach { key ->
                 if (Build.VERSION.SDK_INT >= 34 &&
