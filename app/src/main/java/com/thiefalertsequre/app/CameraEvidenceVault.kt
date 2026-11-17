@@ -116,8 +116,13 @@ internal object CameraEvidenceVault {
     }
 
     fun verifyIntegrity(context: Context): Boolean {
-        val entries = readIndex(context.applicationContext) ?: return false
-        return entries.all { read(context, it.id) != null }
+        val app = context.applicationContext
+        val entries = readIndex(app) ?: return false
+        val indexedFiles = entries.map { "${it.id}.aesgcm" }.toSet()
+        val actualFiles = evidenceDirectory(app).listFiles().orEmpty()
+            .filter { it.name.endsWith(".aesgcm") }
+            .map { it.name }.toSet()
+        return indexedFiles == actualFiles && entries.all { read(app, it.id) != null }
     }
 
     private fun readIndex(context: Context): List<Entry>? {
