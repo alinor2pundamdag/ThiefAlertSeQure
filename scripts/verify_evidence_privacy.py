@@ -34,7 +34,7 @@ required = {
     "privacy policy discloses one-shot location":
         "one cached location fix or request one current GPS/network fix" in privacy and "No background location permission" in privacy,
     "first-launch notice discloses optional location snapshot and encrypted backups":
-        "current GPS/network location request" in main and "password-protected file" in main,
+        "current GPS/network location request" in main and "password-protected file" in main and "privacy_notice_v4" in main,
     "evidence backup uses password-derived authenticated encryption":
         "PBKDF2WithHmacSHA256" in (ROOT / "app/src/main/java/com/thiefalertsequre/app/EvidenceVaultBackup.kt").read_text(encoding="utf-8")
         and "AES/GCM/NoPadding" in (ROOT / "app/src/main/java/com/thiefalertsequre/app/EvidenceVaultBackup.kt").read_text(encoding="utf-8")
