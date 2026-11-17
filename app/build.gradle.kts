@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 val appVersionCode = 6
@@ -60,6 +61,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    buildFeatures { compose = true }
     androidResources { noCompress += "opus" }
     testOptions {
         testBuildType = "release"
@@ -78,6 +80,12 @@ androidComponents {
 }
 
 dependencies {
+    // Compose 1.11 stable line is compatible with this project's compileSdk 36 / AGP 8.10.x.
+    implementation(platform("androidx.compose:compose-bom:2026.04.01"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.animation:animation")
+    implementation("androidx.compose.material3:material3")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-ktx:1.10.0")
     implementation("androidx.fragment:fragment-ktx:1.8.5")
