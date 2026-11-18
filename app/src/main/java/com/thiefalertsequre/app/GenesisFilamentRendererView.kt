@@ -727,6 +727,38 @@ class GenesisFilamentRendererView(
                 angularZ = spin * (3.8f + (seed % 7) * 0.62f)
             )
         }
+        // Add a second, smaller debris scale so the collapse contains chips as well as plates.
+        seeds.take(18).forEachIndexed { index, site ->
+            val angle = index * 2.3999632f
+            val size = 0.035f + (index % 4) * 0.009f
+            val points = listOf(
+                Point2(0f, size),
+                Point2(-size * (0.58f + (index % 3) * 0.12f), -size * 0.52f),
+                Point2(size * (0.62f + (index % 2) * 0.16f), -size * 0.43f)
+            ).map { point ->
+                val rotatedX = point.x * cos(angle) - point.y * sin(angle)
+                val rotatedY = point.x * sin(angle) + point.y * cos(angle)
+                Point2(rotatedX, rotatedY)
+            }
+            val mesh = createExtrudedMesh(points, 0.025f + size * 0.25f, debrisMaterial!!)
+            val directionX = site.x - center.x
+            val directionY = site.y - center.y
+            val distance = sqrt(directionX * directionX + directionY * directionY).coerceAtLeast(0.001f)
+            val spin = if (index % 2 == 0) 1f else -1f
+            bodies += Body(
+                mesh = mesh,
+                x = site.x, y = site.y, z = (index % 3 - 1) * 0.075f,
+                vx = directionX / distance * (2.0f + (index % 5) * 0.38f),
+                vy = directionY / distance * (2.3f + (index % 4) * 0.31f),
+                vz = spin * (1.15f + (index % 3) * 0.3f),
+                rx = 0f, ry = 0f, rz = 0f,
+                radius = size * 0.72f,
+                mass = 0.012f + size * 0.08f,
+                angularX = spin * (7f + index % 4),
+                angularY = -spin * (6f + index % 5),
+                angularZ = spin * (8f + index % 6)
+            )
+        }
         check(bodies.isNotEmpty()) { "Voronoi fracture produced no shield fragments" }
     }
 
