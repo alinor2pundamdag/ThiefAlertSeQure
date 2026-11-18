@@ -25,6 +25,7 @@ import com.google.android.filament.RenderableManager
 import com.google.android.filament.Scene
 import com.google.android.filament.Skybox
 import com.google.android.filament.SwapChain
+import com.google.android.filament.Texture
 import com.google.android.filament.VertexBuffer
 import com.google.android.filament.View
 import com.google.android.filament.View.AmbientOcclusionOptions
