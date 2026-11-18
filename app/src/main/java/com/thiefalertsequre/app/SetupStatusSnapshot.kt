@@ -60,7 +60,11 @@ object SetupStatusSnapshot {
    is PreferenceRead.Value -> {
     val trustedDevices=registry.value
     val baselineCount=trustedDevices.count{TrustedBluetoothRegistry.isBaselineConnected(prefs,it.address)}
-    x+=A2SetupStatusPolicy.evaluate(a2Enabled,trustedDevices.size,perm,adapter,monitorRequired,running,baselineCount,ProtectionClock.bootCount(c)>=0)
+    x+=A2SetupStatusPolicy.evaluate(
+     a2Enabled,trustedDevices.size,perm,adapter,monitorRequired,running,baselineCount,
+     ProtectionClock.bootCount(c)>=0,
+     SafePreferences.boolean(prefs,ProtectionMonitorService.KEY_A2_BOOT_BASELINE_READY,false)
+    )
    }
    is PreferenceRead.Corrupt -> x+=SetupItem(
     "a2_registry","Trusted Bluetooth registry",SetupState.UNKNOWN,
