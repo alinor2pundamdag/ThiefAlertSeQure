@@ -154,6 +154,7 @@ internal object CameraEvidenceVault {
         return entry
     }
 
+    @Synchronized
     fun entries(context: Context): List<Entry> {
         val app = context.applicationContext
         pruneExpired(app)
