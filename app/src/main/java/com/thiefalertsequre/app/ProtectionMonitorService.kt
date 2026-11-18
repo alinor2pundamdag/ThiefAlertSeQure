@@ -239,6 +239,38 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         val monitorEnabled = SafePreferences.boolean(
             prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
+        if (intent?.action == ACTION_STOP) {
+            val currentMode = ProtectionStore(this).read().mode
+            if (!ProtectionMonitorPolicy.canStop(currentMode)) {
+                LocalTamperHistory.record(
+                    this, "monitor_stop_rejected_active_protection",
+                    "Notification stop request was rejected because protection is $currentMode; active protection cannot be disarmed from the notification"
+                )
+                if (currentMode == ProtectionMode.ALARM_TRIGGERED) {
+                    runCatching {
+                        ContextCompat.startForegroundService(
+                            this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START)
+                        )
+                    }.onFailure {
+                        AlarmRecoveryCoordinator.onStartFailure(
+                            this, "Notification stop was rejected while the alarm was latched; alarm service restart failed"
+                        )
+                    }
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+                if (!monitorEnabled && !prefs.edit().putBoolean(KEY_ENABLED, true).commit()) {
+                    LocalTamperHistory.record(
+                        this, "active_monitor_preference_repair_failed",
+                        "Active protection retained its running monitor, but the monitor-enabled preference could not be restored"
+                    )
+                    ProtectionMonitorRecoveryNotice.show(
+                        this, "Active protection still requires its monitor. The saved monitor preference could not be repaired."
+                    )
+                }
+                return START_STICKY
+            }
+        }
         if (monitorEnabled && intent?.action != ACTION_STOP &&
             !A2BluetoothReceiverController.ensureBaselineReady(this)
         ) {
@@ -795,7 +827,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             ProtectionMode.COUNTDOWN -> ThemeStore.get(this).warning
             ProtectionMode.ALARM_TRIGGERED -> ThemeStore.get(this).danger
         }
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_shield)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setOnlyAlertOnce(true)
@@ -806,11 +838,13 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                 statusText + ". Charger monitoring is local. Motion and trusted Bluetooth alerts remain optional."
             ))
             .setContentIntent(open)
-            .addAction(android.R.drawable.ic_media_pause, "Stop monitoring", stop)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
+        if (ProtectionMonitorPolicy.canStop(mode)) {
+            builder.addAction(android.R.drawable.ic_media_pause, "Stop monitoring", stop)
+        }
+        return builder.build()
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
