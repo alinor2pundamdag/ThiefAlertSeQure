@@ -126,7 +126,9 @@ required = {
         and "LocalPreferenceCipher.decrypt(LEGACY_INDEX_PURPOSE, encoded)" in camera_media
         and "legacyIndex.any { entry -> entry.id == id && entry.name == displayName }" in camera_media
         and "rememberLegacyImage(app, uri, fileName)" in camera_media
-        and "unverifiedLegacyCount += 1" in camera_media,
+        and "unverifiedLegacyCount += 1" in camera_media
+        and "ownershipCheck.images.none { it.first == uri }" in camera_media
+        and "gallery_owner_attribution_unverified" in camera_media,
     "active protection hides private photos and blocks plaintext evidence export":
         "private fun showCameraEvidenceArchive() {\n        if (!requireProtectionDisarmed()) return" in settings
         and "private fun exportHistory(uri: Uri) {\n        if (!requireProtectionDisarmed()) return" in settings
