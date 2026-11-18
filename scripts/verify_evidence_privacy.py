@@ -200,9 +200,12 @@ required = {
         camera_archive.index("ioExecutor.execute {")
         < camera_archive.index("CameraEvidenceVault.entries(applicationContext)")
         and "CameraEvidenceVault.entries(this)" not in camera_archive
-        and "BitmapFactory.decodeByteArray(payload, 0, payload.size)" in camera_archive
-        and camera_archive.index("BitmapFactory.decodeByteArray(payload, 0, payload.size)")
-        < camera_archive.index("runOnUiThread {", camera_archive.index("BitmapFactory.decodeByteArray(payload, 0, payload.size)"))
+        and "decodeCameraEvidencePreview(payload)" in camera_archive
+        and camera_archive.index("decodeCameraEvidencePreview(payload)")
+        < camera_archive.index("runOnUiThread photoUi@")
+        and "private fun decodeCameraEvidencePreview(bytes: ByteArray): android.graphics.Bitmap?" in settings
+        and "inJustDecodeBounds = true" in settings[settings.index("private fun decodeCameraEvidencePreview"):settings.index("private fun requestFreshEvidenceLocation")]
+        and "inSampleSize = sampleSize" in settings[settings.index("private fun decodeCameraEvidencePreview"):settings.index("private fun requestFreshEvidenceLocation")]
         and "CameraEvidenceVault.delete(applicationContext, entry.id)" in camera_archive,
     "configuration restore recovery is serialized, fail-closed and snapshots only while DISARMED":
         "@Synchronized\n    fun decryptAndRestore" in configuration
