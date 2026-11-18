@@ -1,7 +1,6 @@
 package com.thiefalertsequre.app
 
 import android.content.Intent
-import android.graphics.Matrix
 import android.graphics.Paint as AndroidPaint
 import android.media.AudioManager
 import android.media.ToneGenerator
@@ -365,7 +364,6 @@ private fun SeismicGenesisIntroContent(
             if (p >= 0.39f) {
                 val nameDrop = ((p - 0.39f) / 0.20f).coerceIn(0f, 1f)
                 val finalFall = ((p - 0.82f) / 0.18f).coerceIn(0f, 1f)
-                val targetAlignment = if (p >= 0.82f) Alignment.BottomCenter else Alignment.Center
                 val concreteBrush = Brush.linearGradient(
                     listOf(Color(0xFFE1E1E1), Color(0xFF8B9097), Color(0xFFD1D4D8), Color(0xFF707780))
                 )
@@ -373,12 +371,15 @@ private fun SeismicGenesisIntroContent(
                 Text(
                     text = if (initialConcrete) concreteName else coloredName,
                     modifier = Modifier
-                        .align(targetAlignment)
-                        .offset(y = if (p >= 0.82f) containerHeight * (-0.06f * finalFall) else containerHeight * (-0.55f * (1f - nameDrop)))
+                        .align(Alignment.Center)
+                        .offset(
+                            y = if (p >= 0.82f) containerHeight * (1.25f * finalFall * finalFall)
+                            else containerHeight * (-0.55f * (1f - nameDrop))
+                        )
                         .graphicsLayer {
                             translationX = if (p in 0.405f..0.455f) shakeEnvelope else 0f
                             rotationZ = if (p < 0.48f) -4f * (1f - nameDrop) else 0f
-                            alpha = 1f
+                            alpha = if (p >= 0.82f) 1f - ((finalFall - 0.55f) / 0.45f).coerceIn(0f, 1f) else 1f
                             if (initialConcrete) compositingStrategy = CompositingStrategy.Offscreen
                         }
                         .drawWithContent {
@@ -416,117 +417,258 @@ private fun SeismicGenesisIntroContent(
     }
 }
 
+/**
+ * Material-first cinematic fracture plate. API 33+ uses AGSL to shade a layered
+ * concrete surface and branching fractures on the GPU. Earlier Android versions
+ * retain a safe layered Canvas fallback. Debris is animated independently using
+ * radial impulse, drag, rotation and gravity.
+ */
+private const val GENESIS_CONCRETE_AGSL = """
+uniform float2 resolution;
+uniform float fractureProgress;
+
+float hash21(float2 p) {
+    p = fract(p * float2(123.34, 345.45));
+    p += dot(p, p + 34.345);
+    return fract(p.x * p.y);
+}
+float noise2(float2 p) {
+    float2 i = floor(p);
+    float2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash21(i), hash21(i + float2(1.0, 0.0)), f.x),
+               mix(hash21(i + float2(0.0, 1.0)), hash21(i + float2(1.0, 1.0)), f.x), f.y);
+}
+float fbm(float2 p) {
+    float value = 0.0;
+    float amplitude = 0.52;
+    for (int octave = 0; octave < 5; octave++) {
+        value += noise2(p) * amplitude;
+        p *= 2.03;
+        amplitude *= 0.49;
+    }
+    return value;
+}
+float segmentDistance(float2 p, float2 a, float2 b) {
+    float2 pa = p - a;
+    float2 ba = b - a;
+    float h = clamp(dot(pa, ba) / max(dot(ba, ba), 0.00001), 0.0, 1.0);
+    return length(pa - ba * h);
+}
+half4 main(float2 fragCoord) {
+    float2 uv = fragCoord / resolution;
+    float2 p = (uv - float2(0.5, 0.46)) * float2(resolution.x / resolution.y, 1.0);
+    float broad = fbm(uv * float2(17.0, 25.0));
+    float medium = fbm(uv * float2(91.0, 137.0));
+    float fine = noise2(uv * resolution * 0.21);
+    float aggregate = hash21(floor(uv * resolution * 0.38));
+    float radius = length(p);
+    float tonal = broad * 0.42 + medium * 0.34 + fine * 0.16 + aggregate * 0.08;
+    float3 concrete = mix(float3(0.026, 0.031, 0.037), float3(0.205, 0.213, 0.219), tonal);
+    concrete += (medium - 0.48) * float3(0.075, 0.078, 0.081);
+    concrete -= smoothstep(0.22, 0.78, uv.y) * 0.025;
+    concrete *= 0.72 + 0.20 * (1.0 - uv.x) + 0.08 * (1.0 - uv.y);
+
+    float crackDistance = 2.0;
+    float crackReach = 0.08 + fractureProgress * 0.50;
+    for (int ray = 0; ray < 14; ray++) {
+        float fi = float(ray);
+        float angle = fi * 0.44879895 + (hash21(float2(fi, 17.0)) - 0.5) * 0.24;
+        float reach = crackReach * (0.55 + hash21(float2(fi, 31.0)) * 0.70);
+        float2 endPoint = float2(cos(angle), sin(angle)) * reach;
+        crackDistance = min(crackDistance, segmentDistance(p, float2(0.0), endPoint));
+        float branchAngle = angle + (hash21(float2(fi, 53.0)) - 0.5) * 1.12;
+        float2 branchStart = endPoint * (0.38 + hash21(float2(fi, 71.0)) * 0.28);
+        float2 branchEnd = branchStart + float2(cos(branchAngle), sin(branchAngle)) * reach * 0.48;
+        crackDistance = min(crackDistance, segmentDistance(p, branchStart, branchEnd));
+        float secondaryAngle = branchAngle + (hash21(float2(fi, 97.0)) - 0.5) * 0.92;
+        float2 secondaryStart = mix(branchStart, branchEnd, 0.58);
+        float2 secondaryEnd = secondaryStart + float2(cos(secondaryAngle), sin(secondaryAngle)) * reach * 0.22;
+        crackDistance = min(crackDistance, segmentDistance(p, secondaryStart, secondaryEnd));
+    }
+    float gate = smoothstep(0.015, 0.20, fractureProgress);
+    float width = 0.0011 + (1.0 - fractureProgress) * 0.00065;
+    float core = (1.0 - smoothstep(width, width * 2.8, crackDistance)) * gate;
+    float edge = (1.0 - smoothstep(width * 2.0, width * 7.0, crackDistance)) * gate;
+    float craterRadius = 0.018 + fractureProgress * 0.115;
+    float craterRim = exp(-abs(radius - craterRadius) * 82.0) * gate;
+    float craterShadow = exp(-abs(radius - craterRadius * 0.82) * 36.0) * gate;
+    concrete *= 1.0 - core * 0.94;
+    concrete -= edge * float3(0.025, 0.030, 0.034);
+    concrete += edge * float3(0.032, 0.040, 0.047) * (1.0 - core);
+    concrete += craterRim * float3(0.045, 0.052, 0.057);
+    concrete -= craterShadow * float3(0.035, 0.038, 0.041);
+    concrete += (aggregate - 0.5) * 0.018;
+    float reveal = smoothstep(0.0, 0.12, fractureProgress);
+    return half4(half3(mix(float3(0.0), concrete, reveal)), 1.0);
+}
+"""
+
 @Composable
 private fun GenesisFractureCanvas(
     progress: Float,
     modifier: Modifier = Modifier
 ) {
+    val materialShader = remember {
+        if (Build.VERSION.SDK_INT >= 33) {
+            runCatching { android.graphics.RuntimeShader(GENESIS_CONCRETE_AGSL) }.getOrNull()
+        } else null
+    }
+
     Canvas(modifier = modifier) {
         drawRect(Color.Black)
-        val center = androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height * 0.46f)
+        val center = Offset(size.width * 0.5f, size.height * 0.46f)
         val fracture = ((progress - 0.23f) / 0.36f).coerceIn(0f, 1f)
-        if (fracture > 0f) {
-            // A jagged radial fracture opens from the impact point and reveals #121212 underneath.
-            val revealPath = androidx.compose.ui.graphics.Path().apply {
-                val segments = 48
-                for (point in 0..segments) {
-                    val angle = point * (2f * PI.toFloat() / segments)
-                    val edgeFactor = if (point % 2 == 0) 1f else 0.84f
-                    val radius = maxOf(size.width, size.height) * fracture * edgeFactor
-                    val x = center.x + cos(angle) * radius
-                    val y = center.y + sin(angle) * radius
-                    if (point == 0) moveTo(x, y) else lineTo(x, y)
+        val native = drawContext.canvas.nativeCanvas
+
+        if (fracture > 0f && materialShader != null) {
+            runCatching {
+                materialShader.setFloatUniform("resolution", size.width, size.height)
+                materialShader.setFloatUniform("fractureProgress", fracture)
+                val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                    shader = materialShader
+                    isDither = true
                 }
-                close()
+                native.drawRect(0f, 0f, size.width, size.height, paint)
+            }.onFailure {
+                drawRect(Color(0xFF15191D).copy(alpha = fracture))
             }
-            drawPath(revealPath, Color(0xFF121212))
-            val crackColor = Color(0xFF565D66).copy(alpha = fracture * 0.72f)
-            val branches = listOf(
-                listOf(0f to 0f, -0.08f to -0.06f, -0.13f to -0.02f, -0.20f to -0.12f, -0.27f to -0.16f),
-                listOf(0f to 0f, 0.07f to -0.04f, 0.12f to -0.11f, 0.22f to -0.14f, 0.29f to -0.23f),
-                listOf(0f to 0f, 0.03f to 0.09f, 0.10f to 0.15f, 0.12f to 0.25f, 0.20f to 0.32f),
-                listOf(0f to 0f, -0.06f to 0.08f, -0.10f to 0.17f, -0.20f to 0.23f, -0.26f to 0.34f),
-                listOf(0f to 0f, 0.12f to 0.02f, 0.20f to 0.05f, 0.27f to 0.12f),
-                listOf(0f to 0f, -0.14f to 0.02f, -0.23f to 0.08f, -0.32f to 0.12f)
+        } else if (fracture > 0f) {
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF343A40), Color(0xFF171B1F), Color(0xFF080A0C)),
+                    center = center,
+                    radius = size.maxDimension * (0.62f + fracture * 0.22f)
+                )
             )
-            branches.forEachIndexed { index, points ->
+            repeat(22) { index ->
+                val angle = index * 2.3999632f
+                val reach = size.maxDimension * fracture * (0.16f + ((index * 37) % 83) / 100f)
                 val path = androidx.compose.ui.graphics.Path().apply {
                     moveTo(center.x, center.y)
-                    points.drop(1).forEach { (dx, dy) ->
-                        lineTo(center.x + size.width * dx * fracture, center.y + size.height * dy * fracture)
+                    for (segment in 1..5) {
+                        val jitter = (((index * 19 + segment * 23) % 17) - 8) * 0.004f
+                        val distance = reach * (segment / 5f)
+                        lineTo(center.x + cos(angle + jitter) * distance, center.y + sin(angle + jitter) * distance)
                     }
                 }
-                drawPath(path, crackColor, style = Stroke(width = if (index % 2 == 0) 2.1.dp.toPx() else 1.2.dp.toPx()))
+                drawPath(path, Color(0xFF060809).copy(alpha = fracture * 0.82f), style = Stroke(width = 2.0.dp.toPx()))
+                drawPath(path, Color(0xFF737B82).copy(alpha = fracture * 0.26f), style = Stroke(width = 0.7.dp.toPx()))
             }
         }
 
-        // Dust fragments are transformed with an Android Matrix (translate + rotate) so the
-        // original launcher artwork visibly breaks apart instead of merely fading away.
-        val dustProgress = ((progress - 0.18f) / 0.24f).coerceIn(0f, 1f)
+        // Subdued impact illumination with a soft volumetric falloff.
+        if (progress in 0.235f..0.29f) {
+            val flash = (1f - ((progress - 0.235f) / 0.055f)).coerceIn(0f, 1f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFFDDE7EC).copy(alpha = flash * 0.20f),
+                        Color(0xFF8FA5B2).copy(alpha = flash * 0.075f),
+                        Color.Transparent
+                    ),
+                    center = center,
+                    radius = size.minDimension * 0.46f
+                ),
+                radius = size.minDimension * 0.46f,
+                center = center
+            )
+        }
+
+        // Fine dust uses varied particle scales, radial impulse, drag and downward gravity.
+        val dustProgress = ((progress - 0.18f) / 0.48f).coerceIn(0f, 1f)
         if (dustProgress > 0f) {
-            val native = drawContext.canvas.nativeCanvas
-            val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                color = android.graphics.Color.rgb(180, 205, 222)
-                alpha = ((1f - dustProgress) * 210f).toInt().coerceIn(0, 210)
+            val dustPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
                 style = AndroidPaint.Style.FILL
+                isDither = true
             }
-            repeat(74) { index ->
-                val angle = index * 2.3999632f
-                val ring = 18f + (index % 9) * 6f
-                val distance = ring + dustProgress * (maxOf(size.width, size.height) * (0.22f + (index % 5) * 0.045f))
-                val x = center.x + cos(angle) * distance
-                val y = center.y + sin(angle) * distance
-                val radius = (1.2f + (index % 4) * 0.55f) * (1f - dustProgress * 0.55f)
-                val matrix = Matrix().apply {
-                    setTranslate(x, y)
-                    postRotate((index * 17f) % 360f, x, y)
-                }
-                val checkpoint = native.save()
-                native.concat(matrix)
-                native.drawCircle(0f, 0f, radius, paint)
-                native.restoreToCount(checkpoint)
+            repeat(132) { index ->
+                val seed = ((index * 73 + 19) % 997) / 997f
+                val angle = index * 2.3999632f + seed * 0.55f
+                val travel = dustProgress * size.maxDimension * (0.10f + seed * 0.43f)
+                val x = center.x + cos(angle) * travel
+                val y = center.y + sin(angle) * travel * 0.78f +
+                    dustProgress * dustProgress * size.height * (0.06f + seed * 0.16f)
+                val life = (1f - dustProgress * (0.78f + seed * 0.18f)).coerceIn(0f, 1f)
+                dustPaint.color = if (index % 4 == 0) android.graphics.Color.rgb(190, 198, 202)
+                    else android.graphics.Color.rgb(105, 116, 124)
+                dustPaint.alpha = (life * (34f + seed * 100f)).toInt().coerceIn(0, 120)
+                val radius = (0.45f + seed * 1.65f) * (1f + dustProgress * 0.25f)
+                native.drawOval(x - radius, y - radius * 0.58f, x + radius, y + radius * 0.58f, dustPaint)
             }
         }
 
-        // The "Developed By:" title itself fractures into dust during the strongest impact.
+        // Angular concrete fragments receive independent impulse, rotation and gravity.
+        val shardProgress = ((progress - 0.235f) / 0.70f).coerceIn(0f, 1f)
+        if (shardProgress > 0f) {
+            repeat(30) { index ->
+                val seed = ((index * 61 + 7) % 991) / 991f
+                val angle = index * 2.3999632f + seed * 0.42f
+                val travel = shardProgress * size.maxDimension * (0.12f + seed * 0.46f)
+                val x = center.x + cos(angle) * travel
+                val y = center.y + sin(angle) * travel * 0.66f +
+                    shardProgress * shardProgress * size.height * (0.10f + seed * 0.20f)
+                val life = (1f - shardProgress * (0.72f + seed * 0.24f)).coerceIn(0f, 1f)
+                val shardSize = (2.0f + seed * 8.0f) * (1f - shardProgress * 0.12f)
+                val fragment = android.graphics.Path().apply {
+                    moveTo(-shardSize, -shardSize * 0.32f)
+                    lineTo(shardSize * 0.78f, -shardSize * 0.62f)
+                    lineTo(shardSize * 0.42f, shardSize * 0.72f)
+                    lineTo(-shardSize * 0.58f, shardSize * 0.48f)
+                    close()
+                }
+                val shadowPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                    color = android.graphics.Color.BLACK
+                    alpha = (life * 100f).toInt().coerceIn(0, 100)
+                }
+                val facePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                    color = if (index % 3 == 0) android.graphics.Color.rgb(154, 160, 163)
+                        else android.graphics.Color.rgb(83, 92, 99)
+                    alpha = (life * 205f).toInt().coerceIn(0, 205)
+                }
+                val save = native.save()
+                native.translate(x, y)
+                native.rotate(index * 41f + shardProgress * (210f + seed * 460f))
+                native.drawPath(fragment, shadowPaint)
+                native.translate(-shardSize * 0.13f, -shardSize * 0.13f)
+                native.drawPath(fragment, facePaint)
+                native.restoreToCount(save)
+            }
+        }
+
+        // Developer-label dust: varied sizes, soft opacity and ballistic downward drift.
         val titleDustProgress = ((progress - 0.39f) / 0.17f).coerceIn(0f, 1f)
         if (titleDustProgress > 0f) {
-            val native = drawContext.canvas.nativeCanvas
+            val titleCenter = Offset(size.width * 0.5f, size.height * 0.43f)
             val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                color = android.graphics.Color.rgb(255, 130, 130)
-                alpha = ((1f - titleDustProgress) * 190f).toInt().coerceIn(0, 190)
+                color = android.graphics.Color.rgb(184, 154, 139)
                 style = AndroidPaint.Style.FILL
             }
-            val titleCenter = androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height * 0.43f)
-            repeat(88) { index ->
+            repeat(92) { index ->
+                val seed = ((index * 47 + 13) % 983) / 983f
                 val angle = index * 2.3999632f
-                val distance = 12f + titleDustProgress * (size.maxDimension * (0.16f + (index % 6) * 0.035f))
+                val distance = 8f + titleDustProgress * size.maxDimension * (0.12f + seed * 0.28f)
                 val x = titleCenter.x + cos(angle) * distance
-                val y = titleCenter.y + sin(angle) * distance
-                val matrix = Matrix().apply {
-                    setTranslate(x, y)
-                    postRotate((index * 23f) % 360f, x, y)
-                }
-                val checkpoint = native.save()
-                native.concat(matrix)
-                native.drawRect(-1.2f, -1.2f, 1.2f, 1.2f, paint)
-                native.restoreToCount(checkpoint)
+                val y = titleCenter.y + sin(angle) * distance * 0.48f +
+                    titleDustProgress * titleDustProgress * size.height * (0.05f + seed * 0.10f)
+                paint.alpha = ((1f - titleDustProgress) * (28f + seed * 115f)).toInt().coerceIn(0, 143)
+                val radius = 0.45f + seed * 1.2f
+                native.drawOval(x - radius, y - radius * 0.65f, x + radius, y + radius * 0.65f, paint)
             }
         }
 
-        // Final digital-wind streaks pull the sequence toward the Privacy Notice & Terms screen.
+        // Final wind streaks transition into the Privacy Notice & Terms screen.
         val windProgress = ((progress - 0.82f) / 0.18f).coerceIn(0f, 1f)
         if (windProgress > 0f) {
-            val native = drawContext.canvas.nativeCanvas
-            val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                color = android.graphics.Color.rgb(150, 165, 180)
-                alpha = ((1f - windProgress) * 145f).toInt().coerceIn(0, 145)
-                strokeWidth = 1.2f
+            val windPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.rgb(166, 183, 194)
+                alpha = ((1f - windProgress) * 82f).toInt().coerceIn(0, 82)
+                strokeWidth = 0.8f
             }
-            repeat(42) { index ->
-                val y = (index * 43f + windProgress * size.height * 0.72f) % size.height
-                val x = (index * 71f + windProgress * size.width * 1.7f) % size.width
-                native.drawLine(x, y, x + 16f + windProgress * 34f, y - 1.5f, paint)
+            repeat(56) { index ->
+                val y = (index * 37f + windProgress * size.height * 0.72f) % size.height
+                val x = (index * 67f + windProgress * size.width * 1.7f) % size.width
+                native.drawLine(x, y, x + 10f + windProgress * 28f, y - 0.8f, windPaint)
             }
         }
     }
