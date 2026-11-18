@@ -61,6 +61,19 @@ checks = {
     "A2 deadline callback retries when the protection-state commit fails":
         "fun scheduleRetry(context: Context, pending: Pending" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
         and "A2DisconnectScheduler.scheduleRetry(context, pending, 1_000L)" in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8"),
+    "A2 cancellation commits durable removal before cancelling OS callbacks":
+        (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8").index(
+            "var removed = write(prefs, remaining)"
+        ) < (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8").index(
+            "manager.cancel(pendingIntent(context, address, namespace))"
+        )
+        and (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8").index(
+            "var cleared = prefs.edit().remove(KEY_PENDING).commit()"
+        ) < (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8").index(
+            "records.forEach { manager.cancel(pendingIntent(context, it.address, namespace)) }"
+        )
+        and "if (!removed) return false" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
+        and "if (!cleared) return false" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8"),
     "orderly shutdown is observed only through the dynamically registered system receiver":
         "Intent.ACTION_SHUTDOWN" in monitor and "ContextCompat.registerReceiver(this, systemReceiver" in monitor,
     "shutdown event is diagnostic and does not claim to block system shutdown":
