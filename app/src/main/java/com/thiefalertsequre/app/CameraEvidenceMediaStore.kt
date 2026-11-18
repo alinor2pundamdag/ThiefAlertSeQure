@@ -126,6 +126,13 @@ internal object CameraEvidenceMediaStore {
         // Copy and verify every selected item first. Do not remove any Gallery
         // source until the complete encrypted vault passes its integrity scan.
         for ((uri, timestamp) in selected) {
+            // Stop creating new encrypted copies as soon as protection is armed.
+            // Already verified copies remain safe; their Gallery originals stay
+            // untouched because source deletion is separately DISARMED-only.
+            if (ProtectionStore(app).read().mode != ProtectionMode.DISARMED) {
+                blocked = true
+                break
+            }
             val original = readBoundedImage(app, uri)
             if (original == null || !CameraEvidencePolicy.isValidImageSize(original.size)) {
                 copyFailures += 1
