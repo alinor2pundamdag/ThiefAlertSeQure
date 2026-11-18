@@ -13,6 +13,7 @@ import android.view.TextureView
 import com.google.android.filament.AmbientOcclusionOptions
 import com.google.android.filament.BloomOptions
 import com.google.android.filament.DepthOfFieldOptions
+import com.google.android.filament.DynamicResolutionOptions
 import com.google.android.filament.FogOptions
 import com.google.android.filament.Box
 import com.google.android.filament.Camera
@@ -221,6 +222,14 @@ class GenesisFilamentRendererView(
             filamentView?.ambientOcclusionOptions = AmbientOcclusionOptions().apply {
                 radius = 0.18f
                 intensity = 0.85f
+                enabled = true
+            }
+            filamentView?.dynamicResolutionOptions = DynamicResolutionOptions().apply {
+                minScale = floatArrayOf(0.82f, 0.82f)
+                maxScale = floatArrayOf(1f, 1f)
+                sharpness = 0.92f
+                homogeneousScaling = true
+                quality = View.QualityLevel.HIGH
                 enabled = true
             }
             buildStudioHdrEnvironment(activeEngine)
