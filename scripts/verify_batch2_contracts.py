@@ -23,8 +23,20 @@ camera_policy = (APP / "CameraEvidencePolicy.kt").read_text(encoding="utf-8")
 settings = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
 
 trusted_registry = (APP / "TrustedBluetoothRegistry.kt").read_text(encoding="utf-8")
+device_intelligence = (APP / "DeviceIntelligenceActivity.kt").read_text(encoding="utf-8")
+device_render_start = device_intelligence.index("private fun render()")
+device_render_end = device_intelligence.index("private fun ", device_render_start + 20)
+device_render = device_intelligence[device_render_start:device_render_end]
 
 checks = {
+    "Device Intelligence performs evidence integrity scans and export on a background executor":
+        "integrityExecutor.execute {" in device_intelligence
+        and "LocalEvidenceVault.verifyIntegrity(applicationContext)" in device_intelligence
+        and "CameraEvidenceVault.verifyIntegrity(applicationContext)" in device_intelligence
+        and "CameraEvidenceVault.entries(applicationContext)" in device_intelligence
+        and "LocalEvidenceVault.verifyIntegrity(this)" not in device_render
+        and "CameraEvidenceVault.verifyIntegrity(this)" not in device_render
+        and "private fun writeDiagnosticsReport(uri: android.net.Uri)" in device_intelligence,
     "trusted Bluetooth registry serializes compound reads, migrations, and mutations":
         all(f"@Synchronized\n    {signature}" in trusted_registry for signature in (
             "fun add(prefs: SharedPreferences, address: String, name: String): Boolean {",
