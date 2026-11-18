@@ -1344,8 +1344,8 @@ class SettingsActivity : FragmentActivity() {
                 runCatching { CameraEvidenceVault.verifyIntegrity(applicationContext) }.getOrDefault(false)
             } else true
 
-            runOnUiThread {
-                if (isFinishing || isDestroyed) return@runOnUiThread
+            runOnUiThread archiveUi@{
+                if (isFinishing || isDestroyed) return@archiveUi
                 if (entries.isEmpty()) {
                     MaterialAlertDialogBuilder(this@SettingsActivity)
                         .setTitle("Front-camera evidence")
@@ -1374,7 +1374,7 @@ class SettingsActivity : FragmentActivity() {
                             val bitmap = bytes?.let { payload ->
                                 runCatching { BitmapFactory.decodeByteArray(payload, 0, payload.size) }.getOrNull()
                             }
-                            runOnUiThread {
+                            runOnUiThread photoUi@{
                                 if (isFinishing || isDestroyed) {
                                     bitmap?.recycle()
                                     return@runOnUiThread
