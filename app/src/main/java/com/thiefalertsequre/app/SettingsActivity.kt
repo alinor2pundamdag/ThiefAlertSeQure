@@ -807,7 +807,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(action("Restore encrypted app configuration") {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Restore owner settings?")
-                .setMessage("This restores only supported app preferences. It does not restore authentication secrets, permissions, evidence, custom audio files, Bluetooth device identities, or the active protection/alarm state. Existing settings are retained if validation or a write fails.")
+                .setMessage("Restore is allowed only while protection is DISARMED; it is blocked during ARMED, COUNTDOWN, or ALARM_TRIGGERED states. It restores supported preferences, then reapplies the monitor setting and charger baseline. It does not restore authentication secrets, permissions, evidence, custom audio files, Bluetooth identities, or the active protection/alarm state. Existing settings are retained if validation or a write fails.")
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Choose backup") { _, _ -> importConfigurationBackup.launch(arrayOf("application/octet-stream", "*/*")) }
                 .showThemed(this)
