@@ -100,6 +100,12 @@ checks = {
         "LocalPreferenceCipher.encrypt(PURPOSE" in vault and "MAX_RECORDS = 100" in vault and "RETENTION_MS" in vault,
     "event evidence writes are bounded asynchronous work":
         "recordAsync(context, safeEvent, safeDetail)" in (APP / "LocalTamperHistory.kt").read_text(encoding="utf-8") and "ArrayBlockingQueue(64)" in vault and "generation.incrementAndGet()" in vault,
+    "evidence queue overflow is observable and failed archive commits do not invalidate queued writes":
+        "ThreadPoolExecutor.AbortPolicy()" in vault
+        and "droppedAsyncWrites.incrementAndGet()" in vault
+        and "if (committed) generation.incrementAndGet()" in vault
+        and "generation.incrementAndGet()" not in vault[vault.index("fun replaceAll"):vault.index("fun verifyIntegrity")]
+        and "generation.incrementAndGet()" not in vault[vault.index("fun deleteAll"):vault.index("private fun readEntries")],
     "cached and bounded current location evidence are owner-requested":
         "getLastKnownLocation" in location and "getCurrentLocation" in location and "requestSingleUpdate" in location and "CURRENT_LOCATION_TIMEOUT_MS = 20_000L" in location,
     "current location tries every enabled GPS/network provider with bounded completion":
