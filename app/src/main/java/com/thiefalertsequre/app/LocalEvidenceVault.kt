@@ -47,13 +47,24 @@ object LocalEvidenceVault {
                 }
             }
         } catch (_: RejectedExecutionException) {
-            val dropped = droppedAsyncWrites.incrementAndGet()
+            val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val dropped = synchronized(droppedWriteLock) {
+                val persisted = SafePreferences.long(prefs, KEY_DROPPED_ASYNC_WRITES, 0L).coerceAtLeast(0L)
+                val next = maxOf(droppedAsyncWrites.get(), persisted) + 1L
+                droppedAsyncWrites.set(next)
+                // apply() updates the in-memory count immediately without blocking alarm callbacks on disk I/O.
+                prefs.edit().putLong(KEY_DROPPED_ASYNC_WRITES, next).apply()
+                next
+            }
             Log.w("LocalEvidenceVault", "Bounded evidence queue is full; async event was not stored (dropped=$dropped)")
         }
     }
 
-    /** Number of async evidence events rejected because the bounded queue was full. */
-    fun droppedAsyncWriteCount(): Long = droppedAsyncWrites.get()
+    /** Durable count of async evidence events rejected because the bounded queue was full. */
+    fun droppedAsyncWriteCount(context: Context): Long {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        return maxOf(droppedAsyncWrites.get(), SafePreferences.long(prefs, KEY_DROPPED_ASYNC_WRITES, 0L))
+    }
 
     data class Entry(
         val timestampEpochMs: Long,
