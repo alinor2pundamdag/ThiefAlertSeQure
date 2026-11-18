@@ -138,6 +138,10 @@ required = {
         and "ProtectionStore(app).runIfDisarmed" in camera_media,
     "camera evidence retention is non-destructive while protection is active":
         "ProtectionStore(context).runIfDisarmed" in camera_vault
+        and "@Synchronized\n    fun save(" in camera_vault
+        and "@Synchronized\n    fun entries(" in camera_vault
+        and "ProtectionStore(app).runIfDisarmed" in camera_vault[camera_vault.index("fun delete(context: Context"):camera_vault.index("fun deleteAll(context: Context")]
+        and "ProtectionStore(app).runIfDisarmed" in camera_vault[camera_vault.index("fun deleteAll(context: Context"):camera_vault.index("fun verifyIntegrity(context: Context")]
         and "readEntry(app, it.id, enforceRetention = false)" in camera_vault
         and "val noInterruptedWrites" in camera_vault
         and "currentEntries.size >= CameraEvidencePolicy.MAX_IMAGES" in camera_vault
