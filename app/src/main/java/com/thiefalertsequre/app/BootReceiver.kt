@@ -47,12 +47,13 @@ class BootReceiver : BroadcastReceiver() {
         // BOOT_COMPLETED is authoritative even on devices where Settings.Global.BOOT_COUNT
         // is unreadable. Invalidate the previous boot's charger baseline before processing
         // any later power event; package-update and exact-alarm callbacks preserve it.
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            A2DisconnectScheduler.clearAll(context)
-            val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
-            runCatching { TrustedBluetoothRegistry.clearBaselines(monitorPrefs) }
-                .onFailure { LocalTamperHistory.record(context, "a2_boot_baseline_reset_failed", it.javaClass.simpleName + ": " + it.message) }
-            A2BluetoothReceiverController.sync(context)
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED &&
+            !A2BluetoothReceiverController.resetBaselineForBoot(context)
+        ) {
+            LocalTamperHistory.record(
+                context, "a2_boot_baseline_reset_failed",
+                "A2 manifest receiver remains disabled until stale Bluetooth baselines are safely cleared"
+            )
         }
         PowerTransitionCoordinator.initializeBaseline(
             context,
