@@ -99,6 +99,9 @@ class AlarmService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        // The primary alarm now owns audio output; stop the monitor's independent
+        // battery-threshold player on every alarm-service entry path.
+        runCatching { stopService(Intent(this, ProtectionMonitorService::class.java)) }
         try {
             // Promote immediately, then start primary audio before any optional
             // UI, telemetry, or Device Owner work.
