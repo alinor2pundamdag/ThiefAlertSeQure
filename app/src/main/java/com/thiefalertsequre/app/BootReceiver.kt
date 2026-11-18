@@ -157,6 +157,7 @@ class BootReceiver : BroadcastReceiver() {
                     "Boot preserved active protection, but the monitor-enabled preference could not be restored"
                 )
             }
+            A2BluetoothReceiverController.sync(context)
             return current
         }
         if (monitorEnabled(context)) return current
