@@ -274,6 +274,7 @@ checks = {
         and "isEnabled = canEditConfiguration" in (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
         and "Full-screen app alarm dashboard" in settings
         and "if (!requireProtectionDisarmed()) return@action" in settings
+        and "private fun requestDeviceAdministrator() {\n        if (!requireProtectionDisarmed()) return" in settings
         and "ProtectionStore(activity).runIfDisarmed" in managed
         and "Managed lockdown can be enabled only while protection is DISARMED" in managed
         and "Managed lockdown can be disabled only while protection is DISARMED" in managed,
