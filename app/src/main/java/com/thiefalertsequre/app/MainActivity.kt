@@ -1187,6 +1187,9 @@ class MainActivity : FragmentActivity() {
             val settingsRecovered = !ConfigurationBackup.isRestoreOrRecoveryInProgress() &&
                 ConfigurationBackup.recoverPendingRestore(this)
             if (settingsRecovered) {
+                if (next.mode == ProtectionMode.DISARMED) {
+                    ManagedProtectionController.startIfConfigured(this)
+                }
                 val authCameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
                 val authCameraPermissionGranted = checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
                 when {
