@@ -1270,24 +1270,35 @@ class SettingsActivity : FragmentActivity() {
             // resetBaselineToCurrentPower is itself serialized against alarm and
             // charger transitions. If state became active after the import commit,
             // it rejects the reset and the monitor is still refreshed safely.
-            PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Owner restored configuration backup")
+            runCatching {
+                PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Owner restored configuration backup")
+            }.onFailure {
+                LocalTamperHistory.record(this, "configuration_restore_baseline_failed", it.javaClass.simpleName + ": " + it.message)
+            }
             runCatching {
                 ContextCompat.startForegroundService(
                     this, Intent(this, ProtectionMonitorService::class.java).setAction(ProtectionMonitorService.ACTION_REFRESH)
                 )
+            }.onFailure {
+                LocalTamperHistory.record(this, "configuration_restore_monitor_start_failed", it.javaClass.simpleName + ": " + it.message)
             }
         } else {
             // Never stop the monitor if a countdown/armed state began between
             // the preference commit and this post-restore synchronization.
-            val stopRequested = ProtectionStore(this).runIfDisarmed {
-                ContextCompat.startForegroundService(
-                    this,
-                    Intent(this, ProtectionMonitorService::class.java)
-                        .setAction(ProtectionMonitorService.ACTION_STOP)
-                        .putExtra(ProtectionMonitorService.EXTRA_STOP_PREFERENCE_COMMITTED, true)
-                )
-            } != null
-            if (!stopRequested) {
+            val stopResult = ProtectionStore(this).runIfDisarmed {
+                runCatching {
+                    ContextCompat.startForegroundService(
+                        this,
+                        Intent(this, ProtectionMonitorService::class.java)
+                            .setAction(ProtectionMonitorService.ACTION_STOP)
+                            .putExtra(ProtectionMonitorService.EXTRA_STOP_PREFERENCE_COMMITTED, true)
+                    )
+                    true
+                }.onFailure {
+                    LocalTamperHistory.record(this, "configuration_restore_monitor_stop_failed", it.javaClass.simpleName + ": " + it.message)
+                }.getOrDefault(false)
+            }
+            if (stopResult == null) {
                 LocalTamperHistory.record(
                     this, "configuration_restore_monitor_stop_deferred",
                     "Protection became active after restore; monitor stop was deferred to preserve active protection"
