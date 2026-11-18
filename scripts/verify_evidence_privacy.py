@@ -77,6 +77,11 @@ required = {
         and "if (!activityVisible.get())" in camera_capture
         and "val displayRotationDegrees = when (activity.windowManager.defaultDisplay.rotation)" in camera_capture
         and "val displayRotation = when (activity.windowManager.defaultDisplay.rotation)" not in camera_capture,
+    "camera JPEG decode bounds pixel memory before allocating the bitmap":
+        "inJustDecodeBounds = true" in camera_capture
+        and "inSampleSize = sampleSize" in camera_capture
+        and "sourceWidth <= PREFERRED_WIDTH" in camera_capture
+        and "sourceHeight <= PREFERRED_HEIGHT" in camera_capture,
     "Gallery is the default and encryption is an explicit future-capture setting":
         "KEY_ENCRYPT_NEW_PHOTOS" in camera_capture
         and "SafePreferences.readBoolean" in camera_capture
