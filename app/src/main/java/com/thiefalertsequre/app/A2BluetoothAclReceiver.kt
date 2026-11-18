@@ -8,6 +8,10 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 /** Dynamically enables the manifest ACL listener only while the owner enabled A2 monitoring. */
 internal object A2BluetoothReceiverController {
@@ -104,6 +108,16 @@ internal object A2BluetoothReceiverController {
  * When the foreground service's runtime receiver is ready, that service owns the event.
  */
 class A2BluetoothAclReceiver : BroadcastReceiver() {
+    private companion object {
+        // A bounded worker pool prevents a burst of ACL broadcasts from creating
+        // unbounded threads while retaining enough capacity for all trusted devices.
+        val receiverExecutor = ThreadPoolExecutor(
+            2, 2, 30L, TimeUnit.SECONDS,
+            ArrayBlockingQueue(64),
+            ThreadPoolExecutor.AbortPolicy()
+        )
+    }
+
     @Suppress("DEPRECATION", "MissingPermission")
     override fun onReceive(context: Context, intent: Intent) {
         if (ProtectionMonitorService.isBluetoothReceiverRegistered) return
@@ -112,7 +126,7 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
         val eventElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime()
         val eventBootCount = ProtectionClock.bootCount(context)
         val pendingResult = goAsync()
-        Thread {
+        val task = Runnable {
             try {
                 val app = context.applicationContext
                 if (!ConfigurationBackup.recoverPendingRestore(app)) {
@@ -186,6 +200,16 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
             } finally {
                 pendingResult.finish()
             }
-        }.start()
+        }
+        try {
+            receiverExecutor.execute(task)
+        } catch (_: RejectedExecutionException) {
+            pendingResult.finish()
+            LocalTamperHistory.recordAsync(
+                context.applicationContext,
+                "a2_receiver_queue_full",
+                "A trusted Bluetooth ACL event was rejected because the bounded receiver queue is full"
+            )
+        }
     }
 }
