@@ -143,8 +143,8 @@ object AlarmScheduler {
         val token = deadlineToken(state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
         val scheduled = replaceTokenAndSchedule(context, token) {
             alarmManager.setAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                System.currentTimeMillis() + delayMs.coerceAtLeast(250L),
+                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                android.os.SystemClock.elapsedRealtime() + delayMs.coerceAtLeast(250L),
                 pendingIntent(context, token)
             )
         }
