@@ -204,7 +204,7 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
                 when (intent.action) {
                     BluetoothDevice.ACTION_ACL_CONNECTED -> {
                         val update = TrustedBluetoothRegistry.markConnected(prefs, address, true)
-                        A2DisconnectScheduler.cancel(app, address)
+                        A2DisconnectScheduler.cancelAfterConfirmedConnection(app, address, eventElapsedRealtimeMs)
                         if (!update.persisted) {
                             LocalTamperHistory.record(app, "a2_baseline_update_failed", "Bluetooth connected, but its encrypted connection baseline could not be committed; disconnect detection may require reconnecting the accessory")
                         }
