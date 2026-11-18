@@ -45,6 +45,9 @@ internal object ConfigurationBackup {
     private const val JOURNAL_PHASE = "phase"
     private const val JOURNAL_APPLYING = "applying"
     private const val JOURNAL_COMMITTED = "committed"
+    @Volatile private var restoreOrRecoveryInProgress = false
+
+    fun isRestoreOrRecoveryInProgress(): Boolean = restoreOrRecoveryInProgress
 
     private data class Definition(
         val file: String,
@@ -102,6 +105,8 @@ internal object ConfigurationBackup {
 
     @Synchronized
     fun decryptAndRestore(context: Context, bytes: ByteArray, password: CharArray): Int {
+        val previousProgress = restoreOrRecoveryInProgress
+        restoreOrRecoveryInProgress = true
         try {
             require(password.size >= 12) { "Configuration backup password must contain at least 12 characters." }
             ConfigurationBackupPolicy.requireSafeRestoreMode(ProtectionStore(context).read().mode)
@@ -151,12 +156,16 @@ internal object ConfigurationBackup {
             return restoredCount
         } finally {
             password.fill('\u0000')
+            restoreOrRecoveryInProgress = previousProgress
         }
     }
 
     /** Recover an interrupted multi-file restore before any app feature consumes settings. */
     @Synchronized
     fun recoverPendingRestore(context: Context): Boolean {
+        val previousProgress = restoreOrRecoveryInProgress
+        restoreOrRecoveryInProgress = true
+        try {
         val journal = context.applicationContext.getSharedPreferences(JOURNAL_PREFS, Context.MODE_PRIVATE)
         val previousJson = when (val read = SafePreferences.readString(journal, JOURNAL_PREVIOUS, null)) {
             is PreferenceRead.Value -> read.value
@@ -175,6 +184,9 @@ internal object ConfigurationBackup {
             val previous = parse(previousJson.toByteArray(Charsets.UTF_8))
             apply(context.applicationContext, previous) && clearRestoreJournal(journal)
         }.getOrDefault(false)
+        } finally {
+            restoreOrRecoveryInProgress = previousProgress
+        }
     }
 
     private fun clearRestoreJournal(journal: SharedPreferences): Boolean =
