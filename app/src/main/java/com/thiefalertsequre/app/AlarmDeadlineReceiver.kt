@@ -259,6 +259,10 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
     }
 
     private fun startAlarm(context: Context, reason: String) {
+        // The theft alarm owns audio output. Stop the monitor service first so
+        // any secondary battery-threshold MediaPlayer is released on every
+        // deadline/recovery entry path, including an already-latched state.
+        runCatching { context.stopService(Intent(context, ProtectionMonitorService::class.java)) }
         runCatching {
             ContextCompat.startForegroundService(
                 context, Intent(context, AlarmService::class.java).setAction(AlarmService.ACTION_START)
