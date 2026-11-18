@@ -207,6 +207,12 @@ checks = {
         and "private fun exportHistory(uri: Uri) {\n        if (!requireProtectionDisarmed()) return" in settings
         and "LocalEvidenceVault.record(this, \"owner_requested_current_location\"" in settings
         and "LocalEvidenceVault.record(this, \"owner_requested_location_snapshot\"" in settings,
+    "alarm output preempts battery-alert audio and ACL work is bounded":
+        "protectionStateReceiver" in (APP / "ProtectionMonitorService.kt").read_text(encoding="utf-8")
+        and "releaseAlertPlayer()" in (APP / "ProtectionMonitorService.kt").read_text(encoding="utf-8")
+        and "stopService(Intent(this, ProtectionMonitorService::class.java))" in (APP / "AlarmService.kt").read_text(encoding="utf-8")
+        and "ArrayBlockingQueue(64)" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
+        and "RejectedExecutionException" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8"),
     "root diagnostics have bounded execution and forceful timeout cleanup":
         "timeoutSeconds.coerceIn(1L, 30L)" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8")
         and "destroyForcibly()" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8")
