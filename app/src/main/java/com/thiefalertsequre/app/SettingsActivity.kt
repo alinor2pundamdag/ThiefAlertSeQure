@@ -263,10 +263,17 @@ class SettingsActivity : FragmentActivity() {
             else -> "ON — Android access not granted"
         }
         root.addView(action("Full-screen app alarm dashboard: $dashboardStateLabel") {
+            if (!requireProtectionDisarmed()) return@action
             val enabled = !SafePreferences.boolean(alarmDisplayPrefs, MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
-            alarmDisplayPrefs.edit()
-                .putBoolean(MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, enabled)
-                .apply()
+            val saved = ProtectionStore(this).runIfDisarmed {
+                alarmDisplayPrefs.edit()
+                    .putBoolean(MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, enabled)
+                    .commit()
+            }
+            if (saved != true) {
+                showProtectionSettingsSaveFailure()
+                return@action
+            }
             if (enabled && Build.VERSION.SDK_INT >= 34 &&
                 !getSystemService(android.app.NotificationManager::class.java).canUseFullScreenIntent()
             ) {
@@ -676,6 +683,7 @@ class SettingsActivity : FragmentActivity() {
             }
         }
         root.addView(action("Encrypt new camera photos: ${if (encryptNewPhotos) "ON — private encrypted vault" else "OFF — visible in Gallery"}") {
+            if (!requireProtectionDisarmed()) return@action
             MaterialAlertDialogBuilder(this)
                 .setTitle(if (encryptNewPhotos) "Save new photos to Gallery?" else "Encrypt new camera photos?")
                 .setMessage(if (encryptNewPhotos)
@@ -739,6 +747,7 @@ class SettingsActivity : FragmentActivity() {
                 .showThemed(this)
         })
         root.addView(action("Front-camera evidence after successful owner authentication: ${when { cameraEvidenceEnabled && cameraPermissionGranted && galleryStoragePermissionGranted -> "ON"; cameraEvidenceEnabled && cameraPermissionGranted -> "NEEDS GALLERY PERMISSION"; cameraEvidenceEnabled -> "NEEDS CAMERA PERMISSION"; else -> "OFF / NEEDS SETUP" }}") {
+            if (!requireProtectionDisarmed()) return@action
             if (cameraEvidenceEnabled && (!cameraPermissionGranted || !galleryStoragePermissionGranted)) {
                 MaterialAlertDialogBuilder(this)
                     .setTitle("Front-camera evidence needs permission")
