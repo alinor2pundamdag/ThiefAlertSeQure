@@ -337,8 +337,72 @@ internal object CameraEvidenceMediaStore {
         val unverifiedLegacyCount: Int = 0
     )
 
+    private fun readLegacyIndex(context: Context): Set<LegacyOwnershipEntry>? {
+        val prefs = context.getSharedPreferences(LEGACY_INDEX_PREFS, Context.MODE_PRIVATE)
+        if (!prefs.contains(KEY_LEGACY_OWNED_IMAGES)) return emptySet()
+        val encoded = runCatching { prefs.getString(KEY_LEGACY_OWNED_IMAGES, null) }.getOrNull() ?: return null
+        return runCatching {
+            val array = org.json.JSONArray(
+                LocalPreferenceCipher.decrypt(LEGACY_INDEX_PURPOSE, encoded)
+            )
+            require(array.length() <= CameraEvidencePolicy.MAX_IMAGES)
+            buildSet {
+                for (index in 0 until array.length()) {
+                    val item = array.getJSONObject(index)
+                    val id = item.getString("id")
+                    val name = item.getString("name")
+                    require(id.matches(Regex("^[0-9]+$")) && OWNED_IMAGE_NAME.matches(name))
+                    add(LegacyOwnershipEntry(id, name))
+                }
+            }
+        }.getOrNull()
+    }
+
+    private fun writeLegacyIndex(
+        context: Context,
+        entries: Set<LegacyOwnershipEntry>
+    ): Boolean = runCatching {
+        val prefs = context.getSharedPreferences(LEGACY_INDEX_PREFS, Context.MODE_PRIVATE)
+        val editorFactory = {
+            if (entries.isEmpty()) {
+                prefs.edit().remove(KEY_LEGACY_OWNED_IMAGES)
+            } else {
+                val array = org.json.JSONArray()
+                entries.forEach { entry ->
+                    array.put(
+                        org.json.JSONObject()
+                            .put("id", entry.id)
+                            .put("name", entry.name)
+                    )
+                }
+                val encrypted = LocalPreferenceCipher.encrypt(LEGACY_INDEX_PURPOSE, array.toString())
+                prefs.edit().putString(KEY_LEGACY_OWNED_IMAGES, encrypted)
+            }
+        }
+        editorFactory().commit() || editorFactory().commit()
+    }.getOrDefault(false)
+
+    private fun rememberLegacyImage(context: Context, uri: Uri, name: String): Boolean {
+        val id = uri.lastPathSegment?.takeIf { it.matches(Regex("^[0-9]+$")) } ?: return false
+        val current = readLegacyIndex(context) ?: return false
+        val entry = LegacyOwnershipEntry(id, name)
+        val existing = current.firstOrNull { it.id == id }
+        if (existing != null && existing != entry) return false
+        if (existing == null && current.size >= CameraEvidencePolicy.MAX_IMAGES) return false
+        return writeLegacyIndex(context, current + entry)
+    }
+
+    private fun removeLegacyImages(context: Context, ids: Collection<String>): Boolean {
+        if (ids.isEmpty()) return true
+        val current = readLegacyIndex(context) ?: return false
+        return writeLegacyIndex(context, current.filterNot { it.id in ids }.toSet())
+    }
+
     private fun queryOwnedImages(context: Context): QueryResult {
         val collection = imageCollectionUri()
+        val legacyIndex = if (Build.VERSION.SDK_INT < 29) {
+            readLegacyIndex(context) ?: return QueryResult(false, emptyList())
+        } else emptySet()
         val projection = buildList {
             add(MediaStore.Images.Media._ID)
             add(MediaStore.Images.Media.DATE_TAKEN)
@@ -365,6 +429,7 @@ internal object CameraEvidenceMediaStore {
                 collection, projection, selection, args, "${MediaStore.Images.Media.DATE_TAKEN} DESC"
             ) ?: return QueryResult(false, emptyList())
             val images = mutableListOf<Pair<Uri, Long>>()
+            var unverifiedLegacyCount = 0
             cursor.use {
                 val idCol = it.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
                 val takenCol = it.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN)
@@ -374,24 +439,27 @@ internal object CameraEvidenceMediaStore {
                     it.getColumnIndexOrThrow(MediaStore.MediaColumns.OWNER_PACKAGE_NAME)
                 } else -1
                 while (it.moveToNext()) {
+                    val id = it.getLong(idCol).toString()
                     val displayName = it.getString(nameCol).orEmpty()
-                    val ownerMatches = Build.VERSION.SDK_INT < 29 ||
+                    val generatedName = OWNED_IMAGE_NAME.matches(displayName)
+                    val ownerMatches = if (Build.VERSION.SDK_INT >= 29) {
                         it.getString(ownerCol) == context.packageName
-                    // API 29+: require MediaStore's owner attribution as well as
-                    // the app-specific folder/name. API 26–28 use the private folder
-                    // and strict generated-name pattern because OWNER_PACKAGE_NAME
-                    // does not exist on those releases.
-                    if (ownerMatches && OWNED_IMAGE_NAME.matches(displayName)) {
-                        val id = it.getLong(idCol)
+                    } else {
+                        legacyIndex.any { entry -> entry.id == id && entry.name == displayName }
+                    }
+                    if (Build.VERSION.SDK_INT < 29 && generatedName && !ownerMatches) {
+                        unverifiedLegacyCount += 1
+                    }
+                    if (generatedName && ownerMatches) {
                         val taken = it.getLong(takenCol)
                         val added = it.getLong(addedCol)
                         val timestamp = if (taken > 0L) taken else added * 1_000L
-                        val uri = collection.buildUpon().appendPath(id.toString()).build()
+                        val uri = collection.buildUpon().appendPath(id).build()
                         images += uri to timestamp
                     }
                 }
             }
-            QueryResult(true, images)
+            QueryResult(true, images, unverifiedLegacyCount)
         } catch (error: Exception) {
             android.util.Log.e("CameraEvidenceMediaStore", "Could not enumerate app-owned Gallery evidence", error)
             QueryResult(false, emptyList())
