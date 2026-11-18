@@ -167,22 +167,23 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         val monitorEnabled = SafePreferences.boolean(
             monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
-        if (!monitorEnabled && state.mode != ProtectionMode.ALARM_TRIGGERED) {
-            val disabledUpdate = ProtectionStore(context).updatePersisted { current ->
-                ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
-            }
-            if (!disabledUpdate.persisted) {
-                LocalTamperHistory.record(
-                    context, "disabled_monitor_state_persist_failed",
-                    "The monitor is OFF, but the protection state was not durably disarmed; the existing deadline was retained"
-                )
-                if (disabledUpdate.state.mode == ProtectionMode.COUNTDOWN) {
-                    AlarmScheduler.scheduleRetry(context, 1_000L)
-                }
-                return
-            }
+        if (!monitorEnabled && state.mode == ProtectionMode.DISARMED) {
             AlarmScheduler.cancel(context)
             return
+        }
+        if (!monitorEnabled &&
+            (state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN)
+        ) {
+            // A stale/OEM preference must never disarm active protection. Repair
+            // the preference and continue validating the authoritative deadline.
+            if (!monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()) {
+                LocalTamperHistory.record(
+                    context, "active_monitor_preference_repair_failed",
+                    "Active protection remains authoritative; the monitor-enabled preference could not be restored"
+                )
+                if (state.mode == ProtectionMode.COUNTDOWN) AlarmScheduler.scheduleRetry(context, 1_000L)
+                return
+            }
         }
 
         val tokenParts = token.split(":")
