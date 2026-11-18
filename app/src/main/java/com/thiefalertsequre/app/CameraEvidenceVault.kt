@@ -61,7 +61,7 @@ internal object CameraEvidenceVault {
             return null
         }
         val entry = Entry(id, timestampEpochMs, sha256(jpeg), jpeg.size)
-        val committed = ProtectionStore(app).runIfDisarmed {
+        val disarmedCommit = ProtectionStore(app).runIfDisarmed {
             synchronized(this) {
                 val currentEntries = readIndex(app) ?: return@synchronized false
                 val retained = currentEntries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
@@ -76,7 +76,23 @@ internal object CameraEvidenceVault {
                 true
             }
         }
-        if (committed != true) {
+        val committed = when (disarmedCommit) {
+            true -> true
+            false -> false
+            null -> synchronized(this) {
+                // After owner authentication a connected charger may immediately
+                // re-arm protection. In that state, allow a new photo only if there
+                // is free capacity; never evict or prune existing evidence.
+                val currentEntries = readIndex(app) ?: return@synchronized false
+                if (currentEntries.size >= CameraEvidencePolicy.MAX_IMAGES) return@synchronized false
+                val next = (currentEntries + entry)
+                    .sortedBy { it.timestampEpochMs }
+                    .takeLast(CameraEvidencePolicy.MAX_IMAGES)
+                if (next.none { it.id == id }) return@synchronized false
+                writeIndex(app, next)
+            }
+        }
+        if (!committed) {
             file.delete()
             return null
         }
