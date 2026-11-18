@@ -68,6 +68,14 @@ checks = {
     "A2 deadline callback retries when the protection-state commit fails":
         "fun scheduleRetry(context: Context, pending: Pending" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
         and "A2DisconnectScheduler.scheduleRetry(context, pending, 1_000L)" in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8"),
+    "confirmed A2 reconnect suppresses stale deadlines even when registry persistence fails":
+        "fun cancelAfterConfirmedConnection(" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
+        and "confirmedConnections.merge(key, connectedAtElapsedRealtimeMs)" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
+        and "manager.cancel(pendingIntent(context, address))" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
+        and "wasConfirmedConnectedAfter(pending)" in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8")
+        and "wasConfirmedConnectedAfter(" in monitor
+        and "cancelAfterConfirmedConnection(context, address, eventElapsedRealtimeMs)" in monitor
+        and "cancelAfterConfirmedConnection(app, address, eventElapsedRealtimeMs)" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8"),
     "A2 cancellation commits durable removal before cancelling OS callbacks":
         (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8").index(
             "var removed = write(prefs, remaining)"
