@@ -362,6 +362,22 @@ object PowerTransitionCoordinator {
         val appContext = context.applicationContext
         val candidate = synchronized(lock) {
             val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val monitorPrefs = appContext.getSharedPreferences(
+                ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
+            )
+            if (!SafePreferences.boolean(
+                    monitorPrefs,
+                    ProtectionMonitorService.KEY_ENABLED,
+                    ProtectionMonitorPolicy.DEFAULT_ENABLED
+                )
+            ) {
+                resetBaselineToCurrentPower(appContext, "Monitor disabled before live unplug processing")
+                LocalTamperHistory.record(
+                    appContext, "live_unplug_ignored_monitor_disabled",
+                    "Power disconnect was ignored because monitoring is OFF"
+                )
+                return@synchronized null
+            }
             val currentBoot = ProtectionClock.bootCount(appContext)
             val priorBoot = SafePreferences.int(prefs, BASELINE_BOOT_COUNT, -1)
             val bootChanged = currentBoot >= 0 && currentBoot != priorBoot
@@ -532,6 +548,22 @@ object PowerTransitionCoordinator {
 
         return synchronized(lock) {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val monitorPrefs = context.getSharedPreferences(
+                ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
+            )
+            if (!SafePreferences.boolean(
+                    monitorPrefs,
+                    ProtectionMonitorService.KEY_ENABLED,
+                    ProtectionMonitorPolicy.DEFAULT_ENABLED
+                )
+            ) {
+                resetBaselineToCurrentPower(context, "Monitor disabled before unplug confirmation")
+                LocalTamperHistory.record(
+                    context, "pending_unplug_confirmation_skipped_monitor_disabled",
+                    "A queued unplug candidate was not confirmed because monitoring is OFF"
+                )
+                return@synchronized ProtectionStore(context).read()
+            }
             if (!isPendingCandidateCurrent(prefs, candidate)) {
                 LocalTamperHistory.record(context, "stale_power_candidate_rejected", "A newer power event or owner action superseded this unplug candidate")
                 return@synchronized ProtectionStore(context).read()
