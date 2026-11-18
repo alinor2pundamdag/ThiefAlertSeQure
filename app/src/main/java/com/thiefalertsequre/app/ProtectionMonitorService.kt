@@ -191,6 +191,12 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!ConfigurationBackup.recoverPendingRestore(this)) {
+            LocalTamperHistory.record(this, "configuration_restore_recovery_pending", "Monitor startup blocked because an interrupted configuration restore could not be recovered")
+            ProtectionMonitorRecoveryNotice.show(this, "An interrupted settings restore needs recovery before monitoring can safely resume.")
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (intent?.action != ACTION_STOP &&
             SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         ) {
