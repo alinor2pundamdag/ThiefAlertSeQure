@@ -2,10 +2,14 @@
 
 - Working branch: `work/batch-4-implementation`; PR #8 is open and unmerged.
 - Candidate identity: `com.thiefalertsequre.app`, versionName `1.1.5_Developer_Alinor`, versionCode `7`, minSdk 26, compileSdk/targetSdk 36.
-- This snapshot supersedes older branch/version statements below. The FIXALL and Phase 0–12 records remain historical evidence, not the active branch state.
-- Camera evidence remains opt-in and post-authentication. New JPEGs go to Gallery unencrypted by default; Settings can enable AES-GCM encryption for future captures. Existing photos are not converted when the setting changes. Gallery deletion is scoped to the app-owned folder and app-prefixed files.
-- The cinematic starting page is displayed once after each installed versionCode change. It is deferred while protection is active, then shown after the owner next launches the app while disarmed.
-- No merge, tag, production publication, emulator, instrumentation, or physical-device test is claimed. Exact-head CI and CodeQL results must be recorded after the code-bearing commit.
+- Latest code-bearing candidate head: `c29c4bffd78a150b3d3ec66802c6b07406e4d7c9`. Android build/tests and CodeQL push + PR runs are pending/in progress for this exact head; do not reuse results from cancelled/intermediate heads.
+- Camera evidence remains opt-in and post-authentication. New JPEGs go to Gallery unencrypted by default; Settings can enable AES-GCM encryption for future captures. Existing photos are not converted when the setting changes. Front-camera JPEG rotation now uses the Camera2 front-facing orientation rule and has regression tests.
+- Settings distinguishes unknown/unavailable evidence counts from a real zero and does not suppress deletion review when integrity or Gallery access cannot be confirmed.
+- The cinematic starting page is shown once per installed versionCode, but a runtime protection guard yields to owner recovery if protection becomes active during the intro. Completion is not persisted if protection is active.
+- Configuration restore is accepted only while protection is DISARMED; ARMED, COUNTDOWN and ALARM_TRIGGERED states are rejected. The monitor setting is reapplied after successful restore.
+- Privacy notice acknowledgement uses one centralized versioned preference key. If the notice is bypassed to prioritize an active alarm, acknowledgement is required after successful owner disarm.
+- The current code-by-code audit is still in progress; the repository has 88 production Kotlin files. High-risk camera/evidence, alarm/flashlight, intro, updater, Settings and backup paths have been reviewed and corrective changes made, but the full 88-file audit is not yet complete.
+- No merge, tag, production publication, emulator, instrumentation, or physical-device test is claimed.
 
 ---
 
