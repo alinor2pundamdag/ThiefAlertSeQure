@@ -356,7 +356,9 @@ checks = {
     "durable charger countdowns request a retry when AlarmManager initially rejects scheduling":
         (APP / "PowerTransitionCoordinator.kt").read_text(encoding="utf-8").count("AlarmScheduler.scheduleRetry(context, 1_000L)") >= 2
         and "pending unplug provenance retained and a one-second scheduler retry requested" in (APP / "PowerTransitionCoordinator.kt").read_text(encoding="utf-8")
-        and "AlarmManager.ELAPSED_REALTIME_WAKEUP" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8")[ (APP / "AlarmScheduler.kt").read_text(encoding="utf-8").index("fun scheduleRetry"): ],
+        and "AlarmManager.ELAPSED_REALTIME_WAKEUP" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8")[(APP / "AlarmScheduler.kt").read_text(encoding="utf-8").index("fun scheduleRetry"): ]
+        and "scheduleCountdownWithRetry(context, next, \"boot\")" in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
+        and "scheduleCountdownWithRetry(context, state, \"app_update\")" in (APP / "BootReceiver.kt").read_text(encoding="utf-8"),
     "encrypted configuration backup includes the photo-storage preference and accepts old backups":
         "PBKDF2WithHmacSHA256" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "AES/GCM/NoPadding" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
