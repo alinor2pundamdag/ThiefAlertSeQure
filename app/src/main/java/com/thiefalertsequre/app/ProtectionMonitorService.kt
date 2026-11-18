@@ -812,6 +812,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         const val KEY_BT_TRUSTED_ADDRESS = "trusted_bluetooth_address"
         const val KEY_BT_TRUSTED_NAME = "trusted_bluetooth_name"
         const val KEY_BT_BASELINE_CONNECTED = "trusted_bluetooth_baseline_connected"
+        const val KEY_A2_BOOT_BASELINE_READY = "a2_boot_baseline_ready"
         private const val KEY_BATTERY_ALERT_FIRED = "battery_alert_fired"
         private const val KEY_LAST_BATTERY_LEVEL = "last_battery_level"
         internal const val CHANNEL_ID = "protection_monitor"
