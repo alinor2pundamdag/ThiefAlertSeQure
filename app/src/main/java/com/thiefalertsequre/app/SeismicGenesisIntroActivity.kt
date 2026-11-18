@@ -214,7 +214,7 @@ private fun SeismicGenesisIntroContent(
     val context = androidx.compose.ui.platform.LocalContext.current
     val lifecycleOwner = context as? LifecycleOwner
     val lifecycle = lifecycleOwner?.lifecycle
-    val use3d = remember { GenesisFilamentRendererView.isSupported(context) }
+    var use3d by remember { mutableStateOf(GenesisFilamentRendererView.isSupported(context)) }
     var filamentView by remember { mutableStateOf<GenesisFilamentRendererView?>(null) }
     DisposableEffect(lifecycleOwner, filamentView) {
         val observer = LifecycleEventObserver { _, event ->
@@ -339,7 +339,7 @@ private fun SeismicGenesisIntroContent(
             if (use3d) {
                 AndroidView(
                     factory = { view ->
-                        GenesisFilamentRendererView(view).also { filamentView = it }
+                        GenesisFilamentRendererView(view) { use3d = false }.also { filamentView = it }
                     },
                     modifier = Modifier.fillMaxSize(),
                     update = { it.setProgress(p) },
@@ -384,7 +384,7 @@ private fun SeismicGenesisIntroContent(
                         .graphicsLayer {
                             translationX = shake
                             rotationZ = shake / 16f
-                            alpha = (1f - ((p - 0.36f) / 0.12f).coerceIn(0f, 1f))
+                            alpha = (if (use3d) 0.26f else 1f) * (1f - ((p - 0.36f) / 0.12f).coerceIn(0f, 1f))
                         },
                     color = Color(0xFFFF5252),
                     fontSize = 27.sp,
@@ -416,7 +416,7 @@ private fun SeismicGenesisIntroContent(
                         .graphicsLayer {
                             translationX = if (p in 0.405f..0.455f) shakeEnvelope else 0f
                             rotationZ = if (p < 0.48f) -4f * (1f - nameDrop) else 0f
-                            alpha = if (p >= 0.82f) 1f - ((finalFall - 0.55f) / 0.45f).coerceIn(0f, 1f) else 1f
+                            alpha = (if (use3d) 0.3f else 1f) * (if (p >= 0.82f) 1f - ((finalFall - 0.55f) / 0.45f).coerceIn(0f, 1f) else 1f)
                             if (initialConcrete) compositingStrategy = CompositingStrategy.Offscreen
                         }
                         .drawWithContent {
