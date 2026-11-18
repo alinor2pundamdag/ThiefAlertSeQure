@@ -108,14 +108,20 @@ internal object CameraEvidenceVault {
         val entries = readIndex(app) ?: return false
         if (entries.none { it.id == id }) return false
         val next = entries.filterNot { it.id == id }
-        // Delete the ciphertext before removing its index entry. If deletion fails,
-        // the index remains intact so the owner can retry instead of leaving an
-        // untracked encrypted file behind.
         val file = evidenceDirectory(app).resolve("$id.aesgcm")
-        val deleted = file.delete() || !file.exists()
-        if (!deleted) return false
-        if (next.isEmpty() && !deleteKeyIfPresent()) return false
+        // Commit the new index before deleting ciphertext. If the index commit
+        // fails, the original photo and its key remain fully discoverable.
         if (!writeIndex(app, next)) return false
+        val deleted = file.delete() || !file.exists()
+        if (!deleted) {
+            // Restore the original index so a failed file deletion never hides
+            // an encrypted photo from the owner's archive.
+            if (!writeIndex(app, entries)) {
+                android.util.Log.e("CameraEvidenceVault", "Photo deletion failed and the original index could not be restored; encrypted file retained")
+            }
+            return false
+        }
+        if (next.isEmpty() && !deleteKeyIfPresent()) return false
         return true
     }
 
@@ -130,10 +136,10 @@ internal object CameraEvidenceVault {
             runCatching { file.delete() || !file.exists() }.getOrDefault(false)
         }
         if (!allDeleted) return false
-        // Keep the index if Keystore cleanup or preference commit fails so the
-        // owner can retry the complete deletion operation.
-        if (!deleteKeyIfPresent()) return false
+        // Remove the now-empty index before deleting the key. If the index
+        // commit fails, the Keystore key remains available for a safe retry.
         if (!prefs.edit().remove(KEY_INDEX).commit()) return false
+        if (!deleteKeyIfPresent()) return false
         return true
     }
 
