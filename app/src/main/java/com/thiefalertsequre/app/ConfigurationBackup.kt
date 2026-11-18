@@ -97,9 +97,10 @@ internal object ConfigurationBackup {
             ConfigurationBackupPolicy.requireSafeRestoreMode(ProtectionStore(context).read().mode)
             val payload = decryptPayload(bytes, password)
             val imported = parse(payload)
-            // Validate current values before changing any settings and retain a rollback snapshot.
-            val previous = parse(snapshot(context).toString().toByteArray(Charsets.UTF_8))
             val restoredCount = ProtectionStore(context).runIfDisarmed {
+                // Capture rollback values only after acquiring the same lock that
+                // protects the DISARMED-state check and imported preference writes.
+                val previous = parse(snapshot(context).toString().toByteArray(Charsets.UTF_8))
                 if (!apply(context, imported)) {
                     if (!apply(context, previous)) {
                         throw IllegalStateException("Configuration restore failed and automatic rollback was incomplete. Do not restart the app until settings are reviewed.")
