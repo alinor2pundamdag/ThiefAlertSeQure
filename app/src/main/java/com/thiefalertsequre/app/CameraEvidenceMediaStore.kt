@@ -48,7 +48,9 @@ internal object CameraEvidenceMediaStore {
             runCatching { prune(app, now, maxImages = CameraEvidencePolicy.MAX_IMAGES - 1) }
         }
         val currentGallery = queryOwnedImages(app)
-        if (!currentGallery.success || currentGallery.images.size >= CameraEvidencePolicy.MAX_IMAGES) return null
+        if (!currentGallery.success ||
+            currentGallery.images.size + currentGallery.unverifiedLegacyCount >= CameraEvidencePolicy.MAX_IMAGES
+        ) return null
         val fileName = "ThiefAlertSeQure-$now-${UUID.randomUUID().toString().take(8)}.jpg"
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
@@ -269,7 +271,7 @@ internal object CameraEvidenceMediaStore {
     fun count(context: Context): Int {
         enforceRetention(context)
         val query = queryOwnedImages(context.applicationContext)
-        return if (query.success) query.images.size else -1
+        return if (query.success) query.images.size + query.unverifiedLegacyCount else -1
     }
 
     @Synchronized
@@ -277,15 +279,23 @@ internal object CameraEvidenceMediaStore {
         val resolver = context.applicationContext.contentResolver
         val query = queryOwnedImages(context.applicationContext)
         if (!query.success) return false
-        var allDeleted = true
+        var allDeleted = query.unverifiedLegacyCount == 0
+        val removedLegacyIds = mutableListOf<String>()
         query.images.forEach { (uri, _) ->
             val deleted = ProtectionStore(context.applicationContext).runIfDisarmed {
                 runCatching { resolver.delete(uri, null, null) == 1 }.getOrDefault(false)
             }
-            if (deleted != true) {
+            if (deleted == true && Build.VERSION.SDK_INT < 29) {
+                uri.lastPathSegment?.let(removedLegacyIds::add)
+            } else if (deleted != true) {
                 allDeleted = false
-                if (deleted == null) return@forEach
             }
+        }
+        if (removedLegacyIds.isNotEmpty() && !removeLegacyImages(context.applicationContext, removedLegacyIds)) {
+            LocalTamperHistory.record(
+                context.applicationContext, "legacy_gallery_index_cleanup_failed",
+                "Gallery originals were deleted, but their encrypted ownership index could not be fully cleaned; missing rows remain harmless stale references"
+            )
         }
         return allDeleted
     }
@@ -299,14 +309,19 @@ internal object CameraEvidenceMediaStore {
         val resolver = context.contentResolver
         val query = queryOwnedImages(context)
         if (!query.success) return
+        val allowedManagedImages = (maxImages - query.unverifiedLegacyCount).coerceAtLeast(0)
+        val removedLegacyIds = mutableListOf<String>()
         query.images.sortedByDescending { it.second }.forEachIndexed { index, (uri, timestamp) ->
-            if (!CameraEvidencePolicy.isRetained(timestamp, now) || index >= maxImages) {
+            if (!CameraEvidencePolicy.isRetained(timestamp, now) || index >= allowedManagedImages) {
                 val deleted = ProtectionStore(context).runIfDisarmed {
                     runCatching { resolver.delete(uri, null, null) == 1 }.getOrDefault(false)
                 }
-                if (deleted == null) return@forEachIndexed
+                if (deleted == true && Build.VERSION.SDK_INT < 29) {
+                    uri.lastPathSegment?.let(removedLegacyIds::add)
+                }
             }
         }
+        if (removedLegacyIds.isNotEmpty()) removeLegacyImages(context, removedLegacyIds)
     }
 
     private fun imageCollectionUri(): Uri =
@@ -318,7 +333,8 @@ internal object CameraEvidenceMediaStore {
 
     private data class QueryResult(
         val success: Boolean,
-        val images: List<Pair<Uri, Long>>
+        val images: List<Pair<Uri, Long>>,
+        val unverifiedLegacyCount: Int = 0
     )
 
     private fun queryOwnedImages(context: Context): QueryResult {
