@@ -10,6 +10,10 @@ import android.opengl.Matrix as GlMatrix
 import android.view.Choreographer
 import android.view.Surface
 import android.view.TextureView
+import com.google.android.filament.AmbientOcclusionOptions
+import com.google.android.filament.BloomOptions
+import com.google.android.filament.DepthOfFieldOptions
+import com.google.android.filament.FogOptions
 import com.google.android.filament.Box
 import com.google.android.filament.Camera
 import com.google.android.filament.Colors
@@ -184,6 +188,41 @@ class GenesisFilamentRendererView(
             filamentView?.camera = camera
             filamentView?.scene = scene
             filamentView?.isPostProcessingEnabled = true
+            filamentView?.fogOptions = FogOptions().apply {
+                distance = 2.2f
+                cutOffDistance = 18f
+                maximumOpacity = 0.28f
+                height = -0.85f
+                heightFalloff = 0.42f
+                color = floatArrayOf(0.055f, 0.075f, 0.11f)
+                density = 0.035f
+                inScatteringStart = 1.8f
+                inScatteringSize = 12f
+                fogColorFromIbl = true
+                enabled = true
+            }
+            filamentView?.bloomOptions = BloomOptions().apply {
+                strength = 0.24f
+                resolution = 128
+                levels = 5
+                threshold = true
+                enabled = true
+            }
+            filamentView?.depthOfFieldOptions = DepthOfFieldOptions().apply {
+                cocScale = 0.22f
+                maxApertureDiameter = 0.008f
+                foregroundRingCount = 3
+                backgroundRingCount = 3
+                fastGatherRingCount = 3
+                maxForegroundCOC = 8
+                maxBackgroundCOC = 12
+                enabled = true
+            }
+            filamentView?.ambientOcclusionOptions = AmbientOcclusionOptions().apply {
+                radius = 0.18f
+                intensity = 0.85f
+                enabled = true
+            }
             buildStudioHdrEnvironment(activeEngine)
 
             pbrMaterial = buildPbrMaterial(activeEngine)
