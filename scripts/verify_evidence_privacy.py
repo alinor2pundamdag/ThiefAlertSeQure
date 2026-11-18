@@ -17,7 +17,12 @@ camera_capture = (APP / "CameraEvidenceCapture.kt").read_text(encoding="utf-8")
 camera_policy = (APP / "CameraEvidencePolicy.kt").read_text(encoding="utf-8")
 camera_media = (APP / "CameraEvidenceMediaStore.kt").read_text(encoding="utf-8")
 settings = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
-camera_settings = settings[settings.index("CAMERA EVIDENCE STORAGE"):]
+camera_section_start = settings.index("CAMERA EVIDENCE STORAGE")
+camera_section_end = settings.index(
+    'val integrityStatus = text(\\n            "Encrypted local event archive',
+    camera_section_start
+)
+camera_settings = settings[camera_section_start:camera_section_end]
 privacy = (ROOT / "docs/PRIVACY_POLICY.md").read_text(encoding="utf-8")
 main = (APP / "MainActivity.kt").read_text(encoding="utf-8")
 intro = (APP / "SeismicGenesisIntroActivity.kt").read_text(encoding="utf-8")
