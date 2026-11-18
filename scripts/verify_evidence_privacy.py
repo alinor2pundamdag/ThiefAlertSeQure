@@ -158,6 +158,9 @@ required = {
         and "CameraEvidenceVault.saveForMigration(app, original, timestamp)" in camera_media
         and "fun saveForMigration(" in camera_vault
         and "if (retained.size >= CameraEvidencePolicy.MAX_IMAGES) return@synchronized false" in camera_vault
+        and "val existingCopy = CameraEvidenceVault.entries(app).firstOrNull" in camera_media
+        and "it.timestampEpochMs == timestamp" in camera_media
+        and "it.sha256.equals(sourceDigestHex, ignoreCase = true)" in camera_media
         and "CameraEvidenceVault.read(app, entry.id)" in camera_media
         and "MessageDigest.isEqual(original, verified)" in camera_media
         and "pendingDeletions += uri to sha256(original)" in camera_media
