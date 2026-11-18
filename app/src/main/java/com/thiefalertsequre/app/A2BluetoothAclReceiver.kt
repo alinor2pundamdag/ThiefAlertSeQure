@@ -137,6 +137,14 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
                     return@Thread
                 }
                 val prefs = app.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+                if (!SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_A2_BOOT_BASELINE_READY, false)) {
+                    A2BluetoothReceiverController.sync(app)
+                    LocalTamperHistory.record(
+                        app, "a2_baseline_not_ready",
+                        "Manifest Bluetooth event ignored because a verified boot baseline is not available"
+                    )
+                    return@Thread
+                }
                 if (!SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED) ||
                     !SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
                 ) return@Thread
