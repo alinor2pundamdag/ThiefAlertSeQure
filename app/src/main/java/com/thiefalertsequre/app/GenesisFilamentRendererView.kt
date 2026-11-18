@@ -427,18 +427,25 @@ class GenesisFilamentRendererView(
         var skyboxTexture: Texture? = null
         var reflections: Texture? = null
         try {
-            prefilter = IBLPrefilterContext(activeEngine)
-            converter = IBLPrefilterContext.EquirectangularToCubemap(prefilter)
-            specularFilter = IBLPrefilterContext.SpecularFilter(prefilter)
-            skyboxTexture = checkNotNull(converter.run(hdr)) { "HDR to cubemap conversion failed" }
-            reflections = checkNotNull(specularFilter.run(skyboxTexture)) { "HDR reflection prefilter failed" }
-            environmentSkyboxTexture = skyboxTexture
-            environmentReflectionTexture = reflections
+            val prefilterContext = IBLPrefilterContext(activeEngine)
+            prefilter = prefilterContext
+            val converterContext = IBLPrefilterContext.EquirectangularToCubemap(prefilterContext)
+            converter = converterContext
+            val specularFilterContext = IBLPrefilterContext.SpecularFilter(prefilterContext)
+            specularFilter = specularFilterContext
+            val generatedSkyboxTexture = checkNotNull(converterContext.run(hdr)) { "HDR to cubemap conversion failed" }
+            skyboxTexture = generatedSkyboxTexture
+            val generatedReflections = checkNotNull(specularFilterContext.run(generatedSkyboxTexture)) {
+                "HDR reflection prefilter failed"
+            }
+            reflections = generatedReflections
+            environmentSkyboxTexture = generatedSkyboxTexture
+            environmentReflectionTexture = generatedReflections
             environmentIndirectLight = IndirectLight.Builder()
-                .reflections(reflections)
+                .reflections(generatedReflections)
                 .intensity(24_000f)
                 .build(activeEngine)
-            environmentSkybox = Skybox.Builder().environment(skyboxTexture).build(activeEngine)
+            environmentSkybox = Skybox.Builder().environment(generatedSkyboxTexture).build(activeEngine)
             scene?.indirectLight = environmentIndirectLight
             scene?.skybox = environmentSkybox
         } catch (error: Throwable) {
