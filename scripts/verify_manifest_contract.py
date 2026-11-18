@@ -103,6 +103,8 @@ for name, element in legacy_bluetooth.items():
 if application is None:
     errors.append("Manifest application element is missing")
 else:
+    if application.get(ANDROID + "name") != ".ThiefAlertSeQureApplication":
+        errors.append("Application must run startup recovery for interrupted configuration restores")
     if application.get(ANDROID + "allowBackup") != "false":
         errors.append("Application backup must remain disabled")
     if application.get(ANDROID + "usesCleartextTraffic") != "false":
