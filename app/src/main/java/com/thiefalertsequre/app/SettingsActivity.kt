@@ -608,9 +608,11 @@ class SettingsActivity : FragmentActivity() {
         sectionAnchors[SECTION_TAMPER_HISTORY] = tamperHeading
         root.addView(tamperHeading)
         root.addView(space(8))
-        val historyText = LocalTamperHistory.read(this, 20).ifEmpty {
-            listOf("No recorded protection events yet.")
-        }.joinToString("\n")
+        val historyText = if (ProtectionStore(this).read().mode == ProtectionMode.DISARMED) {
+            LocalTamperHistory.read(this, 20).ifEmpty { listOf("No recorded protection events yet.") }.joinToString("\n")
+        } else {
+            "Event details are hidden while protection is active. Authenticate and disarm first to review or export local tamper evidence."
+        }
         root.addView(text(historyText, 12f, R.color.tas_text))
         root.addView(space(6))
         root.addView(text(
@@ -619,6 +621,7 @@ class SettingsActivity : FragmentActivity() {
         ))
         root.addView(space(8))
         root.addView(action("Export local event history (CSV)") {
+            if (!requireProtectionDisarmed()) return@action
             exportEvents.launch("thiefalertsequre-events.csv")
         })
         root.addView(action("Clear local event history") {
@@ -949,6 +952,7 @@ class SettingsActivity : FragmentActivity() {
                 .showThemed(this)
         })
         root.addView(action("Save last-known GPS location (optional, owner-requested)") {
+            if (!requireProtectionDisarmed()) return@action
             MaterialAlertDialogBuilder(this)
                 .setTitle("Save a location snapshot?")
                 .setMessage("Only after you grant location permission, the app reads one cached Android location fix and saves its coordinates, provider, accuracy, and fix age into the encrypted local evidence vault. No background tracking, continuous updates, cloud upload, or automatic location capture occurs. A cached fix may be old or unavailable.")
@@ -965,6 +969,7 @@ class SettingsActivity : FragmentActivity() {
                 }.showThemed(this)
         })
         root.addView(action("Request current GPS/network location (one time, owner-requested)") {
+            if (!requireProtectionDisarmed()) return@action
             MaterialAlertDialogBuilder(this)
                 .setTitle("Request a current location?")
                 .setMessage("After you approve, Android is asked for one current GPS or network location fix. The request times out after 20 seconds. The result, its age, accuracy and provider are saved only to the encrypted local evidence vault. This does not enable background tracking or automatic location capture.")
@@ -1467,6 +1472,7 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun showCameraEvidenceArchive() {
+        if (!requireProtectionDisarmed()) return
         // Keystore reads, encrypted index parsing and retention pruning are disk
         // work. Keep them off the Settings main thread, including the empty state.
         ioExecutor.execute {
@@ -1596,17 +1602,16 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun requestFreshEvidenceLocation() {
+        if (!requireProtectionDisarmed()) return
         android.widget.Toast.makeText(this, "Requesting one current location fix…", android.widget.Toast.LENGTH_SHORT).show()
         EvidenceLocationCapture.requestCurrent(this) { snapshot ->
             if (snapshot == null) {
                 android.widget.Toast.makeText(this, "No current location fix was returned within 20 seconds. Nothing was saved.", android.widget.Toast.LENGTH_LONG).show()
                 return@requestCurrent
             }
-            val saved = LocalEvidenceVault.record(
-                this,
-                "owner_requested_current_location",
-                snapshot.toVaultDetail()
-            )
+            val saved = ProtectionStore(this).runIfDisarmed {
+                LocalEvidenceVault.record(this, "owner_requested_current_location", snapshot.toVaultDetail())
+            } == true
             val ageSeconds = snapshot.fixAgeMs / 1_000L
             android.widget.Toast.makeText(
                 this,
@@ -1617,16 +1622,15 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun saveLastKnownEvidenceLocation() {
+        if (!requireProtectionDisarmed()) return
         val snapshot = EvidenceLocationCapture.readLastKnown(this)
         if (snapshot == null) {
             android.widget.Toast.makeText(this, "No cached location fix is available. No location was saved.", android.widget.Toast.LENGTH_LONG).show()
             return
         }
-        val saved = LocalEvidenceVault.record(
-            this,
-            "owner_requested_location_snapshot",
-            snapshot.toVaultDetail()
-        )
+        val saved = ProtectionStore(this).runIfDisarmed {
+            LocalEvidenceVault.record(this, "owner_requested_location_snapshot", snapshot.toVaultDetail())
+        } == true
         val ageSeconds = snapshot.fixAgeMs / 1_000L
         android.widget.Toast.makeText(
             this,
@@ -1638,6 +1642,7 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun exportHistory(uri: Uri) {
+        if (!requireProtectionDisarmed()) return
         runCatching {
             val output = contentResolver.openOutputStream(uri)
                 ?: error("Android could not open the selected export destination.")
