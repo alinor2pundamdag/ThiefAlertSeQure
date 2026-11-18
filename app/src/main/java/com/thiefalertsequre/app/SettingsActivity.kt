@@ -1255,10 +1255,29 @@ class SettingsActivity : FragmentActivity() {
         val protectionMode = ProtectionStore(this).read().mode
         if (protectionMode != ProtectionMode.DISARMED) {
             // A rollback callback must never stop or re-baseline a monitor after
-            // the first synchronization has already advanced protection state.
+            // protection has advanced. Refresh the service appropriate to the
+            // active state without changing the state or the imported preference.
+            when (protectionMode) {
+                ProtectionMode.ARMED, ProtectionMode.COUNTDOWN -> runCatching {
+                    ContextCompat.startForegroundService(
+                        this, Intent(this, ProtectionMonitorService::class.java)
+                            .setAction(ProtectionMonitorService.ACTION_REFRESH)
+                    )
+                }.onFailure {
+                    LocalTamperHistory.record(this, "configuration_restore_monitor_refresh_failed", it.javaClass.simpleName + ": " + it.message)
+                }
+                ProtectionMode.ALARM_TRIGGERED -> runCatching {
+                    ContextCompat.startForegroundService(
+                        this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_REFRESH_OUTPUTS)
+                    )
+                }.onFailure {
+                    LocalTamperHistory.record(this, "configuration_restore_alarm_refresh_failed", it.javaClass.simpleName + ": " + it.message)
+                }
+                ProtectionMode.DISARMED -> Unit
+            }
             LocalTamperHistory.record(
                 this, "configuration_restore_monitor_sync_deferred",
-                "Protection became active during restore recovery; existing monitor and protection state were left untouched"
+                "Protection became active during restore recovery; active service was refreshed without resetting or stopping protection"
             )
             return
         }
