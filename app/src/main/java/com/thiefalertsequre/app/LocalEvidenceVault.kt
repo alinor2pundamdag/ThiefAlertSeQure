@@ -1,6 +1,7 @@
 package com.thiefalertsequre.app
 
 import android.content.Context
+import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
@@ -8,6 +9,7 @@ import java.util.TimeZone
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -26,16 +28,17 @@ object LocalEvidenceVault {
     private const val MAX_RECORDS = 100
     private const val RETENTION_MS = 30L * 24L * 60L * 60L * 1000L
     private val generation = AtomicLong(0L)
+    private val droppedAsyncWrites = AtomicLong(0L)
     private val writer = ThreadPoolExecutor(
         1, 1, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue(64),
         { task -> Thread(task, "tas-evidence-vault").apply { isDaemon = true } },
-        ThreadPoolExecutor.DiscardPolicy()
+        ThreadPoolExecutor.AbortPolicy()
     )
 
     /** Best-effort bounded background write; never blocks an alarm or receiver callback. */
     fun recordAsync(context: Context, event: String, detail: String = "") {
         val submittedGeneration = generation.get()
-        runCatching {
+        try {
             writer.execute {
                 synchronized(this) {
                     if (generation.get() == submittedGeneration) {
@@ -43,8 +46,14 @@ object LocalEvidenceVault {
                     }
                 }
             }
+        } catch (_: RejectedExecutionException) {
+            val dropped = droppedAsyncWrites.incrementAndGet()
+            Log.w("LocalEvidenceVault", "Bounded evidence queue is full; async event was not stored (dropped=$dropped)")
         }
     }
+
+    /** Number of async evidence events rejected because the bounded queue was full. */
+    fun droppedAsyncWriteCount(): Long = droppedAsyncWrites.get()
 
     data class Entry(
         val timestampEpochMs: Long,
@@ -111,12 +120,14 @@ object LocalEvidenceVault {
                 })
             }
         }.toString()
-        generation.incrementAndGet()
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        return runCatching {
+        val committed = runCatching {
             val encrypted = LocalPreferenceCipher.encrypt(PURPOSE, encoded)
             prefs.edit().putString(KEY_PAYLOAD, encrypted).commit()
         }.getOrDefault(false)
+        // Invalidate older queued writes only after the replacement is durable.
+        if (committed) generation.incrementAndGet()
+        return committed
     }
 
     /** Read-only integrity check that distinguishes an empty vault from a corrupt one. */
@@ -144,10 +155,11 @@ object LocalEvidenceVault {
 
     @Synchronized
     fun deleteAll(context: Context): Boolean {
-        // Invalidate queued writes before clearing; older queued tasks cannot repopulate the vault.
-        generation.incrementAndGet()
-        return context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val committed = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().remove(KEY_PAYLOAD).commit()
+        // A failed delete must not discard queued evidence that still belongs in the vault.
+        if (committed) generation.incrementAndGet()
+        return committed
     }
 
     private fun readEntries(raw: String?): List<Entry>? {
