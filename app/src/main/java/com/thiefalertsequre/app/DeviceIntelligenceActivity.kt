@@ -317,46 +317,53 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             else "Needs attention: ${readinessScore.missing.joinToString("; ")}",
             "This is a transparent setup-readiness indicator, not a theft-prevention, security-integrity, or hardware reliability guarantee."
         ))
-        val storeIntegrity = protectionStore.integritySnapshot()
-        val evidenceIntegrity = LocalEvidenceVault.verifyIntegrity(this)
-        val cameraEvidenceIntegrity = runCatching { CameraEvidenceVault.verifyIntegrity(this) }.getOrDefault(false)
         val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
         val cameraPermissionGranted = checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(this).size }.getOrDefault(0)
-        val integritySignals = listOf(
-            IntegritySignal("Protection state storage", if (storeIntegrity.protectionStateHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 3),
-            IntegritySignal("Owner-authentication throttle storage", if (storeIntegrity.authenticationThrottleHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
-            IntegritySignal("Encrypted evidence vault", if (evidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
-            IntegritySignal("Encrypted front-camera photo vault", if (cameraEvidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 1),
-            IntegritySignal(
-                "Protection monitor runtime",
-                when {
-                    !monitorEnabled -> IntegrityStatus.UNSUPPORTED
-                    monitorProcessRunning -> IntegrityStatus.VERIFIED
-                    else -> IntegrityStatus.FAILED
-                }, 2
-            ),
-            IntegritySignal(
-                "Exact alarm access",
-                when {
-                    !monitorEnabled || Build.VERSION.SDK_INT < 31 -> IntegrityStatus.UNSUPPORTED
-                    exactAlarm -> IntegrityStatus.VERIFIED
-                    else -> IntegrityStatus.FAILED
-                }, 1
-            ),
-            IntegritySignal("Alarm notifications", if (notifications) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 1)
-        )
-        val integrityScore = ProtectionIntegrityPolicy.calculate(integritySignals)
-        addCard("PROTECTION INTEGRITY SCORE — ${integrityScore.percent}%", listOf(
-            "${integrityScore.earnedPoints} / ${integrityScore.possiblePoints} verified-component points",
-            "${integrityScore.verifiedCount} verified • ${integrityScore.failed.size} failed • ${integrityScore.unconfirmed.size} unconfirmed • ${integrityScore.unsupported.size} unsupported",
-            if (integrityScore.failed.isEmpty()) "No failed supported integrity checks were detected."
-            else "Failed: ${integrityScore.failed.joinToString("; ")}",
-            if (integrityScore.unconfirmed.isEmpty()) "No supported checks remain unconfirmed."
-            else "Unconfirmed: ${integrityScore.unconfirmed.joinToString("; ")}",
-            "Unsupported checks: ${integrityScore.unsupported.joinToString("; ").ifBlank { "None" }}",
-            "This score only reflects the listed checks the app can verify; it is not proof against tampering, root access, OEM restrictions, or hardware attacks."
-        ))
+        val cameraEvidenceIntegrity = integrity?.cameraVaultHealthy
+        val cameraEvidenceCount = integrity?.cameraPhotoCount ?: -1
+        if (integrity == null) {
+            addCard("PROTECTION INTEGRITY", listOf("Checking encrypted evidence, photo-vault, and protection-state integrity in the background…"))
+        } else if (integrity.error != null) {
+            addCard("PROTECTION INTEGRITY", listOf(
+                "Integrity inspection could not complete: ${integrity.error}",
+                "No integrity result is being represented as verified. Reopen this page to retry."
+            ))
+        } else {
+            val integritySignals = listOf(
+                IntegritySignal("Protection state storage", if (integrity.protectionStateHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 3),
+                IntegritySignal("Owner-authentication throttle storage", if (integrity.authenticationThrottleHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
+                IntegritySignal("Encrypted evidence vault", if (integrity.evidenceVaultHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
+                IntegritySignal("Encrypted front-camera photo vault", if (integrity.cameraVaultHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 1),
+                IntegritySignal(
+                    "Protection monitor runtime",
+                    when {
+                        !monitorEnabled -> IntegrityStatus.UNSUPPORTED
+                        monitorProcessRunning -> IntegrityStatus.VERIFIED
+                        else -> IntegrityStatus.FAILED
+                    }, 2
+                ),
+                IntegritySignal(
+                    "Exact alarm access",
+                    when {
+                        !monitorEnabled || Build.VERSION.SDK_INT < 31 -> IntegrityStatus.UNSUPPORTED
+                        exactAlarm -> IntegrityStatus.VERIFIED
+                        else -> IntegrityStatus.FAILED
+                    }, 1
+                ),
+                IntegritySignal("Alarm notifications", if (notifications) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 1)
+            )
+            val integrityScore = ProtectionIntegrityPolicy.calculate(integritySignals)
+            addCard("PROTECTION INTEGRITY SCORE — ${integrityScore.percent}%", listOf(
+                "${integrityScore.earnedPoints} / ${integrityScore.possiblePoints} verified-component points",
+                "${integrityScore.verifiedCount} verified • ${integrityScore.failed.size} failed • ${integrityScore.unconfirmed.size} unconfirmed • ${integrityScore.unsupported.size} unsupported",
+                if (integrityScore.failed.isEmpty()) "No failed supported integrity checks were detected."
+                else "Failed: ${integrityScore.failed.joinToString("; ")}",
+                if (integrityScore.unconfirmed.isEmpty()) "No supported checks remain unconfirmed."
+                else "Unconfirmed: ${integrityScore.unconfirmed.joinToString("; ")}",
+                "Unsupported checks: ${integrityScore.unsupported.joinToString("; ").ifBlank { "None" }}",
+                "This score only reflects the listed checks the app can verify; it is not proof against tampering, root access, OEM restrictions, or hardware attacks."
+            ))
+        }
         val a2Dependency = when {
             !a2Enabled -> "OPTIONAL OFF"
             !btConnect -> "ACTION REQUIRED — Bluetooth Connect permission"
