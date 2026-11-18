@@ -44,6 +44,7 @@ class MainActivity : FragmentActivity() {
     private var fullScreenAccessButton: MaterialButton? = null
     private var biometricPrompt: BiometricPrompt? = null
     private var autoAuthenticationRequested = false
+    private var privacyScreenVisible = false
     private var notificationPermissionAskedThisSession = false
     private var lastBatchThreeRefreshAt = 0L
     private val maintenanceExecutor = Executors.newSingleThreadExecutor()
@@ -73,7 +74,7 @@ class MainActivity : FragmentActivity() {
 
     private val privacyRecoveryPoll = object : Runnable {
         override fun run() {
-            if (isFinishing || isDestroyed || ::status.isInitialized) return
+            if (isFinishing || isDestroyed || !privacyScreenVisible) return
             if (ProtectionStore(this@MainActivity).read().mode == ProtectionMode.ALARM_TRIGGERED) {
                 window.decorView.removeCallbacks(this)
                 buildDashboard()
@@ -117,6 +118,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun showPrivacyScreen() {
+        privacyScreenVisible = true
         val scroll = ScrollView(this).apply {
             isFillViewport = true
             setBackgroundColor(getColor(R.color.tas_background))
@@ -187,6 +189,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun buildDashboard() {
+        privacyScreenVisible = false
         window.decorView.removeCallbacks(privacyRecoveryPoll)
         val scroll = ScrollView(this).apply {
             isFillViewport = true
