@@ -22,7 +22,17 @@ camera_vault = (APP / "CameraEvidenceVault.kt").read_text(encoding="utf-8")
 camera_policy = (APP / "CameraEvidencePolicy.kt").read_text(encoding="utf-8")
 settings = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
 
+trusted_registry = (APP / "TrustedBluetoothRegistry.kt").read_text(encoding="utf-8")
+
 checks = {
+    "trusted Bluetooth registry serializes compound reads, migrations, and mutations":
+        all(f"@Synchronized\\n    {signature}" in trusted_registry for signature in (
+            "fun add(prefs: SharedPreferences, address: String, name: String): Boolean {",
+            "fun remove(prefs: SharedPreferences, address: String): Boolean {",
+            "fun markConnected(prefs: SharedPreferences, address: String, connected: Boolean): Boolean {",
+            "fun clearBaselines(prefs: SharedPreferences) {",
+            "private fun readStrict(prefs: SharedPreferences): PreferenceRead<List<TrustedBluetoothDevice>> {"
+        )),
     "orderly shutdown is observed only through the dynamically registered system receiver":
         "Intent.ACTION_SHUTDOWN" in monitor and "ContextCompat.registerReceiver(this, systemReceiver" in monitor,
     "shutdown event is diagnostic and does not claim to block system shutdown":
