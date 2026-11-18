@@ -114,7 +114,7 @@ required = {
         and "CameraEvidencePolicy.MAX_IMAGES" in camera_media,
     "owner can view/export encrypted photos and delete both app-managed stores":
         "showCameraEvidenceArchive" in settings and "exportCameraEvidence.launch" in settings
-        and "CameraEvidenceVault.delete(this, entry.id)" in settings
+        and "CameraEvidenceVault.delete(applicationContext, entry.id)" in settings
         and "CameraEvidenceVault.deleteAll(applicationContext)" in settings
         and "CameraEvidenceMediaStore.deleteAll(applicationContext)" in settings
         and "var allDeleted = true" in camera_media
