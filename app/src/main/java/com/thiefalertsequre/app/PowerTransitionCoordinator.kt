@@ -551,19 +551,80 @@ object PowerTransitionCoordinator {
             val store = ProtectionStore(context)
             val current = store.read()
             if (current.mode == ProtectionMode.COUNTDOWN) {
-                // A process may have died after the state write but before the
-                // pending-event marker was cleared. Resume the existing deadline.
-                if (AlarmScheduler.schedule(
-                        context, current.deadlineEpochMs, current.deadlineElapsedRealtimeMs, current.bootCount
+                val candidateIsNewer = PowerTransitionRecoveryPolicy.isNewerDisconnectCandidate(
+                    candidate.eventEpochMs,
+                    candidate.eventElapsedRealtimeMs,
+                    candidate.eventBootCount,
+                    current.changedAtEpochMs,
+                    current.deadlineElapsedRealtimeMs,
+                    current.bootCount
+                )
+                val countdown = if (candidateIsNewer) {
+                    store.updatePersisted { old ->
+                        if (old.mode == ProtectionMode.COUNTDOWN &&
+                            PowerTransitionRecoveryPolicy.isNewerDisconnectCandidate(
+                                candidate.eventEpochMs,
+                                candidate.eventElapsedRealtimeMs,
+                                candidate.eventBootCount,
+                                old.changedAtEpochMs,
+                                old.deadlineElapsedRealtimeMs,
+                                old.bootCount
+                            )
+                        ) {
+                            ProtectionEngine.chargerDisconnected(
+                                ProtectionState(
+                                    ProtectionMode.ARMED, 0L, old.changedAtEpochMs, 0L, old.bootCount
+                                ),
+                                candidate.eventEpochMs,
+                                candidate.eventElapsedRealtimeMs,
+                                candidate.eventBootCount
+                            )
+                        } else old
+                    }
+                } else {
+                    ProtectionStoreUpdateResult(current, true)
+                }
+                val next = countdown.state
+                if (!countdown.persisted) {
+                    LocalTamperHistory.record(
+                        context, "charger_countdown_persist_pending",
+                        "A newer confirmed unplug could not replace the previous countdown; pending event provenance retained for recovery"
+                    )
+                    if (allowRecoveryRetry && !AlarmScheduler.scheduleRecoveryRetry(context, 1_000L)) {
+                        LocalTamperHistory.record(
+                            context, "charger_recovery_retry_schedule_failed",
+                            "The newer unplug candidate remains durable, but Android did not accept its one-shot recovery callback"
+                        )
+                    }
+                    return@synchronized next
+                }
+                if (next.mode == ProtectionMode.COUNTDOWN &&
+                    AlarmScheduler.schedule(
+                        context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount
                     )
                 ) {
                     clearPendingDisconnectLocked(context, prefs)
-                } else {
-                    LocalTamperHistory.record(context, "charger_countdown_schedule_pending", "Existing countdown remains durable; pending unplug provenance retained for retry")
+                    LocalTamperHistory.record(
+                        context,
+                        if (candidateIsNewer) "charger_countdown_restarted" else "charger_countdown_recovered",
+                        if (candidateIsNewer) {
+                            "A newer confirmed unplug superseded the previous countdown and received a fresh event-time grace period"
+                        } else {
+                            "Existing countdown deadline was restored after a process interruption"
+                        }
+                    )
+                    notifyMonitorStateChanged(context)
+                } else if (next.mode == ProtectionMode.COUNTDOWN) {
+                    LocalTamperHistory.record(
+                        context, "charger_countdown_schedule_pending",
+                        "Countdown remains durable but its deadline callback needs retry; pending unplug provenance retained"
+                    )
                     AlarmScheduler.scheduleRetry(context, 1_000L)
                     notifyMonitorStateChanged(context)
+                } else {
+                    clearPendingDisconnectLocked(context, prefs)
                 }
-                return@synchronized current
+                return@synchronized next
             }
             if (current.mode != ProtectionMode.ARMED) {
                 clearPendingDisconnectLocked(context, prefs)

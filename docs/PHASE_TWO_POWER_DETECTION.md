@@ -8,8 +8,9 @@ This document records the non-physical-device engineering contract for Phase Two
 - The live `ACTION_BATTERY_CHANGED` snapshot must produce three consecutive matching samples, with a five-sample hard cap and 100 ms spacing. Stable confirmation normally adds about 200 ms; the cap is about 400 ms, excluding Android broadcast delivery and hardware latency.
 - The ten-second charger grace period is anchored to the original disconnect receipt, not the end of sampling.
 - Unknown or opposite samples reset the consecutive count. A disconnected snapshot alone never creates a countdown without a previously confirmed connected baseline and a valid disconnect event.
-- Pending disconnect provenance is persisted before confirmation so a restarted monitor can revalidate same-boot identity and current power state. Reconnect increments the generation and cancels the candidate/countdown. Stale or cross-boot candidates cannot arm an alarm.
+- Pending disconnect provenance is persisted before confirmation so a restarted monitor can revalidate same-boot identity and current power state. Reconnect increments the generation and cancels the candidate/countdown. If a newer unplug arrives while an older countdown is still persisted after a failed reconnect-state commit, the newer event replaces the old deadline and receives a fresh ten-second grace period.
 - If the confirmed unplug cannot commit the `COUNTDOWN` state, one durable recovery callback retries the persisted candidate. That retry is deliberately one-shot; if storage still fails, the marker remains for the next monitor-start recovery instead of creating an unbounded alarm loop. Recovery rechecks the monitor opt-out before replaying a pending candidate.
+- Pending charger recovery and durable A2 deadlines require a verifiable boot identity. If Android does not expose `BOOT_COUNT`, the live in-process paths still work, but an event that has not yet committed its durable deadline is not replayed after process death; it waits for a fresh connected baseline rather than risking cross-boot elapsed-time confusion.
 
 ## Trusted Bluetooth separation (A2)
 
@@ -19,7 +20,7 @@ This document records the non-physical-device engineering contract for Phase Two
 - A single serialized event queue and the encrypted per-device registry make duplicate deliveries idempotent. Per-device and monitor revisions, the connected baseline, boot identity, and the expected event timestamp prevent stale callbacks from latching an alarm or cancelling another device's deadline.
 - Each accessory has its own encrypted AlarmManager deadline and immutable PendingIntent identity. Reconnect cancels both exact and fallback callbacks for that accessory; unregistering removes only this app's trust relationship and does not unpair Android Bluetooth.
 - On reboot, old-boot deadlines and all connection baselines are invalidated. A fresh current-boot ACL connection event is required before a later disconnect can start an A2 grace period.
-- When the service is alive, the Handler path is the fast path. The manifest receiver plus PendingIntent deadline provides a durable process-absent path where Android permits it. Force-stop remains outside app control.
+- When the service is alive, the Handler path is the fast path. The manifest receiver plus PendingIntent deadline provides a durable process-absent path when a verifiable boot identity is available. Without it, the in-process timer remains available but a process-absent callback is not persisted. Force-stop remains outside app control.
 
 ## Exact-alarm, Doze, and background-service limits
 

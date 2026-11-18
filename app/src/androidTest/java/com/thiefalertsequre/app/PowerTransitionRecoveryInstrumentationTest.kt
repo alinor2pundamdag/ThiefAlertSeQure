@@ -221,6 +221,82 @@ class PowerTransitionRecoveryInstrumentationTest {
         }
     }
 
+    @Test fun newerDisconnectCandidateRestartsExistingCountdownFromNewEventTime() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val bootCount = ProtectionClock.bootCount(context)
+        assumeTrue("This Android build does not expose a usable boot identity", bootCount >= 0)
+
+        val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, 0)
+        val previousMonitorEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
+        val transitionPrefs = context.getSharedPreferences("charger_transition_v2", 0)
+        val store = ProtectionStore(context)
+        val originalState = store.read()
+        assumeTrue(
+            "Test requires no pre-existing countdown or latched alarm",
+            originalState.mode != ProtectionMode.COUNTDOWN &&
+                originalState.mode != ProtectionMode.ALARM_TRIGGERED
+        )
+
+        try {
+            context.stopService(Intent(context, ProtectionMonitorService::class.java))
+            instrumentation.waitForIdleSync()
+            runShell(instrumentation, "dumpsys battery unplug")
+            assumeTrue(
+                "Emulator did not expose a confirmed disconnected battery snapshot",
+                ExternalPowerState.readConnected(context) == false
+            )
+            assertTrue(monitorPrefs.edit()
+                .putBoolean(ProtectionMonitorService.KEY_ENABLED, true)
+                .commit())
+
+            val candidateEpochMs = System.currentTimeMillis() - 250L
+            val candidateElapsedMs = SystemClock.elapsedRealtime() - 250L
+            val priorEventEpochMs = candidateEpochMs - 5_000L
+            val priorEventElapsedMs = candidateElapsedMs - 5_000L
+            assertTrue(priorEventElapsedMs > 0L)
+            assertTrue(store.write(
+                ProtectionState(
+                    mode = ProtectionMode.COUNTDOWN,
+                    deadlineEpochMs = priorEventEpochMs + COUNTDOWN_MS,
+                    changedAtEpochMs = priorEventEpochMs,
+                    deadlineElapsedRealtimeMs = priorEventElapsedMs + COUNTDOWN_MS,
+                    bootCount = bootCount
+                )
+            ))
+            assertTrue(transitionPrefs.edit()
+                .clear()
+                .putBoolean("baseline_known", true)
+                .putBoolean("baseline_connected", false)
+                .putInt("baseline_boot_count", bootCount)
+                .putLong("transition_generation", 18L)
+                .putBoolean("pending_disconnect", true)
+                .putLong("pending_disconnect_epoch_ms", candidateEpochMs)
+                .putLong("pending_disconnect_elapsed_ms", candidateElapsedMs)
+                .putInt("pending_disconnect_boot_count", bootCount)
+                .putLong("pending_disconnect_generation", 18L)
+                .commit())
+
+            val recovered = PowerTransitionCoordinator.recoverPendingDisconnectCandidate(context)
+            assertEquals(ProtectionMode.COUNTDOWN, recovered.mode)
+            assertEquals("A newer unplug must anchor the replacement grace period to its own event time",
+                candidateEpochMs, recovered.changedAtEpochMs)
+            assertEquals(candidateElapsedMs + COUNTDOWN_MS, recovered.deadlineElapsedRealtimeMs)
+            assertTrue("A successfully scheduled replacement must clear the pending marker",
+                !transitionPrefs.getBoolean("pending_disconnect", true))
+        } finally {
+            AlarmScheduler.cancel(context)
+            transitionPrefs.edit().clear().commit()
+            store.write(originalState)
+            monitorPrefs.edit()
+                .putBoolean(ProtectionMonitorService.KEY_ENABLED, previousMonitorEnabled)
+                .commit()
+            runShell(instrumentation, "dumpsys battery reset")
+        }
+    }
+
     private fun runShell(instrumentation: Instrumentation, command: String) {
         val descriptor = instrumentation.uiAutomation.executeShellCommand(command)
         ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }

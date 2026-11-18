@@ -13,6 +13,27 @@ internal object PowerTransitionRecoveryPolicy {
     ): Boolean =
         pending && pendingGeneration == currentGeneration && !baselineConnected
 
+    fun isNewerDisconnectCandidate(
+        candidateEventEpochMs: Long,
+        candidateEventElapsedRealtimeMs: Long,
+        candidateBootCount: Int,
+        countdownChangedAtEpochMs: Long,
+        countdownDeadlineElapsedRealtimeMs: Long,
+        countdownBootCount: Int
+    ): Boolean {
+        val sameBoot = candidateBootCount >= 0 && countdownBootCount >= 0 &&
+            candidateBootCount == countdownBootCount
+        val countdownEventElapsedRealtimeMs = if (
+            sameBoot && countdownDeadlineElapsedRealtimeMs > COUNTDOWN_MS
+        ) countdownDeadlineElapsedRealtimeMs - COUNTDOWN_MS else 0L
+
+        return if (countdownEventElapsedRealtimeMs > 0L && candidateEventElapsedRealtimeMs > 0L) {
+            candidateEventElapsedRealtimeMs > countdownEventElapsedRealtimeMs
+        } else {
+            candidateEventEpochMs > countdownChangedAtEpochMs
+        }
+    }
+
     fun isSameBoot(
         candidateBootCount: Int,
         currentBootCount: Int,
