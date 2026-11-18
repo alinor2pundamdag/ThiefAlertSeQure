@@ -698,6 +698,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     }
 
     private fun startTheftAlarm() {
+        // Stop the independent battery-threshold MediaPlayer before the primary
+        // theft alarm takes ownership of alarm audio output.
+        releaseAlertPlayer()
         runCatching {
             ContextCompat.startForegroundService(
                 this,
