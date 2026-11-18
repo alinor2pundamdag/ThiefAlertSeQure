@@ -39,26 +39,31 @@ internal class RangingCapabilityQuery(
             override fun onRangingCapabilities(capabilities: RangingCapabilities) {
                 if (!resultDelivered.compareAndSet(false, true)) return
                 timeoutHandler.removeCallbacks(timeout)
-                val availability = capabilities.technologyAvailability
-                val knownTechnologies = listOf(
-                    RangingManager.BLE_CS,
-                    RangingManager.BLE_RSSI,
-                    RangingManager.UWB,
-                    RangingManager.WIFI_NAN_RTT
-                )
-                val lines = knownTechnologies.map { technology ->
-                    "${RangingCapabilityStatus.technologyLabel(technology)}: ${RangingCapabilityStatus.label(availability[technology])}"
-                }.toMutableList()
-                availability.filterKeys { it !in knownTechnologies }.toSortedMap().forEach { (technology, status) ->
-                    lines += "${RangingCapabilityStatus.technologyLabel(technology)}: ${RangingCapabilityStatus.label(status)}"
+                try {
+                    val availability = capabilities.technologyAvailability
+                    val knownTechnologies = listOf(
+                        RangingManager.BLE_CS,
+                        RangingManager.BLE_RSSI,
+                        RangingManager.UWB,
+                        RangingManager.WIFI_NAN_RTT
+                    )
+                    val lines = knownTechnologies.map { technology ->
+                        "${RangingCapabilityStatus.technologyLabel(technology)}: ${RangingCapabilityStatus.label(availability[technology])}"
+                    }.toMutableList()
+                    availability.filterKeys { it !in knownTechnologies }.toSortedMap().forEach { (technology, status) ->
+                        lines += "${RangingCapabilityStatus.technologyLabel(technology)}: ${RangingCapabilityStatus.label(status)}"
+                    }
+                    capabilities.csCapabilities?.let { cs ->
+                        lines += "BLE CS security levels: ${cs.supportedSecurityLevels.sorted().joinToString()}"
+                    }
+                    lines += "Enabled means this phone reports local availability only. A compatible peer, firmware, permissions and session setup are still required."
+                    lines += "Capability discovery only. No peer discovery, ranging session, distance measurement, or location access was performed."
+                    onResult(lines.joinToString("\n"))
+                } catch (error: Exception) {
+                    onResult("Android returned ranging capability data that could not be read safely: ${error.javaClass.simpleName}. No ranging session was started.")
+                } finally {
+                    executor.execute { stop() }
                 }
-                capabilities.csCapabilities?.let { cs ->
-                    lines += "BLE CS security levels: ${cs.supportedSecurityLevels.sorted().joinToString()}"
-                }
-                lines += "Enabled means this phone reports local availability only. A compatible peer, firmware, permissions and session setup are still required."
-                lines += "Capability discovery only. No peer discovery, ranging session, distance measurement, or location access was performed."
-                onResult(lines.joinToString("\n"))
-                executor.execute { stop() }
             }
         }
         callback = listener
