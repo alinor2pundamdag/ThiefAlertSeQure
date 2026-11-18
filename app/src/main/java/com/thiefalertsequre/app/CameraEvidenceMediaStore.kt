@@ -14,6 +14,7 @@ import java.util.UUID
 /** Publishes owner-consented photos into the app's dedicated Gallery folder. */
 internal object CameraEvidenceMediaStore {
     private const val DIRECTORY_NAME = "ThiefAlertSeQure"
+    private val OWNED_IMAGE_NAME = Regex("^ThiefAlertSeQure-[0-9]{10,13}-[0-9a-f]{8}\\.jpg$")
 
     data class MigrationResult(
         val enumerationSucceeded: Boolean,
@@ -246,7 +247,11 @@ internal object CameraEvidenceMediaStore {
                 val idCol = it.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
                 val takenCol = it.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN)
                 val addedCol = it.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+                val nameCol = it.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
                 while (it.moveToNext()) {
+                    val displayName = it.getString(nameCol).orEmpty()
+                    // Never treat arbitrary files placed in the app folder as app-owned evidence.
+                    if (!OWNED_IMAGE_NAME.matches(displayName)) continue
                     val id = it.getLong(idCol)
                     val taken = it.getLong(takenCol)
                     val added = it.getLong(addedCol)
