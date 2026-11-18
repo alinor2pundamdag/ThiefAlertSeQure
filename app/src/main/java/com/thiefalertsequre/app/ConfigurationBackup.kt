@@ -89,6 +89,9 @@ internal object ConfigurationBackup {
     fun encrypt(context: Context, password: CharArray): ByteArray {
         try {
             require(password.size >= 12) { "Configuration backup password must contain at least 12 characters." }
+            require(recoverPendingRestore(context)) {
+                "An earlier configuration restore is still awaiting recovery. Resolve it before creating another backup."
+            }
             val payload = snapshot(context).toString().toByteArray(Charsets.UTF_8)
             return encryptPayload(payload, password)
         } finally {
@@ -102,6 +105,9 @@ internal object ConfigurationBackup {
             ConfigurationBackupPolicy.requireSafeRestoreMode(ProtectionStore(context).read().mode)
             val payload = decryptPayload(bytes, password)
             val imported = parse(payload)
+            require(recoverPendingRestore(context)) {
+                "An earlier configuration restore is still awaiting recovery. Resolve it before importing another backup."
+            }
             val restoredCount = ProtectionStore(context).runIfDisarmed {
                 // The durable journal is committed before the first preference file
                 // changes. Application startup rolls back an interrupted transaction.
