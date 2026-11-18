@@ -50,6 +50,14 @@ checks = {
         and "val persisted: Boolean get() = status == BluetoothBaselineUpdateStatus.COMMITTED" in trusted_registry
         and "if (!update.persisted)" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
         and "if (!update.persisted)" in monitor,
+    "A2 manifest and dynamic receivers require a verified boot-scoped baseline":
+        "KEY_A2_BOOT_BASELINE_READY" in monitor
+        and "fun ensureBaselineReady(context: Context): Boolean" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
+        and "fun resetBaselineForBoot(context: Context): Boolean" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
+        and "baselineReady" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
+        and "KEY_A2_BOOT_BASELINE_READY" in (APP / "ProtectionMonitorService.kt").read_text(encoding="utf-8")
+        and "resetBaselineForBoot(context)" in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
+        and "resetBaselineForBoot(this)" in (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8"),
     "A2 deadline callback retries when the protection-state commit fails":
         "fun scheduleRetry(context: Context, pending: Pending" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
         and "A2DisconnectScheduler.scheduleRetry(context, pending, 1_000L)" in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8"),
