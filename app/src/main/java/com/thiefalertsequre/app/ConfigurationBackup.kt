@@ -91,7 +91,7 @@ internal object ConfigurationBackup {
         }
     }
 
-    fun decryptAndRestore(context: Context, bytes: ByteArray, password: CharArray, afterRestore: () -> Unit = {}): Int {
+    fun decryptAndRestore(context: Context, bytes: ByteArray, password: CharArray): Int {
         try {
             require(password.size >= 12) { "Configuration backup password must contain at least 12 characters." }
             ConfigurationBackupPolicy.requireSafeRestoreMode(ProtectionStore(context).read().mode)
@@ -104,19 +104,7 @@ internal object ConfigurationBackup {
                     if (!apply(context, previous)) {
                         throw IllegalStateException("Configuration restore failed and automatic rollback was incomplete. Do not restart the app until settings are reviewed.")
                     }
-                    runCatching(afterRestore).onFailure {
-                        throw IllegalStateException("Previous settings were restored, but their monitor synchronization failed.", it)
-                    }
                     throw IllegalStateException("Android did not confirm every configuration write. Previous settings were restored.")
-                }
-                try {
-                    afterRestore()
-                } catch (failure: Throwable) {
-                    if (!apply(context, previous)) {
-                        throw IllegalStateException("Configuration synchronization failed and automatic rollback was incomplete.", failure)
-                    }
-                    runCatching(afterRestore).onFailure(failure::addSuppressed)
-                    throw IllegalStateException("Configuration synchronization failed. Previous settings were restored.", failure)
                 }
                 imported.size
             } ?: throw IllegalStateException(
