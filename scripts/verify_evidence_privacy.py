@@ -181,14 +181,15 @@ required = {
         and "query.images.forEach" in camera_media
         and "val cursor = context.contentResolver.query(" in camera_media
         and "?: return QueryResult(false, emptyList())" in camera_media,
-    "encrypted photo deletion commits recoverable index changes before key cleanup":
-        camera_vault.index("if (!writeIndex(app, next)) return false")
-        < camera_vault.index("val deleted = file.delete() || !file.exists()")
-        < camera_vault.index("if (next.isEmpty() && !deleteKeyIfPresent()) return false")
+    "encrypted photo deletion keeps the index recoverable until ciphertext deletion succeeds":
+        camera_vault.index("if (!writeIndex(app, next)) return@runIfDisarmed false")
+        < camera_vault.index("val fileDeleted = file.delete() || !file.exists()")
+        < camera_vault.index("if (next.isEmpty() && !deleteKeyIfPresent()) return@runIfDisarmed false")
         and camera_vault.index("val allDeleted = files.all")
-        < camera_vault.index("if (!prefs.edit().remove(KEY_INDEX).commit()) return false")
-        < camera_vault.index("if (!deleteKeyIfPresent()) return false")
+        < camera_vault.index("var indexRemoved = prefs.edit().remove(KEY_INDEX).commit()")
+        < camera_vault.index("if (!deleteKeyIfPresent()) return@runIfDisarmed false")
         and "if (!writeIndex(app, entries))" in camera_vault
+        and "if (!indexRemoved) indexRemoved = prefs.edit().remove(KEY_INDEX).commit()" in camera_vault
         and "private fun deleteKeyIfPresent(): Boolean" in camera_vault,
     "encrypted photo vault enumeration and integrity checks stay off the Settings UI thread":
         "CameraEvidenceVault.entries(applicationContext)" in camera_settings
