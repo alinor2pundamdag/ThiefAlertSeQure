@@ -624,7 +624,7 @@ class SettingsActivity : FragmentActivity() {
                         LocalTamperHistory.record(this, "history_cleared", "Owner cleared local event history")
                         android.widget.Toast.makeText(this, "Local event history cleared.", android.widget.Toast.LENGTH_SHORT).show()
                     } else {
-                        android.widget.Toast.makeText(this, "History was not cleared. Disarm protection first or retry after checking storage.", android.widget.Toast.LENGTH_LONG).show()
+                        android.widget.Toast.makeText(this, "History clearing was blocked or incomplete; some entries may already have been removed. Confirm protection is DISARMED and review storage before retrying.", android.widget.Toast.LENGTH_LONG).show()
                     }
                     render()
                 }.showThemed(this)
