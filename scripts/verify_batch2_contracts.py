@@ -58,6 +58,13 @@ checks = {
         and "KEY_A2_BOOT_BASELINE_READY" in (APP / "ProtectionMonitorService.kt").read_text(encoding="utf-8")
         and "resetBaselineForBoot(context)" in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
         and "resetBaselineForBoot(this)" in (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8"),
+    "A2 boot reset marks the baseline unavailable before disabling its manifest receiver":
+        (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8").index(
+            "val markedNotReady = commitWithOneRetry"
+        ) < (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8").index(
+            "val receiverDisabled = setComponentEnabled(app, false)"
+        )
+        and "if (!markedNotReady || !receiverDisabled)" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8"),
     "A2 deadline callback retries when the protection-state commit fails":
         "fun scheduleRetry(context: Context, pending: Pending" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
         and "A2DisconnectScheduler.scheduleRetry(context, pending, 1_000L)" in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8"),
