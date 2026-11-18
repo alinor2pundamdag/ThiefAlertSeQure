@@ -12,8 +12,12 @@ class A2SetupStatusPolicyTest {
         monitorEnabled: Boolean = true,
         monitorRunning: Boolean = true,
         baselines: Int = 1,
-        bootIdentityAvailable: Boolean = true
-    ) = A2SetupStatusPolicy.evaluate(a2, trusted, permission, adapter, monitorEnabled, monitorRunning, baselines, bootIdentityAvailable)
+        bootIdentityAvailable: Boolean = true,
+        bootBaselineReady: Boolean = true
+    ) = A2SetupStatusPolicy.evaluate(
+        a2, trusted, permission, adapter, monitorEnabled, monitorRunning, baselines,
+        bootIdentityAvailable, bootBaselineReady
+    )
 
     @Test fun disabledA2IsNeutral() {
         assertEquals(SetupState.NEUTRAL, evaluate(a2 = false).state)
@@ -57,6 +61,12 @@ class A2SetupStatusPolicyTest {
         val item = evaluate(bootIdentityAvailable = false)
         assertEquals(SetupState.UNKNOWN, item.state)
         assert(item.detail.contains("boot identity"))
+    }
+
+    @Test fun pendingBootBaselineNeverAppearsVerified() {
+        val item = evaluate(bootBaselineReady = false)
+        assertEquals(SetupState.UNKNOWN, item.state)
+        assert(item.detail.contains("baseline reset"))
     }
 
     @Test fun verifiedRequiresEveryPrerequisite() {
