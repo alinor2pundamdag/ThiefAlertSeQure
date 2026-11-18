@@ -107,6 +107,10 @@ required = {
     "privacy notice explains unencrypted Gallery visibility and optional encryption":
         "unencrypted" in privacy.lower() and "Gallery" in privacy
         and "future captures" in privacy and "visible to Gallery and other apps" in privacy,
+    "review privacy notice clears the active versioned acknowledgement":
+        "PRIVACY_NOTICE_PREFS" in main
+        and "MainActivity.PRIVACY_NOTICE_PREFS" in settings
+        and "privacy_notice_v5" not in settings,
     "camera privacy notice and policy preserve explicit opt-in and no-upload boundary":
         "front-camera photo evidence" in main
         and "CAMERA permission is requested only after you choose Enable" in settings
