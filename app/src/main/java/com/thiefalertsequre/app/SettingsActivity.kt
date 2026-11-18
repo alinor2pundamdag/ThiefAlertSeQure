@@ -1229,7 +1229,9 @@ class SettingsActivity : FragmentActivity() {
                     }
                     output.toByteArray()
                 } ?: error("Android could not open the selected configuration backup file.")
-                ConfigurationBackup.decryptAndRestore(this, bytes, password) { applyRestoredConfiguration() }
+                val restored = ConfigurationBackup.decryptAndRestore(this, bytes, password)
+                applyRestoredConfiguration()
+                restored
             }.also { password.fill('\u0000') }
             runOnUiThread {
                 result.onSuccess { count ->
@@ -1265,6 +1267,9 @@ class SettingsActivity : FragmentActivity() {
             monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
         if (monitorEnabled) {
+            // resetBaselineToCurrentPower is itself serialized against alarm and
+            // charger transitions. If state became active after the import commit,
+            // it rejects the reset and the monitor is still refreshed safely.
             PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Owner restored configuration backup")
             runCatching {
                 ContextCompat.startForegroundService(
@@ -1272,12 +1277,20 @@ class SettingsActivity : FragmentActivity() {
                 )
             }
         } else {
-            runCatching {
+            // Never stop the monitor if a countdown/armed state began between
+            // the preference commit and this post-restore synchronization.
+            val stopRequested = ProtectionStore(this).runIfDisarmed {
                 ContextCompat.startForegroundService(
                     this,
                     Intent(this, ProtectionMonitorService::class.java)
                         .setAction(ProtectionMonitorService.ACTION_STOP)
                         .putExtra(ProtectionMonitorService.EXTRA_STOP_PREFERENCE_COMMITTED, true)
+                )
+            } != null
+            if (!stopRequested) {
+                LocalTamperHistory.record(
+                    this, "configuration_restore_monitor_stop_deferred",
+                    "Protection became active after restore; monitor stop was deferred to preserve active protection"
                 )
             }
         }
