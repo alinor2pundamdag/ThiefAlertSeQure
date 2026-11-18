@@ -350,13 +350,14 @@ private fun SeismicGenesisIntroContent(
         label = "twenty-light-colors"
     )
     val developerName = "Alinor Pundamdag"
+    val effectiveSpectrumPosition = if (reducedMotion) 0f else spectrumPosition
     val concreteName = buildAnnotatedString { append(developerName) }
     val coloredName = buildAnnotatedString {
         developerName.forEachIndexed { index, character ->
             if (character.isWhitespace()) {
                 append(character)
             } else {
-                val phase = (spectrumPosition + index * 0.62f) % 20f
+                val phase = (effectiveSpectrumPosition + index * 0.62f) % 20f
                 val colorIndex = floor(phase).toInt().coerceIn(0, 19)
                 val first = Color.hsv(colorIndex * 18f, 0.42f, 1f)
                 val second = Color.hsv(((colorIndex + 1) % 20) * 18f, 0.42f, 1f)
