@@ -17,6 +17,7 @@ camera_capture = (APP / "CameraEvidenceCapture.kt").read_text(encoding="utf-8")
 camera_policy = (APP / "CameraEvidencePolicy.kt").read_text(encoding="utf-8")
 camera_media = (APP / "CameraEvidenceMediaStore.kt").read_text(encoding="utf-8")
 settings = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
+camera_settings = settings[settings.index("CAMERA EVIDENCE STORAGE"):]
 privacy = (ROOT / "docs/PRIVACY_POLICY.md").read_text(encoding="utf-8")
 main = (APP / "MainActivity.kt").read_text(encoding="utf-8")
 intro = (APP / "SeismicGenesisIntroActivity.kt").read_text(encoding="utf-8")
@@ -111,10 +112,10 @@ required = {
         and camera_vault.index("val allDeleted = files.all")
         < camera_vault.index("if (!prefs.edit().remove(KEY_INDEX).commit()) return false"),
     "encrypted photo vault enumeration and integrity checks stay off the Settings UI thread":
-        "CameraEvidenceVault.entries(applicationContext)" in settings
-        and "CameraEvidenceVault.entries(this)" not in settings
-        and settings.index("ioExecutor.execute {", settings.index("CAMERA EVIDENCE STORAGE"))
-        < settings.index("CameraEvidenceVault.entries(applicationContext)"),
+        "CameraEvidenceVault.entries(applicationContext)" in camera_settings
+        and "CameraEvidenceVault.entries(this)" not in camera_settings
+        and camera_settings.index("ioExecutor.execute {")
+        < camera_settings.index("CameraEvidenceVault.entries(applicationContext)"),
     "configuration backup schema 2 includes the storage preference and accepts schema 1":
         '"camera_evidence_settings", "encrypt_new_photos"' in configuration
         and 'put("schema", 2)' in configuration
