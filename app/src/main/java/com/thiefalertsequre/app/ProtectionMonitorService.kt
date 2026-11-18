@@ -151,19 +151,24 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                             }
                         }
                         pendingBluetoothRunnables[address] = runnable
-                        val durableScheduled = A2DisconnectScheduler.schedule(
-                            this@ProtectionMonitorService,
-                            A2DisconnectScheduler.Pending(
-                                address = address,
-                                eventEpochMs = eventEpochMs,
-                                eventElapsedRealtimeMs = eventElapsedRealtimeMs,
-                                bootCount = ProtectionClock.bootCount(this@ProtectionMonitorService),
-                                monitorRevision = monitorRevision,
-                                deviceRevision = deviceRevision
-                            )
+                        val pendingDeadline = A2DisconnectScheduler.Pending(
+                            address = address,
+                            eventEpochMs = eventEpochMs,
+                            eventElapsedRealtimeMs = eventElapsedRealtimeMs,
+                            bootCount = ProtectionClock.bootCount(this@ProtectionMonitorService),
+                            monitorRevision = monitorRevision,
+                            deviceRevision = deviceRevision
                         )
+                        val durableScheduled = A2DisconnectScheduler.schedule(this@ProtectionMonitorService, pendingDeadline)
                         if (!durableScheduled) {
-                            LocalTamperHistory.record(context, "a2_durable_deadline_unavailable", "Using the in-process grace timer because the durable A2 deadline could not be scheduled")
+                            val retryScheduled = A2DisconnectScheduler.scheduleRetry(
+                                this@ProtectionMonitorService, pendingDeadline, 1_000L
+                            )
+                            LocalTamperHistory.record(
+                                context, "a2_durable_deadline_unavailable",
+                                if (retryScheduled) "Using the in-process grace timer while the retained encrypted A2 deadline retries in one second"
+                                else "Using the in-process grace timer; the encrypted A2 deadline remains for monitor-startup recovery"
+                            )
                         }
                         handler.postAtTime(
                             runnable,
@@ -450,6 +455,17 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         PowerTransitionCoordinator.initializeBaseline(this)
         PowerTransitionReceiver.enqueuePendingRecovery(this)
         reconcileStablePowerState()
+        if (ProtectionStore(this).read().mode == ProtectionMode.ARMED &&
+            SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false)
+        ) {
+            val recoveredDeadlines = A2DisconnectScheduler.reschedulePending(this)
+            if (recoveredDeadlines > 0) {
+                LocalTamperHistory.record(
+                    this, "a2_deadlines_recovered",
+                    "Re-armed $recoveredDeadlines encrypted trusted-device grace deadline(s) after monitor startup"
+                )
+            }
+        }
         syncMotionSensor()
         LocalTamperHistory.record(this, "monitor_started", "Persistent foreground charger monitor active; motion sensing is armed-state only")
         return START_STICKY
