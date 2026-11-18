@@ -442,6 +442,7 @@ internal object CameraEvidenceMediaStore {
                 collection, projection, selection, args, "${MediaStore.Images.Media.DATE_TAKEN} DESC"
             ) ?: return QueryResult(false, emptyList())
             val images = mutableListOf<Pair<Uri, Long>>()
+            val seenLegacyEntries = mutableSetOf<LegacyOwnershipEntry>()
             var unverifiedLegacyCount = 0
             cursor.use {
                 val idCol = it.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
@@ -464,12 +465,18 @@ internal object CameraEvidenceMediaStore {
                         unverifiedLegacyCount += 1
                     }
                     if (generatedName && ownerMatches) {
+                        if (Build.VERSION.SDK_INT < 29) seenLegacyEntries += LegacyOwnershipEntry(id, displayName)
                         val taken = it.getLong(takenCol)
                         val added = it.getLong(addedCol)
                         val timestamp = if (taken > 0L) taken else added * 1_000L
                         val uri = collection.buildUpon().appendPath(id).build()
                         images += uri to timestamp
                     }
+                }
+            }
+            if (Build.VERSION.SDK_INT < 29 && seenLegacyEntries != legacyIndex) {
+                if (!writeLegacyIndex(context, seenLegacyEntries)) {
+                    android.util.Log.w("CameraEvidenceMediaStore", "Could not reconcile stale legacy Gallery ownership-index rows")
                 }
             }
             QueryResult(true, images, unverifiedLegacyCount)
