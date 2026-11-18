@@ -44,6 +44,16 @@ class SettingsActivity : FragmentActivity() {
     private var pendingCameraEvidenceExportId: String? = null
     private var requestedSection: String? = null
     private val sectionAnchors = mutableMapOf<String, View>()
+    private var protectionStateReceiverRegistered = false
+    private val protectionStateReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context, intent: Intent?) {
+            if (ProtectionStore(this@SettingsActivity).read().mode != ProtectionMode.DISARMED) {
+                // The alarm service now owns all audible and torch outputs.
+                stopPreview()
+                stopFlashPreview()
+            }
+        }
+    }
     private val pickSoundFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) validateAndSaveSound(uri, soundSlot, uri)
     }
@@ -125,6 +135,27 @@ class SettingsActivity : FragmentActivity() {
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { renderStatus() }
+    override fun onStart() {
+        super.onStart()
+        if (!protectionStateReceiverRegistered) {
+            ContextCompat.registerReceiver(
+                this,
+                protectionStateReceiver,
+                android.content.IntentFilter(ProtectionStore.ACTION_STATE_CHANGED),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            protectionStateReceiverRegistered = true
+        }
+    }
+
+    override fun onStop() {
+        if (protectionStateReceiverRegistered) {
+            runCatching { unregisterReceiver(protectionStateReceiver) }
+            protectionStateReceiverRegistered = false
+        }
+        super.onStop()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestedSection = intent.getStringExtra(EXTRA_SECTION)
