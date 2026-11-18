@@ -292,8 +292,34 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                         this, "Monitoring is OFF, but trusted-device cleanup needs attention. Reopen Bluetooth settings to review it."
                     )
                 }
-                stopSelf()
-                START_NOT_STICKY
+                val mayStop = ProtectionStore(this).runIfDisarmed {
+                    val stillDisabled = !SafePreferences.boolean(
+                        prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+                    )
+                    if (stillDisabled) {
+                        // Linearize stop against a newer owner re-enable action.
+                        stopSelf()
+                        true
+                    } else false
+                }
+                if (mayStop == true) {
+                    START_NOT_STICKY
+                } else {
+                    val currentMode = ProtectionStore(this).read().mode
+                    if (!ProtectionMonitorPolicy.canStop(currentMode) &&
+                        !SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+                    ) {
+                        prefs.edit().putBoolean(KEY_ENABLED, true).commit()
+                    }
+                    if (SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
+                        A2BluetoothReceiverController.ensureBaselineReady(this)
+                    }
+                    LocalTamperHistory.record(
+                        this, "stale_monitor_stop_ignored",
+                        "A newer owner re-enable or active protection state superseded the monitor stop cleanup"
+                    )
+                    START_STICKY
+                }
             }
             StopRequestResult.STALE -> {
                 LocalTamperHistory.record(
