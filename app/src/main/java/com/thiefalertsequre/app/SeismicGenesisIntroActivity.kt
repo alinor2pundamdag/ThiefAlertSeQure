@@ -191,6 +191,14 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
     }
 
     private fun complete() {
+        // Re-check at the commit boundary: protection may have changed since the
+        // last periodic guard tick. Do not mark this version's intro complete
+        // while protection is active; MainActivity must handle recovery first.
+        val currentMode = runCatching { ProtectionStore(this).read().mode }.getOrNull()
+        if (currentMode != ProtectionMode.DISARMED) {
+            openMain()
+            return
+        }
         val saved = getSharedPreferences(PREFS, MODE_PRIVATE).edit()
             .putBoolean(KEY_COMPLETED, true)
             .putLong(AppLaunchIntroPolicy.KEY_COMPLETED_VERSION_CODE, AppLaunchIntroPolicy.currentVersionCode(this))
