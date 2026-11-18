@@ -9,7 +9,8 @@ object ProtectionMonitorPolicy {
     const val DEFAULT_MOTION_ENABLED = false
 
     fun shouldRun(enabled: Boolean, mode: ProtectionMode): Boolean =
-        enabled && mode != ProtectionMode.ALARM_TRIGGERED
+        mode == ProtectionMode.ARMED || mode == ProtectionMode.COUNTDOWN ||
+            (enabled && mode == ProtectionMode.DISARMED)
 
     /** A stale UI stop must not overwrite a newer owner re-enable preference. */
     fun shouldApplyStopRequest(preferenceAlreadyCommitted: Boolean, monitorEnabled: Boolean): Boolean =
