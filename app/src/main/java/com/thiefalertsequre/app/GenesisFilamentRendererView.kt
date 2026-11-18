@@ -30,7 +30,9 @@ import com.google.android.filament.Viewport
 import com.google.android.filament.android.FilamentHelper
 import com.google.android.filament.android.UiHelper
 import com.google.android.filament.filamat.MaterialBuilder
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -171,11 +173,25 @@ class GenesisFilamentRendererView(
                 setParameter("baseColor", Colors.RgbType.SRGB, 0.34f, 0.43f, 0.52f)
                 setParameter("metallic", 0.92f)
                 setParameter("roughness", 0.22f)
+                setParameter("emissiveColor", 0f, 0f, 0f)
             }
             debrisMaterial = pbrMaterial?.createInstance()?.apply {
                 setParameter("baseColor", Colors.RgbType.SRGB, 0.30f, 0.32f, 0.34f)
                 setParameter("metallic", 0.18f)
                 setParameter("roughness", 0.86f)
+                setParameter("emissiveColor", 0f, 0f, 0f)
+            }
+            titleMaterial = pbrMaterial?.createInstance()?.apply {
+                setParameter("baseColor", Colors.RgbType.SRGB, 0.88f, 0.035f, 0.025f)
+                setParameter("metallic", 0.48f)
+                setParameter("roughness", 0.34f)
+                setParameter("emissiveColor", 0.12f, 0.002f, 0.001f)
+            }
+            coreMaterial = pbrMaterial?.createInstance()?.apply {
+                setParameter("baseColor", Colors.RgbType.SRGB, 0.95f, 0.035f, 0.015f)
+                setParameter("metallic", 0.35f)
+                setParameter("roughness", 0.2f)
+                setParameter("emissiveColor", 3.5f, 0.04f, 0.012f)
             }
 
             val shieldOutline = listOf(
@@ -188,6 +204,16 @@ class GenesisFilamentRendererView(
             scene?.addEntity(shieldMesh!!.entity)
             createFractureBodies(shieldOutline)
 
+            val coreOutline = (0 until 12).map { index ->
+                val angle = index * (2.0 * PI / 12.0)
+                Point2(cos(angle).toFloat() * 0.19f, sin(angle).toFloat() * 0.19f)
+            }
+            coreMesh = createExtrudedMesh(coreOutline, 0.13f, coreMaterial!!)
+            scene?.addEntity(coreMesh!!.entity)
+
+            titleBodies += createTextBodies("Developed By:", titleMaterial!!, 2.35f, -2.0f, 0.82f)
+            nameBodies += createTextBodies("Alinor Pundamdag", debrisMaterial!!, 2.25f, -2.35f, 0.08f)
+
             lightEntity = EntityManager.get().create()
             LightManager.Builder(LightManager.Type.DIRECTIONAL)
                 .color(0.82f, 0.88f, 1.0f)
@@ -196,6 +222,15 @@ class GenesisFilamentRendererView(
                 .castShadows(true)
                 .build(activeEngine, lightEntity)
             scene?.addEntity(lightEntity)
+
+            coreLightEntity = EntityManager.get().create()
+            LightManager.Builder(LightManager.Type.POINT)
+                .position(0f, 0f, 0.28f)
+                .color(1f, 0.035f, 0.012f)
+                .intensity(2_400f)
+                .falloff(2.6f)
+                .build(activeEngine, coreLightEntity)
+            scene?.addEntity(coreLightEntity)
 
             camera?.setExposure(16.0f, 1.0f / 125.0f, 100.0f)
             camera?.lookAt(0.0, 0.0, 5.4, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
@@ -231,9 +266,11 @@ class GenesisFilamentRendererView(
                 }
                 helper.attachTo(this)
             }
+            isReady = true
         } catch (error: Throwable) {
             android.util.Log.e("Genesis3D", "Filament scene initialization failed", error)
             release()
+            post { onInitializationFailed?.invoke() }
         }
     }
 
@@ -247,6 +284,7 @@ class GenesisFilamentRendererView(
                 .uniformParameter(MaterialBuilder.UniformType.FLOAT3, "baseColor")
                 .uniformParameter(MaterialBuilder.UniformType.FLOAT, "metallic")
                 .uniformParameter(MaterialBuilder.UniformType.FLOAT, "roughness")
+                .uniformParameter(MaterialBuilder.UniformType.FLOAT3, "emissiveColor")
                 .material(
                     """
                     void material(inout MaterialInputs material) {
@@ -254,6 +292,7 @@ class GenesisFilamentRendererView(
                         material.baseColor.rgb = materialParams.baseColor;
                         material.metallic = materialParams.metallic;
                         material.roughness = materialParams.roughness;
+                        material.emissive = materialParams.emissiveColor;
                         material.clearCoat = 0.28;
                         material.clearCoatRoughness = 0.24;
                     }
