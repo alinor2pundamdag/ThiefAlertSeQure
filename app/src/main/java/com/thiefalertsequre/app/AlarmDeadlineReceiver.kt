@@ -91,7 +91,9 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             return
         }
         if (nowElapsed < pending.deadlineElapsedRealtimeMs) {
-            A2DisconnectScheduler.schedule(context, pending)
+            if (!A2DisconnectScheduler.schedule(context, pending)) {
+                A2DisconnectScheduler.scheduleRetry(context, pending, 1_000L)
+            }
             return
         }
 
