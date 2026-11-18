@@ -143,7 +143,7 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         PowerTransitionCoordinator.initializeBaseline(context)
 
         val token = intent.data?.lastPathSegment ?: return
-        val state = ProtectionStore(context).read()
+        var state = ProtectionStore(context).read()
 
         // Recovery callbacks are distinct from countdown callbacks and may only
         // restart an already-latched alarm.
@@ -175,13 +175,25 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             (state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN)
         ) {
             // A stale/OEM preference must never disarm active protection. Repair
-            // the preference and continue validating the authoritative deadline.
-            if (!monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()) {
+            // it only while the same active protection state remains authoritative.
+            val repaired = ProtectionStore(context).runIfProtectionActive {
+                monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
+            }
+            if (repaired == false) {
                 LocalTamperHistory.record(
                     context, "active_monitor_preference_repair_failed",
                     "Active protection remains authoritative; the monitor-enabled preference could not be restored"
                 )
                 if (state.mode == ProtectionMode.COUNTDOWN) AlarmScheduler.scheduleRetry(context, 1_000L)
+                return
+            }
+            state = ProtectionStore(context).read()
+            if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
+                startAlarm(context, "Alarm became latched during monitor preference repair")
+                return
+            }
+            if (state.mode != ProtectionMode.COUNTDOWN) {
+                if (state.mode == ProtectionMode.DISARMED) AlarmScheduler.cancel(context)
                 return
             }
         }
