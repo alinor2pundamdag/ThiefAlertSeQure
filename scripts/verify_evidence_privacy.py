@@ -155,7 +155,9 @@ required = {
         and "?: return QueryResult(false, emptyList())" in camera_media,
     "existing Gallery photos can be migrated only after encrypted read-back verification":
         "migrateAllToEncryptedVault" in camera_media
-        and "CameraEvidenceVault.save(app, original, timestamp)" in camera_media
+        and "CameraEvidenceVault.saveForMigration(app, original, timestamp)" in camera_media
+        and "fun saveForMigration(" in camera_vault
+        and "if (retained.size >= CameraEvidencePolicy.MAX_IMAGES) return@synchronized false" in camera_vault
         and "CameraEvidenceVault.read(app, entry.id)" in camera_media
         and "MessageDigest.isEqual(original, verified)" in camera_media
         and "pendingDeletions += uri to sha256(original)" in camera_media
