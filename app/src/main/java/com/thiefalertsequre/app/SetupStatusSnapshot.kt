@@ -52,6 +52,7 @@ object SetupStatusSnapshot {
    protectionMode==ProtectionMode.ALARM_TRIGGERED->SetupItem("monitor","Protection monitor",SetupState.NEUTRAL,"The latched alarm is handled by AlarmService.")
    !enabled&&protectionMode==ProtectionMode.DISARMED->SetupItem("monitor","Protection monitor",SetupState.NEUTRAL,"Monitor is disabled by owner while protection is disarmed.")
    running->SetupItem("monitor","Protection monitor",SetupState.VERIFIED,if(enabled)"Android process list confirms the service is running." else "Active protection requires the monitor; it remains running until protection is disarmed.")
+   protectionMode==ProtectionMode.ARMED||protectionMode==ProtectionMode.COUNTDOWN->SetupItem("monitor","Protection monitor",SetupState.ACTION_REQUIRED,"Active protection requires a running monitor, but Android does not confirm that the service is running.")
    else->SetupItem("monitor","Protection monitor",SetupState.UNKNOWN,"Enabled preference exists, but running service is not confirmed.")
   }
   when (val registry=TrustedBluetoothRegistry.readResult(prefs)) {
