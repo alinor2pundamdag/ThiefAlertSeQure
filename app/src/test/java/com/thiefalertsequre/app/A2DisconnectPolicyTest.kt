@@ -21,10 +21,12 @@ class A2DisconnectPolicyTest {
             A2DisconnectPolicy.isSameBoot(4, 4, 13_000L, 12_000L))
     }
 
-    @Test fun elapsedRealtimeDetectsRebootWhenBootCountUnavailable() {
-        assertTrue(A2DisconnectPolicy.isSameBoot(-1, -1, 12_000L, 13_000L))
+    @Test fun unknownBootCountsCannotProveSameBootFromElapsedTimeAlone() {
+        // A reboot may already have accumulated more uptime than the old event.
+        assertFalse(A2DisconnectPolicy.isSameBoot(-1, -1, 12_000L, 13_000L))
         assertFalse(A2DisconnectPolicy.isSameBoot(-1, -1, 12_000L, 500L))
         assertFalse(A2DisconnectPolicy.isSameBoot(4, -1, 12_000L, 13_000L))
+        assertFalse(A2DisconnectPolicy.isSameBoot(-1, 4, 12_000L, 13_000L))
     }
 
     @Test fun gracePeriodRequiresEnabledTrustedDeviceWithConfirmedBaselineWhileArmed() {
