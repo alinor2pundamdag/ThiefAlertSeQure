@@ -1,6 +1,11 @@
 package com.thiefalertsequre.app
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.Typeface
 import android.opengl.Matrix as GlMatrix
 import android.view.Choreographer
 import android.view.Surface
@@ -25,7 +30,9 @@ import com.google.android.filament.Viewport
 import com.google.android.filament.android.FilamentHelper
 import com.google.android.filament.android.UiHelper
 import com.google.android.filament.filamat.MaterialBuilder
+import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.sin
 import kotlin.math.sqrt
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -40,6 +47,13 @@ import java.nio.ByteOrder
 class GenesisFilamentRendererView(context: Context) : TextureView(context) {
     private data class Point2(val x: Float, val y: Float)
     private data class Mesh(val entity: Int, val vertexBuffer: VertexBuffer, val indexBuffer: IndexBuffer)
+    private data class LetterBody(
+        val body: Body,
+        val homeX: Float,
+        val homeY: Float,
+        val startY: Float,
+        val fallVelocity: Float
+    )
     private data class Body(
         val mesh: Mesh,
         var x: Float,
@@ -75,8 +89,16 @@ class GenesisFilamentRendererView(context: Context) : TextureView(context) {
     private var pbrMaterial: Material? = null
     private var shieldMaterial: com.google.android.filament.MaterialInstance? = null
     private var debrisMaterial: com.google.android.filament.MaterialInstance? = null
+    private var titleMaterial: com.google.android.filament.MaterialInstance? = null
+    private var coreMaterial: com.google.android.filament.MaterialInstance? = null
     private var shieldMesh: Mesh? = null
+    private var coreMesh: Mesh? = null
     private val bodies = mutableListOf<Body>()
+    private val titleBodies = mutableListOf<LetterBody>()
+    private val nameBodies = mutableListOf<LetterBody>()
+    private var titleAdded = false
+    private var nameAdded = false
+    private var coreLightEntity = 0
     private var lightEntity = 0
     private var currentProgress = 0f
     private var lastPhysicsProgress = 0f
@@ -85,6 +107,8 @@ class GenesisFilamentRendererView(context: Context) : TextureView(context) {
     private var released = false
     private var surfaceWidth = 1
     private var surfaceHeight = 1
+    private var isReady = false
+    private val onInitializationFailed: (() -> Unit)? = null
 
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
