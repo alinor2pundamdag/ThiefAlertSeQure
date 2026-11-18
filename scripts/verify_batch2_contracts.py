@@ -157,7 +157,7 @@ checks = {
         and "protectionStateReceiver" in settings
         and "stopPreview()" in settings and "stopFlashPreview()" in settings,
     "Filament cleanup attempts every scene resource even after an individual destroy failure":
-        "private fun destroyMesh" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
+        "fun destroyMesh(mesh: Mesh)" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
         and 'attempt("Filament engine")' in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
         and "catch (error: Throwable)" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8"),
     "configuration preferences commit only while disarmed and monitor stop is guarded against active state":
