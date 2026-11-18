@@ -116,6 +116,15 @@ required = {
         "if (!query.success) return false" in camera_media
         and "query.images.forEach" in camera_media
         and "?: return QueryResult(false, emptyList())" in camera_media,
+    "existing Gallery photos can be migrated only after encrypted read-back verification":
+        "migrateAllToEncryptedVault" in camera_media
+        and "CameraEvidenceVault.save(app, original, timestamp)" in camera_media
+        and "CameraEvidenceVault.read(app, entry.id)" in camera_media
+        and "MessageDigest.isEqual(original, verified)" in camera_media
+        and "MessageDigest.isEqual(original, currentSource)" in camera_media
+        and "ProtectionStore(app).runIfDisarmed" in camera_media
+        and "Encrypt existing Gallery photos into the private vault" in camera_settings
+        and "originalsRemoved" in camera_media,
     "owner can view/export encrypted photos and delete both app-managed stores":
         "showCameraEvidenceArchive" in settings and "exportCameraEvidence.launch" in settings
         and "CameraEvidenceVault.delete(applicationContext, entry.id)" in settings
