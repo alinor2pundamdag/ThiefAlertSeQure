@@ -205,6 +205,10 @@ checks = {
         "canResetBaseline(currentState.mode)" in (APP / "PowerTransitionCoordinator.kt").read_text(encoding="utf-8")
         and "mode == ProtectionMode.DISARMED" in (APP / "PowerTransitionRecoveryPolicy.kt").read_text(encoding="utf-8")
         and "baselineResetIsAllowedOnlyWhenProtectionIsDisarmed" in (ROOT / "app/src/test/java/com/thiefalertsequre/app/PowerTransitionRecoveryPolicyTest.kt").read_text(encoding="utf-8"),
+    "active armed/countdown protection retains the foreground monitor despite a stale OFF preference":
+        "mode == ProtectionMode.ARMED || mode == ProtectionMode.COUNTDOWN" in (APP / "ProtectionMonitorPolicy.kt").read_text(encoding="utf-8")
+        and "shouldRun(false, ProtectionMode.ARMED)" in (ROOT / "app/src/test/java/com/thiefalertsequre/app/ProtectionMonitorPolicyTest.kt").read_text(encoding="utf-8")
+        and "shouldRun(false, ProtectionMode.COUNTDOWN)" in (ROOT / "app/src/test/java/com/thiefalertsequre/app/ProtectionMonitorPolicyTest.kt").read_text(encoding="utf-8"),
     "charger countdown remains exactly ten seconds":
         "const val COUNTDOWN_MS = 10_000L" in engine,
 }
