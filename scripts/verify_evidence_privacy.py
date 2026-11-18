@@ -117,9 +117,11 @@ required = {
         and "RETENTION_MS = 30L" in camera_policy
         and "CameraEvidencePolicy.isRetained" in camera_media
         and "CameraEvidencePolicy.MAX_IMAGES" in camera_media,
-    "Gallery management only targets exact app-generated photo filenames":
+    "Gallery management requires exact app-generated names and MediaStore owner attribution where supported":
         "OWNED_IMAGE_NAME = Regex" in camera_media
-        and "if (OWNED_IMAGE_NAME.matches(displayName)) {" in camera_media
+        and "if (ownerMatches && OWNED_IMAGE_NAME.matches(displayName)) {" in camera_media
+        and "MediaStore.MediaColumns.OWNER_PACKAGE_NAME" in camera_media
+        and "it.getString(ownerCol) == context.packageName" in camera_media
         and "getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)" in camera_media,
     "active protection hides private photos and blocks plaintext evidence export":
         "private fun showCameraEvidenceArchive() {\n        if (!requireProtectionDisarmed()) return" in settings
