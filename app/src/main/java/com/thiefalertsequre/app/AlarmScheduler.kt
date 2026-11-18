@@ -177,8 +177,10 @@ object AlarmScheduler {
         when (val stored = SafePreferences.readString(prefs, KEY_LAST_TOKEN, null)) {
             is PreferenceRead.Value -> {
                 stored.value?.let { alarmManager.cancel(pendingIntent(context, it, namespace)) }
-                if (!prefs.edit().remove(KEY_LAST_TOKEN).commit()) {
-                    LocalTamperHistory.record(context, "deadline_token_clear_failed", "Scheduled alarm token could not be removed from preferences")
+                var cleared = prefs.edit().remove(KEY_LAST_TOKEN).commit()
+                if (!cleared) cleared = prefs.edit().remove(KEY_LAST_TOKEN).commit()
+                if (!cleared) {
+                    LocalTamperHistory.record(context, "deadline_token_clear_failed", "Scheduled alarm token could not be removed from preferences after one retry")
                 }
             }
             is PreferenceRead.Corrupt -> LocalTamperHistory.record(
