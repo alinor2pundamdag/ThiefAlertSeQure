@@ -592,7 +592,7 @@ class SettingsActivity : FragmentActivity() {
                 if (!isFinishing && !isDestroyed && root === evidenceRenderRoot) {
                     galleryEvidenceCount = galleryCount
                     cameraEvidenceStatus.text =
-                        "Front-camera photo evidence: ${when { !frontCameraAvailable -> "UNSUPPORTED"; cameraEvidenceEnabled && cameraPermissionGranted -> "ON"; cameraEvidenceEnabled -> "NEEDS CAMERA PERMISSION"; else -> "OFF" }} • new photos: ${if (encryptNewPhotos) "ENCRYPTED PRIVATE VAULT" else "GALLERY (UNENCRYPTED)"} • $cameraEvidenceCount encrypted / $galleryEvidenceCount Gallery • vault integrity ${if (cameraEvidenceIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}"
+                        "Front-camera photo evidence: ${when { !frontCameraAvailable -> "UNSUPPORTED"; cameraEvidenceEnabled && !cameraPermissionGranted -> "NEEDS CAMERA PERMISSION"; cameraEvidenceEnabled && !galleryStoragePermissionGranted -> "NEEDS GALLERY PERMISSION"; cameraEvidenceEnabled -> "ON"; else -> "OFF" }} • new photos: ${if (encryptNewPhotos) "ENCRYPTED PRIVATE VAULT" else "GALLERY (UNENCRYPTED)"} • $cameraEvidenceCount encrypted / $galleryEvidenceCount Gallery • vault integrity ${if (cameraEvidenceIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}"
                 }
             }
         }
