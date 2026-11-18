@@ -126,32 +126,42 @@ object PowerTransitionCoordinator {
         }
     }
 
-    /** Establish a fresh non-transition baseline when the owner re-enables monitoring. */
+    /** Establish a fresh non-transition baseline only inside an atomic DISARMED-state transaction. */
     fun resetBaselineToCurrentPower(context: Context, reason: String) = synchronized(lock) {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val store = ProtectionStore(context)
-        val currentState = store.read()
-        if (!PowerTransitionRecoveryPolicy.canResetBaseline(currentState.mode)) {
+        val reset = store.runIfDisarmed {
+            check(PowerTransitionRecoveryPolicy.canResetBaseline(store.read().mode))
+            resetBaselineToCurrentPowerWhileDisarmed(context, reason, store)
+        }
+        if (reset == null) {
+            val mode = store.read().mode
             LocalTamperHistory.record(
                 context,
                 "power_baseline_reset_rejected",
-                "$reason; protection mode ${currentState.mode} is active and was preserved"
+                "$reason; protection mode $mode is active and was preserved"
             )
-            return@synchronized
         }
+    }
 
+    /**
+     * Caller holds both the coordinator lock and ProtectionStore's DISARMED
+     * transaction lock. Alarm deadlines and charger transitions cannot change
+     * protection mode between the safety check and baseline/state persistence.
+     */
+    private fun resetBaselineToCurrentPowerWhileDisarmed(
+        context: Context,
+        reason: String,
+        store: ProtectionStore
+    ) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val connected = ExternalPowerState.readConnected(context)
         val generation = SafePreferences.long(prefs, GENERATION, 0L) + 1L
         if (connected == null) {
-            // Preserve an already-valid countdown; clearing KNOWN would make
-            // first-run migration discard it on the monitor's next startup.
-            val edit = prefs.edit()
-            if (currentState.mode != ProtectionMode.COUNTDOWN) {
-                edit.putBoolean(KNOWN, false)
-                    .putBoolean(CONNECTED, false)
-                    .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
-            }
-            val saved = edit.putLong(GENERATION, generation)
+            val saved = prefs.edit()
+                .putBoolean(KNOWN, false)
+                .putBoolean(CONNECTED, false)
+                .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
+                .putLong(GENERATION, generation)
                 .putBoolean(PENDING_DISCONNECT, false)
                 .remove(PENDING_EPOCH_MS)
                 .remove(PENDING_ELAPSED_MS)
@@ -159,23 +169,23 @@ object PowerTransitionCoordinator {
                 .remove(PENDING_GENERATION)
                 .commit()
             if (!saved) {
-                LocalTamperHistory.record(context, "power_baseline_unknown_persist_failed", "$reason; prior baseline retained because unknown state could not be persisted")
+                LocalTamperHistory.record(context, "power_baseline_reset_persist_failed", "$reason; power state unknown and baseline cleanup could not be committed")
             } else {
-                LocalTamperHistory.record(context, "power_baseline_unknown", "$reason; no new transition accepted until a reliable power state is available")
+                LocalTamperHistory.record(context, "power_baseline_reset_unknown", "$reason; live power state unknown; protection remains DISARMED")
             }
-            return@synchronized
+            return
         }
 
         if (!connected) {
-            // Disarm durably before changing the baseline. A failed state commit
-            // must never leave an ARMED state paired with a disconnected baseline.
+            // State is locked DISARMED; record the disconnected baseline without
+            // creating a countdown. A later confirmed connect may arm protection.
             val disarm = store.updatePersisted { current ->
                 if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
                 else ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
             }
             if (!disarm.persisted || disarm.state.mode == ProtectionMode.ALARM_TRIGGERED) {
                 LocalTamperHistory.record(context, "power_baseline_reset_state_failed", "$reason; protection state was not durably disarmed")
-                return@synchronized
+                return
             }
             val baselineSaved = prefs.edit()
                 .putBoolean(KNOWN, true)
@@ -197,7 +207,7 @@ object PowerTransitionCoordinator {
                 context, "power_baseline_reset",
                 "$reason; disconnected state recorded without creating a countdown; protection remains DISARMED until a new connect event"
             )
-            return@synchronized
+            return
         }
 
         confirmConnectedAndArmLocked(context, reason)
