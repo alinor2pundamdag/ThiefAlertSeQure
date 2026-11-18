@@ -16,6 +16,11 @@ internal object CameraEvidenceMediaStore {
     private const val DIRECTORY_NAME = "ThiefAlertSeQure"
     private val OWNED_IMAGE_NAME = Regex("^ThiefAlertSeQure-[0-9]{10,13}-[0-9a-f]{8}\\.jpg$")
     private val MIGRATION_LOCK = Any()
+    private const val LEGACY_INDEX_PREFS = "camera_gallery_ownership_v1"
+    private const val KEY_LEGACY_OWNED_IMAGES = "owned_images"
+    private const val LEGACY_INDEX_PURPOSE = "thiefalertsequre:legacy-gallery-ownership:v1"
+
+    private data class LegacyOwnershipEntry(val id: String, val name: String)
 
     data class MigrationResult(
         val enumerationSucceeded: Boolean,
@@ -26,7 +31,8 @@ internal object CameraEvidenceMediaStore {
         val capacityLimited: Int = 0,
         val vaultIntegrityVerified: Boolean = false,
         val blockedByProtection: Boolean = false,
-        val blockedByEncryptionSetting: Boolean = false
+        val blockedByEncryptionSetting: Boolean = false,
+        val unverifiedLegacyPhotos: Int = 0
     )
 
     @Synchronized
@@ -71,6 +77,14 @@ internal object CameraEvidenceMediaStore {
         }.getOrDefault(false)
         if (!written) {
             runCatching { resolver.delete(uri, null, null) }
+            return null
+        }
+        if (Build.VERSION.SDK_INT < 29 && !rememberLegacyImage(app, uri, fileName)) {
+            val removed = runCatching { resolver.delete(uri, null, null) == 1 }.getOrDefault(false)
+            LocalTamperHistory.record(
+                app, "legacy_gallery_ownership_index_failed",
+                "API 26–28 Gallery ownership could not be recorded securely; the just-created photo was ${if (removed) "removed" else "left visible but unmanaged"}"
+            )
             return null
         }
         runCatching { prune(context.applicationContext, now) }
