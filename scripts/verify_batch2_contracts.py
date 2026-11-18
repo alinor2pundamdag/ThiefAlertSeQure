@@ -94,6 +94,11 @@ checks = {
         "CameraManager.TorchCallback" in flash_controller
         and "alarm_flash_external_interruption" in flash_controller
         and "alarm_flash_output_unavailable" in flash_controller,
+    "primary alarm audio starts immediately after foreground promotion before optional lock/UI work":
+        alarm.index("startForeground(NOTIFICATION_ID, notification())")
+        < alarm.index("if (player == null && toneController == null) startAlarmAudio()")
+        < alarm.index("BatchThreeUiBridge.refresh(this)")
+        < alarm.index("lockDeviceIfAdminEnabled(alarmStartedAt)"),
     "optional flash failure remains independent of audio alarm":
         "Failure to access a flash unit never blocks or stops alarm audio" in alarm,
     "severe thermal status suppresses flash while preserving alarm audio":
