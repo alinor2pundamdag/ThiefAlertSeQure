@@ -110,6 +110,7 @@ internal object CameraEvidenceMediaStore {
         var removed = 0
         var copyFailures = 0
         var removalFailures = 0
+        var capacityLimitedDuringMigration = 0
         var blocked = false
         val pendingDeletions = mutableListOf<Pair<Uri, ByteArray>>() // URI plus SHA-256 digest, not the full photo bytes
 
@@ -121,9 +122,17 @@ internal object CameraEvidenceMediaStore {
                 copyFailures += 1
                 continue
             }
-            val entry = CameraEvidenceVault.save(app, original, timestamp)
+            val entry = CameraEvidenceVault.saveForMigration(app, original, timestamp)
             if (entry == null) {
-                copyFailures += 1
+                if (ProtectionStore(app).read().mode != ProtectionMode.DISARMED) {
+                    blocked = true
+                    break
+                }
+                if (CameraEvidenceVault.entries(app).size >= CameraEvidencePolicy.MAX_IMAGES) {
+                    capacityLimitedDuringMigration += 1
+                } else {
+                    copyFailures += 1
+                }
                 continue
             }
             val verified = CameraEvidenceVault.read(app, entry.id)
@@ -142,8 +151,9 @@ internal object CameraEvidenceMediaStore {
                 enumerationSucceeded = true,
                 copiedToVault = copied,
                 copyFailures = copyFailures,
-                capacityLimited = (query.images.size - selected.size).coerceAtLeast(0),
-                vaultIntegrityVerified = false
+                capacityLimited = (query.images.size - selected.size).coerceAtLeast(0) + capacityLimitedDuringMigration,
+                vaultIntegrityVerified = false,
+                blockedByProtection = blocked
             )
         }
 
@@ -175,7 +185,7 @@ internal object CameraEvidenceMediaStore {
             originalsRemoved = removed,
             copyFailures = copyFailures,
             removalFailures = removalFailures,
-            capacityLimited = (query.images.size - selected.size).coerceAtLeast(0),
+            capacityLimited = (query.images.size - selected.size).coerceAtLeast(0) + capacityLimitedDuringMigration,
             vaultIntegrityVerified = vaultHealthy,
             blockedByProtection = blocked
         )
