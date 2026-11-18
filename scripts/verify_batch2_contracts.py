@@ -101,8 +101,10 @@ checks = {
         < alarm.index("lockDeviceIfAdminEnabled(alarmStartedAt)"),
     "optional flash failure remains independent of audio alarm":
         "Failure to access a flash unit never blocks or stops alarm audio" in alarm,
-    "severe thermal status suppresses flash while preserving alarm audio":
-        "THERMAL_STATUS_SEVERE" in thermal and "ThermalFlashController" in alarm and "alarm_flash_thermal_suppressed" in alarm and "audio alarm continues" in alarm,
+    "severe or unknown thermal status suppresses flash while preserving alarm audio":
+        "THERMAL_STATUS_SEVERE" in thermal and "ThermalFlashController" in alarm
+        and "private var thermalFlashSuppressed = Build.VERSION.SDK_INT >= 29" in alarm
+        and "alarm_flash_thermal_suppressed" in alarm and "audio alarm continues" in alarm,
     "flash fails closed when thermal monitoring or initial status is unavailable":
         "ThermalFlashPolicy.shouldSuppress" in thermal
         and "!listenerRegistered || thermalStatus == null || thermalStatus >= severeThreshold" in thermal
