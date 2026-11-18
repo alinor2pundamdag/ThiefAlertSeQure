@@ -367,28 +367,16 @@ class BluetoothCenterActivity : FragmentActivity() {
             showResult("Alarm is active", "Do not change Bluetooth alert configuration while the theft alarm is active.")
             return
         }
-        if (!A2DisconnectScheduler.clearAll(this)) {
-            showResult("Could not enable A2", "Existing trusted-device deadlines could not be safely cleared. A2 remains OFF; resolve the stored schedule before retrying.")
+        if (!A2BluetoothReceiverController.resetBaselineForBoot(this)) {
+            showResult(
+                "Could not enable A2",
+                "Trusted-device deadlines and connection baselines could not be safely reset. A2 remains OFF until the reset succeeds."
+            )
+            render()
             return
         }
         if (!prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, true).commit()) {
             showResult("Could not enable A2", "Android did not confirm that the ON setting was saved.")
-            return
-        }
-        val baselinesCleared = runCatching {
-            TrustedBluetoothRegistry.clearBaselines(prefs)
-            true
-        }.getOrDefault(false)
-        if (!baselinesCleared) {
-            val rolledBack = prefs.edit()
-                .putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-                .commit()
-            showResult(
-                "Could not enable A2",
-                "The trusted-device baseline could not be reset." +
-                    if (rolledBack) " A2 was rolled back to OFF." else " WARNING: the OFF rollback could not be saved; verify the setting before leaving this screen."
-            )
-            render()
             return
         }
         if (!A2BluetoothReceiverController.sync(this)) {
