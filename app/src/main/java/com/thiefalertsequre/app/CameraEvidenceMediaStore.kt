@@ -304,7 +304,13 @@ internal object CameraEvidenceMediaStore {
 
     private fun queryOwnedImages(context: Context): QueryResult {
         val collection = imageCollectionUri()
-        val projection = arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.DATE_TAKEN, MediaStore.Images.Media.DATE_ADDED, MediaStore.Images.Media.DISPLAY_NAME)
+        val projection = buildList {
+            add(MediaStore.Images.Media._ID)
+            add(MediaStore.Images.Media.DATE_TAKEN)
+            add(MediaStore.Images.Media.DATE_ADDED)
+            add(MediaStore.Images.Media.DISPLAY_NAME)
+            if (Build.VERSION.SDK_INT >= 29) add(MediaStore.MediaColumns.OWNER_PACKAGE_NAME)
+        }.toTypedArray()
         val selection: String
         val args: Array<String>
         if (Build.VERSION.SDK_INT >= 29) {
@@ -329,10 +335,18 @@ internal object CameraEvidenceMediaStore {
                 val takenCol = it.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN)
                 val addedCol = it.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
                 val nameCol = it.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+                val ownerCol = if (Build.VERSION.SDK_INT >= 29) {
+                    it.getColumnIndexOrThrow(MediaStore.MediaColumns.OWNER_PACKAGE_NAME)
+                } else -1
                 while (it.moveToNext()) {
                     val displayName = it.getString(nameCol).orEmpty()
-                    // Never treat arbitrary files placed in the app folder as app-owned evidence.
-                    if (OWNED_IMAGE_NAME.matches(displayName)) {
+                    val ownerMatches = Build.VERSION.SDK_INT < 29 ||
+                        it.getString(ownerCol) == context.packageName
+                    // API 29+: require MediaStore's owner attribution as well as
+                    // the app-specific folder/name. API 26–28 use the private folder
+                    // and strict generated-name pattern because OWNER_PACKAGE_NAME
+                    // does not exist on those releases.
+                    if (ownerMatches && OWNED_IMAGE_NAME.matches(displayName)) {
                         val id = it.getLong(idCol)
                         val taken = it.getLong(takenCol)
                         val added = it.getLong(addedCol)
