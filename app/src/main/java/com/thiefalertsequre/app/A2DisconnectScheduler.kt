@@ -174,14 +174,18 @@ internal object A2DisconnectScheduler {
         if (matching == null || (expectedEventElapsedMs != null &&
                 matching.eventElapsedRealtimeMs != expectedEventElapsedMs)
         ) return true
-        context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context, address, namespace))
+        // Commit removal before cancelling the OS callback. If persistence fails,
+        // leave the callback scheduled: it will revalidate trust, connection and
+        // protection state instead of becoming an orphaned durable deadline.
         val remaining = records.filterNot { it.address.equals(address, true) }
         var removed = write(prefs, remaining)
         if (!removed) removed = write(prefs, remaining)
         if (!removed) {
-            LocalTamperHistory.record(context, "a2_deadline_cancel_persist_failed", "Reconnect cancellation removed the AlarmManager callback but could not commit the updated encrypted deadline list after one retry")
+            LocalTamperHistory.record(context, "a2_deadline_cancel_persist_failed", "Reconnect cancellation could not commit the encrypted deadline removal; the scheduled callback was retained for safe state revalidation")
+            return false
         }
-        return removed
+        context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context, address, namespace))
+        return true
     }
 
     fun clearAll(context: Context): Boolean =
@@ -203,14 +207,17 @@ internal object A2DisconnectScheduler {
             LocalTamperHistory.record(context, "a2_pending_clear_store_unreadable", "A2 deadline cleanup could not read the encrypted schedule; source retained")
             return false
         }
-        val manager = context.getSystemService(AlarmManager::class.java)
-        records.forEach { manager.cancel(pendingIntent(context, it.address, namespace)) }
+        // Remove the durable source first. If that commit fails, preserve all
+        // AlarmManager callbacks so they can still revalidate against the source.
         var cleared = prefs.edit().remove(KEY_PENDING).commit()
         if (!cleared) cleared = prefs.edit().remove(KEY_PENDING).commit()
         if (!cleared) {
-            LocalTamperHistory.record(context, "a2_pending_clear_failed", "Pending trusted-device deadlines could not be cleared after one retry")
+            LocalTamperHistory.record(context, "a2_pending_clear_failed", "Pending trusted-device deadlines could not be cleared after one retry; scheduled callbacks were retained")
+            return false
         }
-        return cleared
+        val manager = context.getSystemService(AlarmManager::class.java)
+        records.forEach { manager.cancel(pendingIntent(context, it.address, namespace)) }
+        return true
     }
 
     /** Replace only this accessory's timer while preserving every other device's record. */
