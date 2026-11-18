@@ -20,19 +20,82 @@ internal object A2BluetoothReceiverController {
         val permissionGranted = Build.VERSION.SDK_INT < 31 ||
             ContextCompat.checkSelfPermission(context, android.Manifest.permission.BLUETOOTH_CONNECT) ==
             PackageManager.PERMISSION_GRANTED
-        val enabled = monitorEnabled && alertEnabled && permissionGranted
-        return runCatching {
-            val component = ComponentName(context, A2BluetoothAclReceiver::class.java)
-            val expectedState = if (enabled) PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-            context.packageManager.setComponentEnabledSetting(
-                component, expectedState, PackageManager.DONT_KILL_APP
-            )
-            context.packageManager.getComponentEnabledSetting(component) == expectedState
-        }.getOrElse {
-            LocalTamperHistory.record(context, "a2_manifest_receiver_sync_failed", it.javaClass.simpleName + ": " + it.message)
-            false
+        val baselineReady = SafePreferences.boolean(
+            prefs, ProtectionMonitorService.KEY_A2_BOOT_BASELINE_READY, false
+        )
+        val enabled = monitorEnabled && alertEnabled && permissionGranted && baselineReady
+        return setComponentEnabled(context, enabled)
+    }
+
+    /** Clears old connection evidence before A2 can listen after boot or upgrade. */
+    fun ensureBaselineReady(context: Context): Boolean {
+        val app = context.applicationContext
+        val prefs = app.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        if (SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_A2_BOOT_BASELINE_READY, false)) return true
+        val cleared = runCatching {
+            if (!A2DisconnectScheduler.clearAll(app)) return@runCatching false
+            TrustedBluetoothRegistry.clearBaselines(prefs)
+            true
+        }.getOrDefault(false)
+        if (!cleared) {
+            setComponentEnabled(app, false)
+            LocalTamperHistory.record(app, "a2_boot_baseline_reset_failed", "A2 remains disabled because old Bluetooth connection baselines could not be cleared")
+            return false
         }
+        val saved = commitWithOneRetry {
+            prefs.edit().putBoolean(ProtectionMonitorService.KEY_A2_BOOT_BASELINE_READY, true)
+        }
+        if (!saved) {
+            setComponentEnabled(app, false)
+            LocalTamperHistory.record(app, "a2_boot_baseline_marker_failed", "A2 remains disabled because boot-baseline readiness could not be committed")
+        }
+        return saved
+    }
+
+    /** A boot always invalidates prior connected-device evidence before re-enabling A2. */
+    fun resetBaselineForBoot(context: Context): Boolean {
+        val app = context.applicationContext
+        setComponentEnabled(app, false)
+        val prefs = app.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        val markedNotReady = commitWithOneRetry {
+            prefs.edit().putBoolean(ProtectionMonitorService.KEY_A2_BOOT_BASELINE_READY, false)
+        }
+        if (!markedNotReady) return false
+        val cleared = runCatching {
+            if (!A2DisconnectScheduler.clearAll(app)) return@runCatching false
+            TrustedBluetoothRegistry.clearBaselines(prefs)
+            true
+        }.getOrDefault(false)
+        if (!cleared) {
+            LocalTamperHistory.record(app, "a2_boot_baseline_reset_failed", "A2 receiver stays disabled until old connection baselines can be cleared")
+            return false
+        }
+        val markedReady = commitWithOneRetry {
+            prefs.edit().putBoolean(ProtectionMonitorService.KEY_A2_BOOT_BASELINE_READY, true)
+        }
+        if (!markedReady) {
+            LocalTamperHistory.record(app, "a2_boot_baseline_marker_failed", "A2 receiver stays disabled because boot-baseline readiness could not be committed")
+            return false
+        }
+        return sync(app)
+    }
+
+    private fun commitWithOneRetry(editorFactory: () -> android.content.SharedPreferences.Editor): Boolean {
+        val first = runCatching { editorFactory().commit() }.getOrDefault(false)
+        return first || runCatching { editorFactory().commit() }.getOrDefault(false)
+    }
+
+    private fun setComponentEnabled(context: Context, enabled: Boolean): Boolean = runCatching {
+        val component = ComponentName(context, A2BluetoothAclReceiver::class.java)
+        val expectedState = if (enabled) PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        context.packageManager.setComponentEnabledSetting(
+            component, expectedState, PackageManager.DONT_KILL_APP
+        )
+        context.packageManager.getComponentEnabledSetting(component) == expectedState
+    }.getOrElse {
+        LocalTamperHistory.record(context, "a2_manifest_receiver_sync_failed", it.javaClass.simpleName + ": " + it.message)
+        false
     }
 }
 
