@@ -255,13 +255,14 @@ internal object CameraEvidenceMediaStore {
                 while (it.moveToNext()) {
                     val displayName = it.getString(nameCol).orEmpty()
                     // Never treat arbitrary files placed in the app folder as app-owned evidence.
-                    if (!OWNED_IMAGE_NAME.matches(displayName)) continue
-                    val id = it.getLong(idCol)
-                    val taken = it.getLong(takenCol)
-                    val added = it.getLong(addedCol)
-                    val timestamp = if (taken > 0L) taken else added * 1_000L
-                    val uri = collection.buildUpon().appendPath(id.toString()).build()
-                    images += uri to timestamp
+                    if (OWNED_IMAGE_NAME.matches(displayName)) {
+                        val id = it.getLong(idCol)
+                        val taken = it.getLong(takenCol)
+                        val added = it.getLong(addedCol)
+                        val timestamp = if (taken > 0L) taken else added * 1_000L
+                        val uri = collection.buildUpon().appendPath(id.toString()).build()
+                        images += uri to timestamp
+                    }
                 }
             }
             QueryResult(true, images)
