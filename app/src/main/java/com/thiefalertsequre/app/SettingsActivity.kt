@@ -741,7 +741,11 @@ class SettingsActivity : FragmentActivity() {
                                         "No app-owned Gallery photos were available to migrate."
                                     else -> "Encrypted copies verified: ${result.copiedToVault}. Gallery originals removed: ${result.originalsRemoved}. Copy failures: ${result.copyFailures}. Originals kept because removal was not confirmed: ${result.removalFailures}. Capacity-limited originals kept in Gallery: ${result.capacityLimited}. Vault integrity: ${if (result.vaultIntegrityVerified) "VERIFIED" else "FAILED / UNKNOWN"}."
                                 }
-                                android.widget.Toast.makeText(this@SettingsActivity, message, android.widget.Toast.LENGTH_LONG).show()
+                                MaterialAlertDialogBuilder(this@SettingsActivity)
+                                    .setTitle("Photo migration report")
+                                    .setMessage(message)
+                                    .setPositiveButton("OK", null)
+                                    .showThemed(this@SettingsActivity)
                                 render()
                             }
                         }
