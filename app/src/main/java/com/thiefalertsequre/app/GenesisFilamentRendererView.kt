@@ -122,6 +122,7 @@ class GenesisFilamentRendererView(
     private var coreLightEntity = 0
     private var coreLightRemoved = false
     private var lightEntity = 0
+    private val rimLightEntities = mutableListOf<Int>()
     private var currentProgress = 0f
     private var lastPhysicsProgress = 0f
     private var debrisAdded = false
@@ -248,6 +249,21 @@ class GenesisFilamentRendererView(
                 .castShadows(true)
                 .build(activeEngine, lightEntity)
             scene?.addEntity(lightEntity)
+
+            listOf(
+                Triple(floatArrayOf(-1.75f, 0.55f, 1.15f), floatArrayOf(0.18f, 0.34f, 0.82f), 620f),
+                Triple(floatArrayOf(1.72f, -0.42f, 0.95f), floatArrayOf(0.92f, 0.20f, 0.08f), 540f)
+            ).forEach { (position, color, intensity) ->
+                val rimLight = EntityManager.get().create()
+                LightManager.Builder(LightManager.Type.POINT)
+                    .position(position[0], position[1], position[2])
+                    .color(color[0], color[1], color[2])
+                    .intensity(intensity)
+                    .falloff(4.2f)
+                    .build(activeEngine, rimLight)
+                rimLightEntities += rimLight
+                scene?.addEntity(rimLight)
+            }
 
             coreLightEntity = EntityManager.get().create()
             LightManager.Builder(LightManager.Type.POINT)
@@ -1158,6 +1174,10 @@ class GenesisFilamentRendererView(
                     activeEngine.destroyEntity(coreLightEntity)
                     EntityManager.get().destroy(coreLightEntity)
                 }
+                rimLightEntities.forEach { entity ->
+                    activeEngine.destroyEntity(entity)
+                    EntityManager.get().destroy(entity)
+                }
                 shieldMaterial?.let(activeEngine::destroyMaterialInstance)
                 shieldRimMaterial?.let(activeEngine::destroyMaterialInstance)
                 debrisMaterial?.let(activeEngine::destroyMaterialInstance)
@@ -1178,6 +1198,7 @@ class GenesisFilamentRendererView(
             }
         }
         bodies.clear()
+        rimLightEntities.clear()
         titleBodies.clear()
         nameBodies.clear()
         shieldMesh = null
