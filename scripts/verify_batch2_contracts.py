@@ -227,7 +227,8 @@ checks = {
         and "A2BluetoothReceiverController.sync(context)" in (APP / "BootReceiver.kt").read_text(encoding="utf-8"),
     "monitor notification cannot disarm ARMED or COUNTDOWN protection":
         "fun canStop(mode: ProtectionMode): Boolean = mode == ProtectionMode.DISARMED" in (APP / "ProtectionMonitorPolicy.kt").read_text(encoding="utf-8")
-        and "if (!ProtectionMonitorPolicy.canStop(currentMode))" in monitor
+        and "private fun handleStopRequest(" in monitor
+        and "ProtectionStore(this).runIfDisarmed" in monitor
         and "monitor_stop_rejected_active_protection" in monitor
         and "if (ProtectionMonitorPolicy.canStop(mode))" in monitor
         and "if (!monitorEnabled && state.mode == ProtectionMode.DISARMED)" in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8")
