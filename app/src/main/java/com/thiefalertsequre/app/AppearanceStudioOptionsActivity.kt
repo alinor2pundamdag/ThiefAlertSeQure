@@ -81,7 +81,14 @@ class AppearanceStudioOptionsActivity : FragmentActivity() {
         val presets = listOf(AlarmTonePreset.DEFAULT_AUDIO) + AlarmTonePreset.builtIns
         val current = AlarmSoundStore.selectedBuiltInPreset(this)
         choiceButton("Built-in alarm sound • ${current.label}", presets.map { it.label }) { index ->
-            AlarmSoundStore.setBuiltInPreset(this, presets[index])
+            val saved = AlarmSoundStore.setBuiltInPreset(this, presets[index])
+            if (!saved) {
+                android.widget.Toast.makeText(
+                    this,
+                    "Alarm sound settings can be changed only while protection is DISARMED.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
             render()
         }
         root.addView(TextView(this).apply {
