@@ -243,7 +243,12 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
                             if (A2DisconnectScheduler.schedule(app, pending)) {
                                 LocalTamperHistory.record(app, "trusted_bluetooth_disconnected", "Registered trusted device disconnected while the monitor process was absent; durable 8-second grace deadline scheduled")
                             } else {
-                                LocalTamperHistory.record(app, "a2_durable_deadline_unavailable", "A2 disconnect was detected without a foreground service, but the durable grace deadline could not be scheduled")
+                                val retryScheduled = A2DisconnectScheduler.scheduleRetry(app, pending, 1_000L)
+                                LocalTamperHistory.record(
+                                    app, "a2_durable_deadline_unavailable",
+                                    if (retryScheduled) "Initial AlarmManager scheduling failed; encrypted grace deadline retained and a one-second retry was scheduled"
+                                    else "Initial and retry AlarmManager scheduling failed; encrypted grace deadline remains for monitor-startup recovery"
+                                )
                             }
                         }
                     }
