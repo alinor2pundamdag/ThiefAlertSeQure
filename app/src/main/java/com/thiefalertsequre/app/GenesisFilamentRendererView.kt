@@ -98,10 +98,12 @@ class GenesisFilamentRendererView(
     private var swapChain: SwapChain? = null
     private var pbrMaterial: Material? = null
     private var shieldMaterial: com.google.android.filament.MaterialInstance? = null
+    private var shieldRimMaterial: com.google.android.filament.MaterialInstance? = null
     private var debrisMaterial: com.google.android.filament.MaterialInstance? = null
     private var titleMaterial: com.google.android.filament.MaterialInstance? = null
     private var coreMaterial: com.google.android.filament.MaterialInstance? = null
     private var shieldMesh: Mesh? = null
+    private var shieldRimMesh: Mesh? = null
     private var coreMesh: Mesh? = null
     private val bodies = mutableListOf<Body>()
     private val titleBodies = mutableListOf<LetterBody>()
@@ -208,6 +210,15 @@ class GenesisFilamentRendererView(
             )
             shieldMesh = createExtrudedMesh(shieldOutline, 0.18f, shieldMaterial!!)
             scene?.addEntity(shieldMesh!!.entity)
+            shieldRimMaterial = pbrMaterial?.createInstance()?.apply {
+                setParameter("baseColor", Colors.RgbType.SRGB, 0.68f, 0.76f, 0.86f)
+                setParameter("metallic", 0.98f)
+                setParameter("roughness", 0.16f)
+                setParameter("emissiveColor", 0.025f, 0.035f, 0.05f)
+            }
+            val insetRimOutline = shieldOutline.map { Point2(it.x * 0.91f, it.y * 0.91f) }
+            shieldRimMesh = createExtrudedMesh(insetRimOutline, 0.055f, shieldRimMaterial!!)
+            scene?.addEntity(shieldRimMesh!!.entity)
             createFractureBodies(shieldOutline)
 
             val coreOutline = (0 until 12).map { index ->
@@ -702,6 +713,7 @@ class GenesisFilamentRendererView(
             if (debrisAdded) {
                 bodies.forEach { activeScene.removeEntity(it.mesh.entity) }
                 activeScene.addEntity(shield.entity)
+                shieldRimMesh?.let { activeScene.addEntity(it.entity) }
                 debrisAdded = false
             }
             val appear = (progress / 0.13f).coerceIn(0f, 1f)
@@ -710,11 +722,19 @@ class GenesisFilamentRendererView(
             GlMatrix.setIdentityM(matrix, 0)
             GlMatrix.scaleM(matrix, 0, scale, scale, scale)
             transformManager.setTransform(shieldTransform, matrix)
+            shieldRimMesh?.let { rim ->
+                val rimMatrix = FloatArray(16)
+                GlMatrix.setIdentityM(rimMatrix, 0)
+                GlMatrix.translateM(rimMatrix, 0, 0f, 0f, 0.118f)
+                GlMatrix.scaleM(rimMatrix, 0, scale, scale, scale)
+                transformManager.setTransform(transformManager.getInstance(rim.entity), rimMatrix)
+            }
             return
         }
 
         if (!debrisAdded) {
             activeScene.removeEntity(shield.entity)
+            shieldRimMesh?.let { activeScene.removeEntity(it.entity) }
             bodies.forEach { activeScene.addEntity(it.mesh.entity) }
             debrisAdded = true
             lastPhysicsProgress = progress
@@ -928,6 +948,7 @@ class GenesisFilamentRendererView(
                 titleBodies.forEach { destroyMesh(it.body.mesh) }
                 nameBodies.forEach { destroyMesh(it.body.mesh) }
                 shieldMesh?.let(::destroyMesh)
+                shieldRimMesh?.let(::destroyMesh)
                 coreMesh?.let(::destroyMesh)
                 if (lightEntity != 0) {
                     activeEngine.destroyEntity(lightEntity)
@@ -938,6 +959,7 @@ class GenesisFilamentRendererView(
                     EntityManager.get().destroy(coreLightEntity)
                 }
                 shieldMaterial?.let(activeEngine::destroyMaterialInstance)
+                shieldRimMaterial?.let(activeEngine::destroyMaterialInstance)
                 debrisMaterial?.let(activeEngine::destroyMaterialInstance)
                 titleMaterial?.let(activeEngine::destroyMaterialInstance)
                 coreMaterial?.let(activeEngine::destroyMaterialInstance)
@@ -953,6 +975,7 @@ class GenesisFilamentRendererView(
         titleBodies.clear()
         nameBodies.clear()
         shieldMesh = null
+        shieldRimMesh = null
         coreMesh = null
         engine = null
         renderer = null
