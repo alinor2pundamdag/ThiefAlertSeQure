@@ -2185,6 +2185,7 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun requestDeviceAdministrator() {
+        if (!requireProtectionDisarmed()) return
         val component = android.content.ComponentName(this, ThiefAlertAdminReceiver::class.java)
         val intent = Intent(android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
             .putExtra(android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN, component)
