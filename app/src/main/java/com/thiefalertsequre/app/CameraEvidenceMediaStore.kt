@@ -108,12 +108,11 @@ internal object CameraEvidenceMediaStore {
             return MigrationResult(true, vaultIntegrityVerified = true)
         }
 
-        val existingCount = CameraEvidenceVault.entries(app).size
-        val capacity = (CameraEvidencePolicy.MAX_IMAGES - existingCount).coerceAtLeast(0)
-        val selected = query.images
-            .sortedByDescending { it.second }
-            .take(capacity)
-            .sortedBy { it.second }
+        var availableCapacity = (CameraEvidencePolicy.MAX_IMAGES - CameraEvidenceVault.entries(app).size)
+            .coerceAtLeast(0)
+        // Inspect every app-owned Gallery photo so a retry can recognize an
+        // already-copied item even when the encrypted vault is currently full.
+        val selected = query.images.sortedByDescending { it.second }
         var copied = 0
         var removed = 0
         var copyFailures = 0
@@ -140,6 +139,10 @@ internal object CameraEvidenceMediaStore {
                     it.sizeBytes == original.size &&
                     it.sha256.equals(sourceDigestHex, ignoreCase = true)
             }
+            if (existingCopy == null && availableCapacity <= 0) {
+                capacityLimitedDuringMigration += 1
+                continue
+            }
             val entry = existingCopy ?: CameraEvidenceVault.saveForMigration(app, original, timestamp)
             if (entry == null) {
                 if (ProtectionStore(app).read().mode != ProtectionMode.DISARMED) {
@@ -147,12 +150,14 @@ internal object CameraEvidenceMediaStore {
                     break
                 }
                 if (CameraEvidenceVault.entries(app).size >= CameraEvidencePolicy.MAX_IMAGES) {
+                    availableCapacity = 0
                     capacityLimitedDuringMigration += 1
                 } else {
                     copyFailures += 1
                 }
                 continue
             }
+            if (existingCopy == null) availableCapacity = (availableCapacity - 1).coerceAtLeast(0)
             val verified = CameraEvidenceVault.read(app, entry.id)
             if (verified == null || !MessageDigest.isEqual(original, verified)) {
                 if (existingCopy == null) runCatching { CameraEvidenceVault.delete(app, entry.id) }
@@ -169,7 +174,7 @@ internal object CameraEvidenceMediaStore {
                 enumerationSucceeded = true,
                 copiedToVault = copied,
                 copyFailures = copyFailures,
-                capacityLimited = (query.images.size - selected.size).coerceAtLeast(0) + capacityLimitedDuringMigration,
+                capacityLimited = capacityLimitedDuringMigration,
                 vaultIntegrityVerified = false,
                 blockedByProtection = blocked
             )
@@ -203,7 +208,7 @@ internal object CameraEvidenceMediaStore {
             originalsRemoved = removed,
             copyFailures = copyFailures,
             removalFailures = removalFailures,
-            capacityLimited = (query.images.size - selected.size).coerceAtLeast(0) + capacityLimitedDuringMigration,
+            capacityLimited = capacityLimitedDuringMigration,
             vaultIntegrityVerified = vaultHealthy,
             blockedByProtection = blocked
         )
