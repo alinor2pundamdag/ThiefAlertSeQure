@@ -287,7 +287,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                 )
             }
             A2BluetoothReceiverController.sync(this)
-            return START_STICKY
+            // Continue through normal foreground-service startup so an active
+            // monitor is never left running as a background-only service.
+            return null
         }
 
         return when (result) {
