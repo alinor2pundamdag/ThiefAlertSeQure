@@ -43,12 +43,9 @@ class BootReceiver : BroadcastReceiver() {
                     // Preserve/recreate the consumed countdown callback. On a new
                     // boot AlarmScheduler detects the stale monotonic clock and
                     // schedules a reconciliation callback instead of firing early.
-                    val scheduled = AlarmScheduler.schedule(
-                        context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount
+                    scheduleCountdownWithRetry(
+                        context, state, "interrupted_settings_recovery"
                     )
-                    if (!scheduled) {
-                        LocalTamperHistory.record(context, "countdown_recovery_schedule_failed", "Interrupted settings recovery prevented boot reconciliation and the preserved countdown could not be rescheduled")
-                    }
                 }
                 ProtectionMode.ARMED, ProtectionMode.DISARMED -> Unit
             }
@@ -68,7 +65,7 @@ class BootReceiver : BroadcastReceiver() {
             if (Build.VERSION.SDK_INT >= 31 && context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()) {
                 val state = enforceMonitorOptOut(context)
                 when (state.mode) {
-                    ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
+                    ProtectionMode.COUNTDOWN -> scheduleCountdownWithRetry(context, state, "exact_alarm_access")
                     ProtectionMode.ALARM_TRIGGERED -> scheduleAlarmRecovery(
                         context, "Protection alarm is active after reboot or app update"
                     )
@@ -100,7 +97,7 @@ class BootReceiver : BroadcastReceiver() {
             }
         }
         when (next.mode) {
-            ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
+            ProtectionMode.COUNTDOWN -> scheduleCountdownWithRetry(context, next, "boot")
             ProtectionMode.ALARM_TRIGGERED -> scheduleAlarmRecovery(
                         context, "Protection alarm is active after reboot or app update"
                     )
@@ -113,7 +110,7 @@ class BootReceiver : BroadcastReceiver() {
     private fun restoreAfterAppUpdate(context: Context) {
         val state = enforceMonitorOptOut(context)
         when (state.mode) {
-            ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
+            ProtectionMode.COUNTDOWN -> scheduleCountdownWithRetry(context, state, "app_update")
             ProtectionMode.ALARM_TRIGGERED -> scheduleAlarmRecovery(
                         context, "Protection alarm is active after reboot or app update"
                     )
@@ -121,6 +118,22 @@ class BootReceiver : BroadcastReceiver() {
         }
         startMonitorIfNeeded(context, state, "app_update")
         LocalTamperHistory.record(context, "app_update_state_restored", "Persisted protection state re-evaluated after package replacement")
+    }
+
+    private fun scheduleCountdownWithRetry(
+        context: Context,
+        state: ProtectionState,
+        source: String
+    ) {
+        if (AlarmScheduler.schedule(
+                context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount
+            )
+        ) return
+        AlarmScheduler.scheduleRetry(context, 1_000L)
+        LocalTamperHistory.record(
+            context, "countdown_recovery_schedule_failed",
+            "$source could not schedule the preserved countdown immediately; a one-second retry was requested"
+        )
     }
 
     private fun scheduleAlarmRecovery(context: Context, reason: String) {
