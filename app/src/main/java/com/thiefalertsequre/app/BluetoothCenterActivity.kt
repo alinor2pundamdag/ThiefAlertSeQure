@@ -129,34 +129,34 @@ class BluetoothCenterActivity : FragmentActivity() {
 
     private fun addTrustedDeviceSection() {
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        val registryRead = TrustedBluetoothRegistry.readResult(prefs)
-        val registryReadable = registryRead is PreferenceRead.Value
-        val devices = when (registryRead) {
+        val protectionMode = ProtectionStore(this).read().mode
+        val canEditConfiguration = protectionMode == ProtectionMode.DISARMED
+        val registryRead = if (canEditConfiguration) TrustedBluetoothRegistry.readResult(prefs) else null
+        val registryReadable = !canEditConfiguration || registryRead is PreferenceRead.Value
+        val devices = if (!canEditConfiguration) emptyList() else when (registryRead) {
             is PreferenceRead.Value -> registryRead.value
-            is PreferenceRead.Corrupt -> emptyList()
+            is PreferenceRead.Corrupt, null -> emptyList()
         }
         val enabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
         val baselineCount = devices.count { TrustedBluetoothRegistry.isBaselineConnected(prefs, it.address) }
-        val baselineSummary = if (registryReadable) {
-            "Connection baselines confirmed: $baselineCount / ${devices.size}"
-        } else {
-            "Connection baselines: UNKNOWN"
+        val baselineSummary = when {
+            !canEditConfiguration -> "Connection baselines: hidden while protection is active"
+            registryReadable -> "Connection baselines confirmed: $baselineCount / ${devices.size}"
+            else -> "Connection baselines: UNKNOWN"
         }
         val monitorEnabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         val monitorRunning = runCatching {
             getSystemService(ActivityManager::class.java).getRunningServices(100)
                 .any { it.service.className == ProtectionMonitorService::class.java.name }
         }.getOrDefault(false)
-        val protectionMode = ProtectionStore(this).read().mode
-        val canEditConfiguration = protectionMode == ProtectionMode.DISARMED
         addCard("TRUSTED ACCESSORY SEPARATION ALERT (A2)", listOf(
             "Feature: ${when {
                 !registryReadable && enabled -> "UNAVAILABLE — saved trust data unreadable"
                 enabled -> "ON"
                 else -> "OFF"
             }}",
-            "Stored trusted-device data: ${if (registryReadable) "Readable" else "UNREADABLE — original data retained"}",
-            "Registered trusted accessories: ${devices.size}",
+            "Stored trusted-device data: ${if (!canEditConfiguration) "Hidden while protection is active" else if (registryReadable) "Readable" else "UNREADABLE — original data retained"}",
+            "Registered trusted accessories: ${if (canEditConfiguration) devices.size.toString() else "Details hidden"}",
             baselineSummary,
             "Monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled by owner"}",
             "Monitor runtime: ${if (monitorRunning) "Running" else "Not confirmed running"}",
@@ -170,6 +170,9 @@ class BluetoothCenterActivity : FragmentActivity() {
         root.addView(button("Add trusted paired device") { requestTrustedDevicePicker() }.apply {
             isEnabled = registryReadable && canEditConfiguration
         }, matchWrap())
+        if (!canEditConfiguration) {
+            root.addView(label("Trusted accessory names are hidden until protection is DISARMED.", 12f, R.color.tas_muted, false), matchWrap())
+        }
         devices.forEach { device ->
             root.addView(space(6))
             root.addView(button("Unregister: ${device.name}") { confirmUnregister(device) }.apply {
