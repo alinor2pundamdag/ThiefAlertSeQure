@@ -78,7 +78,7 @@ class AppearanceStudioOptionsActivity : FragmentActivity() {
             render()
         }
 
-        val presets = listOf(AlarmTonePreset.SIREN, AlarmTonePreset.PULSE, AlarmTonePreset.DOUBLE, AlarmTonePreset.URGENT, AlarmTonePreset.CONTINUOUS)
+        val presets = listOf(AlarmTonePreset.DEFAULT_AUDIO) + AlarmTonePreset.builtIns
         val current = AlarmSoundStore.selectedBuiltInPreset(this)
         choiceButton("Built-in alarm sound • ${current.label}", presets.map { it.label }) { index ->
             AlarmSoundStore.setBuiltInPreset(this, presets[index])
