@@ -616,7 +616,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(action("Clear local event history") {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Clear local history?")
-                .setMessage("This permanently clears the on-device protection event log. It does not change protection state.")
+                .setMessage("This permanently clears the readable local event log and encrypted event-metadata vault. It does not change protection state and is available only while protection is DISARMED.")
                 .setNegativeButton("Keep history", null)
                 .setPositiveButton("Clear") { _, _ ->
                     val cleared = LocalTamperHistory.clear(this)
