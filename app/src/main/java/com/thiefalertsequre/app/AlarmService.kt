@@ -101,11 +101,15 @@ class AlarmService : Service() {
             // Promote immediately before locking the device; lockNow() may
             // turn the display off and must not delay the FGS startup deadline.
             startForeground(NOTIFICATION_ID, notification())
+            // Start the primary audible alarm immediately after foreground
+            // promotion. Dashboard refresh and optional Device Owner locking
+            // must never delay the core alarm output.
+            if (player == null && toneController == null) startAlarmAudio()
             BatchThreeUiBridge.refresh(this)
             AlarmRecoveryCoordinator.onServiceStarted(this)
             val alarmStartedAt = ProtectionStore(this).read().changedAtEpochMs
             lockDeviceIfAdminEnabled(alarmStartedAt)
-            LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active; device-lock request issued")
+            LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active; primary alarm output requested; device-lock request issued")
         } catch (error: Exception) {
             LocalTamperHistory.record(this, "alarm_service_start_failed", error.javaClass.simpleName + ": " + error.message)
             AlarmRecoveryCoordinator.onStartFailure(
@@ -114,7 +118,6 @@ class AlarmService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        if (player == null && toneController == null) startAlarmAudio()
         syncAlarmFlash()
         syncSecondaryAlarm()
         syncAlarmHaptics()
