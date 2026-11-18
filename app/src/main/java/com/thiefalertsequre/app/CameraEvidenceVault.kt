@@ -107,15 +107,9 @@ internal object CameraEvidenceVault {
         val file = evidenceDirectory(app).resolve("$id.aesgcm")
         val deleted = file.delete() || !file.exists()
         if (!deleted) return false
+        if (next.isEmpty() && !deleteKeyIfPresent()) return false
         if (!writeIndex(app, next)) return false
-        if (next.isEmpty()) {
-            runCatching {
-                synchronized(keyLock) {
-                    KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
-                }
-            }
-        }
-        return deleted
+        return true
     }
 
     @Synchronized
@@ -129,14 +123,10 @@ internal object CameraEvidenceVault {
             runCatching { file.delete() || !file.exists() }.getOrDefault(false)
         }
         if (!allDeleted) return false
-        // If this commit fails, the stale index is still available for a retry;
-        // missing files are treated as successfully deleted on the next attempt.
+        // Keep the index if Keystore cleanup or preference commit fails so the
+        // owner can retry the complete deletion operation.
+        if (!deleteKeyIfPresent()) return false
         if (!prefs.edit().remove(KEY_INDEX).commit()) return false
-        runCatching {
-            synchronized(keyLock) {
-                KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
-            }
-        }
         return true
     }
 
@@ -243,6 +233,14 @@ internal object CameraEvidenceVault {
             generator.generateKey()
         }
     }
+
+    private fun deleteKeyIfPresent(): Boolean = runCatching {
+        synchronized(keyLock) {
+            val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            if (keyStore.containsAlias(KEY_ALIAS)) keyStore.deleteEntry(KEY_ALIAS)
+            !keyStore.containsAlias(KEY_ALIAS)
+        }
+    }.getOrDefault(false)
 
     private fun getExistingKey(): SecretKey = synchronized(keyLock) {
         val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
