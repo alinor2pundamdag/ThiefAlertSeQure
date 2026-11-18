@@ -306,6 +306,12 @@ checks = {
         and '"a2_receiver_queue_full"' in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
         and "LocalTamperHistory.record(" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
         and "LocalEvidenceVault.recordAsync(context, safeEvent, safeDetail)" in (APP / "LocalTamperHistory.kt").read_text(encoding="utf-8"),
+    "A2 durable deadlines survive scheduling failure and recover after monitor restart":
+        "encrypted pending record retained for retry" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
+        and "fun reschedulePending(context: Context): Int" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
+        and "A2DisconnectScheduler.scheduleRetry(app, pending, 1_000L)" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
+        and "A2DisconnectScheduler.reschedulePending(this)" in monitor
+        and "A2DisconnectScheduler.scheduleRetry(" in monitor,
     "root diagnostics have bounded execution and forceful timeout cleanup":
         "timeoutSeconds.coerceIn(1L, 30L)" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8")
         and "destroyForcibly()" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8")
