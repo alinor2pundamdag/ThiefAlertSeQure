@@ -222,13 +222,15 @@ checks = {
     "dashboard and boot reconciliation never disarm active protection because of an OFF preference":
         "ProtectionEngine.disableMonitoring(" not in (APP / "MainActivity.kt").read_text(encoding="utf-8")
         and "ProtectionEngine.disableMonitoring(" not in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
-        and "current.mode == ProtectionMode.ARMED || current.mode == ProtectionMode.COUNTDOWN" in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
-        and "current.mode == ProtectionMode.ARMED || current.mode == ProtectionMode.COUNTDOWN" in (APP / "MainActivity.kt").read_text(encoding="utf-8")
-        and "A2BluetoothReceiverController.sync(context)" in (APP / "BootReceiver.kt").read_text(encoding="utf-8"),
+        and "store.runIfProtectionActive" in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
+        and "store.runIfProtectionActive" in (APP / "MainActivity.kt").read_text(encoding="utf-8")
+        and "A2BluetoothReceiverController.sync(context)" in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
+        and "runIfProtectionActive" in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8"),
     "monitor notification cannot disarm ARMED or COUNTDOWN protection":
         "fun canStop(mode: ProtectionMode): Boolean = mode == ProtectionMode.DISARMED" in (APP / "ProtectionMonitorPolicy.kt").read_text(encoding="utf-8")
         and "private fun handleStopRequest(" in monitor
         and "ProtectionStore(this).runIfDisarmed" in monitor
+        and "ProtectionStore(this).runIfProtectionActive" in monitor
         and "monitor_stop_rejected_active_protection" in monitor
         and "if (ProtectionMonitorPolicy.canStop(mode))" in monitor
         and "if (!monitorEnabled && state.mode == ProtectionMode.DISARMED)" in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8")
