@@ -264,6 +264,8 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         }.getOrDefault(false)
         val protectionStore = ProtectionStore(this)
         val protectionMode = protectionStore.read().mode
+        val activeProtectionRequiresMonitor = protectionMode == ProtectionMode.ARMED || protectionMode == ProtectionMode.COUNTDOWN
+        val monitorRequiredNow = monitorEnabled || activeProtectionRequiresMonitor
         val btConnect = Build.VERSION.SDK_INT < 31 || checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
         val a2Enabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
         val dashboardEnabled = SafePreferences.boolean(getSharedPreferences(MainActivity.ALARM_DISPLAY_PREFS, MODE_PRIVATE), MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
@@ -274,7 +276,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             else -> "Not allowed — normal alarm notification and sound remain available"
         }
         val exactAlarmSummary = when {
-            !monitorEnabled -> "Not needed while the protection monitor is disabled"
+            !monitorRequiredNow -> "Not needed while protection is disarmed and the monitor is disabled"
             Build.VERSION.SDK_INT < 31 -> "Available — no separate access gate on this Android version"
             exactAlarm -> "Available / permitted"
             else -> "Access not granted — precise protection scheduling may be delayed"
@@ -296,16 +298,16 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             "Secure screen lock: ${if (secureLock) "Configured" else "Not configured"}",
             "Bluetooth Connect permission: $btConnectSummary",
             "Android ranging capability check: $rangingSummary",
-            "Protection monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled"} • Runtime status: ${if (monitorRunning) "Running (last recorded state)" else "Not running (last recorded state)"}",
+            "Protection monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled"} • Current protection requires monitor: ${if (activeProtectionRequiresMonitor) "Yes" else "No"} • Runtime: ${if (monitorProcessRunning) "Process confirmed running" else if (monitorRunning) "Last recorded running; current process not confirmed" else "Not running"}",
             "Protection state: $protectionMode",
             "Background guidance family: $family"
         )
         addCard("THIEFALERTSEQuRE READINESS", appReadiness)
         val readinessSignals = buildList {
-            add(ReadinessSignal("Protection monitor enabled and last recorded running", monitorEnabled && monitorRunning, 25))
+            add(ReadinessSignal("Required protection monitor running", monitorRequiredNow && monitorProcessRunning, 25))
             add(ReadinessSignal("Alarm notifications enabled", notifications, 15))
             add(ReadinessSignal("Secure Android screen lock configured", secureLock, 15))
-            if (monitorEnabled) add(ReadinessSignal("Exact alarm scheduling available", exactAlarm, 15))
+            if (monitorRequiredNow) add(ReadinessSignal("Exact alarm scheduling available", exactAlarm, 15))
             if (dashboardEnabled) add(ReadinessSignal("Optional full-screen alarm access available", fullScreenIntent, 10))
             if (a2Enabled) add(ReadinessSignal("Optional Bluetooth Connect permission available", btConnect, 10))
             add(ReadinessSignal("Battery optimization exemption", power.isIgnoringBatteryOptimizations(packageName), 10))
@@ -344,7 +346,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                 IntegritySignal(
                     "Exact alarm access",
                     when {
-                        !monitorEnabled || Build.VERSION.SDK_INT < 31 -> IntegrityStatus.UNSUPPORTED
+                        !monitorRequiredNow || Build.VERSION.SDK_INT < 31 -> IntegrityStatus.UNSUPPORTED
                         exactAlarm -> IntegrityStatus.VERIFIED
                         else -> IntegrityStatus.FAILED
                     }, 1
@@ -369,7 +371,9 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             else -> "OWNER ENABLED — trusted device and fresh baseline must remain verified"
         }
         val monitorDependency = when {
-            !monitorEnabled -> "OWNER DISABLED"
+            activeProtectionRequiresMonitor && monitorProcessRunning -> "ACTIVE PROTECTION — monitor process confirmed, even if the owner preference is OFF"
+            activeProtectionRequiresMonitor -> "ACTION REQUIRED — active protection requires a running monitor"
+            !monitorEnabled -> "OWNER DISABLED WHILE DISARMED"
             monitorProcessRunning -> "OPERATIONAL — process currently confirmed"
             else -> "FAILED / NOT CONFIRMED — monitor process not found"
         }
