@@ -72,6 +72,14 @@ internal object CameraEvidenceCapture {
             activity, Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
         val visible = isActivityVisible(activity)
+        // Read window/display state on the Activity thread before camera callbacks
+        // move to the dedicated camera HandlerThread.
+        val displayRotationDegrees = when (activity.windowManager.defaultDisplay.rotation) {
+            Surface.ROTATION_90 -> 90
+            Surface.ROTATION_180 -> 180
+            Surface.ROTATION_270 -> 270
+            else -> 0
+        }
         val encryptEvidence = isEncryptionEnabled(app)
         if (!CameraEvidencePolicy.shouldCapture(true, permissionGranted, true, visible)) {
             recordFailure(app, if (!permissionGranted) "camera_evidence_permission_missing"
@@ -246,7 +254,7 @@ internal object CameraEvidenceCapture {
                                         configured.close()
                                         return
                                     }
-                                    if (!isActivityVisible(activity)) {
+                                    if (!activityVisible.get()) {
                                         finish("camera_evidence_activity_not_visible", "App left the visible state before the front-camera photo was captured")
                                         return
                                     }
@@ -264,18 +272,12 @@ internal object CameraEvidenceCapture {
                                             }
                                             set(CaptureRequest.JPEG_QUALITY, 85.toByte())
                                             val sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
-                                            val displayRotation = when (activity.windowManager.defaultDisplay.rotation) {
-                                                Surface.ROTATION_90 -> 90
-                                                Surface.ROTATION_180 -> 180
-                                                Surface.ROTATION_270 -> 270
-                                                else -> 0
-                                            }
                                             val frontFacing = characteristics.get(CameraCharacteristics.LENS_FACING) ==
                                                 CameraCharacteristics.LENS_FACING_FRONT
                                             set(
                                                 CaptureRequest.JPEG_ORIENTATION,
                                                 CameraEvidencePolicy.jpegOrientation(
-                                                    sensorOrientation, displayRotation, frontFacing
+                                                    sensorOrientation, displayRotationDegrees, frontFacing
                                                 )
                                             )
                                         }.build()
