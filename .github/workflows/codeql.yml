@@ -61,7 +61,11 @@ jobs:
           set -euo pipefail
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
           test -x "$SDKMANAGER"
+          # sdkmanager may close stdin after all licenses are already accepted;
+          # keep its exit status without treating yes(1)'s expected SIGPIPE as failure.
+          set +o pipefail
           yes | "$SDKMANAGER" --licenses >/dev/null
+          set -o pipefail
           "$SDKMANAGER" "platforms;android-37"
 
       - name: Initialize CodeQL
