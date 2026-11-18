@@ -51,7 +51,7 @@ No other event may clear ALARM_TRIGGERED.
 - Re-check the deadline inside AlarmDeadlineReceiver before changing state.
 - Prefer setExactAndAllowWhileIdle when Android permits it.
 - Android 12+ requires user-granted SCHEDULE_EXACT_ALARM access for this app's exact-alarm route.
-- If exact access is unavailable or revoked, use setAndAllowWhileIdle as a best-effort fallback and clearly report that the ten-second deadline can be delayed.
+- If exact access is unavailable or revoked, retain a setAndAllowWhileIdle fallback and report that the ten-second deadline can be delayed. Unlike exact alarms, an inexact callback has no documented background foreground-service-start exemption; if the app process is absent, it may latch the alarm without starting continuous audio. Attempt the owner-visible recovery notice and bounded retries; notification denial or continued Android restrictions may require the owner to reopen the app.
 - Exact-alarm idle quotas and OEM battery behavior can still affect real-world delivery.
 
 ## 4. Authentication policy

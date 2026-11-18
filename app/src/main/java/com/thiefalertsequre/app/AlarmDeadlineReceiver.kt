@@ -19,26 +19,62 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
                     handleDeadline(context.applicationContext, callbackIntent)
                 }
             } catch (error: Exception) {
-                LocalTamperHistory.record(
-                    context, "deadline_receiver_error",
-                    error.javaClass.simpleName + ": " + error.message
-                )
-                if (A2DisconnectScheduler.isDeadlineAction(callbackIntent.action)) {
-                    val token = callbackIntent.data?.lastPathSegment
-                    if (token != null) A2DisconnectScheduler.find(context, token)?.let {
-                        A2DisconnectScheduler.scheduleRetry(context, it, 1_000L)
-                    }
-                } else if (ProtectionStore(context).read().mode == ProtectionMode.ALARM_TRIGGERED) {
-                    AlarmRecoveryCoordinator.onStartFailure(
-                        context, "Deadline receiver failed while the alarm was latched"
-                    )
-                } else {
-                    AlarmScheduler.scheduleRetry(context, 1_000L)
-                }
+                handleProcessingFailure(context, callbackIntent, error)
             } finally {
                 pending.finish()
             }
         }.start()
+    }
+
+    /**
+     * A2 may already be durably latched when Android rejects a background foreground-service
+     * start (notably when an inexact fallback alarm fires with the process absent). In that case
+     * the A2 pending record has already been cancelled, so route the failure through the same
+     * owner-visible notice and bounded recovery path as the charger alarm.
+     */
+    internal fun handleProcessingFailure(context: Context, intent: Intent, error: Exception) {
+        val appContext = context.applicationContext
+        LocalTamperHistory.record(
+            appContext, "deadline_receiver_error",
+            error.javaClass.simpleName + ": " + error.message
+        )
+        if (A2DisconnectScheduler.isDeadlineAction(intent.action)) {
+            val token = intent.data?.lastPathSegment
+            val pending = token?.let { A2DisconnectScheduler.find(appContext, it) }
+            val alarmLatched = runCatching {
+                ProtectionStore(appContext).read().mode == ProtectionMode.ALARM_TRIGGERED
+            }.getOrDefault(false)
+            if (alarmLatched) {
+                pending?.let {
+                    A2DisconnectScheduler.cancel(appContext, it.address, it.eventElapsedRealtimeMs)
+                }
+                runCatching {
+                    AlarmRecoveryCoordinator.onStartFailure(
+                        appContext,
+                        "The A2 alarm is latched, but Android deferred foreground alarm playback. Open the app to resume it."
+                    )
+                }.onFailure { recoveryError ->
+                    LocalTamperHistory.record(
+                        appContext, "a2_alarm_recovery_failed",
+                        recoveryError.javaClass.simpleName + ": " + recoveryError.message
+                    )
+                }
+            } else if (pending != null) {
+                A2DisconnectScheduler.scheduleRetry(appContext, pending, 1_000L)
+            }
+            return
+        }
+
+        if (runCatching {
+                ProtectionStore(appContext).read().mode == ProtectionMode.ALARM_TRIGGERED
+            }.getOrDefault(false)
+        ) {
+            AlarmRecoveryCoordinator.onStartFailure(
+                appContext, "Deadline receiver failed while the alarm was latched"
+            )
+        } else {
+            AlarmScheduler.scheduleRetry(appContext, 1_000L)
+        }
     }
 
     private fun handleA2DisconnectDeadline(context: Context, intent: Intent) {

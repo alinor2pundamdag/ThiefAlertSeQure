@@ -33,12 +33,12 @@
 ## Phase Two — detection reliability
 
 - Working branch: `dev/fixall-data-integrity`; Phase One verified baseline: `72cfad5e3f7e539a385cc09d6dd820d0de80dffa`. Do not modify `main`, merge, or release without owner approval.
-- Charger detection: event-receipt timestamp anchoring, bounded multi-sample confirmation, persisted transition recovery, reconnect cancellation, and alarm-deadline reconciliation are implemented in the branch.
-- Trusted Bluetooth detection: live foreground-service ACL receiver plus a manifest ACL receiver dynamically enabled only while monitoring, A2, and BLUETOOTH_CONNECT permission are active. Per-device encrypted disconnect deadlines use AlarmManager and reconnect/revision/boot/state guards; the foreground Handler remains the fast path while service is alive.
-- Exact-alarm access unavailable: inexact idle-aware fallback is used and recorded. Android may defer inexact alarms and throttle exact idle alarms, especially in Doze; eight-second delivery is a target, not a platform guarantee. Force-stop and OEM/hardware behavior remain outside app control.
-- Boot behavior: old-boot A2 deadlines and connection baselines are invalidated; a fresh ACL connection event is required after reboot.
-- Verification: final build/lint/unit/instrumentation matrix must pass on the final branch head. Physical-device testing is explicitly separate and is not a blocker for finishing Phase Two software work.
-- Phase Two is not complete until final CI, documentation consistency, and branch review are verified. Do not claim production release readiness from emulator CI alone.
+- Charger detection: event-receipt timestamp anchoring, three-consecutive-sample confirmation (five-sample cap), persisted transition recovery, reconnect cancellation, and alarm-deadline reconciliation are implemented. The ten-second grace begins at OS event receipt; Android broadcast and hardware latency remain outside the sampling bound.
+- Trusted Bluetooth detection: foreground ACL receiver plus an exported manifest receiver limited to platform-protected ACL actions. Export is required for the privileged Bluetooth UID; the controller enables the component only while monitoring, A2, and BLUETOOTH_CONNECT are active. Per-device encrypted deadlines use immutable PendingIntents and reconnect/revision/boot/state guards.
+- Exact-alarm access denied or revoked: an inexact idle-aware fallback remains, but Android may delay it in Doze. If it fires while the app process is absent, Android may block starting the continuous audio foreground service. The state remains latched; an owner-visible recovery notice and up to three retries are attempted. Notification denial or continued FGS restriction may require the owner to reopen the app. Eight-second delivery is a target, not a guarantee.
+- Boot behavior: old-boot A2 deadlines and connection baselines are invalidated; a fresh current-boot ACL connection event is required after reboot. Force-stop and OEM battery controls remain outside app control.
+- Verification: the newest branch workflow must pass build, unit, lint, API 36/37 instrumentation, and CodeQL before non-device Phase Two is declared complete. Physical-device testing is explicitly excluded from this work and remains a separate acceptance task.
+- Do not claim production release readiness from emulator CI alone.
 
 ## Verification status
 - Source-head run #1270: PASS for the build job and all seven Android instrumentation jobs.

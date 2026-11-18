@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class A2BluetoothAclReceiverInstrumentationTest {
-    @Test fun manifestReceiverPersistsDisconnectAndReconnectCancelsItWithoutTheService() {
+    @Test fun sharedProcessorPersistsDisconnectAndReconnectCancelsItWithoutTheServiceWithoutTheService() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, 0)
@@ -52,7 +52,7 @@ class A2BluetoothAclReceiverInstrumentationTest {
                 SystemClock.sleep(50L)
             }
             ProtectionMonitorService.isBluetoothReceiverRegistered = false
-            assumeTrue("A clean ARMED state is required for the manifest receiver test",
+            assumeTrue("A clean ARMED state is required for the shared A2 processor test",
                 store.write(ProtectionState(
                     ProtectionMode.ARMED, 0L, System.currentTimeMillis(), 0L, bootCount
                 )))
@@ -74,7 +74,7 @@ class A2BluetoothAclReceiverInstrumentationTest {
             )
             assertTrue("The shared manifest/runtime event queue should finish the disconnect transition",
                 disconnectFinished.await(5, TimeUnit.SECONDS))
-            assertTrue("Manifest receiver should persist an A2 deadline while the service is absent",
+            assertTrue("shared A2 processor should persist an A2 deadline while the service is absent",
                 A2DisconnectScheduler.hasPendingIntent(context, address, fallback = true))
 
             val reconnectFinished = CountDownLatch(1)

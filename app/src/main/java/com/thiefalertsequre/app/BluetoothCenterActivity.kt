@@ -144,7 +144,7 @@ class BluetoothCenterActivity : FragmentActivity() {
             "Monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled by owner"}",
             "Monitor runtime: ${if (monitorRunning) "Running" else "Not confirmed running"}",
             "Protection state: $protectionMode",
-            "Monitoring runs only while A2 is ON and the protection monitor setting is enabled. The foreground service handles live ACL events; a manifest receiver covers ACL connect/disconnect events while its process is absent. Each registered accessory needs a fresh connection baseline; disconnect starts an 8-second grace period, and reconnect cancels its pending alert. Exact-alarm access improves the process-death deadline; without it Android uses an inexact fallback that may be delayed in Doze.",
+            "Monitoring runs only while A2 is ON and the protection monitor setting is enabled. The foreground service handles live ACL events; a manifest receiver covers ACL connect/disconnect events while its process is absent. Each registered accessory needs a fresh connection baseline; disconnect starts an 8-second grace period, and reconnect cancels its pending alert. Exact-alarm access improves process-death response. Without it, Android may delay the inexact fallback in Doze; if the app process is absent, background alarm playback may be blocked until you reopen the app. Keep notifications enabled for recovery notices.",
             "Unregistering removes only this app's trust. Android pairing remains unchanged."
         ))
         root.addView(button("Add trusted paired device") { requestTrustedDevicePicker() }, matchWrap())

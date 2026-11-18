@@ -1,51 +1,44 @@
-# Phase Two — Power Detection and Charger Reliability
+# Phase Two — charger and trusted Bluetooth detection
 
-Status: Phase Two implementation is on `dev/fixall-data-integrity`; exact-head CI and emulator instrumentation are the remaining software verification gates. Physical-device certification is separate. This document records the source contract, not universal device certification.
+This document records the non-physical-device engineering contract for Phase Two. Emulator/CI evidence does not substitute for physical-device acceptance.
 
-## Detection path
+## Charger and power detection
 
-1. Android emits the protected `ACTION_POWER_CONNECTED` or `ACTION_POWER_DISCONNECTED` system broadcast.
-2. `ProtectionMonitorService` registers `PowerTransitionReceiver` while the user-enabled foreground monitor is active.
-3. `PowerTransitionReceiver` captures wall-clock, elapsed-realtime, and boot identity immediately, then queues work on the single-thread executor to preserve event order.
-4. `ExternalPowerState` reads Android's sticky `ACTION_BATTERY_CHANGED` snapshot and interprets `EXTRA_PLUGGED`. Missing or malformed values remain unknown; charging-current/charging-status is not substituted for external-power presence.
-5. `PowerTransitionSamplingPolicy` confirms three consecutive matching samples, at 100 ms intervals, with a five-read upper bound. It exits immediately after the third match. Unknown or opposite samples reset the consecutive count.
-6. `PowerTransitionCoordinator` validates the current-boot connected baseline, generation token, persisted candidate provenance, and current live power state before it changes protection state.
-7. The disconnect countdown uses the original OS event's elapsed-realtime timestamp. Confirmation latency does not add to the owner's 10-second grace period.
-8. Reconnection invalidates the pending generation, re-arms protection, and cancels only the matching deadline. A latched alarm is never cleared by power events.
-9. Persisted pending candidates are replayed only when generation and same-boot identity still match. A repeated recovery cannot create a second countdown or move the original deadline.
+- `PowerTransitionReceiver` captures the OS event's wall-clock and elapsed-realtime timestamps before asynchronous queueing.
+- The live `ACTION_BATTERY_CHANGED` snapshot must produce three consecutive matching samples, with a five-sample hard cap and 100 ms spacing. Stable confirmation normally adds about 200 ms; the cap is about 400 ms, excluding Android broadcast delivery and hardware latency.
+- The ten-second charger grace period is anchored to the original disconnect receipt, not the end of sampling.
+- Unknown or opposite samples reset the consecutive count. A disconnected snapshot alone never creates a countdown without a previously confirmed connected baseline and a valid disconnect event.
+- Pending disconnect provenance is persisted before confirmation so a restarted monitor can revalidate same-boot identity and current power state. Reconnect increments the generation and cancels the candidate/countdown. Stale or cross-boot candidates cannot arm an alarm.
 
-## Latency and reliability policy
+## Trusted Bluetooth separation (A2)
 
-- Stable-state sampling normally needs three reads and two 100 ms pauses (about 200 ms of sampling wait, plus Android snapshot and persistence overhead), rather than always waiting through all five reads.
-- The five-read cap remains for transient/stale snapshots. Reducing the sample interval further without device evidence would trade reliability for an unverified latency claim.
-- The disconnect event time is captured before sampling and queueing. The countdown deadline is therefore anchored to the OS event, not to the completion of debounce.
-- The single-thread event queue is intentionally retained: parallel handling could allow a stale disconnect to race a newer reconnect.
-- A failed durable write never authorizes an alarm transition. Unknown state never counts as connected or disconnected evidence.
+- A2 is opt-in and local-only. It uses paired-device identity; it does not scan, pair, or request location.
+- The foreground service registers the live ACL receiver while A2 and the monitor are active. A manifest ACL receiver is also enabled only while the monitor, A2, and `BLUETOOTH_CONNECT` permission are active.
+- The manifest receiver is intentionally `exported=true`: Android's Bluetooth stack can send from a privileged non-system UID. The receiver filter is limited to the platform-protected `ACL_CONNECTED` and `ACL_DISCONNECTED` actions; the controller keeps the component disabled outside the active A2 state. No new permission was added for this correction.
+- A single serialized event queue and the encrypted per-device registry make duplicate deliveries idempotent. Per-device and monitor revisions, the connected baseline, boot identity, and the expected event timestamp prevent stale callbacks from latching an alarm or cancelling another device's deadline.
+- Each accessory has its own encrypted AlarmManager deadline and immutable PendingIntent identity. Reconnect cancels both exact and fallback callbacks for that accessory; unregistering removes only this app's trust relationship and does not unpair Android Bluetooth.
+- On reboot, old-boot deadlines and all connection baselines are invalidated. A fresh current-boot ACL connection event is required before a later disconnect can start an A2 grace period.
+- When the service is alive, the Handler path is the fast path. The manifest receiver plus PendingIntent deadline provides a durable process-absent path where Android permits it. Force-stop remains outside app control.
 
-## Related device/phone connection detection
+## Exact-alarm, Doze, and background-service limits
 
-The existing A2 trusted-Bluetooth separation path remains a separate signal from charger power detection:
+- `SCHEDULE_EXACT_ALARM` is user-controlled special app access. When available, A2 schedules `setExactAndAllowWhileIdle`; a distinct `setAndAllowWhileIdle` fallback is also retained so exact-alarm revocation does not remove the only persisted callback.
+- Android can throttle idle exact alarms and defer inexact alarms, particularly in Doze. The eight-second A2 grace period is a target, not a guaranteed wall-clock delivery time.
+- Android explicitly exempts exact alarms from background foreground-service launch restrictions. An inexact fallback does not carry that documented exemption. If it fires while the app process/service is absent, the callback can latch `ALARM_TRIGGERED` but Android may reject starting the continuous audio foreground service.
+- That failure now enters `AlarmRecoveryCoordinator`: an owner-visible recovery notice is attempted and up to three bounded retries are scheduled. The notice requires `POST_NOTIFICATIONS`; if notifications are denied or Android continues to block background playback, the owner must reopen the app to resume the active alarm. The persisted alarm remains latched until successful owner authentication.
+- Do not claim zero latency, guaranteed eight-second playback without exact-alarm access, or immunity to force-stop/OEM battery controls. No battery-optimization exemption or other new intrusive permission was added.
 
-- It listens for Android ACL connect/disconnect events only while the optional A2 feature is enabled and Bluetooth Connect permission is available.
-- Only an owner-registered trusted device with a fresh connection baseline can start the existing 8-second separation grace period.
-- Reconnection, unregistration, re-registration, monitor revision changes, or a latched/non-ARMED protection state invalidate the pending timer.
-- The foreground service uses a runtime ACL receiver for the lowest-latency live path. A separate manifest ACL receiver is enabled only while both the protection monitor and A2 are enabled and BLUETOOTH_CONNECT permission is available; it covers connect/disconnect events while the app process is absent. Android explicitly lists ACL_CONNECTED and ACL_DISCONNECTED among the manifest implicit-broadcast exceptions.
-- Pending disconnect metadata is AES-GCM encrypted at rest and keyed per accessory. AlarmManager schedules an ELAPSED_REALTIME_WAKEUP deadline using setExactAndAllowWhileIdle when exact-alarm access is granted; otherwise it uses setAndAllowWhileIdle. The Handler timer remains the fast companion while the foreground service is alive.
-- Reconnection cancels the matching persisted deadline. Trust changes, per-device/monitor revision changes, disabled A2, non-ARMED state, and stale boot identity reject the callback before it can latch an alarm.
-- Process/service restart preserves the connection baseline and durable deadline; the manifest receiver continues to observe ACL events during the process gap. BOOT_COMPLETED clears prior-boot deadlines and baselines; a fresh ACL_CONNECTED event is required to establish the new boot's baseline.
-- Force-stop, revoked Bluetooth permission, exact-alarm denial, OEM restrictions, and Android idle-alarm throttling remain platform boundaries. Inexact fallback can be delayed substantially during Doze; an eight-second target is not a guaranteed delivery time.
-- No continuous Bluetooth discovery/scanning, location permission, automatic pairing, or background root activity is introduced. Controller/API inventory is not represented as a working peer connection.
+## Automated evidence
 
-## Scope boundaries
+- Unit: `PowerTransitionSamplingPolicyTest`, `A2DisconnectPolicyTest`, `A2DisconnectSchedulerMergeTest`, and `A2BluetoothEventQueueTest`.
+- Instrumentation: `PowerTransitionRecoveryInstrumentationTest`, `A2DisconnectSchedulerInstrumentationTest`, `A2BluetoothReceiverControllerInstrumentationTest`, `A2BluetoothAclReceiverInstrumentationTest`, `AlarmSchedulerInstrumentationTest`, and `AlarmDeadlineReceiverInstrumentationTest`.
+- The receiver-controller test verifies the manifest receiver's exported contract and enable/disable gating. The shared-processor test runs with the service stopped; it does not kill the app process or prove actual Bluetooth-stack delivery on every OEM.
+- Android's broadcast guidance explains why Bluetooth-originated broadcasts may require an exported receiver, and the alarm/FGS guidance defines the exact-versus-inexact background-start boundary:
+  - [Broadcast receiver guidance](https://developer.android.com/develop/background-work/background-tasks/broadcasts)
+  - [Manifest implicit-broadcast exceptions](https://developer.android.com/develop/background-work/background-tasks/broadcasts/broadcast-exceptions)
+  - [Alarm scheduling and exact-alarm permission](https://developer.android.com/develop/background-work/services/alarms)
+  - [Background foreground-service start restrictions](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start)
 
-- Preserve the authoritative DISARMED / ARMED / COUNTDOWN / ALARM_TRIGGERED state machine, the 10-second charger grace period, owner authentication, alarm latch, package identity, minSdk 26, target/compile SDK 36, local-only privacy, and existing signing identity.
-- Android/OEM scheduling, receiver delivery, exact-alarm access, force-stop, Bluetooth permission, and hardware/firmware behavior can affect end-to-end delivery. Android may throttle exact-and-allow-while-idle alarms (including significantly longer intervals in low-power idle) and can defer inexact alarms; do not claim zero-delay or guaranteed universal detection. See [AlarmManager API](https://developer.android.com/reference/android/app/AlarmManager) and [Schedule alarms](https://developer.android.com/develop/background-work/services/alarms).
-- No manifest-only implicit power receiver is added. Android's background broadcast restrictions and receiver-delivery behavior must be respected; the existing runtime receiver remains tied to the visible foreground monitor.
-- Do not add Bluetooth scanning, new permissions, cloud telemetry, or unrelated anti-theft features as part of this phase.
+## Explicitly outstanding physical-device acceptance
 
-## Verification record
-
-- Unit coverage: `PowerTransitionSamplingPolicyTest` covers early confirmation, unknown/opposite sample resets, bounded rejection, and unknown-only input. `A2DisconnectPolicyTest` covers same-boot validation, deadline overflow, revision invalidation, reconnect cancellation, and alarm guards.
-- Android instrumentation coverage: `A2DisconnectSchedulerInstrumentationTest` verifies encrypted per-device deadline persistence and reconnect cancellation; `A2BluetoothReceiverControllerInstrumentationTest` verifies manifest receiver gating by monitor/A2 state and Bluetooth permission.
-- Android integration coverage: `PowerTransitionRecoveryInstrumentationTest` seeds a persisted same-boot disconnect candidate, confirms recovery from Android's live battery snapshot, and checks replay idempotency.
-- Still device-dependent: real charger attach/detach timing, OEM receiver/service survival, actual process kill/restart timing, exact/inexact alarm delivery under Doze, Bluetooth permission revocation behavior, and real Bluetooth accessory ACL behavior.
+Physical-device testing is excluded from this engineering task and remains outstanding. On the target phone, verify actual ACL delivery after process death, Doze behavior, exact-alarm access denied and revoked, notification permission denied, reboot, multi-device identity, rapid reconnect/disconnect, charger transitions, OEM battery controls, and audible alarm recovery. Record device model, Android/MagicOS version, and observed timing. Do not represent emulator CI as physical-device acceptance.

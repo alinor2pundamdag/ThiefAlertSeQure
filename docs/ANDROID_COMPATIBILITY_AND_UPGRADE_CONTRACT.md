@@ -54,6 +54,7 @@ HONOR menus vary by region and MagicOS version. The device's actual Settings UI 
 - The monitor foreground service remains private and uses the declared `specialUse` type. The alarm foreground service remains private and uses `mediaPlayback`; boot recovery must not start a prohibited mediaPlayback foreground service directly from BOOT_COMPLETED.
 - Alarm playback, vibration and flash remain independent of optional device-admin screen locking. Failure of the optional lock request must not stop alarm audio.
 - All PendingIntents must use immutable flags unless mutability is explicitly required and justified. System-only power receivers must accept only protected system broadcasts.
+- The A2 manifest receiver is exported only for Android-protected ACL connect/disconnect actions because the Bluetooth stack may use a privileged non-system UID. The controller keeps it disabled unless monitoring, A2, and Bluetooth permission are active; do not add unprotected actions to its filter.
 - Boot, deadline and device-admin receivers must retain their intended exported state and permissions. The APK FileProvider must remain non-exported and grant access only through scoped content URIs.
 - Do not add unrelated permissions, background data collection, broad storage access, microphone, location or camera capture for charger protection.
 - OEM controls, force-stop behavior, battery-saver behavior and real hardware cannot be proven by an emulator. Report emulator results separately from physical HONOR 200 Pro acceptance.

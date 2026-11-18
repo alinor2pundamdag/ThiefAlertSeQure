@@ -188,6 +188,11 @@ internal fun enqueueA2BluetoothEvent(
  * remove ACL coverage. The runtime receiver may see the same broadcast; both
  * copies enter the same serial queue and the registry baseline makes duplicates idempotent.
  */
+/**
+ * Manifest entry point for Android-protected ACL broadcasts. Exported intentionally so the
+ * privileged Bluetooth stack UID can deliver events while the app process is absent. The
+ * controller enables this component only while monitoring, A2, and Bluetooth permission are active.
+ */
 class A2BluetoothAclReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val receipt = A2BluetoothEventReceipt.capture(context)

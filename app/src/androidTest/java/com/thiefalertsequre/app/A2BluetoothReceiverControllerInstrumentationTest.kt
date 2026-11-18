@@ -21,6 +21,10 @@ class A2BluetoothReceiverControllerInstrumentationTest {
         )
         val previousA2 = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
         val component = ComponentName(context, A2BluetoothAclReceiver::class.java)
+        assertTrue(
+            "Bluetooth ACL receiver must be exported so Android's privileged Bluetooth UID can deliver protected broadcasts after process death",
+            context.packageManager.getReceiverInfo(component, 0).exported
+        )
         try {
             assertTrue(prefs.edit()
                 .putBoolean(ProtectionMonitorService.KEY_ENABLED, false)
