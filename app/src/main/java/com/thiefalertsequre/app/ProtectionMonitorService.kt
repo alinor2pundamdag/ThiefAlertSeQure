@@ -430,22 +430,35 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                 val boot = ProtectionClock.bootCount(this)
                 var callbackStillCurrent = false
                 var transitionedToAlarm = false
-                val next = ProtectionStore(this).update { current ->
+                val update = ProtectionStore(this).updatePersisted { current ->
                     if (!ProtectionEngine.isCurrentDeadline(
                             current, expected.deadlineEpochMs,
                             expected.deadlineElapsedRealtimeMs, expected.bootCount
                         )
-                    ) return@update current
+                    ) return@updatePersisted current
                     callbackStillCurrent = true
                     val updated = ProtectionEngine.reconcileCountdown(current, connected, now, elapsed, boot)
                     transitionedToAlarm = current.mode == ProtectionMode.COUNTDOWN &&
                         updated.mode == ProtectionMode.ALARM_TRIGGERED
                     updated
                 }
-                if (!callbackStillCurrent) return@Thread
+                val next = update.state
+                if (!callbackStillCurrent) {
+                    if (next.mode == ProtectionMode.ALARM_TRIGGERED) {
+                        handler.post { startTheftAlarm() }
+                    }
+                    return@Thread
+                }
 
                 handler.post {
-                    if (transitionedToAlarm && next.mode == ProtectionMode.ALARM_TRIGGERED) {
+                    if (!update.persisted && next.mode == ProtectionMode.COUNTDOWN) {
+                        LocalTamperHistory.record(
+                            this, "monitor_countdown_state_persist_failed",
+                            "The deadline callback could not commit the live charger reconciliation; retrying without shortening the countdown"
+                        )
+                        AlarmScheduler.scheduleRetry(this, POWER_RETRY_MS)
+                        handler.postDelayed(countdownRunnable, POWER_RETRY_MS)
+                    } else if (transitionedToAlarm && next.mode == ProtectionMode.ALARM_TRIGGERED) {
                         countdownExpected = null
                         AlarmScheduler.cancel(this)
                         LocalTamperHistory.record(this, "monitor_countdown_expired", "Stable charger samples and current deadline transitioned to alarm")
