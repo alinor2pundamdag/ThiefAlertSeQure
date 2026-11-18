@@ -1091,23 +1091,23 @@ class GenesisFilamentRendererView(
             val angle = index * (2.0 * PI / 14.0)
             Point2(cos(angle).toFloat() * 0.145f, sin(angle).toFloat() * 0.17f)
         }
-        addBone(1, 0.29f, 0.30f, 0.15f, 0f, impactAngle = 18f, offsetY = 0.35f, polygon = head, accent = true)
+        addBone(1, 0.29f, 0.30f, 0.15f, 0f, impactAngle = 18f, offsetY = 0.02f, polygon = head, accent = true)
 
         // Shoulder, elbow and wrist bones: left and right chains are parented to the torso.
-        addBone(1, 0.17f, 0.43f, 0.13f, -58f, swing = -17f, phase = 0f, impactAngle = -34f, offsetX = -0.27f, offsetY = 0.24f)
+        addBone(1, 0.17f, 0.43f, 0.13f, -58f, swing = -17f, phase = 0f, impactAngle = -34f, offsetX = -0.27f, offsetY = -0.05f)
         addBone(3, 0.135f, 0.37f, 0.12f, -13f, swing = -9f, phase = 0.4f, impactAngle = -24f)
         addBone(4, 0.15f, 0.15f, 0.12f, -8f, impactAngle = -15f)
-        addBone(1, 0.17f, 0.43f, 0.13f, 58f, swing = 17f, phase = PI.toFloat(), impactAngle = 34f, offsetX = 0.27f, offsetY = 0.24f)
+        addBone(1, 0.17f, 0.43f, 0.13f, 58f, swing = 17f, phase = PI.toFloat(), impactAngle = 34f, offsetX = 0.27f, offsetY = -0.05f)
         addBone(6, 0.135f, 0.37f, 0.12f, 13f, swing = 9f, phase = 2.1f, impactAngle = 24f)
         addBone(7, 0.15f, 0.15f, 0.12f, 8f, impactAngle = 15f)
 
         // Hip, knee and ankle chains. Each limb is a separate beveled 3D PBR mesh.
         addBone(0, 0.205f, 0.54f, 0.15f, 176f, swing = 18f, phase = 0f, impactAngle = -28f, offsetX = -0.12f, offsetY = -0.12f)
         addBone(9, 0.155f, 0.49f, 0.13f, 0f, swing = 9f, phase = 0.3f, impactAngle = -18f)
-        addBone(10, 0.23f, 0.16f, 0.16f, -78f, impactAngle = -22f)
+        addBone(10, 0.23f, 0.16f, 0.16f, 78f, impactAngle = -22f)
         addBone(0, 0.205f, 0.54f, 0.15f, 184f, swing = -18f, phase = PI.toFloat(), impactAngle = 28f, offsetX = 0.12f, offsetY = -0.12f)
         addBone(12, 0.155f, 0.49f, 0.13f, 0f, swing = -9f, phase = 2.1f, impactAngle = 18f)
-        addBone(13, 0.23f, 0.16f, 0.16f, 78f, impactAngle = 22f)
+        addBone(13, 0.23f, 0.16f, 0.16f, -78f, impactAngle = 22f)
     }
 
     private fun updateIntruderRig(
