@@ -11,10 +11,22 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         val pending = goAsync()
         Thread {
             try {
+                val app = context.applicationContext
+                val alarmAlreadyLatched = ProtectionStore(app).read().mode == ProtectionMode.ALARM_TRIGGERED
+                if (!ConfigurationBackup.recoverPendingRestore(app) && !alarmAlreadyLatched) {
+                    LocalTamperHistory.record(
+                        app, "configuration_restore_recovery_pending",
+                        "A non-alarm deadline was deferred because interrupted settings could not be recovered"
+                    )
+                    ProtectionMonitorRecoveryNotice.show(
+                        app, "An interrupted settings restore must be recovered before protection deadlines can be processed."
+                    )
+                    return@Thread
+                }
                 if (callbackIntent.action == A2DisconnectScheduler.ACTION_DEADLINE) {
-                    handleA2DisconnectDeadline(context.applicationContext, callbackIntent)
+                    handleA2DisconnectDeadline(app, callbackIntent)
                 } else {
-                    handleDeadline(context.applicationContext, callbackIntent)
+                    handleDeadline(app, callbackIntent)
                 }
             } catch (error: Exception) {
                 LocalTamperHistory.record(
