@@ -423,6 +423,8 @@ jobs:
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         env:
           ANDROID_API_LEVEL: ${{ matrix.api-level }}
+          # Android 17's emulator requires explicit TCG opt-in when this hosted Linux runner has no KVM.
+          ANDROID_I_WANT_MY_TCG: ${{ matrix.api-level == 37 && 'yes' || 'no' }}
         with:
           api-level: ${{ matrix.api-level }}
           system-image-api-level: ${{ matrix.api-level == 37 && '37.0' || matrix.api-level }}
