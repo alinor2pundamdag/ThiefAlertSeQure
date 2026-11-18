@@ -27,7 +27,11 @@ internal object A2BluetoothReceiverController {
         val baselineReady = SafePreferences.boolean(
             prefs, ProtectionMonitorService.KEY_A2_BOOT_BASELINE_READY, false
         )
-        val enabled = monitorEnabled && alertEnabled && permissionGranted && baselineReady
+        val mode = ProtectionStore(context).read().mode
+        val activeProtectionRequiresMonitor =
+            mode == ProtectionMode.ARMED || mode == ProtectionMode.COUNTDOWN
+        val monitorAvailable = monitorEnabled || activeProtectionRequiresMonitor
+        val enabled = monitorAvailable && alertEnabled && permissionGranted && baselineReady
         return setComponentEnabled(context, enabled)
     }
 
