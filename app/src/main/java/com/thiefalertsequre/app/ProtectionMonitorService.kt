@@ -1,5 +1,6 @@
 package com.thiefalertsequre.app
 
+import android.bluetooth.BluetoothDevice
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -228,7 +229,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         bluetoothReceiverRegistered = true
         isBluetoothReceiverRegistered = true
         A2BluetoothReceiverController.sync(this)
-        LocalTamperHistory.record(this, "trusted_bluetooth_receiver_registered", "Trusted Bluetooth separation monitoring active; manifest receiver covers process-death ACL events")
+        LocalTamperHistory.record(this, "trusted_bluetooth_receiver_registered", "Runtime and manifest ACL listeners share the serialized A2 event queue; duplicate broadcasts are idempotent")
     }
 
     private fun handleBluetoothEventResult(result: A2BluetoothEventResult) {

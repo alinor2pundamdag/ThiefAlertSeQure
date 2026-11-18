@@ -2,7 +2,6 @@ package com.thiefalertsequre.app
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
-import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -16,6 +15,8 @@ import org.junit.Assume.assumeNotNull
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class A2BluetoothAclReceiverInstrumentationTest {
@@ -63,31 +64,29 @@ class A2BluetoothAclReceiverInstrumentationTest {
             assertFalse(TrustedBluetoothRegistry.markConnected(prefs, address, true))
             assertTrue(A2BluetoothReceiverController.sync(context))
 
-            context.sendBroadcast(
-                Intent(BluetoothDevice.ACTION_ACL_DISCONNECTED)
-                    .setComponent(ComponentName(context, A2BluetoothAclReceiver::class.java))
-                    .putExtra(BluetoothDevice.EXTRA_DEVICE, device)
+            val disconnectFinished = CountDownLatch(1)
+            enqueueA2BluetoothEvent(
+                context,
+                Intent(BluetoothDevice.ACTION_ACL_DISCONNECTED).putExtra(BluetoothDevice.EXTRA_DEVICE, device),
+                A2BluetoothEventReceipt.capture(context),
+                "a2_instrumentation_manifest_path",
+                onFinished = { disconnectFinished.countDown() }
             )
-            val deadline = SystemClock.elapsedRealtime() + 5_000L
-            while (!A2DisconnectScheduler.hasPendingIntent(context, address, fallback = true) &&
-                SystemClock.elapsedRealtime() < deadline
-            ) {
-                SystemClock.sleep(50L)
-            }
+            assertTrue("The shared manifest/runtime event queue should finish the disconnect transition",
+                disconnectFinished.await(5, TimeUnit.SECONDS))
             assertTrue("Manifest receiver should persist an A2 deadline while the service is absent",
                 A2DisconnectScheduler.hasPendingIntent(context, address, fallback = true))
 
-            context.sendBroadcast(
-                Intent(BluetoothDevice.ACTION_ACL_CONNECTED)
-                    .setComponent(ComponentName(context, A2BluetoothAclReceiver::class.java))
-                    .putExtra(BluetoothDevice.EXTRA_DEVICE, device)
+            val reconnectFinished = CountDownLatch(1)
+            enqueueA2BluetoothEvent(
+                context,
+                Intent(BluetoothDevice.ACTION_ACL_CONNECTED).putExtra(BluetoothDevice.EXTRA_DEVICE, device),
+                A2BluetoothEventReceipt.capture(context),
+                "a2_instrumentation_manifest_path",
+                onFinished = { reconnectFinished.countDown() }
             )
-            val reconnectDeadline = SystemClock.elapsedRealtime() + 5_000L
-            while (A2DisconnectScheduler.hasPendingIntent(context, address, fallback = true) &&
-                SystemClock.elapsedRealtime() < reconnectDeadline
-            ) {
-                SystemClock.sleep(50L)
-            }
+            assertTrue("The shared manifest/runtime event queue should finish the reconnect transition",
+                reconnectFinished.await(5, TimeUnit.SECONDS))
             assertFalse("Reconnect must cancel the durable deadline without a running service",
                 A2DisconnectScheduler.hasPendingIntent(context, address, fallback = true))
             assertTrue("Reconnect must restore the trusted device's connected baseline",

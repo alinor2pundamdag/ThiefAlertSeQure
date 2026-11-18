@@ -298,6 +298,12 @@ class BluetoothCenterActivity : FragmentActivity() {
             return
         }
         val configurationError = A2DisconnectStateLock.withLock {
+            if (!SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
+                return@withLock "The protection monitor was disabled before A2 could be enabled."
+            }
+            if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                return@withLock "The alarm became active before A2 could be enabled."
+            }
             if (!A2DisconnectScheduler.clearAll(this)) {
                 return@withLock "Existing trusted-device deadlines could not be safely cleared. A2 remains OFF; resolve the stored schedule before retrying."
             }
