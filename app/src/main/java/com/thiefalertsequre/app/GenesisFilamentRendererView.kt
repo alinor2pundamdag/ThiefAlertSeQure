@@ -1242,7 +1242,7 @@ class GenesisFilamentRendererView(
             swapChain = null
 
             fun destroyMesh(mesh: Mesh) {
-                attempt("scene mesh entity") { scene?.remove(mesh.entity) }
+                attempt("scene mesh entity") { scene?.removeEntity(mesh.entity) }
                 attempt("mesh entity") { activeEngine.destroyEntity(mesh.entity) }
                 attempt("mesh vertex buffer") { activeEngine.destroyVertexBuffer(mesh.vertexBuffer) }
                 attempt("mesh index buffer") { activeEngine.destroyIndexBuffer(mesh.indexBuffer) }
@@ -1256,17 +1256,17 @@ class GenesisFilamentRendererView(
             coreMesh?.let(::destroyMesh)
 
             if (lightEntity != 0) {
-                attempt("key light scene entity") { scene?.remove(lightEntity) }
+                attempt("key light scene entity") { scene?.removeEntity(lightEntity) }
                 attempt("key light") { activeEngine.destroyEntity(lightEntity) }
                 attempt("key light entity manager") { EntityManager.get().destroy(lightEntity) }
             }
             if (coreLightEntity != 0) {
-                attempt("core light scene entity") { scene?.remove(coreLightEntity) }
+                attempt("core light scene entity") { scene?.removeEntity(coreLightEntity) }
                 attempt("core light") { activeEngine.destroyEntity(coreLightEntity) }
                 attempt("core light entity manager") { EntityManager.get().destroy(coreLightEntity) }
             }
             rimLightEntities.toList().forEach { entity ->
-                attempt("rim light scene entity") { scene?.remove(entity) }
+                attempt("rim light scene entity") { scene?.removeEntity(entity) }
                 attempt("rim light") { activeEngine.destroyEntity(entity) }
                 attempt("rim light entity manager") { EntityManager.get().destroy(entity) }
             }
