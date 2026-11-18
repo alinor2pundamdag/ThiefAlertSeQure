@@ -9,6 +9,13 @@ import androidx.core.content.ContextCompat
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress()) {
+            LocalTamperHistory.record(
+                context, "configuration_restore_recovery_pending",
+                "Boot/package/exact-alarm callback was deferred while an in-process settings restore is active"
+            )
+            return
+        }
         if (!ConfigurationBackup.recoverPendingRestore(context)) {
             LocalTamperHistory.record(
                 context, "configuration_restore_recovery_pending",
