@@ -6,12 +6,25 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.security.MessageDigest
 import java.util.UUID
 
 /** Publishes owner-consented photos into the app's dedicated Gallery folder. */
 internal object CameraEvidenceMediaStore {
     private const val DIRECTORY_NAME = "ThiefAlertSeQure"
+
+    data class MigrationResult(
+        val enumerationSucceeded: Boolean,
+        val copiedToVault: Int = 0,
+        val originalsRemoved: Int = 0,
+        val copyFailures: Int = 0,
+        val removalFailures: Int = 0,
+        val capacityLimited: Int = 0,
+        val vaultIntegrityVerified: Boolean = false,
+        val blockedByProtection: Boolean = false
+    )
 
     @Synchronized
     fun save(context: Context, jpeg: ByteArray): Uri? {
@@ -57,6 +70,111 @@ internal object CameraEvidenceMediaStore {
     fun enforceRetention(context: Context) {
         prune(context.applicationContext, System.currentTimeMillis())
     }
+
+    /**
+     * Copies app-owned Gallery photos into the encrypted vault, verifies every
+     * ciphertext by reading it back, then removes the original only if the
+     * source bytes are still identical and protection remains DISARMED.
+     */
+    @Synchronized
+    fun migrateAllToEncryptedVault(context: Context): MigrationResult {
+        val app = context.applicationContext
+        if (ProtectionStore(app).read().mode != ProtectionMode.DISARMED) {
+            return MigrationResult(true, blockedByProtection = true)
+        }
+        enforceRetention(app)
+        val query = queryOwnedImages(app)
+        if (!query.success) return MigrationResult(false)
+        if (!CameraEvidenceVault.verifyIntegrity(app)) {
+            return MigrationResult(true, copyFailures = query.images.size, vaultIntegrityVerified = false)
+        }
+        if (query.images.isEmpty()) {
+            return MigrationResult(true, vaultIntegrityVerified = true)
+        }
+
+        val existingCount = CameraEvidenceVault.entries(app).size
+        val capacity = (CameraEvidencePolicy.MAX_IMAGES - existingCount).coerceAtLeast(0)
+        val selected = query.images
+            .sortedByDescending { it.second }
+            .take(capacity)
+            .sortedBy { it.second }
+        var copied = 0
+        var removed = 0
+        var copyFailures = 0
+        var removalFailures = 0
+        var blocked = false
+
+        for ((uri, timestamp) in selected) {
+            val original = readBoundedImage(app, uri)
+            if (original == null || !CameraEvidencePolicy.isValidImageSize(original.size)) {
+                copyFailures += 1
+                continue
+            }
+            val entry = CameraEvidenceVault.save(app, original, timestamp)
+            if (entry == null) {
+                copyFailures += 1
+                continue
+            }
+            val verified = CameraEvidenceVault.read(app, entry.id)
+            if (verified == null || !MessageDigest.isEqual(original, verified)) {
+                runCatching { CameraEvidenceVault.delete(app, entry.id) }
+                copyFailures += 1
+                continue
+            }
+            copied += 1
+
+            // Re-read the Gallery row immediately before deletion. If its contents
+            // changed after the encrypted copy was made, preserve the source row.
+            val currentSource = readBoundedImage(app, uri)
+            if (currentSource == null || !MessageDigest.isEqual(original, currentSource)) {
+                removalFailures += 1
+                continue
+            }
+            val deleteResult = ProtectionStore(app).runIfDisarmed {
+                runCatching { app.contentResolver.delete(uri, null, null) == 1 }.getOrDefault(false)
+            }
+            when (deleteResult) {
+                true -> removed += 1
+                false -> removalFailures += 1
+                null -> {
+                    blocked = true
+                    break
+                }
+            }
+        }
+
+        val vaultHealthy = CameraEvidenceVault.verifyIntegrity(app)
+        return MigrationResult(
+            enumerationSucceeded = true,
+            copiedToVault = copied,
+            originalsRemoved = removed,
+            copyFailures = copyFailures,
+            removalFailures = removalFailures,
+            capacityLimited = (query.images.size - selected.size).coerceAtLeast(0),
+            vaultIntegrityVerified = vaultHealthy,
+            blockedByProtection = blocked
+        )
+    }
+
+    private fun readBoundedImage(context: Context, uri: Uri): ByteArray? = runCatching {
+        val input = context.contentResolver.openInputStream(uri) ?: return@runCatching null
+        input.use { stream ->
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(8 * 1024)
+            var total = 0
+            while (true) {
+                val read = stream.read(buffer)
+                if (read < 0) break
+                total += read
+                require(total <= CameraEvidencePolicy.MAX_IMAGE_BYTES) {
+                    "Gallery image exceeds the encrypted evidence size limit"
+                }
+                output.write(buffer, 0, read)
+            }
+            output.toByteArray()
+        }
+    }.getOrNull()
+
 
     @Synchronized
     fun count(context: Context): Int {
