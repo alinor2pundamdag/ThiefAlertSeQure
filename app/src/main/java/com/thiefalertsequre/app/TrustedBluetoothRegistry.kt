@@ -305,11 +305,15 @@ object TrustedBluetoothRegistry {
             is PreferenceRead.Value -> stored.value + 1L
             is PreferenceRead.Corrupt -> throw IllegalStateException("Corrupt Bluetooth revision retained; refusing to overwrite it.")
         }
-        check(prefs.edit()
-            .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, ""))
+        val encrypted = LocalPreferenceCipher.encrypt(KEY_BASELINES, "")
+        fun commitReset(): Boolean = prefs.edit()
+            .putString(KEY_BASELINES, encrypted)
             .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
             .putLong(KEY_REVISION, nextRevision)
-            .commit()) { "Could not securely clear trusted Bluetooth baselines." }
+            .commit()
+        var saved = runCatching { commitReset() }.getOrDefault(false)
+        if (!saved) saved = runCatching { commitReset() }.getOrDefault(false)
+        check(saved) { "Could not securely clear trusted Bluetooth baselines after retry." }
     }
 
     private fun baselineAddresses(prefs: SharedPreferences): Set<String> =
