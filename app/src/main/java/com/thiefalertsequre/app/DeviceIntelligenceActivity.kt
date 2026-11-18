@@ -338,7 +338,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                 IntegritySignal(
                     "Protection monitor runtime",
                     when {
-                        !monitorEnabled -> IntegrityStatus.UNSUPPORTED
+                        !monitorRequiredNow -> IntegrityStatus.UNSUPPORTED
                         monitorProcessRunning -> IntegrityStatus.VERIFIED
                         else -> IntegrityStatus.FAILED
                     }, 2
@@ -506,6 +506,8 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                 val frontCameraFeatureAvailable = app.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
                 val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(app).size }.getOrDefault(-1)
                 val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+                val activeProtectionRequiresMonitor = state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN
+                val monitorRequiredNow = monitorEnabled || activeProtectionRequiresMonitor
                 val monitorProcessRunning = runCatching {
                     app.getSystemService(ActivityManager::class.java).getRunningServices(100)
                         .any { it.service.className == ProtectionMonitorService::class.java.name }
@@ -542,6 +544,8 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                     put("frontCameraFeatureAvailable", frontCameraFeatureAvailable)
                     put("encryptedCameraPhotoCount", cameraEvidenceCount)
                     put("monitorProcessCurrentlyConfirmed", monitorProcessRunning)
+                    put("activeProtectionRequiresMonitor", activeProtectionRequiresMonitor)
+                    put("monitorRequiredByCurrentState", monitorRequiredNow)
                     put("protectionIntegrityScorePercent", integrityScore.percent)
                     put("protectionIntegrityScorePoints", "${integrityScore.earnedPoints}/${integrityScore.possiblePoints}")
                     put("permissionChangeMonitoring", "Android permission and special-access snapshots are compared when the app resumes")
