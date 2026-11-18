@@ -64,7 +64,9 @@ internal object CameraEvidenceVault {
             return null
         }
         val entry = Entry(id, timestampEpochMs, sha256(jpeg), jpeg.size)
-        val next = (retained + entry).takeLast(CameraEvidencePolicy.MAX_IMAGES)
+        val next = (retained + entry)
+            .sortedBy { it.timestampEpochMs }
+            .takeLast(CameraEvidencePolicy.MAX_IMAGES)
         if (!writeIndex(app, next)) {
             file.delete()
             return null
