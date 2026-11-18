@@ -9,6 +9,16 @@ import androidx.core.content.ContextCompat
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // A reboot invalidates every previous Bluetooth connection baseline even
+        // when settings recovery is pending. Do this before any early return.
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED &&
+            !A2BluetoothReceiverController.resetBaselineForBoot(context)
+        ) {
+            LocalTamperHistory.record(
+                context, "a2_boot_baseline_reset_failed",
+                "A2 manifest receiver remains disabled until stale Bluetooth baselines are safely cleared"
+            )
+        }
         if (ConfigurationBackup.isRestoreOrRecoveryInProgress()) {
             LocalTamperHistory.record(
                 context, "configuration_restore_recovery_pending",
@@ -47,14 +57,6 @@ class BootReceiver : BroadcastReceiver() {
         // BOOT_COMPLETED is authoritative even on devices where Settings.Global.BOOT_COUNT
         // is unreadable. Invalidate the previous boot's charger baseline before processing
         // any later power event; package-update and exact-alarm callbacks preserve it.
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED &&
-            !A2BluetoothReceiverController.resetBaselineForBoot(context)
-        ) {
-            LocalTamperHistory.record(
-                context, "a2_boot_baseline_reset_failed",
-                "A2 manifest receiver remains disabled until stale Bluetooth baselines are safely cleared"
-            )
-        }
         PowerTransitionCoordinator.initializeBaseline(
             context,
             forceBootReconciliation = intent.action == Intent.ACTION_BOOT_COMPLETED
