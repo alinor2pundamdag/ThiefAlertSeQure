@@ -567,7 +567,9 @@ class SettingsActivity : FragmentActivity() {
         val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
         val cameraPermissionGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         val frontCameraAvailable = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
-        val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(this).size }.getOrDefault(-1)
+        // Vault index reads, retention pruning and Keystore-backed integrity
+        // checks run on the IO executor below, never during UI rendering.
+        var cameraEvidenceCount = -1
         var galleryEvidenceCount = -1
         var cameraEvidenceIntegrityVerified = false
         val encryptNewPhotos = CameraEvidenceCapture.isEncryptionEnabled(this)
@@ -576,22 +578,25 @@ class SettingsActivity : FragmentActivity() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
                 ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         )
-        val cameraEvidenceCountLabel = if (cameraEvidenceCount >= 0) cameraEvidenceCount.toString() else "unknown"
         val cameraEvidenceStatus = text(
-            "Front-camera photo evidence: ${when { !frontCameraAvailable -> "UNSUPPORTED"; cameraEvidenceEnabled && !cameraPermissionGranted -> "NEEDS CAMERA PERMISSION"; cameraEvidenceEnabled && !galleryStoragePermissionGranted -> "NEEDS GALLERY PERMISSION"; cameraEvidenceEnabled -> "ON"; else -> "OFF" }} • new photos: ${if (encryptNewPhotos) "ENCRYPTED PRIVATE VAULT" else "GALLERY (UNENCRYPTED)"} • ${if (cameraEvidenceCount >= 0) "$cameraEvidenceCount encrypted" else "encrypted count CHECKING"} / Gallery count CHECKING • vault integrity CHECKING",
+            "Front-camera photo evidence: ${when { !frontCameraAvailable -> "UNSUPPORTED"; cameraEvidenceEnabled && !cameraPermissionGranted -> "NEEDS CAMERA PERMISSION"; cameraEvidenceEnabled && !galleryStoragePermissionGranted -> "NEEDS GALLERY PERMISSION"; cameraEvidenceEnabled -> "ON"; else -> "OFF" }} • new photos: ${if (encryptNewPhotos) "ENCRYPTED PRIVATE VAULT" else "GALLERY (UNENCRYPTED)"} • encrypted count CHECKING / Gallery count CHECKING • vault integrity CHECKING",
             12f, R.color.tas_muted
         )
         root.addView(cameraEvidenceStatus)
         val evidenceRenderRoot = root
         ioExecutor.execute {
+            val vaultEntries = runCatching {
+                CameraEvidenceVault.entries(applicationContext)
+            }.getOrNull()
             val cameraEvidenceIntegrity = runCatching {
-                CameraEvidenceVault.verifyIntegrity(this@SettingsActivity)
+                CameraEvidenceVault.verifyIntegrity(applicationContext)
             }.getOrDefault(false)
             val galleryCount = runCatching {
                 CameraEvidenceMediaStore.count(applicationContext)
             }.getOrDefault(-1)
             runOnUiThread {
                 if (!isFinishing && !isDestroyed && root === evidenceRenderRoot) {
+                    cameraEvidenceCount = vaultEntries?.size ?: -1
                     galleryEvidenceCount = galleryCount
                     cameraEvidenceIntegrityVerified = cameraEvidenceIntegrity
                     val encryptedCountLabel = if (cameraEvidenceCount >= 0) "$cameraEvidenceCount encrypted" else "encrypted count UNKNOWN"
@@ -693,7 +698,7 @@ class SettingsActivity : FragmentActivity() {
                     }.showThemed(this)
             }
         })
-        root.addView(action("Review / view / export encrypted-vault photos ($cameraEvidenceCountLabel)") {
+        root.addView(action("Review / view / export encrypted-vault photos") {
             showCameraEvidenceArchive()
         })
         root.addView(action("Delete all front-camera photos") {
