@@ -71,7 +71,11 @@ class GenesisFilamentRendererView(
         var rx: Float,
         var ry: Float,
         var rz: Float,
-        val radius: Float
+        val radius: Float,
+        val mass: Float = (radius * radius * radius * 18f).coerceAtLeast(0.025f),
+        var angularX: Float = 0f,
+        var angularY: Float = 0f,
+        var angularZ: Float = 0f
     )
 
     companion object {
@@ -529,7 +533,7 @@ class GenesisFilamentRendererView(
 
     private fun createFractureBodies(outline: List<Point2>) {
         val center = Point2(0f, 0.05f)
-        val subdivisions = 3
+        val subdivisions = 6
         for (edge in outline.indices) {
             val a = outline[edge]
             val b = outline[(edge + 1) % outline.size]
@@ -545,19 +549,29 @@ class GenesisFilamentRendererView(
                     Point2(p0.x - cx, p0.y - cy),
                     Point2(p1.x - cx, p1.y - cy)
                 )
-                val mesh = createExtrudedMesh(local, 0.15f, debrisMaterial!!)
+                val edge1x = p0.x - center.x
+                val edge1y = p0.y - center.y
+                val edge2x = p1.x - center.x
+                val edge2y = p1.y - center.y
+                val area = abs(edge1x * edge2y - edge1y * edge2x) * 0.5f
+                val radius = (sqrt(area) * 0.46f).coerceIn(0.065f, 0.22f)
+                val mesh = createExtrudedMesh(local, 0.105f + radius * 0.34f, debrisMaterial!!)
                 val dx = cx - center.x
                 val dy = cy - center.y
                 val length = sqrt(dx * dx + dy * dy).coerceAtLeast(0.001f)
                 val seed = edge * subdivisions + part
+                val spin = if (seed % 2 == 0) 1f else -1f
                 bodies += Body(
                     mesh = mesh,
                     x = cx, y = cy, z = 0f,
-                    vx = dx / length * (1.35f + (seed % 4) * 0.18f),
-                    vy = dy / length * (1.8f + (seed % 3) * 0.22f),
-                    vz = if (seed % 2 == 0) 0.85f else -0.85f,
+                    vx = dx / length * (1.55f + (seed % 5) * 0.23f),
+                    vy = dy / length * (2.05f + (seed % 4) * 0.28f),
+                    vz = spin * (0.72f + (seed % 3) * 0.24f),
                     rx = 0f, ry = 0f, rz = 0f,
-                    radius = 0.17f
+                    radius = radius,
+                    angularX = spin * (3.2f + (seed % 4) * 0.8f),
+                    angularY = -spin * (2.4f + (seed % 5) * 0.65f),
+                    angularZ = spin * (4.0f + (seed % 6) * 0.7f)
                 )
             }
         }
@@ -716,15 +730,24 @@ class GenesisFilamentRendererView(
             body.x += body.vx * delta
             body.y += body.vy * delta
             body.z += body.vz * delta
-            body.rx += (body.vz * 82f + 38f) * delta
-            body.ry += (body.vx * 57f + 24f) * delta
-            body.rz += (body.vy * 48f + 35f) * delta
+            body.rx += body.angularX * delta
+            body.ry += body.angularY * delta
+            body.rz += body.angularZ * delta
 
             if (body.y - body.radius < -2.55f) {
                 body.y = -2.55f + body.radius
-                if (body.vy < 0f) body.vy = -body.vy * 0.31f
-                body.vx *= 0.82f
-                body.vz *= 0.82f
+                if (body.vy < 0f) {
+                    val impactSpeed = -body.vy
+                    body.vy = impactSpeed * 0.28f
+                    val floorImpulse = impactSpeed * body.mass
+                    body.angularX += body.vz * floorImpulse * 0.9f
+                    body.angularZ -= body.vx * floorImpulse * 0.65f
+                }
+                body.vx *= 0.84f
+                body.vz *= 0.84f
+                body.angularX *= 0.88f
+                body.angularY *= 0.88f
+                body.angularZ *= 0.88f
             }
         }
 
@@ -743,14 +766,49 @@ class GenesisFilamentRendererView(
                     val ny = dy / distance
                     val nz = dz / distance
                     val relative = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny + (b.vz - a.vz) * nz
+                    val invA = 1f / a.mass
+                    val invB = 1f / b.mass
+                    val inverseMassSum = invA + invB
                     if (relative < 0f) {
-                        val impulse = -(1.0f + 0.32f) * relative * 0.5f
-                        a.vx -= impulse * nx; a.vy -= impulse * ny; a.vz -= impulse * nz
-                        b.vx += impulse * nx; b.vy += impulse * ny; b.vz += impulse * nz
+                        val restitution = 0.38f
+                        val normalImpulse = -(1f + restitution) * relative / inverseMassSum
+                        a.vx -= normalImpulse * invA * nx
+                        a.vy -= normalImpulse * invA * ny
+                        a.vz -= normalImpulse * invA * nz
+                        b.vx += normalImpulse * invB * nx
+                        b.vy += normalImpulse * invB * ny
+                        b.vz += normalImpulse * invB * nz
+
+                        val rvx = b.vx - a.vx
+                        val rvy = b.vy - a.vy
+                        val rvz = b.vz - a.vz
+                        val tangentDot = rvx * nx + rvy * ny + rvz * nz
+                        var tx = rvx - tangentDot * nx
+                        var ty = rvy - tangentDot * ny
+                        var tz = rvz - tangentDot * nz
+                        val tangentLength = sqrt(tx * tx + ty * ty + tz * tz)
+                        if (tangentLength > 0.0001f) {
+                            tx /= tangentLength; ty /= tangentLength; tz /= tangentLength
+                            val frictionImpulse = (-tangentLength / inverseMassSum)
+                                .coerceIn(-normalImpulse * 0.42f, normalImpulse * 0.42f)
+                            a.vx -= frictionImpulse * invA * tx
+                            a.vy -= frictionImpulse * invA * ty
+                            a.vz -= frictionImpulse * invA * tz
+                            b.vx += frictionImpulse * invB * tx
+                            b.vy += frictionImpulse * invB * ty
+                            b.vz += frictionImpulse * invB * tz
+                            val spinImpulse = frictionImpulse * 2.2f
+                            a.angularX += (ny * tz - nz * ty) * spinImpulse * invA
+                            a.angularY += (nz * tx - nx * tz) * spinImpulse * invA
+                            a.angularZ += (nx * ty - ny * tx) * spinImpulse * invA
+                            b.angularX -= (ny * tz - nz * ty) * spinImpulse * invB
+                            b.angularY -= (nz * tx - nx * tz) * spinImpulse * invB
+                            b.angularZ -= (nx * ty - ny * tx) * spinImpulse * invB
+                        }
                     }
-                    val correction = (minDistance - distance) * 0.5f
-                    a.x -= nx * correction; a.y -= ny * correction; a.z -= nz * correction
-                    b.x += nx * correction; b.y += ny * correction; b.z += nz * correction
+                    val correction = ((minDistance - distance - 0.003f).coerceAtLeast(0f) * 0.72f) / inverseMassSum
+                    a.x -= nx * correction * invA; a.y -= ny * correction * invA; a.z -= nz * correction * invA
+                    b.x += nx * correction * invB; b.y += ny * correction * invB; b.z += nz * correction * invB
                 }
             }
         }
