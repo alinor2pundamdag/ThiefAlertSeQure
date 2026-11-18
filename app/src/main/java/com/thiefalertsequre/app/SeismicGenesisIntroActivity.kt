@@ -80,6 +80,33 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
     private var impactTone: ToneGenerator? = null
     private var completionAttempts = 0
 
+    // Protection may become armed or trigger an alarm while the 9-second intro is running.
+    // Never let a cinematic sequence delay the owner's alarm-recovery screen.
+    private val protectionStateGuard = object : Runnable {
+        override fun run() {
+            if (isFinishing || isDestroyed) return
+            val mode = runCatching { ProtectionStore(this@SeismicGenesisIntroActivity).read().mode }
+                .getOrNull()
+            if (mode != ProtectionMode.DISARMED) {
+                mainHandler.removeCallbacks(this)
+                openMain()
+                return
+            }
+            mainHandler.postDelayed(this, 300L)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        mainHandler.removeCallbacks(protectionStateGuard)
+        mainHandler.post(protectionStateGuard)
+    }
+
+    override fun onPause() {
+        mainHandler.removeCallbacks(protectionStateGuard)
+        super.onPause()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val replay = intent.getBooleanExtra(EXTRA_REPLAY, false)
