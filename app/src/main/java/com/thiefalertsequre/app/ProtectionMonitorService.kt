@@ -368,6 +368,14 @@ class ProtectionMonitorService : Service(), SensorEventListener {
 
     private fun registerBluetoothSeparationReceiver() {
         if (bluetoothReceiverRegistered) return
+        if (!SafePreferences.boolean(prefs, KEY_A2_BOOT_BASELINE_READY, false)) {
+            A2BluetoothReceiverController.sync(this)
+            LocalTamperHistory.record(
+                this, "a2_baseline_not_ready",
+                "Dynamic Bluetooth receiver remains disabled until a verified boot-baseline reset succeeds"
+            )
+            return
+        }
         if (!SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false)) {
             A2BluetoothReceiverController.sync(this)
             return
