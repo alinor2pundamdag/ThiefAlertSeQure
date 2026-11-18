@@ -213,6 +213,16 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
             ).show()
             if (completionAttempts < 3) {
                 mainHandler.postDelayed({ if (!isFinishing) complete() }, 1_000L)
+            } else {
+                // Do not trap the owner on the final intro frame if storage is
+                // unavailable. Leave the version marker incomplete so the intro
+                // is retried on the next app launch.
+                android.widget.Toast.makeText(
+                    this,
+                    "The intro could not be saved as complete. It will be shown again next time.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                openMain()
             }
             return
         }
