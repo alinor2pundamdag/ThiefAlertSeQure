@@ -5,6 +5,7 @@ import android.graphics.Paint as AndroidPaint
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Build
+import androidx.annotation.RequiresApi
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -504,6 +505,23 @@ half4 main(float2 fragCoord) {
 }
 """
 
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+private fun drawGenesisRuntimeShader(
+    canvas: android.graphics.Canvas,
+    shader: android.graphics.RuntimeShader,
+    width: Float,
+    height: Float,
+    fracture: Float
+) {
+    shader.setFloatUniform("resolution", width, height)
+    shader.setFloatUniform("fractureProgress", fracture)
+    val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+        this.shader = shader
+        isDither = true
+    }
+    canvas.drawRect(0f, 0f, width, height, paint)
+}
+
 @Composable
 private fun GenesisFractureCanvas(
     progress: Float,
@@ -523,13 +541,7 @@ private fun GenesisFractureCanvas(
 
         if (fracture > 0f && materialShader != null) {
             runCatching {
-                materialShader.setFloatUniform("resolution", size.width, size.height)
-                materialShader.setFloatUniform("fractureProgress", fracture)
-                val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                    shader = materialShader
-                    isDither = true
-                }
-                native.drawRect(0f, 0f, size.width, size.height, paint)
+                drawGenesisRuntimeShader(native, materialShader, size.width, size.height, fracture)
             }.onFailure {
                 drawRect(Color(0xFF15191D).copy(alpha = fracture))
             }
