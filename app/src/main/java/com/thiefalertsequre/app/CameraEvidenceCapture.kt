@@ -326,13 +326,35 @@ internal object CameraEvidenceCapture {
     }
 
     private fun boundJpeg(source: ByteArray): ByteArray? {
-        if (CameraEvidencePolicy.isValidImageSize(source.size)) return source
-        val bitmap = runCatching { BitmapFactory.decodeByteArray(source, 0, source.size) }.getOrNull() ?: return null
+        // Inspect dimensions without allocating a full-resolution bitmap. A small
+        // compressed 8K JPEG can still require hundreds of MiB when decoded.
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(source, 0, source.size, bounds)
+        val sourceWidth = bounds.outWidth
+        val sourceHeight = bounds.outHeight
+        if (sourceWidth <= 0 || sourceHeight <= 0) return null
+        if (CameraEvidencePolicy.isValidImageSize(source.size) &&
+            sourceWidth <= PREFERRED_WIDTH && sourceHeight <= PREFERRED_HEIGHT
+        ) return source
+
+        val requiredSampleRatio = maxOf(
+            sourceWidth.toFloat() / PREFERRED_WIDTH,
+            sourceHeight.toFloat() / PREFERRED_HEIGHT
+        )
+        var sampleSize = 1
+        while (sampleSize * 2 <= requiredSampleRatio) sampleSize *= 2
+        val decodeOptions = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        val bitmap = runCatching {
+            BitmapFactory.decodeByteArray(source, 0, source.size, decodeOptions)
+        }.getOrNull() ?: return null
         return try {
             val scale = minOf(
                 1f,
-                1280f / bitmap.width.coerceAtLeast(1),
-                720f / bitmap.height.coerceAtLeast(1)
+                PREFERRED_WIDTH.toFloat() / bitmap.width.coerceAtLeast(1),
+                PREFERRED_HEIGHT.toFloat() / bitmap.height.coerceAtLeast(1)
             )
             val resized = if (scale < 1f) {
                 Bitmap.createScaledBitmap(
