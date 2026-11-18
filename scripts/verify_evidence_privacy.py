@@ -120,6 +120,13 @@ required = {
         "private fun showCameraEvidenceArchive() {\n        if (!requireProtectionDisarmed()) return" in settings
         and "private fun exportHistory(uri: Uri) {\n        if (!requireProtectionDisarmed()) return" in settings
         and "Event details are hidden while protection is active" in settings,
+    "every sensitive evidence export is state-locked DISARMED at execution time":
+        'root.addView(action("Export encrypted evidence backup") {\n            if (!requireProtectionDisarmed()) return@action' in settings
+        and "val exportedBytes = ProtectionStore(applicationContext).runIfDisarmed" in settings
+        and "private fun writeCameraEvidenceExport(uri: Uri, id: String)" in settings
+        and "ProtectionStore(applicationContext).runIfDisarmed {" in settings[settings.index("private fun writeCameraEvidenceExport"):settings.index("private fun requestFreshEvidenceLocation")]
+        and "private fun exportHistory(uri: Uri)" in settings
+        and "ProtectionStore(applicationContext).runIfDisarmed {" in settings[settings.index("private fun exportHistory"):settings.index("private fun showCustomFlashTimingDialog")],
     "asynchronous evidence write failures are durable and visible":
         "KEY_ASYNC_WRITE_FAILURES" in vault
         and "fun asyncWriteFailureCount(context: Context)" in vault
