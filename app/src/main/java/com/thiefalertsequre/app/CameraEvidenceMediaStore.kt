@@ -30,6 +30,7 @@ internal object CameraEvidenceMediaStore {
     )
 
     @Synchronized
+    @Synchronized
     fun save(context: Context, jpeg: ByteArray): Uri? {
         if (!CameraEvidencePolicy.isValidImageSize(jpeg.size)) return null
         val app = context.applicationContext
@@ -88,7 +89,9 @@ internal object CameraEvidenceMediaStore {
      * source bytes are still identical and protection remains DISARMED.
      */
     fun migrateAllToEncryptedVault(context: Context): MigrationResult =
-        synchronized(MIGRATION_LOCK) { migrateAllToEncryptedVaultLocked(context) }
+        synchronized(this) {
+            synchronized(MIGRATION_LOCK) { migrateAllToEncryptedVaultLocked(context) }
+        }
 
     private fun migrateAllToEncryptedVaultLocked(context: Context): MigrationResult {
         val app = context.applicationContext
