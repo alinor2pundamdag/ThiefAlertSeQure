@@ -621,49 +621,111 @@ class GenesisFilamentRendererView(
     }
 
     private fun createFractureBodies(outline: List<Point2>) {
-        val center = Point2(0f, 0.05f)
-        val subdivisions = 6
-        for (edge in outline.indices) {
-            val a = outline[edge]
-            val b = outline[(edge + 1) % outline.size]
-            for (part in 0 until subdivisions) {
-                val t0 = part.toFloat() / subdivisions
-                val t1 = (part + 1).toFloat() / subdivisions
-                val p0 = Point2(a.x + (b.x - a.x) * t0, a.y + (b.y - a.y) * t0)
-                val p1 = Point2(a.x + (b.x - a.x) * t1, a.y + (b.y - a.y) * t1)
-                val cx = (center.x + p0.x + p1.x) / 3f
-                val cy = (center.y + p0.y + p1.y) / 3f
-                val local = listOf(
-                    Point2(center.x - cx, center.y - cy),
-                    Point2(p0.x - cx, p0.y - cy),
-                    Point2(p1.x - cx, p1.y - cy)
+        // Deterministic seed placement inside the shield, followed by convex Voronoi clipping.
+        // Each resulting cell is a distinct, irregular 3D fragment rather than a radial triangle.
+        fun contains(point: Point2): Boolean {
+            var inside = false
+            var j = outline.lastIndex
+            for (i in outline.indices) {
+                val a = outline[i]
+                val b = outline[j]
+                if ((a.y > point.y) != (b.y > point.y)) {
+                    val crossingX = (b.x - a.x) * (point.y - a.y) /
+                        ((b.y - a.y).takeIf { abs(it) > 0.000001f } ?: 0.000001f) + a.x
+                    if (point.x < crossingX) inside = !inside
+                }
+                j = i
+            }
+            return inside
+        }
+
+        val seeds = mutableListOf<Point2>()
+        for (row in 0..10) {
+            for (column in 0..10) {
+                val index = row * 11 + column
+                val jitterX = sin(index * 12.9898f) * 0.035f
+                val jitterY = cos(index * 7.233f) * 0.035f
+                val point = Point2(
+                    -0.72f + column * 0.144f + jitterX,
+                    -0.88f + row * 0.176f + jitterY
                 )
-                val edge1x = p0.x - center.x
-                val edge1y = p0.y - center.y
-                val edge2x = p1.x - center.x
-                val edge2y = p1.y - center.y
-                val area = abs(edge1x * edge2y - edge1y * edge2x) * 0.5f
-                val radius = (sqrt(area) * 0.46f).coerceIn(0.065f, 0.22f)
-                val mesh = createExtrudedMesh(local, 0.105f + radius * 0.34f, debrisMaterial!!)
-                val dx = cx - center.x
-                val dy = cy - center.y
-                val length = sqrt(dx * dx + dy * dy).coerceAtLeast(0.001f)
-                val seed = edge * subdivisions + part
-                val spin = if (seed % 2 == 0) 1f else -1f
-                bodies += Body(
-                    mesh = mesh,
-                    x = cx, y = cy, z = 0f,
-                    vx = dx / length * (1.55f + (seed % 5) * 0.23f),
-                    vy = dy / length * (2.05f + (seed % 4) * 0.28f),
-                    vz = spin * (0.72f + (seed % 3) * 0.24f),
-                    rx = 0f, ry = 0f, rz = 0f,
-                    radius = radius,
-                    angularX = spin * (3.2f + (seed % 4) * 0.8f),
-                    angularY = -spin * (2.4f + (seed % 5) * 0.65f),
-                    angularZ = spin * (4.0f + (seed % 6) * 0.7f)
-                )
+                if (contains(point) && seeds.size < 48) seeds += point
             }
         }
+        check(seeds.size >= 32) { "Insufficient in-shield fracture seeds" }
+
+        fun clipToBisector(polygon: List<Point2>, site: Point2, other: Point2): List<Point2> {
+            if (polygon.isEmpty()) return emptyList()
+            val nx = 2f * (other.x - site.x)
+            val ny = 2f * (other.y - site.y)
+            val limit = other.x * other.x + other.y * other.y -
+                site.x * site.x - site.y * site.y
+            val output = mutableListOf<Point2>()
+            var previous = polygon.last()
+            var previousDistance = nx * previous.x + ny * previous.y - limit
+            for (current in polygon) {
+                val currentDistance = nx * current.x + ny * current.y - limit
+                val previousInside = previousDistance <= 0.00001f
+                val currentInside = currentDistance <= 0.00001f
+                if (previousInside != currentInside) {
+                    val denominator = previousDistance - currentDistance
+                    val t = if (abs(denominator) < 0.000001f) 0f else previousDistance / denominator
+                    output += Point2(
+                        previous.x + (current.x - previous.x) * t,
+                        previous.y + (current.y - previous.y) * t
+                    )
+                }
+                if (currentInside) output += current
+                previous = current
+                previousDistance = currentDistance
+            }
+            return output
+        }
+
+        val center = Point2(0f, 0.05f)
+        seeds.forEachIndexed { index, site ->
+            var cell: List<Point2> = outline
+            seeds.forEachIndexed { otherIndex, other ->
+                if (otherIndex != index && cell.size >= 3) {
+                    cell = clipToBisector(cell, site, other)
+                }
+            }
+            if (cell.size < 3) return@forEachIndexed
+
+            var twiceArea = 0f
+            for (i in cell.indices) {
+                val a = cell[i]
+                val b = cell[(i + 1) % cell.size]
+                twiceArea += a.x * b.y - b.x * a.y
+            }
+            val area = abs(twiceArea) * 0.5f
+            if (area < 0.0008f) return@forEachIndexed
+            val cx = cell.map { it.x }.average().toFloat()
+            val cy = cell.map { it.y }.average().toFloat()
+            val local = cell.map { Point2(it.x - cx, it.y - cy) }
+            val radius = (sqrt(area) * 0.46f).coerceIn(0.065f, 0.24f)
+            val depth = 0.09f + radius * 0.38f
+            val mesh = createExtrudedMesh(local, depth, debrisMaterial!!)
+            val dx = cx - center.x
+            val dy = cy - center.y
+            val distance = sqrt(dx * dx + dy * dy).coerceAtLeast(0.001f)
+            val seed = index * 17 + cell.size * 5
+            val spin = if (index % 2 == 0) 1f else -1f
+            bodies += Body(
+                mesh = mesh,
+                x = cx, y = cy, z = 0f,
+                vx = dx / distance * (1.45f + (seed % 7) * 0.19f),
+                vy = dy / distance * (1.85f + (seed % 5) * 0.27f),
+                vz = spin * (0.7f + (seed % 4) * 0.22f),
+                rx = 0f, ry = 0f, rz = 0f,
+                radius = radius,
+                mass = (area * depth * 18f).coerceAtLeast(0.025f),
+                angularX = spin * (3.0f + (seed % 5) * 0.75f),
+                angularY = -spin * (2.1f + (seed % 6) * 0.58f),
+                angularZ = spin * (3.8f + (seed % 7) * 0.62f)
+            )
+        }
+        check(bodies.isNotEmpty()) { "Voronoi fracture produced no shield fragments" }
     }
 
     private fun createExtrudedMesh(
