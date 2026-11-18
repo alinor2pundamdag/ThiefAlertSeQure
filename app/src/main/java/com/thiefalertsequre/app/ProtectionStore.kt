@@ -61,6 +61,15 @@ class ProtectionStore internal constructor(
         block()
     }
 
+    /** Runs a small preference repair only while ARMED/COUNTDOWN remains authoritative. */
+    internal fun <T> runIfProtectionActive(block: (ProtectionState) -> T): T? = synchronized(LOCK) {
+        val current = readUnlocked()
+        if (stateCorruptionDetected ||
+            (current.mode != ProtectionMode.ARMED && current.mode != ProtectionMode.COUNTDOWN)
+        ) return@synchronized null
+        block(current)
+    }
+
     /** Returns the actual commit result so callers do not cancel alarms on an unpersisted transition. */
     fun updatePersisted(transform: (ProtectionState) -> ProtectionState): ProtectionStoreUpdateResult =
         synchronized(LOCK) {
