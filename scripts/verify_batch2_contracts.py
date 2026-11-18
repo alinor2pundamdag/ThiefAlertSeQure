@@ -201,9 +201,11 @@ checks = {
         and "SECTION_PRIVACY" in (APP / "AboutActivity.kt").read_text(encoding="utf-8"),
     "authentication and tamper evidence remain reachable from the owner-authentication section":
         "Review authentication & tamper evidence" in dashboard and "Intent(this, SettingsActivity::class.java)" in dashboard,
-    "baseline reset cannot erase armed or countdown protection":
-        "canResetBaseline(currentState.mode)" in (APP / "PowerTransitionCoordinator.kt").read_text(encoding="utf-8")
-        and "mode == ProtectionMode.DISARMED" in (APP / "PowerTransitionRecoveryPolicy.kt").read_text(encoding="utf-8")
+    "baseline reset and monitor preference reconciliation are atomic with protection state":
+        "store.runIfDisarmed" in (APP / "PowerTransitionCoordinator.kt").read_text(encoding="utf-8")
+        and "canResetBaseline(store.read().mode)" in (APP / "PowerTransitionCoordinator.kt").read_text(encoding="utf-8")
+        and "monitorEnabled = SafePreferences.boolean(" in (APP / "PowerTransitionCoordinator.kt").read_text(encoding="utf-8")
+        and "monitorPrefs, ProtectionMonitorService.KEY_ENABLED" in (APP / "PowerTransitionCoordinator.kt").read_text(encoding="utf-8")
         and "baselineResetIsAllowedOnlyWhenProtectionIsDisarmed" in (ROOT / "app/src/test/java/com/thiefalertsequre/app/PowerTransitionRecoveryPolicyTest.kt").read_text(encoding="utf-8"),
     "active armed/countdown protection retains the foreground monitor despite a stale OFF preference":
         "mode == ProtectionMode.ARMED || mode == ProtectionMode.COUNTDOWN" in (APP / "ProtectionMonitorPolicy.kt").read_text(encoding="utf-8")
