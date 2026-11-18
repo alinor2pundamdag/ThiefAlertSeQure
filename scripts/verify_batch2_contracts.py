@@ -213,6 +213,12 @@ checks = {
     "device intelligence reports OEM/background restriction, Doze, and standby bucket states":
         "OEM AND BACKGROUND EXECUTION" in diagnostics and "isBackgroundRestricted" in diagnostics
         and "isDeviceIdleMode" in diagnostics and "appStandbyBucket" in diagnostics,
+    "dashboard and boot reconciliation never disarm active protection because of an OFF preference":
+        "ProtectionEngine.disableMonitoring(" not in (APP / "MainActivity.kt").read_text(encoding="utf-8")
+        and "ProtectionEngine.disableMonitoring(" not in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
+        and "current.mode == ProtectionMode.ARMED || current.mode == ProtectionMode.COUNTDOWN" in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
+        and "current.mode == ProtectionMode.ARMED || current.mode == ProtectionMode.COUNTDOWN" in (APP / "MainActivity.kt").read_text(encoding="utf-8")
+        and "A2BluetoothReceiverController.sync(context)" in (APP / "BootReceiver.kt").read_text(encoding="utf-8"),
     "monitor notification cannot disarm ARMED or COUNTDOWN protection":
         "fun canStop(mode: ProtectionMode): Boolean = mode == ProtectionMode.DISARMED" in monitor
         and "if (!ProtectionMonitorPolicy.canStop(currentMode))" in monitor
