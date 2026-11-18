@@ -476,6 +476,7 @@ class SettingsActivity : FragmentActivity() {
         val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
         val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         root.addView(action(if (monitorEnabled) "Disable background monitoring" else "Enable background monitoring") {
+            if (!requireProtectionDisarmed()) return@action
             val enabled = !SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
             val monitorSave = ProtectionStore(this).runIfDisarmed {
                 monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).commit()
