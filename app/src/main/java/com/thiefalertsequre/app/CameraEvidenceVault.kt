@@ -34,11 +34,16 @@ internal object CameraEvidenceVault {
     )
 
     @Synchronized
-    fun save(context: Context, jpeg: ByteArray): Entry? {
+    fun save(
+        context: Context,
+        jpeg: ByteArray,
+        timestampEpochMs: Long = System.currentTimeMillis()
+    ): Entry? {
         if (!CameraEvidencePolicy.isValidImageSize(jpeg.size)) return null
         val app = context.applicationContext
-        val entries = readIndex(app) ?: return null
         val now = System.currentTimeMillis()
+        if (!CameraEvidencePolicy.isRetained(timestampEpochMs, now)) return null
+        val entries = readIndex(app) ?: return null
         val retained = entries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
         val id = UUID.randomUUID().toString()
         val directory = evidenceDirectory(app)
@@ -58,7 +63,7 @@ internal object CameraEvidenceVault {
             file.delete()
             return null
         }
-        val entry = Entry(id, now, sha256(jpeg), jpeg.size)
+        val entry = Entry(id, timestampEpochMs, sha256(jpeg), jpeg.size)
         val next = (retained + entry).takeLast(CameraEvidencePolicy.MAX_IMAGES)
         if (!writeIndex(app, next)) {
             file.delete()
