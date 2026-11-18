@@ -70,31 +70,37 @@ internal object A2DisconnectScheduler {
             LocalTamperHistory.record(context, "a2_deadline_persist_failed", "Encrypted A2 disconnect deadline could not be committed after one retry")
             return false
         }
-        return runCatching {
-            val manager = context.getSystemService(AlarmManager::class.java)
-            val operation = pendingIntent(context, pending.address, namespace)
-            val deadline = pending.deadlineElapsedRealtimeMs.coerceAtLeast(android.os.SystemClock.elapsedRealtime())
-            val exactAllowed = Build.VERSION.SDK_INT < 31 || manager.canScheduleExactAlarms()
-            if (!exactAllowed) {
-                LocalTamperHistory.record(context, "a2_exact_alarm_access_missing", "Using the inexact idle-aware A2 deadline fallback; Android may delay delivery")
-            }
-            if (exactAllowed) {
-                try {
-                    manager.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, operation)
-                } catch (_: SecurityException) {
+        val manager = context.getSystemService(AlarmManager::class.java)
+        val operation = pendingIntent(context, pending.address, namespace)
+        val deadline = pending.deadlineElapsedRealtimeMs.coerceAtLeast(android.os.SystemClock.elapsedRealtime())
+        val exactAllowed = Build.VERSION.SDK_INT < 31 || manager.canScheduleExactAlarms()
+        if (!exactAllowed) {
+            LocalTamperHistory.record(context, "a2_exact_alarm_access_missing", "Using the inexact idle-aware A2 deadline fallback; Android may delay delivery")
+        }
+        var lastFailure: Throwable? = null
+        for (attempt in 1..2) {
+            val scheduled = runCatching {
+                if (exactAllowed) {
+                    try {
+                        manager.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, operation)
+                    } catch (_: SecurityException) {
+                        manager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, operation)
+                    }
+                } else {
                     manager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, operation)
                 }
-            } else {
-                manager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, operation)
             }
-            true
-        }.getOrElse {
-            LocalTamperHistory.record(context, "a2_deadline_schedule_failed", it.javaClass.simpleName + ": " + it.message)
-            runCatching {
-                cancelInternal(context, pending.address, pending.eventElapsedRealtimeMs, preferencesName, namespace)
-            }
-            false
+            if (scheduled.isSuccess) return@synchronized true
+            lastFailure = scheduled.exceptionOrNull()
         }
+        LocalTamperHistory.record(
+            context, "a2_deadline_schedule_failed",
+            "AlarmManager rejected the A2 grace deadline after one retry: ${lastFailure?.javaClass?.simpleName}: ${lastFailure?.message}"
+        )
+        runCatching {
+            cancelInternal(context, pending.address, pending.eventElapsedRealtimeMs, preferencesName, namespace)
+        }
+        false
     }
 
     fun find(context: Context, token: String): Pending? = synchronized(lock) {
