@@ -843,9 +843,7 @@ class SettingsActivity : FragmentActivity() {
                                 CameraEvidenceMediaStore.deleteAll(applicationContext)
                             }.getOrDefault(false)
                             val vaultDeleted = if (galleryDeleted) {
-                                ProtectionStore(applicationContext).runIfDisarmed {
-                                    runCatching { CameraEvidenceVault.deleteAll(applicationContext) }.getOrDefault(false)
-                                }
+                                runCatching { CameraEvidenceVault.deleteAll(applicationContext) }.getOrDefault(false)
                             } else {
                                 false
                             }
@@ -1543,9 +1541,9 @@ class SettingsActivity : FragmentActivity() {
                         if (!requireProtectionDisarmed()) return@setItems
                         val entry = entries[index]
                         ioExecutor.execute {
-                            val bytes = ProtectionStore(applicationContext).runIfDisarmed {
+                            val bytes = if (ProtectionStore(applicationContext).read().mode == ProtectionMode.DISARMED) {
                                 runCatching { CameraEvidenceVault.read(applicationContext, entry.id) }.getOrNull()
-                            }
+                            } else null
                             val bitmap = bytes?.let { payload ->
                                 runCatching { decodeCameraEvidencePreview(payload) }.getOrNull()
                             }
@@ -1581,12 +1579,12 @@ class SettingsActivity : FragmentActivity() {
                                     }
                                     .setNegativeButton("Delete") { _, _ ->
                                         ioExecutor.execute {
-                                            val deletion = ProtectionStore(applicationContext).runIfDisarmed {
-                                                runCatching {
-                                                    CameraEvidenceVault.delete(applicationContext, entry.id)
-                                                }.getOrDefault(false)
-                                            }
-                                            val deleted = deletion == true
+                                            val deleted = runCatching {
+                                                CameraEvidenceVault.delete(applicationContext, entry.id)
+                                            }.getOrDefault(false)
+                                            val deletion: Boolean? = if (
+                                                ProtectionStore(applicationContext).read().mode == ProtectionMode.DISARMED
+                                            ) deleted else null
                                             LocalEvidenceVault.recordAsync(
                                                 applicationContext,
                                                 "camera_evidence_deleted",
@@ -1640,15 +1638,18 @@ class SettingsActivity : FragmentActivity() {
     private fun writeCameraEvidenceExport(uri: Uri, id: String) {
         ioExecutor.execute {
             val result = runCatching {
+                if (ProtectionStore(applicationContext).read().mode != ProtectionMode.DISARMED) {
+                    throw IllegalStateException("Photo export is available only while protection is DISARMED.")
+                }
+                val bytes = CameraEvidenceVault.read(applicationContext, id)
+                    ?: throw IllegalStateException("Photo is missing or failed its integrity check.")
                 ProtectionStore(applicationContext).runIfDisarmed {
-                    val bytes = runCatching { CameraEvidenceVault.read(applicationContext, id) }.getOrNull()
-                        ?: throw IllegalStateException("Photo is missing or failed its integrity check.")
                     contentResolver.openOutputStream(uri)?.use { output ->
                         output.write(bytes)
                         output.flush()
                     } ?: throw IllegalStateException("Android could not open the selected export destination.")
                     bytes.size
-                } ?: throw IllegalStateException("Photo export is available only while protection is DISARMED.")
+                } ?: throw IllegalStateException("Protection became active before the photo export could be written.")
             }
             runOnUiThread {
                 android.widget.Toast.makeText(
