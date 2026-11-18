@@ -651,6 +651,7 @@ class MainActivity : FragmentActivity() {
                         "Active protection remains authoritative, but the monitor-enabled preference could not be restored"
                     )
                 }
+                A2BluetoothReceiverController.sync(this)
                 current
             }
             !monitorEnabled && current.mode == ProtectionMode.DISARMED -> current
