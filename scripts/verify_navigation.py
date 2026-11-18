@@ -136,7 +136,7 @@ intro_activity = (APP / "SeismicGenesisIntroActivity.kt").read_text(encoding="ut
 for required in (
     "ComposeView(this)", "SeismicGenesisIntroContent", "INTRO_DURATION_MS = 9_000",
     "Alinor Pundamdag", "Developed By:", "Color(0xFFFF5252)",
-    "0xFF121212", "Matrix().apply", "GenesisFractureCanvas",
+    "0xFF121212", "android.graphics.RuntimeShader", "native.rotate(", "native.restoreToCount(", "GenesisFractureCanvas",
     "repeatOnLifecycle(Lifecycle.State.RESUMED)"
 ):
     if required not in intro_activity:
