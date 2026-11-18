@@ -47,10 +47,26 @@ class SettingsActivity : FragmentActivity() {
     private var protectionStateReceiverRegistered = false
     private val protectionStateReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: android.content.Context, intent: Intent?) {
-            if (ProtectionStore(this@SettingsActivity).read().mode != ProtectionMode.DISARMED) {
-                // The alarm service now owns all audible and torch outputs.
+            val mode = ProtectionStore(this@SettingsActivity).read().mode
+            if (mode != ProtectionMode.DISARMED) {
+                // Release preview-owned audio/torch first. If the alarm latched
+                // during a flash preview, refresh its outputs after the torch is free.
                 stopPreview()
                 stopFlashPreview()
+                if (mode == ProtectionMode.ALARM_TRIGGERED) {
+                    runCatching {
+                        ContextCompat.startForegroundService(
+                            this@SettingsActivity,
+                            Intent(this@SettingsActivity, AlarmService::class.java)
+                                .setAction(AlarmService.ACTION_REFRESH_FLASH)
+                        )
+                    }.onFailure {
+                        LocalTamperHistory.record(
+                            this@SettingsActivity, "alarm_flash_refresh_after_preview_failed",
+                            it.javaClass.simpleName + ": " + it.message
+                        )
+                    }
+                }
             }
         }
     }
