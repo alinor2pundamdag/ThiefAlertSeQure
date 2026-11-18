@@ -156,7 +156,7 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
         // A bounded worker pool prevents a burst of ACL broadcasts from creating
         // unbounded threads while retaining enough capacity for all trusted devices.
         val receiverExecutor = ThreadPoolExecutor(
-            2, 2, 30L, TimeUnit.SECONDS,
+            1, 1, 30L, TimeUnit.SECONDS,
             ArrayBlockingQueue(64),
             ThreadPoolExecutor.AbortPolicy()
         )
@@ -207,8 +207,8 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
 
                 when (intent.action) {
                     BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                        val update = TrustedBluetoothRegistry.markConnected(prefs, address, true)
                         A2DisconnectScheduler.cancelAfterConfirmedConnection(app, address, eventElapsedRealtimeMs)
+                        val update = TrustedBluetoothRegistry.markConnected(prefs, address, true)
                         if (!update.persisted) {
                             LocalTamperHistory.record(app, "a2_baseline_update_failed", "Bluetooth connected, but its encrypted connection baseline could not be committed; disconnect detection may require reconnecting the accessory")
                         }
