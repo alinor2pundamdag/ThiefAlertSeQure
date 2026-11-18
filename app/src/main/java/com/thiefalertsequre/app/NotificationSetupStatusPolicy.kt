@@ -58,11 +58,17 @@ object NotificationSetupStatusPolicy {
                 SetupState.ACTION_REQUIRED,
                 "Android reports that the alarm notification channel is blocked."
             )
+            importance < NotificationManager.IMPORTANCE_HIGH -> SetupItem(
+                "alarm_channel",
+                "Alarm notification channel",
+                SetupState.ACTION_REQUIRED,
+                "Full-screen alarm presentation requires HIGH channel importance. Raise this channel to High in Android notification settings."
+            )
             else -> SetupItem(
                 "alarm_channel",
                 "Alarm notification channel",
                 SetupState.VERIFIED,
-                "Android reports that the alarm notification channel is available."
+                "Android reports HIGH alarm-channel importance, which permits full-screen alarm notifications when the platform also grants full-screen intent access."
             )
         }
 }
