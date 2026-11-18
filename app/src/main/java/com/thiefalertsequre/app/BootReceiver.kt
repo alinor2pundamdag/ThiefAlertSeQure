@@ -9,6 +9,21 @@ import androidx.core.content.ContextCompat
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (!ConfigurationBackup.recoverPendingRestore(context)) {
+            LocalTamperHistory.record(
+                context, "configuration_restore_recovery_pending",
+                "Boot/package/exact-alarm reconciliation was deferred until the interrupted settings restore can be recovered"
+            )
+            val state = ProtectionStore(context).read()
+            if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
+                scheduleAlarmRecovery(context, "Latched alarm recovery takes priority over interrupted settings recovery")
+            } else {
+                ProtectionMonitorRecoveryNotice.show(
+                    context, "An interrupted settings restore must be recovered before background protection can resume."
+                )
+            }
+            return
+        }
         // BOOT_COMPLETED is authoritative even on devices where Settings.Global.BOOT_COUNT
         // is unreadable. Invalidate the previous boot's charger baseline before processing
         // any later power event; package-update and exact-alarm callbacks preserve it.
