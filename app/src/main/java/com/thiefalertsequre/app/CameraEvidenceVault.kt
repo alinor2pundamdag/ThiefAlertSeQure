@@ -101,6 +101,59 @@ internal object CameraEvidenceVault {
     }
 
     @Synchronized
+    /**
+     * Migration-only write: never evicts a non-expired existing photo if another
+     * capture consumes the last free slot while Gallery migration is running.
+     */
+    fun saveForMigration(
+        context: Context,
+        jpeg: ByteArray,
+        timestampEpochMs: Long
+    ): Entry? {
+        if (!CameraEvidencePolicy.isValidImageSize(jpeg.size)) return null
+        val app = context.applicationContext
+        val now = System.currentTimeMillis()
+        if (!CameraEvidencePolicy.isRetained(timestampEpochMs, now)) return null
+        val id = UUID.randomUUID().toString()
+        val directory = evidenceDirectory(app)
+        val file = directory.resolve("$id.aesgcm")
+        val temp = directory.resolve("$id.tmp")
+        val encrypted = runCatching { encrypt(id, jpeg) }.getOrNull() ?: return null
+        val written = runCatching {
+            FileOutputStream(temp).use { output ->
+                output.write(encrypted)
+                output.fd.sync()
+            }
+            if (!temp.renameTo(file)) throw IllegalStateException("Atomic evidence-file publish failed")
+            true
+        }.getOrDefault(false)
+        if (!written) {
+            temp.delete()
+            file.delete()
+            return null
+        }
+
+        val entry = Entry(id, timestampEpochMs, sha256(jpeg), jpeg.size)
+        val committed = ProtectionStore(app).runIfDisarmed {
+            synchronized(this) {
+                val current = readIndex(app) ?: return@synchronized false
+                val retained = current.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
+                if (retained.size >= CameraEvidencePolicy.MAX_IMAGES) return@synchronized false
+                val next = (retained + entry)
+                    .sortedBy { it.timestampEpochMs }
+                    .takeLast(CameraEvidencePolicy.MAX_IMAGES)
+                if (next.none { it.id == id } || !writeIndex(app, next)) return@synchronized false
+                removeUnreferencedFiles(app, next)
+                true
+            }
+        }
+        if (committed != true) {
+            file.delete()
+            return null
+        }
+        return entry
+    }
+
     fun entries(context: Context): List<Entry> {
         val app = context.applicationContext
         pruneExpired(app)
