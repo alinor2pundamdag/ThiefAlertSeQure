@@ -97,7 +97,9 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
         }
 
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-        if (!replay && SafePreferences.boolean(prefs, KEY_COMPLETED, false)) {
+        val currentVersionCode = AppLaunchIntroPolicy.currentVersionCode(this)
+        val lastCompletedVersionCode = AppLaunchIntroPolicy.lastCompletedVersionCode(prefs, currentVersionCode)
+        if (!replay && lastCompletedVersionCode >= currentVersionCode) {
             openMain()
             return
         }
@@ -164,6 +166,7 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
     private fun complete() {
         val saved = getSharedPreferences(PREFS, MODE_PRIVATE).edit()
             .putBoolean(KEY_COMPLETED, true)
+            .putLong(AppLaunchIntroPolicy.KEY_COMPLETED_VERSION_CODE, AppLaunchIntroPolicy.currentVersionCode(this))
             .putLong(KEY_COMPLETED_AT, System.currentTimeMillis())
             .commit()
         if (!saved) {
@@ -198,8 +201,8 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
 
     companion object {
         const val EXTRA_REPLAY = "replay_intro"
-        private const val PREFS = "batch_three_intro_v1"
-        private const val KEY_COMPLETED = "completed"
+        private const val PREFS = AppLaunchIntroPolicy.PREFS
+        private const val KEY_COMPLETED = AppLaunchIntroPolicy.KEY_COMPLETED
         private const val KEY_COMPLETED_AT = "completed_at"
         internal const val INTRO_DURATION_MS = 9_000
     }

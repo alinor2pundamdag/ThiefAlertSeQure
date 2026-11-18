@@ -100,11 +100,14 @@ checks = {
     "device intelligence reports OEM/background restriction, Doze, and standby bucket states":
         "OEM AND BACKGROUND EXECUTION" in diagnostics and "isBackgroundRestricted" in diagnostics
         and "isDeviceIdleMode" in diagnostics and "appStandbyBucket" in diagnostics,
-    "encrypted configuration backup uses PBKDF2 AES-GCM and excludes authentication secrets":
+    "encrypted configuration backup includes the photo-storage preference and accepts old backups":
         "PBKDF2WithHmacSHA256" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "AES/GCM/NoPadding" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "authentication secrets" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "ProtectionMode.ALARM_TRIGGERED" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
+        and '"camera_evidence_settings", "encrypt_new_photos"' in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
+        and 'put("schema", 2)' in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
+        and "schema == 1 || schema == 2" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "Export encrypted app configuration" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8"),
     "permission changes are detected on primary screens and recorded locally":
         "PermissionChangeMonitor.check(this)" in (APP / "MainActivity.kt").read_text(encoding="utf-8")
@@ -132,16 +135,24 @@ checks = {
         and "AuthenticationThrottle.remainingMs" in dashboard,
     "front-camera capture is explicitly owner-enabled and permission-gated":
         "Enable front-camera photo evidence?" in settings
-        and "requestCameraEvidencePermission.launch(Manifest.permission.CAMERA)" in settings
+        and "requestCameraEvidencePermissions.launch(permissions.toTypedArray())" in settings
         and "CameraEvidencePolicy.shouldCapture(true, permissionGranted, true, visible)" in camera_capture,
-    "camera photo files are encrypted and integrity checked with bounded retention":
-        "AES/GCM/NoPadding" in camera_vault and "AndroidKeyStore" in camera_vault
+    "camera photos route to Gallery by default or the optional AES-GCM private vault":
+        "KEY_ENCRYPT_NEW_PHOTOS" in camera_capture
+        and "CameraEvidenceMediaStore.save" in camera_capture and "CameraEvidenceVault.save" in camera_capture
+        and "Encrypt new camera photos:" in settings
+        and "VOLUME_EXTERNAL_PRIMARY" in (APP / "CameraEvidenceMediaStore.kt").read_text(encoding="utf-8")
+        and "IS_PENDING" in (APP / "CameraEvidenceMediaStore.kt").read_text(encoding="utf-8")
+        and "AES/GCM/NoPadding" in camera_vault and "AndroidKeyStore" in camera_vault
         and "sha256(plaintext) != entry.sha256" in camera_vault
         and "MAX_IMAGES = 20" in camera_policy and "RETENTION_MS = 30L" in camera_policy,
     "front-camera photos can be viewed, exported, deleted and integrity-checked":
         "showCameraEvidenceArchive" in settings and "exportCameraEvidence.launch" in settings
-        and "CameraEvidenceVault.delete(this, entry.id)" in settings and "CameraEvidenceVault.deleteAll(this)" in settings
-        and "CameraEvidenceVault.verifyIntegrity(this)" in settings,
+        and "CameraEvidenceVault.delete(this, entry.id)" in settings
+        and "CameraEvidenceVault.deleteAll(applicationContext)" in settings
+        and "CameraEvidenceMediaStore.deleteAll(applicationContext)" in settings
+        and "var allDeleted = true" in (APP / "CameraEvidenceMediaStore.kt").read_text(encoding="utf-8")
+        and "CameraEvidenceVault.verifyIntegrity(this@SettingsActivity)" in settings,
     "emergency recovery guide explains camera evidence failure boundaries":
         "front-camera evidence is not saved" in diagnostics
         and "camera failure never reverses alarm disarm" in diagnostics,

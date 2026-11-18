@@ -1,7 +1,18 @@
+# Current Batch Four candidate snapshot — 18 November 2026
+
+- Working branch: `work/batch-4-implementation`; PR #8 is open and unmerged.
+- Candidate identity: `com.thiefalertsequre.app`, versionName `1.1.5_Developer_Alinor`, versionCode `7`, minSdk 26, compileSdk/targetSdk 36.
+- This snapshot supersedes older branch/version statements below. The FIXALL and Phase 0–12 records remain historical evidence, not the active branch state.
+- Camera evidence remains opt-in and post-authentication. New JPEGs go to Gallery unencrypted by default; Settings can enable AES-GCM encryption for future captures. Existing photos are not converted when the setting changes. Gallery deletion is scoped to the app-owned folder and app-prefixed files.
+- The cinematic starting page is displayed once after each installed versionCode change. It is deferred while protection is active, then shown after the owner next launches the app while disarmed.
+- No merge, tag, production publication, emulator, instrumentation, or physical-device test is claimed. Exact-head CI and CodeQL results must be recorded after the code-bearing commit.
+
+---
+
 # ThiefAlertSeQure — Project State
 
-## Active FIXALL branch
-- Working branch: `work/phase-0-12-coding` (current coding branch; exact head recorded in the verification snapshot below)
+## Historical FIXALL branch snapshot (superseded by the current Batch Four candidate)
+- Historical FIXALL working branch: `work/phase-0-12-coding` (the current Batch Four branch is listed in the snapshot above)
 - Production branch: `main` (untouched)
 - Production package identity and signing configuration must remain unchanged.
 - Approved minimum SDK: 26. Do not lower without explicit approval.
@@ -12,7 +23,7 @@
 
 The [docs/PHASE_0_12_EXECUTION_CHECKLIST.md](docs/PHASE_0_12_EXECUTION_CHECKLIST.md) is a historical FIXALL checklist for predecessor v1.1.4 work; its Phase 0–12 numbering is not the active product roadmap. The active approved scope is the four-batch, 17-phase product roadmap recorded below and summarized in [docs/FEATURE_COMPLETION_MATRIX.md](docs/FEATURE_COMPLETION_MATRIX.md). Current Batch 2 is Phases 5–9. Instrumentation compilation/execution and emulator matrices remain prohibited; physical-device acceptance is separate and must never be inferred from CI.
 
-The bullets below are predecessor FIXALL history; they are not current Batch 1–4 phase acceptance claims.
+The bullets below are predecessor FIXALL history; they are not current Batch 1–4 phase acceptance claims. Current branch/version status is recorded in the Batch Four snapshot above.
 - Created a dedicated safety/work branch from the reviewed development candidate.
 - Restored the approved minSdk 26 invariant in the build candidate and aligned compatibility documentation.
 - Hardened charger-state handling so missing battery extras remain unknown rather than being treated as unplugged.
@@ -46,7 +57,7 @@ The bullets below are predecessor FIXALL history; they are not current Batch 1�
 
 ## Latest code-bearing candidate status (2026-11-17)
 
-- Current coding branch: `work/phase-0-12-coding`.
+- Historical FIXALL coding branch: `work/phase-0-12-coding`.
 - Latest code-bearing source commit: `475c1fa00b8c30c1280f77053d83eb91c0db7f64`. Subsequent commits in this status-documentation pass change documentation only; no Kotlin, Gradle, manifest, or workflow source was changed after the verified code commit.
 - Android non-instrumentation CI [run 43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535): **PASS** on the code-bearing commit. The final documentation snapshot `ffe5fdae9150cb8ca791478d48cfc68263776ff8` also passed [Android run 43951488247](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43951488247); JVM unit tests, source-contract checks, lint, assets, APK packaging, minified release metadata, package/version/signer checks, and artifact upload all succeeded.
 - CodeQL [run 43950015623](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623): **PASS** for Java/Kotlin and GitHub Actions on the code-bearing commit. The final documentation snapshot also passed [CodeQL run 43951488080](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43951488080).
@@ -216,7 +227,7 @@ The active roadmap is **17 phases numbered Phase 0 through Phase 16**, organized
 
 **Batch 2 completion gate:** all Phase 5–9 implementation, privacy boundaries, UI/UX, error handling, static contract checks, JVM unit tests, Android lint/build and CodeQL must pass on the exact current branch HEAD. Hardware/OEM behavior remains explicitly unverified until physical-device validation; no claim of universal shutdown/torch/camera control is permitted.
 
-**Phase 7 camera evidence boundary:** optional and OFF by default. CAMERA permission is requested only after an explicit Settings opt-in. One front-camera still is attempted only after successful owner PIN/password or supported strong-biometric authentication disarms a latched alarm while the authentication Activity is visible. Images are Android Keystore AES-GCM encrypted, locally retained with bounded limits, and owner-viewable/exportable/deletable. No background camera service, video, microphone capture, or cloud upload is allowed. Camera failure must never reverse successful authentication or alarm disarm.
+**Historical Phase 7 camera evidence boundary (superseded):** the predecessor branch stored all photos in the encrypted vault. The current Batch Four candidate saves new captures unencrypted to Gallery by default and offers a Settings toggle for future-capture AES-GCM storage; existing images are not silently converted. Capture remains optional and OFF by default, after successful owner authentication while the authentication Activity is visible. No background camera service, video, microphone capture, or cloud upload is allowed. Camera failure must never reverse successful authentication or alarm disarm.
 
 **Phase 9 dashboard boundary:** the fixed-color 136dp main shield stays above a compact, horizontally swipeable nine-destination tab strip (Bluetooth Settings; Device Hardening & Reliability; Sounds & Flash Alert; Authentication Evidence; Device Intelligence; Appearance Studio; Local Tamper History; More; About). The tab strip uses accessible 48dp touch targets and destination-specific navigation.
 

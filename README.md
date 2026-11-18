@@ -17,7 +17,7 @@
     </a>
     <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" alt="Android 8.0 and newer" />
     <img src="https://img.shields.io/badge/Privacy-On--device-2D6CDF" alt="On-device privacy" />
-    <img src="https://img.shields.io/badge/Version-1.1.4%5FDeveloper%5FAlinor-1677D2" alt="Version 1.1.4_Developer_Alinor" />
+    <img src="https://img.shields.io/badge/Candidate-1.1.5%5FDeveloper%5FAlinor-1677D2" alt="Candidate 1.1.5_Developer_Alinor" />
     <img src="https://img.shields.io/badge/Owner%20device%20tests-11%2F11%20PASS-2E8B57" alt="Owner-reported 11 of 11 physical test scenarios passed" />
     <img src="https://img.shields.io/badge/Updates-Owner--initiated%20GitHub%20releases-2D6CDF" alt="Owner initiated GitHub updates" />
     <img src="https://img.shields.io/badge/License-See%20LICENSE-lightgrey" alt="License information" />
@@ -110,7 +110,7 @@ ThiefAlertSeQure is designed to do its essential work on your Android device.
 - No configured advertising SDK or analytics tracker.
 - No sale or advertising-based sharing of app-collected data.
 - No collection of your device PIN, password, pattern, fingerprint data, or face templates.
-- Contacts, SMS, and microphone permissions are not requested. CAMERA permission is requested only if the owner explicitly enables front-camera photo evidence in Settings. One still photo is captured only after successful Android owner authentication disarms a latched alarm while the app is visible; Android shows its camera privacy indicator. Photos are AES-GCM encrypted locally, retained for up to 30 days (maximum 20, 2 MiB each), and can be viewed, exported, or deleted. No background camera service, video, or cloud upload is used. Optional coarse/fine location permission is requested only after the owner explicitly chooses to save one cached or one current GPS/network location result into the encrypted local evidence vault. Current requests time out after 20 seconds. No background location or continuous tracking is used. The owner can export or restore the metadata vault through a separate password-encrypted backup file. The optional flashlight uses Android's public torch API independently and does not capture photos/video.
+- Contacts, SMS, and microphone permissions are not requested. CAMERA permission is requested only if the owner explicitly enables front-camera photo evidence in Settings. One still photo is captured only after successful Android owner authentication disarms a latched alarm while the app is visible; Android shows its camera privacy indicator. New photos appear in Gallery as unencrypted JPEGs by default; Settings can enable AES-GCM encryption for future captures into the private photo vault. The two storage locations retain up to 20 photos for 30 days (2 MiB each). Existing photos are not converted when the setting changes; Gallery photos are visible to apps with photo access. No background camera service, video, or cloud upload is used. Optional coarse/fine location permission is requested only after the owner explicitly chooses to save one cached or one current GPS/network location result into the encrypted local evidence vault. Current requests time out after 20 seconds. No background location or continuous tracking is used. The owner can export or restore the metadata vault through a separate password-encrypted backup file. The optional flashlight uses Android's public torch API independently and does not capture photos/video.
 
 ### What stays on your device
 
@@ -249,15 +249,15 @@ Please test the app on your own device and confirm its permissions and backgroun
 
 ## 📦 Reliable APK updates
 
-**Version:** 1.1.3 (version code 5). Official release availability is determined by the GitHub Releases page and the signed APK assets attached there—not by this README version label.
+**Current Batch Four candidate:** 1.1.5_Developer_Alinor (versionCode 7), branch `work/batch-4-implementation`, PR #8 open/unmerged. This is not a production release; official release availability is determined by the GitHub Releases page and signed APK assets attached there.
 
-> **Legacy upgrade note:** v1.1.2 was signed with a different signing certificate. Because that old private key is unavailable, v1.1.3 cannot update that installation in place. Users on v1.1.2 must review the migration instructions and data implications before uninstalling or reinstalling.
+> **Historical legacy upgrade note:** v1.1.2 was signed with a different signing certificate. Because that old private key is unavailable, v1.1.3 cannot update that installation in place. Users on v1.1.2 must review the migration instructions and data implications before uninstalling or reinstalling.
 
 - In Settings, tap **Check for official updates**. The app contacts GitHub only when you request it, downloads the published stable APK and checksum, verifies the checksum, package ID, version and pinned release certificate, then opens Android's installer.
 - Android confirmation is required. If the package ID and release key match, Android updates the installed app in place and retains its private app data; uninstalling is not required.
 - Updates are blocked while protection monitoring is enabled or a countdown/alarm is active. Disable monitoring first so package replacement cannot interrupt an active protection event.
 - Android may require you to allow installs from ThiefAlertSeQure in its app-specific unknown-apps setting. This is system-controlled and can be revoked after the update.
-- The current development baseline is `1.1.3` (version code `5`).
+- The current development candidate is `1.1.5_Developer_Alinor` (versionCode `7`) on `work/batch-4-implementation`; PR #8 remains unmerged.
 - Production updates must always use the same permanent release keystore. CI supports the four GitHub Actions secrets documented in [APK installation and update safety](docs/APK_INSTALL_AND_UPDATE.md).
 - CI labels release-signed and debug-only APKs separately and verifies the package ID, version, and signing certificate before upload.
 - A debug APK is for development only. Do not alternate debug and release builds on one installed app.

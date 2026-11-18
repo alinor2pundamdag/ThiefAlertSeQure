@@ -1,4 +1,4 @@
-<div align="right">
+> Current Batch Four candidate: `work/batch-4-implementation`, v1.1.5 code 7, PR #8 open/unmerged. Historical audit runs and device reports below do not verify this exact candidate.\n\n<div align="right">
   <a href="../README.md"><img src="../ThiefAlertSeQureIcon.jpg" alt="ThiefAlertSeQure icon" width="64" /></a>
 </div>
 
@@ -65,7 +65,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 
 ## Visual alarm flashlight
 - AlarmService starts the optional LED output only after ProtectionStore confirms ALARM_TRIGGERED; countdown and ARMED states never pulse the LED.
-- The alarm flashlight uses CameraManager.setTorchMode without CAMERA permission or a camera capture session. Separately, optional front-camera photo evidence requests CAMERA permission only after explicit owner opt-in; it captures one still only after successful owner authentication while the authentication Activity is visible. Photos are Android Keystore AES-GCM encrypted, bounded to 20 images / 30 days / 2 MiB each, and individually viewable/exportable/deletable. No camera foreground-service type, background camera capture, video, microphone capture or cloud upload is used.
+- The alarm flashlight uses CameraManager.setTorchMode without CAMERA permission or a camera capture session. Separately, optional front-camera photo evidence requests CAMERA permission only after explicit owner opt-in; it captures one still only after successful owner authentication while the authentication Activity is visible. New photos are unencrypted Gallery JPEGs by default in the app-owned Pictures/ThiefAlertSeQure folder; Settings can enable Android Keystore AES-GCM encryption for future captures. Existing photos are not converted when the setting changes. Both stores are bounded to 20 images / 30 days / 2 MiB each; encrypted-vault photos are individually viewable/exportable/deletable, while Gallery photos are managed through Gallery and the app's scoped delete action. No camera foreground-service type, background camera capture, video, microphone capture or cloud upload is used.
 - Flash hardware is declared optional in the manifest so Play does not require a flash unit for installation. Audio alarm remains the primary output and is not gated by flash availability.
 - The default pulse is 700 ms on / 700 ms off (about 0.71 cycles per second), not a rapid strobe. Photosensitive users can disable it in Settings.
 - Torch access is best-effort: camera contention, an unavailable camera service, thermal management, OEM policy or process termination can stop light output. stopAlarm() explicitly turns the torch off on authenticated disarm and service teardown. Android also may turn it off when the client exits.
@@ -93,7 +93,7 @@ Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPl
 - Biometric availability depends on hardware, enrollment and Android strength classification.
 - Device Owner APIs and restrictions depend on Android version, provisioning state and OEM build.
 - HONOR/MagicOS, Xiaomi/HyperOS, Samsung/One UI and other OEM battery managers may require user-side background/autostart configuration. No universal public API disables all OEM power management.
-- Optional flash and front-camera hardware are declared non-required. Torch control does not request CAMERA permission. The separate photo-evidence feature requires explicit owner opt-in and runtime CAMERA permission, and runs only after successful owner authentication while the app is visible; no camera foreground-service type is declared.
+- Optional flash and front-camera hardware are declared non-required. Torch control does not request CAMERA permission. The separate photo-evidence feature requires explicit owner opt-in and runtime CAMERA permission, and runs only after successful owner authentication while the app is visible. Gallery mode additionally requests READ/WRITE external-storage permission only on API 26–28; Android 10+ uses app-owned MediaStore without broad media permissions. No camera foreground-service type is declared.
 
 ## Source-review correction — 11 November 2026
 

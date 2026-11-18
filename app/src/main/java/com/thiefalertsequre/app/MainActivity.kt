@@ -29,6 +29,7 @@ import androidx.fragment.app.FragmentActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import java.util.concurrent.Executors
 
 class MainActivity : FragmentActivity() {
     private lateinit var status: TextView
@@ -45,6 +46,7 @@ class MainActivity : FragmentActivity() {
     private var autoAuthenticationRequested = false
     private var notificationPermissionAskedThisSession = false
     private var lastBatchThreeRefreshAt = 0L
+    private val maintenanceExecutor = Executors.newSingleThreadExecutor()
 
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -83,20 +85,24 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val introPrefs = getSharedPreferences("batch_three_intro_v1", MODE_PRIVATE)
-        val introCompleted = SafePreferences.boolean(introPrefs, "completed", false)
+        val introPrefs = getSharedPreferences(AppLaunchIntroPolicy.PREFS, MODE_PRIVATE)
         val protectionModeAtLaunch = ProtectionStore(this).read().mode
-        // Never let a cosmetic first-run sequence delay an active countdown or owner authentication.
-        if (!introCompleted && protectionModeAtLaunch == ProtectionMode.DISARMED) {
+        val installedVersionCode = AppLaunchIntroPolicy.currentVersionCode(this)
+        val lastIntroVersionCode = AppLaunchIntroPolicy.lastCompletedVersionCode(introPrefs, installedVersionCode)
+        // Show the cinematic intro once per installed app version, but never delay active protection or owner authentication.
+        if (AppLaunchIntroPolicy.shouldShow(lastIntroVersionCode, installedVersionCode, protectionModeAtLaunch == ProtectionMode.DISARMED)) {
             startActivity(Intent(this, SeismicGenesisIntroActivity::class.java))
             finish()
             return
         }
-        // Enforce the optional photo-vault retention window when the owner opens the app.
-        runCatching { CameraEvidenceVault.entries(this) }
+        // Prune both app-managed photo stores off the main thread; keep startup responsive.
+        maintenanceExecutor.execute {
+            runCatching { CameraEvidenceVault.entries(applicationContext) }
+            runCatching { CameraEvidenceMediaStore.enforceRetention(applicationContext) }
+        }
         applyAlarmWindowPolicy()
 
-        val privacyDecision = SafePreferences.string(getSharedPreferences("privacy_notice_v5", MODE_PRIVATE), "decision", null)
+        val privacyDecision = SafePreferences.string(getSharedPreferences("privacy_notice_v6", MODE_PRIVATE), "decision", null)
         // Require acknowledgement of this updated notice on every existing
         // install once; it now discloses the optional alarm flashlight and its safety toggle.
         // Privacy acknowledgement remains mandatory for normal app use, but it must
@@ -144,14 +150,14 @@ class MainActivity : FragmentActivity() {
         body.addView(label("Data and privacy", 18f, getColor(R.color.tas_text), true), matchWrap())
         body.addView(space(8))
         body.addView(label(
-            "The app does not require an account, analytics, advertising, or a cloud backend. Internet access is used only when you manually check for an official GitHub release and download its APK. The app does not upload protection state, event history, evidence, location, credentials, photos, or other personal data. GitHub receives ordinary network request metadata, such as your request IP address, when you check for updates. Protection state, biometric-failure cooldown counters, a bounded local event history, monitor preferences, and AES-GCM encrypted local evidence metadata are stored on this device. Optional front-camera photos are stored separately in an AES-GCM encrypted local vault only after explicit owner opt-in and successful Android owner authentication that disarms a latched alarm while this app is visible. A cached location fix or one bounded current GPS/network location request (20-second timeout) is saved only after you explicitly request it and grant location permission. The metadata evidence vault can be exported or restored only through a password-protected file you choose; camera photos can be exported individually. Backup passwords are not stored. Selected audio remains with its Android document provider; the app retains only the access grant and URI. Your PIN, pattern, password, and biometric templates are never collected or stored by this app; Android performs verification.",
+            "The app does not require an account, analytics, advertising, or a cloud backend. Internet access is used only when you manually check for an official GitHub release and download its APK. The app does not upload protection state, event history, evidence, location, credentials, photos, or other personal data. GitHub receives ordinary network request metadata, such as your request IP address, when you check for updates. Protection state, biometric-failure cooldown counters, a bounded local event history, monitor preferences, and AES-GCM encrypted local evidence metadata are stored on this device. Optional front-camera photos are saved as normal, unencrypted images in Pictures/ThiefAlertSeQure and appear in Gallery by default, only after explicit owner opt-in and successful Android owner authentication that disarms a latched alarm while this app is visible. Settings can enable AES-GCM encryption for future captures, moving them to the private app vault instead of Gallery. Changing this setting does not retroactively encrypt or decrypt existing photos. A cached location fix or one bounded current GPS/network location request (20-second timeout) is saved only after you explicitly request it and grant location permission. The metadata evidence vault can be exported or restored only through a password-protected file you choose; camera photos can be exported individually. Backup passwords are not stored. Selected audio remains with its Android document provider; the app retains only the access grant and URI. Your PIN, pattern, password, and biometric templates are never collected or stored by this app; Android performs verification.",
             14f, getColor(R.color.tas_muted), false
         ), matchWrap())
         body.addView(space(16))
         body.addView(label("System access and limitations", 18f, getColor(R.color.tas_text), true), matchWrap())
         body.addView(space(8))
         body.addView(label(
-            "The app may use boot and charger broadcasts, alarm scheduling, notifications, alarm audio, the camera flashlight's Android torch control while the alarm is active, and foreground services. Five optional built-in alarm tones and owner-selected custom audio are stored locally. The flash feature does not request camera permission and does not capture images. Separately, you may explicitly enable optional front-camera photo evidence in Settings; CAMERA permission is requested only after that choice, and one photo is captured only after a successful owner PIN/password or supported strong-biometric verification that disarms a latched alarm while the app is visible. Android displays its camera privacy indicator. Photos are AES-GCM encrypted with an Android Keystore key, stored locally for up to 30 days (maximum 20 photos), and can be viewed, exported or deleted; they are never uploaded. If permission, camera hardware, or foreground access is unavailable, capture is skipped and alarm/authentication behavior is unaffected. The encrypted local evidence vault stores app-observed event metadata and only cached location snapshots or a one-shot current GPS/network location request that you explicitly initiate after granting location permission; the current request times out after 20 seconds. No background location, continuous tracking, microphone capture, or cloud evidence upload is used. You may export or restore the metadata evidence vault using a separate password-protected file encrypted with AES-GCM; camera photos are exported individually. The backup password is not stored by the app. Flashing light may affect photosensitive users; you can disable the flash alert in Settings. Exact alarm access and notification permission are controlled by Android. Optional Device Owner mode requires separate device enrollment and can restrict device settings. No ordinary app can guarantee protection against force-stop, uninstall, physical shutdown, recovery controls, battery removal, or every manufacturer-specific power policy. Alarm delivery may be delayed when Android restricts background execution or exact alarms.",
+            "The app may use boot and charger broadcasts, alarm scheduling, notifications, alarm audio, the camera flashlight's Android torch control while the alarm is active, and foreground services. Five optional built-in alarm tones and owner-selected custom audio are stored locally. The flash feature does not request camera permission and does not capture images. Separately, you may explicitly enable optional front-camera photo evidence in Settings; CAMERA permission is requested only after that choice, and one photo is captured only after a successful owner PIN/password or supported strong-biometric verification that disarms a latched alarm while the app is visible. Android displays its camera privacy indicator. Photos are saved unencrypted in the app-specific Gallery folder by default, or in the private AES-GCM vault when photo encryption is enabled in Settings. App-managed photos are limited to 20 images and 30 days; Gallery images are visible to anyone with Gallery access. Changing the setting affects future captures only; existing images are not converted. Photos are never uploaded. If permission, camera hardware, or foreground access is unavailable, capture is skipped and alarm/authentication behavior is unaffected. The encrypted local evidence vault stores app-observed event metadata and only cached location snapshots or a one-shot current GPS/network location request that you explicitly initiate after granting location permission; the current request times out after 20 seconds. No background location, continuous tracking, microphone capture, or cloud evidence upload is used. You may export or restore the metadata evidence vault using a separate password-protected file encrypted with AES-GCM; camera photos are exported individually. The backup password is not stored by the app. Flashing light may affect photosensitive users; you can disable the flash alert in Settings. Exact alarm access and notification permission are controlled by Android. Optional Device Owner mode requires separate device enrollment and can restrict device settings. No ordinary app can guarantee protection against force-stop, uninstall, physical shutdown, recovery controls, battery removal, or every manufacturer-specific power policy. Alarm delivery may be delayed when Android restricts background execution or exact alarms.",
             14f, getColor(R.color.tas_muted), false
         ), matchWrap())
         body.addView(space(16))
@@ -165,7 +171,7 @@ class MainActivity : FragmentActivity() {
         root.addView(notice, matchWrap())
         root.addView(space(22))
         root.addView(button("I understand & continue") {
-            getSharedPreferences("privacy_notice_v5", MODE_PRIVATE).edit()
+            getSharedPreferences("privacy_notice_v6", MODE_PRIVATE).edit()
                 .putString("decision", "acknowledged").putLong("decision_at", System.currentTimeMillis()).apply()
             buildDashboard()
         }, matchWrap())
@@ -467,6 +473,7 @@ class MainActivity : FragmentActivity() {
     override fun onDestroy() {
         window.decorView.removeCallbacks(privacyRecoveryPoll)
         if (::status.isInitialized) status.removeCallbacks(ticker)
+        maintenanceExecutor.shutdown()
         super.onDestroy()
     }
 

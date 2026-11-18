@@ -67,7 +67,8 @@ internal object ConfigurationBackup {
             (listOf(AlarmTonePreset.DEFAULT_AUDIO) + AlarmTonePreset.builtIns).map { it.name }.toSet()),
         Definition("tas_theme_preferences_v1", "selected_theme_id", "string", ThemeStore.DEFAULT_ID,
             ThemeStore.all.map { it.id }.toSet()),
-        Definition("alarm_display_settings_v1", "show_alarm_screen_over_lockscreen", "boolean", false)
+        Definition("alarm_display_settings_v1", "show_alarm_screen_over_lockscreen", "boolean", false),
+        Definition("camera_evidence_settings", "encrypt_new_photos", "boolean", false)
     )
 
     fun encrypt(context: Context, password: CharArray): ByteArray {
@@ -115,7 +116,7 @@ internal object ConfigurationBackup {
                 put("value", value)
             })
         }
-        return JSONObject().put("schema", 1).put("settings", array)
+        return JSONObject().put("schema", 2).put("settings", array)
     }
 
     private fun readValue(prefs: SharedPreferences, definition: Definition): Any =
@@ -141,10 +142,17 @@ internal object ConfigurationBackup {
 
     private fun parse(payload: ByteArray): List<Entry> {
         val root = JSONObject(String(payload, Charsets.UTF_8))
-        require(root.getInt("schema") == 1) { "Configuration backup version is not supported." }
+        val schema = root.getInt("schema")
+        require(schema == 1 || schema == 2) { "Configuration backup version is not supported." }
+        // Schema 1 predates the camera-evidence storage preference. Preserve the
+        // current value when restoring an older backup instead of silently changing
+        // the owner's photo privacy mode.
+        val expectedDefinitions = if (schema == 1) {
+            definitions.filterNot { it.file == "camera_evidence_settings" && it.key == "encrypt_new_photos" }
+        } else definitions
         val array = root.getJSONArray("settings")
-        require(array.length() == definitions.size) { "Configuration backup is incomplete or contains unexpected settings." }
-        val definitionMap = definitions.associateBy { it.file to it.key }
+        require(array.length() == expectedDefinitions.size) { "Configuration backup is incomplete or contains unexpected settings." }
+        val definitionMap = expectedDefinitions.associateBy { it.file to it.key }
         val seen = mutableSetOf<Pair<String, String>>()
         return buildList {
             for (index in 0 until array.length()) {
@@ -167,7 +175,7 @@ internal object ConfigurationBackup {
                 validate(definition, value)
                 add(Entry(definition, value))
             }
-        }.also { require(it.size == definitions.size) { "Configuration backup is missing settings." } }
+        }.also { require(it.size == expectedDefinitions.size) { "Configuration backup is missing settings." } }
     }
 
     private fun validate(definition: Definition, value: Any) {

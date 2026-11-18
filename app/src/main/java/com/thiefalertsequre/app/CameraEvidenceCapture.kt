@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal object CameraEvidenceCapture {
     private const val SETTINGS = "camera_evidence_settings"
     private const val KEY_ENABLED = "capture_after_owner_authentication"
+    private const val KEY_ENCRYPT_NEW_PHOTOS = "encrypt_new_photos"
     private const val CAPTURE_TIMEOUT_MS = 15_000L
     private const val PREFERRED_WIDTH = 1280
     private const val PREFERRED_HEIGHT = 720
@@ -41,6 +42,22 @@ internal object CameraEvidenceCapture {
             KEY_ENABLED,
             false
         )
+    }.getOrDefault(false)
+
+    fun isEncryptionEnabled(context: Context): Boolean = runCatching {
+        when (val read = SafePreferences.readBoolean(
+            context.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE),
+            KEY_ENCRYPT_NEW_PHOTOS,
+            false
+        )) {
+            is PreferenceRead.Value -> read.value
+            is PreferenceRead.Corrupt -> true
+        }
+    }.getOrDefault(true)
+
+    fun setEncryptionEnabled(context: Context, enabled: Boolean): Boolean = runCatching {
+        context.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_ENCRYPT_NEW_PHOTOS, enabled).commit()
     }.getOrDefault(false)
 
     fun setEnabled(context: Context, enabled: Boolean): Boolean = runCatching {
@@ -55,10 +72,18 @@ internal object CameraEvidenceCapture {
             activity, Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
         val visible = isActivityVisible(activity)
+        val encryptEvidence = isEncryptionEnabled(app)
         if (!CameraEvidencePolicy.shouldCapture(true, permissionGranted, true, visible)) {
             recordFailure(app, if (!permissionGranted) "camera_evidence_permission_missing"
                 else "camera_evidence_activity_not_visible",
                 "Front-camera evidence was skipped; owner authentication remains successful")
+            return
+        }
+        val galleryPermissionGranted = encryptEvidence || android.os.Build.VERSION.SDK_INT >= 29 ||
+            (ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
+        if (!galleryPermissionGranted) {
+            recordFailure(app, "camera_evidence_gallery_permission_missing", "Read/write Gallery permissions are required on Android 8–9 when unencrypted Gallery storage is selected")
             return
         }
         if (!inFlight.compareAndSet(false, true)) {
@@ -178,25 +203,23 @@ internal object CameraEvidenceCapture {
                 finish("camera_evidence_image_rejected", "JPEG could not be compressed below the 2 MiB evidence size limit")
                 return@setOnImageAvailableListener
             }
-            val entry = runCatching { CameraEvidenceVault.save(app, boundedJpeg) }.getOrNull()
-            if (entry == null) {
-                finish("camera_evidence_storage_failed", "Encrypted front-camera evidence could not be committed to local storage")
+            val encryptedEntry = if (encryptEvidence) runCatching { CameraEvidenceVault.save(app, boundedJpeg) }.getOrNull() else null
+            val galleryUri = if (!encryptEvidence) runCatching { CameraEvidenceMediaStore.save(app, boundedJpeg) }.getOrNull() else null
+            val saved = if (encryptEvidence) encryptedEntry != null else galleryUri != null
+            if (!saved) {
+                finish("camera_evidence_storage_failed", if (encryptEvidence)
+                    "Encrypted photo could not be committed to the private vault"
+                else "Photo could not be published to the Gallery MediaStore")
             } else {
-                runCatching {
-                    LocalEvidenceVault.recordAsync(
-                        app,
-                        "front_camera_evidence_saved",
-                        "id=${entry.id}; sha256=${entry.sha256}; bytes=${entry.sizeBytes}; trigger=successful_owner_authentication"
-                    )
+                val storageDetail = if (encryptEvidence) {
+                    val entry = requireNotNull(encryptedEntry)
+                    "storage=encrypted_private_vault; id=${entry.id}; sha256=${entry.sha256}; bytes=${entry.sizeBytes}"
+                } else {
+                    "storage=gallery_unencrypted; uri=$galleryUri; bytes=${boundedJpeg.size}"
                 }
-                runCatching {
-                    LocalTamperHistory.record(
-                        app,
-                        "front_camera_evidence_saved",
-                        "Encrypted front-camera photo saved after successful owner authentication; id=${entry.id}; sha256=${entry.sha256}"
-                    )
-                }
-                notifyOwner(app, "Front-camera evidence saved securely.")
+                runCatching { LocalEvidenceVault.recordAsync(app, "front_camera_evidence_saved", "$storageDetail; trigger=successful_owner_authentication") }
+                runCatching { LocalTamperHistory.record(app, "front_camera_evidence_saved", "Front-camera photo saved after successful owner authentication; $storageDetail") }
+                notifyOwner(app, if (encryptEvidence) "Front-camera evidence saved in the encrypted private vault." else "Front-camera evidence saved to Gallery.")
                 finish()
             }
         }, handler)

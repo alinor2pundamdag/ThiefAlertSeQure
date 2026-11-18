@@ -4,8 +4,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val appVersionCode = 6
-val appVersionName = "1.1.4_Developer_Alinor"
+val appVersionCode = 7
+val appVersionName = "1.1.5_Developer_Alinor"
 
 val releaseSigningReady = listOf(
     "ANDROID_KEYSTORE_PATH",
@@ -73,8 +73,8 @@ android {
 androidComponents {
     onVariants(selector().withBuildType("debug")) { variant ->
         variant.outputs.forEach { output ->
-            output.versionCode.set(6)
-            output.versionName.set("1.1.4-test")
+            output.versionCode.set(7)
+            output.versionName.set("1.1.5-test")
         }
     }
 }

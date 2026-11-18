@@ -1,4 +1,6 @@
-> Current FIXALL candidate: v`1.1.4` / versionCode `6`, package `com.thiefalertsequre.app`; side-by-side debug test variant is `com.thiefalertsequre.app.v114test`. Production identity and signing configuration are protected invariants. No production release is authorized by this verification work.
+> **Current Batch Four candidate (18 November 2026):** `work/batch-4-implementation`, version `1.1.5_Developer_Alinor` / versionCode `7`, PR #8 open/unmerged. The verification snapshot and branch identity recorded below are historical FIXALL evidence, not exact-head verification of this candidate. Current camera photo storage defaults to unencrypted Gallery with an explicit future-capture AES-GCM option; the cinematic intro is shown once per installed versionCode.
+
+> Historical FIXALL candidate: v`1.1.4` / versionCode `6`, package `com.thiefalertsequre.app`; side-by-side debug test variant is `com.thiefalertsequre.app.v114test`. Production identity and signing configuration are protected invariants. No production release is authorized by this verification work.
 > Contract: [Universal Maximum Protection Specification](UNIVERSAL_MAXIMUM_PROTECTION_SPEC.md).
 > Status labels: **Implemented** means source code exists; **Unit-covered** means a named JVM unit test exists; **CI-verified** means the exact commit passed the named non-instrumentation GitHub Actions checks. Physical-device and emulator acceptance are explicitly outside the current owner-authorized completion scope and are not blockers. Dormant `androidTest` source files and historical instrumentation records are reference-only; they must not be compiled or executed.
 
@@ -8,7 +10,7 @@
 
 | Area | Current evidence | Status / limitation |
 |---|---|---|
-| Branch / identity | Current coding branch `work/phase-0-12-coding`, latest code-bearing commit `475c1fa00b8c30c1280f77053d83eb91c0db7f64`; production branch `main` remains untouched; package `com.thiefalertsequre.app`; minSdk 26, compile/target SDK 36; Java/Kotlin 17; versionCode 6 / versionName 1.1.4 | Working candidate only; not merged or released |
+| Branch / identity | Historical FIXALL coding branch `work/phase-0-12-coding`, latest code-bearing commit `475c1fa00b8c30c1280f77053d83eb91c0db7f64`; production branch `main` remains untouched; package `com.thiefalertsequre.app`; minSdk 26, compile/target SDK 36; Java/Kotlin 17; versionCode 6 / versionName 1.1.4 | Working candidate only; not merged or released |
 | Phase One baseline build and static checks | Workflow run [#1270](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43734061025), exact Phase One baseline; build, unit tests, navigation verification, lint, asset/config checks, APK assembly and package/version/signer validation | PASS on that exact Phase One source head |
 | Last exact-head non-instrumentation CI baseline | Run [43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535) and CodeQL [43950015623](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623) on `475c1fa`; JVM unit tests, source contracts, lint, APK build/metadata/signer checks and CodeQL | PASS on that exact code-bearing head; the final documentation snapshot also passed exact-head CI |
 | Historical instrumentation API 26 / 28 | 25 tests per API; zero failures and errors; one documented biometric-enrollment skip per API on the earlier Phase One baseline | Historical PASS only; not evidence for current coding-branch head |
@@ -184,7 +186,7 @@ Physical-device tests, emulator tests, and instrumentation compilation/execution
 - Confirmed authentication freshness defect fixed in `e17f482264eba0d027b92499010be3b72c6d0086`: mismatched availability of issued/current boot identity now rejects the ephemeral proof.
 - Regression coverage added in `80c8c52be927db24a31a7c08d699998ffb72d559`: known-to-unknown, unknown-to-known, and both-unknown identity cases.
 - Instrumentation policy guard strengthened in `1e69aeb6b412ca52c9b79049e8be024cda8fb817`: it now scans every Gradle build/configuration file (`.gradle`, `.gradle.kts`, `.toml`) and all GitHub Actions workflow YAML files for forbidden instrumentation/emulator build wiring.
-- These changes are committed on `work/phase-0-12-coding`; they have not yet received independently confirmed exact-head Android/JVM/CodeQL CI results.
+- Historical FIXALL changes were committed on `work/phase-0-12-coding`; they have not yet received independently confirmed exact-head Android/JVM/CodeQL CI results.
 - Source review in this continuation covers the charger, protection state/persistence, alarm scheduling/recovery, boot, monitor lifecycle, A2 Bluetooth registry/scheduler/receiver, encryption, updater, alarm audio/volume, and authentication flows. Repository-wide audit remains open; no claim of 100% source audit is made.
 - Physical-device, emulator, and instrumentation execution remain explicitly excluded from the owner's completion criteria.
 
