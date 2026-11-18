@@ -723,6 +723,7 @@ class SettingsActivity : FragmentActivity() {
                                 val message = when {
                                     result == null -> "Migration stopped unexpectedly; some photos may already have been moved. Check both Gallery and the encrypted vault before deleting or retrying anything."
                                     result.blockedByProtection -> "Migration stopped because protection became active. Remaining Gallery originals were kept."
+                                    result.blockedByEncryptionSetting -> "Migration was not started because encryption is OFF. Enable it first."
                                     !result.enumerationSucceeded -> "Gallery photos could not be enumerated. No Gallery originals were removed."
                                     result.copiedToVault == 0 && result.copyFailures == 0 && result.capacityLimited == 0 ->
                                         "No app-owned Gallery photos were available to migrate."
