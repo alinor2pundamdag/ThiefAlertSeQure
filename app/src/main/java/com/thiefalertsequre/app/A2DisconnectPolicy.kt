@@ -19,10 +19,11 @@ object A2DisconnectPolicy {
         // elapsedRealtime must move forward within the same boot. Boot count
         // alone must not legitimize a corrupt or future-dated persisted event.
         if (eventElapsedRealtimeMs <= 0L || currentElapsedRealtimeMs < eventElapsedRealtimeMs) return false
-        if (storedBootCount >= 0 || currentBootCount >= 0) {
-            return storedBootCount >= 0 && currentBootCount >= 0 && storedBootCount == currentBootCount
-        }
-        return true
+        // Elapsed realtime alone cannot prove boot identity: after a reboot,
+        // the new uptime may already exceed the old event's uptime. Persisted
+        // deadlines therefore require a matching, readable BOOT_COUNT.
+        return storedBootCount >= 0 && currentBootCount >= 0 &&
+            storedBootCount == currentBootCount
     }
 
     fun shouldStartGracePeriod(
