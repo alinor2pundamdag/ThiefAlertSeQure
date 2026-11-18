@@ -218,8 +218,13 @@ internal object CameraEvidenceMediaStore {
         if (!query.success) return false
         var allDeleted = true
         query.images.forEach { (uri, _) ->
-            val deleted = runCatching { resolver.delete(uri, null, null) == 1 }.getOrDefault(false)
-            if (!deleted) allDeleted = false
+            val deleted = ProtectionStore(context.applicationContext).runIfDisarmed {
+                runCatching { resolver.delete(uri, null, null) == 1 }.getOrDefault(false)
+            }
+            if (deleted != true) {
+                allDeleted = false
+                if (deleted == null) return@forEach
+            }
         }
         return allDeleted
     }
@@ -231,7 +236,10 @@ internal object CameraEvidenceMediaStore {
         if (!query.success) return
         query.images.sortedByDescending { it.second }.forEachIndexed { index, (uri, timestamp) ->
             if (!CameraEvidencePolicy.isRetained(timestamp, now) || index >= CameraEvidencePolicy.MAX_IMAGES) {
-                runCatching { resolver.delete(uri, null, null) }
+                val deleted = ProtectionStore(context).runIfDisarmed {
+                    runCatching { resolver.delete(uri, null, null) == 1 }.getOrDefault(false)
+                }
+                if (deleted == null) return@forEachIndexed
             }
         }
     }
