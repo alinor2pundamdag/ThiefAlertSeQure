@@ -120,7 +120,7 @@ class PowerTransitionRecoveryInstrumentationTest {
             )
 
             assertTrue("A one-shot recovery callback must be scheduled with an inexact fallback",
-                AlarmScheduler.scheduleRecoveryRetry(context, 250L))
+                AlarmScheduler.scheduleRecoveryRetry(context, 60_000L))
             assertTrue(AlarmScheduler.hasPendingIntent(context, "recovery", fallback = true))
             val recoveryIntent = Intent(context, AlarmDeadlineReceiver::class.java)
                 .setAction("com.thiefalertsequre.DEADLINE")
