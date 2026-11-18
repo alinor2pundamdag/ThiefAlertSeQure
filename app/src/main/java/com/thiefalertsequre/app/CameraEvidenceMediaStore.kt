@@ -30,7 +30,6 @@ internal object CameraEvidenceMediaStore {
     )
 
     @Synchronized
-    @Synchronized
     fun save(context: Context, jpeg: ByteArray): Uri? {
         if (!CameraEvidencePolicy.isValidImageSize(jpeg.size)) return null
         val app = context.applicationContext
