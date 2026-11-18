@@ -539,7 +539,7 @@ private fun GenesisFractureCanvas(
         val fracture = ((progress - 0.23f) / 0.36f).coerceIn(0f, 1f)
         val native = drawContext.canvas.nativeCanvas
 
-        if (fracture > 0f && materialShader != null) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && fracture > 0f && materialShader != null) {
             runCatching {
                 drawGenesisRuntimeShader(native, materialShader, size.width, size.height, fracture)
             }.onFailure {
