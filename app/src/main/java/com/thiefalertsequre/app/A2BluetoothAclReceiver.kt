@@ -189,7 +189,11 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
                     )
                     return@Runnable
                 }
-                if (!SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED) ||
+                val protectionState = ProtectionStore(app).read()
+                val monitorEnabled = SafePreferences.boolean(
+                    prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+                )
+                if (!ProtectionMonitorPolicy.shouldRun(monitorEnabled, protectionState.mode) ||
                     !SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
                 ) return@Runnable
                 if (Build.VERSION.SDK_INT >= 31 &&
