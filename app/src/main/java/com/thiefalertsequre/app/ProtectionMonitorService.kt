@@ -213,6 +213,14 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         val monitorEnabled = SafePreferences.boolean(
             prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
+        if (monitorEnabled && intent?.action != ACTION_STOP &&
+            !A2BluetoothReceiverController.ensureBaselineReady(this)
+        ) {
+            LocalTamperHistory.record(
+                this, "a2_baseline_not_ready",
+                "Trusted Bluetooth separation detection remains disabled until a verified baseline reset succeeds"
+            )
+        }
         val applyStopRequest = ProtectionMonitorPolicy.shouldApplyStopRequest(
             stopPreferenceAlreadyCommitted, monitorEnabled
         )
