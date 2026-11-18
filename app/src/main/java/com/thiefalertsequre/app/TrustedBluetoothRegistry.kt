@@ -270,12 +270,25 @@ object TrustedBluetoothRegistry {
         val hadBaseline = old.any { it.equals(normalizedAddress, ignoreCase = true) }
         val updated = old.filterNot { it.equals(normalizedAddress, ignoreCase = true) }.toMutableSet()
         if (connected && isTrusted(prefs, normalizedAddress)) updated.add(normalizedAddress)
-        val committed = runCatching {
-            val encrypted = LocalPreferenceCipher.encrypt(KEY_BASELINES, updated.joinToString("\n"))
-            prefs.edit().putString(KEY_BASELINES, encrypted).commit()
+        val encrypted = runCatching {
+            LocalPreferenceCipher.encrypt(KEY_BASELINES, updated.joinToString("\n"))
         }.onFailure {
-            Log.e(TAG, "Could not encrypt or commit Bluetooth connection baseline; existing source retained", it)
-        }.getOrDefault(false)
+            Log.e(TAG, "Could not encrypt Bluetooth connection baseline; existing source retained", it)
+        }.getOrElse {
+            return BluetoothBaselineUpdateResult(BluetoothBaselineUpdateStatus.COMMIT_FAILED, hadBaseline)
+        }
+        var committed = false
+        for (attempt in 1..2) {
+            committed = runCatching {
+                prefs.edit().putString(KEY_BASELINES, encrypted).commit()
+            }.onFailure {
+                Log.e(TAG, "Bluetooth baseline commit attempt $attempt failed; source retained where possible", it)
+            }.getOrDefault(false)
+            if (committed) break
+        }
+        if (!committed) {
+            Log.e(TAG, "Bluetooth baseline commit failed after one retry; A2 disconnect scheduling must fail closed")
+        }
         return BluetoothBaselineUpdateResult(
             if (committed) BluetoothBaselineUpdateStatus.COMMITTED else BluetoothBaselineUpdateStatus.COMMIT_FAILED,
             hadBaseline
