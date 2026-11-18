@@ -39,7 +39,8 @@ class ProtectionQuickSettingsTile : TileService() {
             ProtectionMonitorService.KEY_ENABLED,
             ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
-        val monitorActive = monitorEnabled && ProtectionMonitorService.isRunning
+        val activeProtectionRequiresMonitor = mode == ProtectionMode.ARMED || mode == ProtectionMode.COUNTDOWN
+        val monitorActive = ProtectionMonitorService.isRunning && (monitorEnabled || activeProtectionRequiresMonitor)
         tile.state = when (mode) {
             ProtectionMode.ARMED -> if (monitorActive) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
             ProtectionMode.COUNTDOWN, ProtectionMode.ALARM_TRIGGERED -> Tile.STATE_ACTIVE
