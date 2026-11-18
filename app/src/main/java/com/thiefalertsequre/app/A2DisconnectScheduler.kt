@@ -64,8 +64,10 @@ internal object A2DisconnectScheduler {
             return false
         }
         val updated = mergePending(records, pending)
-        if (!write(prefs, updated)) {
-            LocalTamperHistory.record(context, "a2_deadline_persist_failed", "Encrypted A2 disconnect deadline could not be committed")
+        var persisted = write(prefs, updated)
+        if (!persisted) persisted = write(prefs, updated)
+        if (!persisted) {
+            LocalTamperHistory.record(context, "a2_deadline_persist_failed", "Encrypted A2 disconnect deadline could not be committed after one retry")
             return false
         }
         return runCatching {
@@ -167,9 +169,11 @@ internal object A2DisconnectScheduler {
                 matching.eventElapsedRealtimeMs != expectedEventElapsedMs)
         ) return true
         context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context, address, namespace))
-        val removed = write(prefs, records.filterNot { it.address.equals(address, true) })
+        val remaining = records.filterNot { it.address.equals(address, true) }
+        var removed = write(prefs, remaining)
+        if (!removed) removed = write(prefs, remaining)
         if (!removed) {
-            LocalTamperHistory.record(context, "a2_deadline_cancel_persist_failed", "Reconnect cancellation removed the AlarmManager callback but could not commit the updated encrypted deadline list")
+            LocalTamperHistory.record(context, "a2_deadline_cancel_persist_failed", "Reconnect cancellation removed the AlarmManager callback but could not commit the updated encrypted deadline list after one retry")
         }
         return removed
     }
@@ -195,9 +199,10 @@ internal object A2DisconnectScheduler {
         }
         val manager = context.getSystemService(AlarmManager::class.java)
         records.forEach { manager.cancel(pendingIntent(context, it.address, namespace)) }
-        val cleared = prefs.edit().remove(KEY_PENDING).commit()
+        var cleared = prefs.edit().remove(KEY_PENDING).commit()
+        if (!cleared) cleared = prefs.edit().remove(KEY_PENDING).commit()
         if (!cleared) {
-            LocalTamperHistory.record(context, "a2_pending_clear_failed", "Pending trusted-device deadlines could not be cleared")
+            LocalTamperHistory.record(context, "a2_pending_clear_failed", "Pending trusted-device deadlines could not be cleared after one retry")
         }
         return cleared
     }
