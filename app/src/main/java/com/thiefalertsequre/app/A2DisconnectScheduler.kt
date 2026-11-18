@@ -112,6 +112,36 @@ internal object A2DisconnectScheduler {
     fun cancel(context: Context, address: String, expectedEventElapsedMs: Long? = null): Boolean =
         cancelInternal(context, address, expectedEventElapsedMs, ProtectionMonitorService.PREFS, null)
 
+    /** Retry a consumed one-shot deadline without extending the original grace period. */
+    fun scheduleRetry(context: Context, pending: Pending, delayMs: Long = 1_000L): Boolean =
+        synchronized(lock) {
+            if (delayMs !in 250L..60_000L) return false
+            val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+            val records = read(prefs) ?: return false
+            val current = records.firstOrNull {
+                it.address.equals(pending.address, ignoreCase = true) &&
+                    it.eventElapsedRealtimeMs == pending.eventElapsedRealtimeMs
+            } ?: return false
+            if (current != pending) return false
+            return runCatching {
+                val manager = context.getSystemService(AlarmManager::class.java)
+                val operation = pendingIntent(context, pending.address)
+                val triggerAt = android.os.SystemClock.elapsedRealtime() + delayMs
+                if (Build.VERSION.SDK_INT < 31 || manager.canScheduleExactAlarms()) {
+                    try {
+                        manager.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, operation)
+                    } catch (_: SecurityException) {
+                        manager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, operation)
+                    }
+                } else {
+                    manager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, operation)
+                }
+                true
+            }.onFailure {
+                LocalTamperHistory.record(context, "a2_deadline_retry_failed", it.javaClass.simpleName + ": " + it.message)
+            }.getOrDefault(false)
+        }
+
     internal fun cancelIsolated(
         context: Context,
         address: String,
