@@ -44,7 +44,17 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private var receiverRegistered = false
     private var powerReceiverRegistered = false
     private var bluetoothReceiverRegistered = false
+    private var protectionStateReceiverRegistered = false
     private var stopRetryRunnable: Runnable? = null
+    private val protectionStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (ProtectionStore(this@ProtectionMonitorService).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                // The primary theft alarm owns alarm audio; stop any already-playing
+                // battery-threshold clip immediately when the persisted latch changes.
+                releaseAlertPlayer()
+            }
+        }
+    }
     private val powerTransitionReceiver = PowerTransitionReceiver()
     private val pendingBluetoothRunnables = mutableMapOf<String, Runnable>()
     private val bluetoothSeparationReceiver = object : BroadcastReceiver() {
@@ -191,6 +201,17 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         sensorManager = getSystemService(SensorManager::class.java)
         accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         createNotificationChannel()
+        runCatching {
+            ContextCompat.registerReceiver(
+                this,
+                protectionStateReceiver,
+                IntentFilter(ProtectionStore.ACTION_STATE_CHANGED),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            protectionStateReceiverRegistered = true
+        }.onFailure {
+            LocalTamperHistory.record(this, "monitor_state_receiver_registration_failed", it.javaClass.simpleName + ": " + it.message)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -803,6 +824,8 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         isBluetoothReceiverRegistered = false
         if (bluetoothReceiverRegistered) runCatching { unregisterReceiver(bluetoothSeparationReceiver) }
         bluetoothReceiverRegistered = false
+        if (protectionStateReceiverRegistered) runCatching { unregisterReceiver(protectionStateReceiver) }
+        protectionStateReceiverRegistered = false
         releaseAlertPlayer()
         isRunning = false
         prefs.edit().putBoolean(KEY_RUNNING, false).apply()
