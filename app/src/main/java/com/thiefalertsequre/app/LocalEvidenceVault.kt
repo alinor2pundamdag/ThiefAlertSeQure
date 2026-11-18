@@ -67,7 +67,7 @@ object LocalEvidenceVault {
         Log.w("LocalEvidenceVault", "Async evidence event was not stored ($reason; failures=$count)")
     }
 
-    /** Durable count of asynchronous evidence writes that could not be stored. */
+    /** Best-effort persisted count of asynchronous evidence writes that could not be stored. */
     fun asyncWriteFailureCount(context: Context): Long {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         return maxOf(asyncWriteFailures.get(), SafePreferences.long(prefs, KEY_ASYNC_WRITE_FAILURES, 0L))
