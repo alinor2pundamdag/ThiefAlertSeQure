@@ -259,9 +259,12 @@ class SettingsActivity : FragmentActivity() {
         ))
         val flashEnabled = AlarmFlashSettings.isEnabled(this)
         root.addView(action("Camera flash alert: ${if (flashEnabled) "ON" else "OFF"}") {
+            if (!requireProtectionDisarmed()) return@action
             val enabled = !AlarmFlashSettings.isEnabled(this)
-            getSharedPreferences(AlarmFlashSettings.PREFS_NAME, MODE_PRIVATE)
-                .edit().putBoolean(AlarmFlashSettings.KEY_ENABLED, enabled).apply()
+            if (!AlarmFlashSettings.setEnabled(this, enabled)) {
+                showProtectionSettingsSaveFailure()
+                return@action
+            }
             if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
                 runCatching {
                     ContextCompat.startForegroundService(
@@ -275,6 +278,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(6))
         val flashPattern = AlarmFlashPatternPolicy.read(this)
         root.addView(action("Flash pattern: ${flashPattern.label} (tap to cycle)") {
+            if (!requireProtectionDisarmed()) return@action
             val next = AlarmFlashPatternPolicy.next(this)
             if (next != flashPattern) {
                 LocalTamperHistory.record(this, "alarm_flash_pattern_changed", "Selected ${next.label}; applies on the next alarm start")
@@ -284,6 +288,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(6))
         val flashSpeed = AlarmFlashPatternPolicy.speedPercent(this)
         root.addView(action("Flash speed: $flashSpeed% (tap to cycle)") {
+            if (!requireProtectionDisarmed()) return@action
             val speeds = listOf(50, 75, 100, 125, 150, 200)
             val current = AlarmFlashPatternPolicy.speedPercent(this)
             val next = speeds[(speeds.indexOf(current).coerceAtLeast(0) + 1) % speeds.size]
@@ -295,6 +300,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(6))
         val customTiming = AlarmFlashPatternPolicy.customTimings(this)
         root.addView(action("Custom flash timing: ON ${customTiming.first} ms / OFF ${customTiming.second} ms") {
+            if (!requireProtectionDisarmed()) return@action
             showCustomFlashTimingDialog()
         })
         root.addView(space(6))
@@ -332,6 +338,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(8))
         root.addView(text("Built-in alarm tone: " + AlarmSoundStore.selectedBuiltInPreset(this).label, 13f, R.color.tas_text))
         root.addView(action("Change built-in alarm tone (5 presets + packaged default)") {
+            if (!requireProtectionDisarmed()) return@action
             val selected = AlarmSoundStore.selectNextBuiltInPreset(this)
             android.widget.Toast.makeText(this, "Built-in alarm tone: " + selected.label + ". Applies to the next alarm.", android.widget.Toast.LENGTH_LONG).show()
             render()
@@ -339,6 +346,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(text("A custom main alarm file takes priority over this built-in tone selection. Clear the custom file to use the selected built-in tone.", 12f, R.color.tas_muted))
         root.addView(text("Main alarm: " + AlarmSoundStore.displayName(this, AlarmSoundStore.ALARM), 13f, R.color.tas_text))
         root.addView(action("Use built-in default alarm (clear custom override)") {
+            if (!requireProtectionDisarmed()) return@action
             val cleared = AlarmSoundStore.clear(this, AlarmSoundStore.ALARM)
             android.widget.Toast.makeText(
                 this,
@@ -348,10 +356,12 @@ class SettingsActivity : FragmentActivity() {
             render()
         })
         root.addView(action("Choose custom main alarm audio file") {
+            if (!requireProtectionDisarmed()) return@action
             soundSlot = AlarmSoundStore.ALARM
             pickSoundFile.launch(arrayOf("audio/*"))
         })
         root.addView(action("Search a folder and its subfolders for alarm audio") {
+            if (!requireProtectionDisarmed()) return@action
             soundSlot = AlarmSoundStore.ALARM
             pickSoundFolder.launch(null)
         })
@@ -359,10 +369,12 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(6))
         root.addView(text("Secondary alert: " + AlarmSoundStore.displayName(this, AlarmSoundStore.ALERT), 13f, R.color.tas_text))
         root.addView(action("Choose secondary alert audio file") {
+            if (!requireProtectionDisarmed()) return@action
             soundSlot = AlarmSoundStore.ALERT
             pickSoundFile.launch(arrayOf("audio/*"))
         })
         root.addView(action("Search a folder and its subfolders for alert audio") {
+            if (!requireProtectionDisarmed()) return@action
             soundSlot = AlarmSoundStore.ALERT
             pickSoundFolder.launch(null)
         })
@@ -371,6 +383,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(6))
         val secondaryEnabled = AlarmSoundStore.isSecondaryAlarmEnabled(this)
         root.addView(action("Persistent secondary theft alarm: ${if (secondaryEnabled) "ON" else "OFF"}") {
+            if (!requireProtectionDisarmed()) return@action
             val enable = !AlarmSoundStore.isSecondaryAlarmEnabled(this)
             if (enable && AlarmSoundStore.uri(this, AlarmSoundStore.ALERT) == null) {
                 android.widget.Toast.makeText(this, "Choose a secondary alert audio file before enabling the persistent secondary alarm.", android.widget.Toast.LENGTH_LONG).show()
@@ -390,6 +403,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(6))
         val hapticsEnabled = AlarmHapticsPolicy.isEnabled(this)
         root.addView(action("Independent repeating vibration: ${if (hapticsEnabled) "ON" else "OFF"}") {
+            if (!requireProtectionDisarmed()) return@action
             val enabled = !AlarmHapticsPolicy.isEnabled(this)
             if (AlarmHapticsPolicy.setEnabled(this, enabled)) {
                 if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
@@ -405,6 +419,7 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(6))
         val hapticPattern = AlarmHapticsPolicy.readPattern(this)
         root.addView(action("Vibration pattern: ${hapticPattern.label} (tap to cycle)") {
+            if (!requireProtectionDisarmed()) return@action
             val next = AlarmHapticsPolicy.nextPattern(this)
             if (next != hapticPattern && ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
                 runCatching {
@@ -431,7 +446,10 @@ class SettingsActivity : FragmentActivity() {
         val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         root.addView(action(if (monitorEnabled) "Disable background monitoring" else "Enable background monitoring") {
             val enabled = !SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
-            if (!monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).commit()) {
+            val monitorSave = ProtectionStore(this).runIfDisarmed {
+                monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).commit()
+            }
+            if (monitorSave != true) {
                 android.widget.Toast.makeText(this, "Android did not confirm the monitoring setting. No service or protection state was changed.", android.widget.Toast.LENGTH_LONG).show()
                 render()
                 return@action
@@ -467,8 +485,12 @@ class SettingsActivity : FragmentActivity() {
         })
         val motionEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED)
         root.addView(action("Independent motion alarm: ${if (motionEnabled) "ON" else "OFF"}") {
+            if (!requireProtectionDisarmed()) return@action
             val enabled = !SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED)
-            monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_MOTION_ENABLED, enabled).apply()
+            val saved = ProtectionStore(this).runIfDisarmed {
+                monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_MOTION_ENABLED, enabled).commit()
+            }
+            if (saved != true) { showProtectionSettingsSaveFailure(); return@action }
             sendBroadcast(Intent(ProtectionMonitorService.ACTION_REFRESH).setPackage(packageName))
             render()
         })
@@ -481,11 +503,15 @@ class SettingsActivity : FragmentActivity() {
             SafePreferences.string(monitorPrefs, ProtectionMonitorService.KEY_SENSITIVITY, MotionSensitivity.MEDIUM.name)
         )
         root.addView(action("Motion sensitivity (when enabled): ${sensitivity.name.lowercase()}") {
+            if (!requireProtectionDisarmed()) return@action
             val choices = MotionSensitivity.values().map { it.name.lowercase() }.toTypedArray()
             MaterialAlertDialogBuilder(this)
                 .setTitle("Motion sensitivity")
                 .setSingleChoiceItems(choices, MotionSensitivity.values().indexOf(sensitivity)) { dialog, which ->
-                    monitorPrefs.edit().putString(ProtectionMonitorService.KEY_SENSITIVITY, MotionSensitivity.values()[which].name).apply()
+                    val saved = ProtectionStore(this).runIfDisarmed {
+                        monitorPrefs.edit().putString(ProtectionMonitorService.KEY_SENSITIVITY, MotionSensitivity.values()[which].name).commit()
+                    }
+                    if (saved != true) { showProtectionSettingsSaveFailure(); return@setSingleChoiceItems }
                     dialog.dismiss()
                     render()
                 }
@@ -494,11 +520,13 @@ class SettingsActivity : FragmentActivity() {
         })
         val batteryAlertEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_BATTERY_ALERT_ENABLED, false)
         root.addView(action("Battery threshold alert: ${if (batteryAlertEnabled) "ON" else "OFF"}") {
+            if (!requireProtectionDisarmed()) return@action
             val enabled = !batteryAlertEnabled
             val batteryAlertEdit = monitorPrefs.edit()
                 .putBoolean(ProtectionMonitorService.KEY_BATTERY_ALERT_ENABLED, enabled)
             if (enabled) batteryAlertEdit.putBoolean(ProtectionMonitorService.KEY_ENABLED, true)
-            if (!batteryAlertEdit.commit()) {
+            val batteryAlertSave = ProtectionStore(this).runIfDisarmed { batteryAlertEdit.commit() }
+            if (batteryAlertSave != true) {
                 android.widget.Toast.makeText(this, "Android did not confirm the battery-alert setting. No service state was changed.", android.widget.Toast.LENGTH_LONG).show()
                 render()
                 return@action
@@ -519,12 +547,16 @@ class SettingsActivity : FragmentActivity() {
         })
         val threshold = SafePreferences.int(monitorPrefs, ProtectionMonitorService.KEY_BATTERY_THRESHOLD, 80)
         root.addView(action("Battery alert threshold: ${threshold}%") {
+            if (!requireProtectionDisarmed()) return@action
             val choices = arrayOf("80%", "85%", "90%", "95%", "100%")
             val values = intArrayOf(80, 85, 90, 95, 100)
             MaterialAlertDialogBuilder(this)
                 .setTitle("Battery alert threshold")
                 .setSingleChoiceItems(choices, values.indexOf(threshold).coerceAtLeast(0)) { dialog, which ->
-                    monitorPrefs.edit().putInt(ProtectionMonitorService.KEY_BATTERY_THRESHOLD, values[which]).apply()
+                    val saved = ProtectionStore(this).runIfDisarmed {
+                        monitorPrefs.edit().putInt(ProtectionMonitorService.KEY_BATTERY_THRESHOLD, values[which]).commit()
+                    }
+                    if (saved != true) { showProtectionSettingsSaveFailure(); return@setSingleChoiceItems }
                     dialog.dismiss()
                     render()
                 }
@@ -2038,6 +2070,24 @@ class SettingsActivity : FragmentActivity() {
         } else {
             AndroidDeviceCompatibility.open(this, primary, fallback)
         }
+    }
+
+    private fun requireProtectionDisarmed(): Boolean {
+        if (ProtectionStore(this).read().mode == ProtectionMode.DISARMED) return true
+        android.widget.Toast.makeText(
+            this,
+            "Protection settings are locked while protection is ARMED, COUNTDOWN, or ALARM_TRIGGERED. Disarm first.",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+        return false
+    }
+
+    private fun showProtectionSettingsSaveFailure() {
+        android.widget.Toast.makeText(
+            this,
+            "The setting was not changed. Confirm protection is DISARMED and retry.",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
     }
 
     private fun action(value: String, click: () -> Unit) = MaterialButton(this).apply {
