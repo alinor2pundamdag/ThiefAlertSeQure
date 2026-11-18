@@ -233,6 +233,9 @@ object ManagedProtectionController {
     }
 
     fun startIfConfigured(activity: Activity) {
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress() ||
+            !ConfigurationBackup.recoverPendingRestore(activity)
+        ) return
         // Never re-enter kiosk automatically while an explicit rollback is pending.
         if (hasPendingRollback(activity)) return
         if (isPolicyConfigured(activity) &&
