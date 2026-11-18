@@ -331,11 +331,15 @@ object PowerTransitionCoordinator {
             return ProtectionStore(context).read()
         }
 
-        val monitorEnabled = SafePreferences.boolean(
-            context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE),
-            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
-        )
+        val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        var monitorEnabled = false
         val update = ProtectionStore(context).updatePersisted { current ->
+            // Read the owner preference inside the same ProtectionStore lock as
+            // the state transition. A concurrent configuration restore/opt-out
+            // cannot be overwritten by a stale pre-lock preference snapshot.
+            monitorEnabled = SafePreferences.boolean(
+                monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+            )
             when {
                 current.mode == ProtectionMode.ALARM_TRIGGERED -> current
                 !monitorEnabled -> ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
