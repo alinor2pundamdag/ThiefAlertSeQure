@@ -229,8 +229,10 @@ object AlarmScheduler {
                 return false
             }
         }
-        if (!prefs.edit().putString(KEY_LAST_TOKEN, token).commit()) {
-            LocalTamperHistory.record(context, "deadline_token_persist_failed", "Alarm token was not saved; previous alarm retained")
+        var tokenPersisted = prefs.edit().putString(KEY_LAST_TOKEN, token).commit()
+        if (!tokenPersisted) tokenPersisted = prefs.edit().putString(KEY_LAST_TOKEN, token).commit()
+        if (!tokenPersisted) {
+            LocalTamperHistory.record(context, "deadline_token_persist_failed", "Alarm token was not saved after one retry; previous alarm retained")
             return false
         }
         return try {
@@ -240,10 +242,15 @@ object AlarmScheduler {
             }
             true
         } catch (error: Exception) {
-            val restore = prefs.edit()
-            if (previous == null) restore.remove(KEY_LAST_TOKEN) else restore.putString(KEY_LAST_TOKEN, previous)
-            if (!restore.commit()) {
-                LocalTamperHistory.record(context, "deadline_token_restore_failed", "Failed scheduling left the alarm token in an uncertain state")
+            fun restorePreviousToken(): Boolean {
+                val restore = prefs.edit()
+                if (previous == null) restore.remove(KEY_LAST_TOKEN) else restore.putString(KEY_LAST_TOKEN, previous)
+                return restore.commit()
+            }
+            var restored = restorePreviousToken()
+            if (!restored) restored = restorePreviousToken()
+            if (!restored) {
+                LocalTamperHistory.record(context, "deadline_token_restore_failed", "Failed scheduling left the alarm token in an uncertain state after one retry")
             }
             LocalTamperHistory.record(context, "deadline_alarm_schedule_failed", error.javaClass.simpleName + ": " + error.message)
             false
