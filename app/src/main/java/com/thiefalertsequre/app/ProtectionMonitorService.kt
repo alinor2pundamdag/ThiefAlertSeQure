@@ -50,6 +50,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private val bluetoothSeparationReceiver = object : BroadcastReceiver() {
         @Suppress("DEPRECATION", "MissingPermission")
         override fun onReceive(context: Context, intent: Intent) {
+            // Never consume partially restored monitor preferences. This check is
+            // nonblocking because this receiver runs on the service main thread.
+            if (ConfigurationBackup.isRestoreOrRecoveryInProgress()) return
             // Anchor the grace deadline to broadcast receipt, not the time spent
             // validating encrypted trust state and protection guards.
             if (!SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) return
