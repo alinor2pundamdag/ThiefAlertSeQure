@@ -118,7 +118,7 @@ internal object CameraEvidenceVault {
         val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         // Keep the encrypted index until every ciphertext/temp file is gone.
         // A failed delete therefore remains discoverable and can be retried.
-        val files = evidenceDirectory(app).listFiles().orEmpty()
+        val files = evidenceDirectory(app).listFiles() ?: return false
         val allDeleted = files.all { file ->
             runCatching { file.delete() || !file.exists() }.getOrDefault(false)
         }
@@ -135,7 +135,7 @@ internal object CameraEvidenceVault {
         val app = context.applicationContext
         pruneExpired(app)
         val entries = readIndex(app) ?: return false
-        val directoryFiles = evidenceDirectory(app).listFiles().orEmpty()
+        val directoryFiles = evidenceDirectory(app).listFiles() ?: return false
         val temporaryFiles = directoryFiles.filter { it.name.endsWith(".tmp") }
         val tempCleanupSucceeded = temporaryFiles.all { it.delete() || !it.exists() }
         val indexedFiles = entries.map { "${it.id}.aesgcm" }.toSet()
@@ -255,8 +255,10 @@ internal object CameraEvidenceVault {
         val indexReady = retained.size == entries.size || writeIndex(context, retained)
         if (indexReady) {
             removeUnreferencedFiles(context, retained)
-            val noPhotoFilesRemain = evidenceDirectory(context).listFiles().orEmpty()
-                .none { it.name.endsWith(".aesgcm") || it.name.endsWith(".tmp") }
+            val remainingFiles = evidenceDirectory(context).listFiles() ?: return
+            val noPhotoFilesRemain = remainingFiles.none {
+                it.name.endsWith(".aesgcm") || it.name.endsWith(".tmp")
+            }
             if (retained.isEmpty() && noPhotoFilesRemain) {
                 runCatching {
                     synchronized(keyLock) {
