@@ -299,7 +299,9 @@ checks = {
         and "releaseAlertPlayer()" in (APP / "ProtectionMonitorService.kt").read_text(encoding="utf-8")
         and "stopService(Intent(this, ProtectionMonitorService::class.java))" in (APP / "AlarmService.kt").read_text(encoding="utf-8")
         and "ArrayBlockingQueue(64)" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
-        and "RejectedExecutionException" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8"),
+        and "RejectedExecutionException" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
+        and "flashPreviewWasActive = flashPreviewController != null" in settings
+        and "AlarmService.ACTION_REFRESH_FLASH" in settings,
     "manifest ACL receiver uses valid Runnable labels and durable queue-overflow history":
         "return@Runnable" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
         and "return@Thread" not in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
