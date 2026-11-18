@@ -312,13 +312,14 @@ class ProtectionStore internal constructor(
     }
 
     private fun writeUnlocked(state: ProtectionState): Boolean {
-        val saved = prefs.edit()
-            .putString("mode", state.mode.name)
-            .putLong("deadline", state.deadlineEpochMs)
-            .putLong("changed", state.changedAtEpochMs)
-            .putLong("deadline_elapsed", state.deadlineElapsedRealtimeMs)
-            .putInt("boot_count", state.bootCount)
-            .let(commitEditor)
+        val saved = commitWithOneRetry {
+            prefs.edit()
+                .putString("mode", state.mode.name)
+                .putLong("deadline", state.deadlineEpochMs)
+                .putLong("changed", state.changedAtEpochMs)
+                .putLong("deadline_elapsed", state.deadlineElapsedRealtimeMs)
+                .putInt("boot_count", state.bootCount)
+        }
         if (saved) runCatching {
             appContext.sendBroadcast(
                 android.content.Intent(ACTION_STATE_CHANGED).setPackage(appContext.packageName)
@@ -327,12 +328,20 @@ class ProtectionStore internal constructor(
         return saved
     }
 
-    private fun writeThrottleUnlocked(state: AuthThrottleState): Boolean = prefs.edit()
-        .putInt(KEY_AUTH_FAILURES, state.failedAttempts)
-        .putLong(KEY_AUTH_COOLDOWN, state.cooldownUntilEpochMs)
-        .putLong(KEY_AUTH_COOLDOWN_ELAPSED, state.cooldownUntilElapsedRealtimeMs)
-        .putInt(KEY_AUTH_BOOT_COUNT, state.bootCount)
-        .let(commitEditor)
+    private fun writeThrottleUnlocked(state: AuthThrottleState): Boolean = commitWithOneRetry {
+        prefs.edit()
+            .putInt(KEY_AUTH_FAILURES, state.failedAttempts)
+            .putLong(KEY_AUTH_COOLDOWN, state.cooldownUntilEpochMs)
+            .putLong(KEY_AUTH_COOLDOWN_ELAPSED, state.cooldownUntilElapsedRealtimeMs)
+            .putInt(KEY_AUTH_BOOT_COUNT, state.bootCount)
+    }
+
+    private fun commitWithOneRetry(editorFactory: () -> SharedPreferences.Editor): Boolean {
+        val first = runCatching { commitEditor(editorFactory()) }.getOrDefault(false)
+        if (first) return true
+        android.util.Log.w(TAG, "SharedPreferences commit failed; retrying once")
+        return runCatching { commitEditor(editorFactory()) }.getOrDefault(false)
+    }
 
     private fun corruptionFlag(key: String): Boolean? = when (
         val value = SafePreferences.readBoolean(corruptionPrefs(), key, false)
@@ -373,12 +382,26 @@ class ProtectionStore internal constructor(
                 else -> return false
             }
         }
-        val saved = editor
-            .putString("snapshot_${snapshot}_reason", reason.take(256))
-            .putLong("snapshot_${snapshot}_captured_at_epoch_ms", System.currentTimeMillis())
-            .putLong(KEY_SNAPSHOT_COUNT, snapshot)
-            .putBoolean(activeKey, true)
-            .let(commitEditor)
+        val saved = commitWithOneRetry {
+            backup.edit().also { retryEditor ->
+                for ((key, value) in rawValues) {
+                    val snapshotKey = "snapshot_${snapshot}_$key"
+                    when (value) {
+                        is String -> retryEditor.putString(snapshotKey, value)
+                        is Int -> retryEditor.putInt(snapshotKey, value)
+                        is Long -> retryEditor.putLong(snapshotKey, value)
+                        is Float -> retryEditor.putFloat(snapshotKey, value)
+                        is Boolean -> retryEditor.putBoolean(snapshotKey, value)
+                        is Set<*> -> retryEditor.putStringSet(snapshotKey, value.filterIsInstance<String>().toSet())
+                    }
+                }
+                retryEditor
+                    .putString("snapshot_${snapshot}_reason", reason.take(256))
+                    .putLong("snapshot_${snapshot}_captured_at_epoch_ms", System.currentTimeMillis())
+                    .putLong(KEY_SNAPSHOT_COUNT, snapshot)
+                    .putBoolean(activeKey, true)
+            }
+        }
         return saved
     }
 
@@ -388,7 +411,7 @@ class ProtectionStore internal constructor(
             is PreferenceRead.Value -> value.value
             is PreferenceRead.Corrupt -> return false
         }
-        return !active || commitEditor(backup.edit().putBoolean(key, false))
+        return !active || commitWithOneRetry { backup.edit().putBoolean(key, false) }
     }
 
     private fun corruptionPrefs(): SharedPreferences = appContext.getSharedPreferences(
