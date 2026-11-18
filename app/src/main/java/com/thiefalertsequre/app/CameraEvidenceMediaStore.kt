@@ -24,7 +24,8 @@ internal object CameraEvidenceMediaStore {
         val removalFailures: Int = 0,
         val capacityLimited: Int = 0,
         val vaultIntegrityVerified: Boolean = false,
-        val blockedByProtection: Boolean = false
+        val blockedByProtection: Boolean = false,
+        val blockedByEncryptionSetting: Boolean = false
     )
 
     @Synchronized
@@ -82,6 +83,9 @@ internal object CameraEvidenceMediaStore {
         val app = context.applicationContext
         if (ProtectionStore(app).read().mode != ProtectionMode.DISARMED) {
             return MigrationResult(true, blockedByProtection = true)
+        }
+        if (!CameraEvidenceCapture.isEncryptionEnabled(app)) {
+            return MigrationResult(true, blockedByEncryptionSetting = true)
         }
         enforceRetention(app)
         val query = queryOwnedImages(app)
