@@ -121,7 +121,10 @@ internal object CameraEvidenceMediaStore {
             return MigrationResult(true, copyFailures = query.images.size, vaultIntegrityVerified = false)
         }
         if (query.images.isEmpty()) {
-            return MigrationResult(true, vaultIntegrityVerified = true)
+            return MigrationResult(
+                true, vaultIntegrityVerified = true,
+                unverifiedLegacyPhotos = query.unverifiedLegacyCount
+            )
         }
 
         var availableCapacity = (CameraEvidencePolicy.MAX_IMAGES - CameraEvidenceVault.entries(app).size)
@@ -199,7 +202,8 @@ internal object CameraEvidenceMediaStore {
                 copyFailures = copyFailures,
                 capacityLimited = capacityLimitedDuringMigration,
                 vaultIntegrityVerified = false,
-                blockedByProtection = blocked
+                blockedByProtection = blocked,
+                unverifiedLegacyPhotos = query.unverifiedLegacyCount
             )
         }
 
@@ -233,7 +237,8 @@ internal object CameraEvidenceMediaStore {
             removalFailures = removalFailures,
             capacityLimited = capacityLimitedDuringMigration,
             vaultIntegrityVerified = vaultHealthy,
-            blockedByProtection = blocked
+            blockedByProtection = blocked,
+            unverifiedLegacyPhotos = query.unverifiedLegacyCount
         )
     }
 
