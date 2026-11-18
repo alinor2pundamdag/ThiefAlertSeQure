@@ -1356,7 +1356,7 @@ class SettingsActivity : FragmentActivity() {
                         })
                         .setPositiveButton("Close", null)
                         .showThemed(this@SettingsActivity)
-                    return@runOnUiThread
+                    return@archiveUi
                 }
 
                 val formatter = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
@@ -1377,11 +1377,11 @@ class SettingsActivity : FragmentActivity() {
                             runOnUiThread photoUi@{
                                 if (isFinishing || isDestroyed) {
                                     bitmap?.recycle()
-                                    return@runOnUiThread
+                                    return@photoUi
                                 }
                                 if (bitmap == null) {
                                     android.widget.Toast.makeText(this@SettingsActivity, "Photo failed its integrity check or is unavailable.", android.widget.Toast.LENGTH_LONG).show()
-                                    return@runOnUiThread
+                                    return@photoUi
                                 }
                                 val image = ImageView(this@SettingsActivity).apply {
                                     contentDescription = "Encrypted front-camera evidence photo captured after successful owner authentication"
