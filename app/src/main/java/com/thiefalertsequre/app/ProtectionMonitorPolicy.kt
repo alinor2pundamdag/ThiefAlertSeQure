@@ -15,6 +15,11 @@ object ProtectionMonitorPolicy {
     /** Only a disarmed owner may stop the persistent protection monitor. */
     fun canStop(mode: ProtectionMode): Boolean = mode == ProtectionMode.DISARMED
 
+    /** A confirmed charger connection may arm DISARMED only when enabled; it must never disarm active protection. */
+    fun shouldArmOnConfirmedConnection(monitorEnabled: Boolean, mode: ProtectionMode): Boolean =
+        mode == ProtectionMode.ARMED || mode == ProtectionMode.COUNTDOWN ||
+            (monitorEnabled && mode == ProtectionMode.DISARMED)
+
     /** A stale UI stop must not overwrite a newer owner re-enable preference. */
     fun shouldApplyStopRequest(preferenceAlreadyCommitted: Boolean, monitorEnabled: Boolean): Boolean =
         !preferenceAlreadyCommitted || !monitorEnabled
