@@ -105,6 +105,7 @@ class GenesisFilamentRendererView(
     private var titleAdded = false
     private var nameAdded = false
     private var coreLightEntity = 0
+    private var coreLightRemoved = false
     private var lightEntity = 0
     private var currentProgress = 0f
     private var lastPhysicsProgress = 0f
@@ -829,8 +830,9 @@ class GenesisFilamentRendererView(
         GlMatrix.setIdentityM(matrix, 0)
         GlMatrix.scaleM(matrix, 0, scale, scale, scale)
         transformManager.setTransform(transformManager.getInstance(core.entity), matrix)
-        if (progress >= 0.82f) {
-            coreLightEntity.takeIf { it != 0 }?.let(activeScene::removeEntity)
+        if (progress >= 0.82f && !coreLightRemoved && coreLightEntity != 0) {
+            activeScene.removeEntity(coreLightEntity)
+            coreLightRemoved = true
         }
     }
 
@@ -851,30 +853,36 @@ class GenesisFilamentRendererView(
     fun release() {
         if (released) return
         released = true
+        isReady = false
         pauseRendering()
         runCatching { uiHelper?.detach() }
         uiHelper = null
         val activeEngine = engine
         if (activeEngine != null) {
             runCatching {
-                bodies.forEach { body ->
-                    activeEngine.destroyEntity(body.mesh.entity)
-                    activeEngine.destroyVertexBuffer(body.mesh.vertexBuffer)
-                    activeEngine.destroyIndexBuffer(body.mesh.indexBuffer)
-                    EntityManager.get().destroy(body.mesh.entity)
+                fun destroyMesh(mesh: Mesh) {
+                    activeEngine.destroyEntity(mesh.entity)
+                    activeEngine.destroyVertexBuffer(mesh.vertexBuffer)
+                    activeEngine.destroyIndexBuffer(mesh.indexBuffer)
+                    EntityManager.get().destroy(mesh.entity)
                 }
-                shieldMesh?.let {
-                    activeEngine.destroyEntity(it.entity)
-                    activeEngine.destroyVertexBuffer(it.vertexBuffer)
-                    activeEngine.destroyIndexBuffer(it.indexBuffer)
-                    EntityManager.get().destroy(it.entity)
-                }
+                bodies.forEach { destroyMesh(it.mesh) }
+                titleBodies.forEach { destroyMesh(it.body.mesh) }
+                nameBodies.forEach { destroyMesh(it.body.mesh) }
+                shieldMesh?.let(::destroyMesh)
+                coreMesh?.let(::destroyMesh)
                 if (lightEntity != 0) {
                     activeEngine.destroyEntity(lightEntity)
                     EntityManager.get().destroy(lightEntity)
                 }
+                if (coreLightEntity != 0) {
+                    activeEngine.destroyEntity(coreLightEntity)
+                    EntityManager.get().destroy(coreLightEntity)
+                }
                 shieldMaterial?.let(activeEngine::destroyMaterialInstance)
                 debrisMaterial?.let(activeEngine::destroyMaterialInstance)
+                titleMaterial?.let(activeEngine::destroyMaterialInstance)
+                coreMaterial?.let(activeEngine::destroyMaterialInstance)
                 pbrMaterial?.let(activeEngine::destroyMaterial)
                 filamentView?.let(activeEngine::destroyView)
                 scene?.let(activeEngine::destroyScene)
@@ -884,7 +892,10 @@ class GenesisFilamentRendererView(
             }
         }
         bodies.clear()
+        titleBodies.clear()
+        nameBodies.clear()
         shieldMesh = null
+        coreMesh = null
         engine = null
         renderer = null
         scene = null
