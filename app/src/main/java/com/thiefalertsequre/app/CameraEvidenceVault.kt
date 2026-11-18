@@ -33,6 +33,7 @@ internal object CameraEvidenceVault {
         val sizeBytes: Int
     )
 
+    @Synchronized
     fun save(
         context: Context,
         jpeg: ByteArray,
@@ -99,6 +100,7 @@ internal object CameraEvidenceVault {
         return entry
     }
 
+    @Synchronized
     fun entries(context: Context): List<Entry> {
         val app = context.applicationContext
         pruneExpired(app)
@@ -111,6 +113,7 @@ internal object CameraEvidenceVault {
         }
     }
 
+    @Synchronized
     fun read(context: Context, id: String): ByteArray? =
         readEntry(context.applicationContext, id, enforceRetention = true)
 
@@ -134,44 +137,50 @@ internal object CameraEvidenceVault {
     fun delete(context: Context, id: String): Boolean {
         if (!isSafeId(id)) return false
         val app = context.applicationContext
-        val entries = readIndex(app) ?: return false
-        if (entries.none { it.id == id }) return false
-        val next = entries.filterNot { it.id == id }
-        val file = evidenceDirectory(app).resolve("$id.aesgcm")
-        // Commit the new index before deleting ciphertext. If the index commit
-        // fails, the original photo and its key remain fully discoverable.
-        if (!writeIndex(app, next)) return false
-        val deleted = file.delete() || !file.exists()
-        if (!deleted) {
-            // Restore the original index so a failed file deletion never hides
-            // an encrypted photo from the owner's archive.
-            if (!writeIndex(app, entries)) {
-                android.util.Log.e("CameraEvidenceVault", "Photo deletion failed and the original index could not be restored; encrypted file retained")
+        val deleted = ProtectionStore(app).runIfDisarmed {
+            val entries = readIndex(app) ?: return@runIfDisarmed false
+            if (entries.none { it.id == id }) return@runIfDisarmed false
+            val next = entries.filterNot { it.id == id }
+            val file = evidenceDirectory(app).resolve("$id.aesgcm")
+            // Commit the new index before deleting ciphertext. If the index commit
+            // fails, the original photo and its key remain fully discoverable.
+            if (!writeIndex(app, next)) return@runIfDisarmed false
+            val fileDeleted = file.delete() || !file.exists()
+            if (!fileDeleted) {
+                // Restore the original index so a failed file deletion never hides
+                // an encrypted photo from the owner's archive.
+                if (!writeIndex(app, entries)) {
+                    android.util.Log.e("CameraEvidenceVault", "Photo deletion failed and the original index could not be restored; encrypted file retained")
+                }
+                return@runIfDisarmed false
             }
-            return false
+            if (next.isEmpty() && !deleteKeyIfPresent()) return@runIfDisarmed false
+            true
         }
-        if (next.isEmpty() && !deleteKeyIfPresent()) return false
-        return true
+        return deleted == true
     }
 
     @Synchronized
     fun deleteAll(context: Context): Boolean {
         val app = context.applicationContext
-        val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        // Keep the encrypted index until every ciphertext/temp file is gone.
-        // A failed delete therefore remains discoverable and can be retried.
-        val files = evidenceDirectory(app).listFiles() ?: return false
-        val allDeleted = files.all { file ->
-            runCatching { file.delete() || !file.exists() }.getOrDefault(false)
+        val deleted = ProtectionStore(app).runIfDisarmed {
+            val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            // Keep the encrypted index until every ciphertext/temp file is gone.
+            // A failed delete therefore remains discoverable and can be retried.
+            val files = evidenceDirectory(app).listFiles() ?: return@runIfDisarmed false
+            val allDeleted = files.all { file ->
+                runCatching { file.delete() || !file.exists() }.getOrDefault(false)
+            }
+            if (!allDeleted) return@runIfDisarmed false
+            // Remove the now-empty index before deleting the key. If the index
+            // commit fails, the Keystore key remains available for a safe retry.
+            var indexRemoved = prefs.edit().remove(KEY_INDEX).commit()
+            if (!indexRemoved) indexRemoved = prefs.edit().remove(KEY_INDEX).commit()
+            if (!indexRemoved) return@runIfDisarmed false
+            if (!deleteKeyIfPresent()) return@runIfDisarmed false
+            true
         }
-        if (!allDeleted) return false
-        // Remove the now-empty index before deleting the key. If the index
-        // commit fails, the Keystore key remains available for a safe retry.
-        var indexRemoved = prefs.edit().remove(KEY_INDEX).commit()
-        if (!indexRemoved) indexRemoved = prefs.edit().remove(KEY_INDEX).commit()
-        if (!indexRemoved) return false
-        if (!deleteKeyIfPresent()) return false
-        return true
+        return deleted == true
     }
 
     @Synchronized
