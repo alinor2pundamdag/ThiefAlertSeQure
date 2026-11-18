@@ -198,7 +198,9 @@ object AppUpdateManager {
         repeat(6) {
             require(
                 currentUrl.protocol.equals("https", ignoreCase = true) &&
-                    currentUrl.host in allowedHosts
+                    currentUrl.host in allowedHosts &&
+                    (currentUrl.port == -1 || currentUrl.port == 443) &&
+                    currentUrl.userInfo == null
             ) { "The update server or redirect is not an approved HTTPS GitHub host." }
 
             val connection = (currentUrl.openConnection() as HttpURLConnection).apply {
