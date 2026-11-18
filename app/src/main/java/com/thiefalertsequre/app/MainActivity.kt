@@ -1153,6 +1153,16 @@ class MainActivity : FragmentActivity() {
                     LocalEvidenceVault.recordAsync(this, "camera_evidence_capture_failed", "Optional camera evidence failed safely: ${it.javaClass.simpleName}")
                     LocalTamperHistory.record(this, "camera_evidence_capture_failed", "Optional camera evidence failed safely: ${it.javaClass.simpleName}")
                 }
+            // Active-alarm recovery bypasses the first-run notice so authentication is never
+            // blocked. Once the owner has disarmed the alarm, require acknowledgement before
+            // returning to normal dashboard use.
+            val privacyDecision = SafePreferences.string(
+                getSharedPreferences(PRIVACY_NOTICE_PREFS, MODE_PRIVATE), "decision", null
+            )
+            if (privacyDecision != "acknowledged") {
+                showPrivacyScreen()
+                return
+            }
         } else {
             syncProtectionMonitor(ProtectionStore(this).read())
         }
