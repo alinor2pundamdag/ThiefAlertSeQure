@@ -167,7 +167,9 @@ internal object CameraEvidenceVault {
         if (!allDeleted) return false
         // Remove the now-empty index before deleting the key. If the index
         // commit fails, the Keystore key remains available for a safe retry.
-        if (!prefs.edit().remove(KEY_INDEX).commit()) return false
+        var indexRemoved = prefs.edit().remove(KEY_INDEX).commit()
+        if (!indexRemoved) indexRemoved = prefs.edit().remove(KEY_INDEX).commit()
+        if (!indexRemoved) return false
         if (!deleteKeyIfPresent()) return false
         return true
     }
@@ -226,11 +228,19 @@ internal object CameraEvidenceVault {
                 })
             }
         }.toString()
-        return runCatching {
-            val encrypted = LocalPreferenceCipher.encrypt(INDEX_PURPOSE, encoded)
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit().putString(KEY_INDEX, encrypted).commit()
+        val encrypted = runCatching {
+            LocalPreferenceCipher.encrypt(INDEX_PURPOSE, encoded)
+        }.getOrNull() ?: return false
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        var saved = runCatching {
+            prefs.edit().putString(KEY_INDEX, encrypted).commit()
         }.getOrDefault(false)
+        if (!saved) {
+            saved = runCatching {
+                prefs.edit().putString(KEY_INDEX, encrypted).commit()
+            }.getOrDefault(false)
+        }
+        return saved
     }
 
     private fun encrypt(id: String, plaintext: ByteArray): ByteArray {
