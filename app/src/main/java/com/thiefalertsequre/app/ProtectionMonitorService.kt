@@ -306,6 +306,19 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                     START_NOT_STICKY
                 } else {
                     val currentMode = ProtectionStore(this).read().mode
+                    if (currentMode == ProtectionMode.ALARM_TRIGGERED) {
+                        runCatching {
+                            ContextCompat.startForegroundService(
+                                this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START)
+                            )
+                        }.onFailure {
+                            AlarmRecoveryCoordinator.onStartFailure(
+                                this, "Alarm latched during monitor stop cleanup; alarm service restart failed"
+                            )
+                        }
+                        stopSelf()
+                        return START_NOT_STICKY
+                    }
                     if (!ProtectionMonitorPolicy.canStop(currentMode) &&
                         !SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
                     ) {
