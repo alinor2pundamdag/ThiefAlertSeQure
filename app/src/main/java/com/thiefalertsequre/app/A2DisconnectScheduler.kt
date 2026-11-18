@@ -60,6 +60,11 @@ internal object A2DisconnectScheduler {
             return false
         }
         val addressKey = pending.address.uppercase()
+        val confirmedAt = confirmedConnections[addressKey]
+        if (confirmedAt != null && confirmedAt >= pending.eventElapsedRealtimeMs) {
+            // A later CONNECTED event already superseded this queued DISCONNECTED event.
+            return@synchronized false
+        }
         confirmedConnections.computeIfPresent(addressKey) { _, connectedAt ->
             if (pending.eventElapsedRealtimeMs > connectedAt) null else connectedAt
         }
