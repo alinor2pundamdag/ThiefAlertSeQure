@@ -40,7 +40,9 @@ object EvidenceLocationCapture {
         val manager = context.getSystemService(LocationManager::class.java) ?: return null
         val candidates = runCatching {
             manager.getProviders(true).mapNotNull { provider ->
-                runCatching { manager.getLastKnownLocation(provider) }.getOrNull()
+                runCatching { manager.getLastKnownLocation(provider) }
+                    .getOrNull()
+                    ?.takeIf(::isValidLocation)
             }
         }.getOrDefault(emptyList())
         val best = candidates.maxByOrNull { it.elapsedRealtimeNanos } ?: return null
@@ -96,7 +98,7 @@ object EvidenceLocationCapture {
             timeout?.let(handler::removeCallbacks)
             listeners.forEach { listener -> runCatching { manager.removeUpdates(listener) } }
             cancellations.forEach { signal -> runCatching { signal.cancel() } }
-            onResult(location?.let { snapshot(it, "CURRENT_REQUEST_RESULT") })
+            onResult(location?.takeIf(::isValidLocation)?.let { snapshot(it, "CURRENT_REQUEST_RESULT") })
         }
 
         fun providerFinished(location: Location?) {
@@ -136,6 +138,12 @@ object EvidenceLocationCapture {
         }
     }
 
+    private fun isValidLocation(location: Location): Boolean =
+        location.latitude.isFinite() &&
+            location.longitude.isFinite() &&
+            location.latitude in -90.0..90.0 &&
+            location.longitude in -180.0..180.0
+
     internal fun enabledProviders(gpsEnabled: Boolean, networkEnabled: Boolean): List<String> =
         buildList {
             if (gpsEnabled) add(LocationManager.GPS_PROVIDER)
@@ -149,7 +157,7 @@ object EvidenceLocationCapture {
         return Snapshot(
             latitude = location.latitude,
             longitude = location.longitude,
-            accuracyMeters = if (location.hasAccuracy()) location.accuracy else null,
+            accuracyMeters = if (location.hasAccuracy() && location.accuracy.isFinite() && location.accuracy >= 0f) location.accuracy else null,
             provider = location.provider ?: "unknown",
             fixAgeMs = ageMs,
             classification = if (ageMs <= RECENT_FIX_MAX_AGE_MS) "${source}_RECENT" else "${source}_STALE"
