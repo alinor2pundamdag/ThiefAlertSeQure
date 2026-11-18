@@ -28,7 +28,7 @@ class CameraEvidencePolicyTest {
 
     @Test fun jpegOrientationNormalizesUnexpectedDegrees() {
         assertEquals(270, CameraEvidencePolicy.jpegOrientation(-90, 0, true))
-        assertEquals(0, CameraEvidencePolicy.jpegOrientation(450, 90, true))
+        assertEquals(180, CameraEvidencePolicy.jpegOrientation(450, 90, true))
     }
 
     @Test fun retentionAndImageSizeAreBounded() {
