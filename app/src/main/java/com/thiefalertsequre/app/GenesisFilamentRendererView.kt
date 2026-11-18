@@ -421,12 +421,17 @@ class GenesisFilamentRendererView(
         val hdrBuffer = ByteBuffer.allocateDirect(hdrBytes.size).put(hdrBytes).apply { flip() }
         val hdr = HDRLoader.createTexture(activeEngine, hdrBuffer)
             ?: error("Unable to decode generated Seismic Genesis HDR environment")
-        val prefilter = IBLPrefilterContext(activeEngine)
-        val converter = IBLPrefilterContext.EquirectangularToCubemap(prefilter)
-        val specularFilter = IBLPrefilterContext.SpecularFilter(prefilter)
+        var prefilter: IBLPrefilterContext? = null
+        var converter: IBLPrefilterContext.EquirectangularToCubemap? = null
+        var specularFilter: IBLPrefilterContext.SpecularFilter? = null
+        var skyboxTexture: Texture? = null
+        var reflections: Texture? = null
         try {
-            val skyboxTexture = checkNotNull(converter.run(hdr)) { "HDR to cubemap conversion failed" }
-            val reflections = checkNotNull(specularFilter.run(skyboxTexture)) { "HDR reflection prefilter failed" }
+            prefilter = IBLPrefilterContext(activeEngine)
+            converter = IBLPrefilterContext.EquirectangularToCubemap(prefilter)
+            specularFilter = IBLPrefilterContext.SpecularFilter(prefilter)
+            skyboxTexture = checkNotNull(converter.run(hdr)) { "HDR to cubemap conversion failed" }
+            reflections = checkNotNull(specularFilter.run(skyboxTexture)) { "HDR reflection prefilter failed" }
             environmentSkyboxTexture = skyboxTexture
             environmentReflectionTexture = reflections
             environmentIndirectLight = IndirectLight.Builder()
@@ -436,11 +441,19 @@ class GenesisFilamentRendererView(
             environmentSkybox = Skybox.Builder().environment(skyboxTexture).build(activeEngine)
             scene?.indirectLight = environmentIndirectLight
             scene?.skybox = environmentSkybox
+        } catch (error: Throwable) {
+            if (environmentSkyboxTexture == null) skyboxTexture?.let {
+                runCatching { activeEngine.destroyTexture(it) }
+            }
+            if (environmentReflectionTexture == null) reflections?.let {
+                runCatching { activeEngine.destroyTexture(it) }
+            }
+            throw error
         } finally {
-            activeEngine.destroyTexture(hdr)
-            specularFilter.destroy()
-            converter.destroy()
-            prefilter.destroy()
+            runCatching { activeEngine.destroyTexture(hdr) }
+            runCatching { specularFilter?.destroy() }
+            runCatching { converter?.destroy() }
+            runCatching { prefilter?.destroy() }
         }
     }
 
@@ -1206,53 +1219,71 @@ class GenesisFilamentRendererView(
         released = true
         isReady = false
         pauseRendering()
-        runCatching { uiHelper?.detach() }
+        runCatching { uiHelper?.detach() }.onFailure {
+            android.util.Log.w("Genesis3D", "Filament surface detach failed during release", it)
+        }
         uiHelper = null
         val activeEngine = engine
         if (activeEngine != null) {
-            runCatching {
-                fun destroyMesh(mesh: Mesh) {
-                    activeEngine.destroyEntity(mesh.entity)
-                    activeEngine.destroyVertexBuffer(mesh.vertexBuffer)
-                    activeEngine.destroyIndexBuffer(mesh.indexBuffer)
-                    EntityManager.get().destroy(mesh.entity)
+            fun attempt(label: String, action: () -> Unit) {
+                runCatching(action).onFailure {
+                    android.util.Log.w("Genesis3D", "Filament resource cleanup failed: $label", it)
                 }
-                bodies.forEach { destroyMesh(it.mesh) }
-                titleBodies.forEach { destroyMesh(it.body.mesh) }
-                nameBodies.forEach { destroyMesh(it.body.mesh) }
-                shieldMesh?.let(::destroyMesh)
-                shieldRimMesh?.let(::destroyMesh)
-                coreMesh?.let(::destroyMesh)
-                if (lightEntity != 0) {
-                    activeEngine.destroyEntity(lightEntity)
-                    EntityManager.get().destroy(lightEntity)
-                }
-                if (coreLightEntity != 0) {
-                    activeEngine.destroyEntity(coreLightEntity)
-                    EntityManager.get().destroy(coreLightEntity)
-                }
-                rimLightEntities.forEach { entity ->
-                    activeEngine.destroyEntity(entity)
-                    EntityManager.get().destroy(entity)
-                }
-                shieldMaterial?.let(activeEngine::destroyMaterialInstance)
-                shieldRimMaterial?.let(activeEngine::destroyMaterialInstance)
-                debrisMaterial?.let(activeEngine::destroyMaterialInstance)
-                titleMaterial?.let(activeEngine::destroyMaterialInstance)
-                coreMaterial?.let(activeEngine::destroyMaterialInstance)
-                pbrMaterial?.let(activeEngine::destroyMaterial)
-                scene?.indirectLight = null
-                scene?.skybox = null
-                environmentIndirectLight?.let(activeEngine::destroyIndirectLight)
-                environmentSkybox?.let(activeEngine::destroySkybox)
-                environmentReflectionTexture?.let(activeEngine::destroyTexture)
-                environmentSkyboxTexture?.let(activeEngine::destroyTexture)
-                filamentView?.let(activeEngine::destroyView)
-                scene?.let(activeEngine::destroyScene)
-                camera?.let { activeEngine.destroyCameraComponent(it.entity); EntityManager.get().destroy(it.entity) }
-                renderer?.let(activeEngine::destroyRenderer)
-                activeEngine.destroy()
             }
+            attempt("flush") { activeEngine.flushAndWait() }
+            swapChain?.let { chain -> attempt("swap chain") { activeEngine.destroySwapChain(chain) } }
+            swapChain = null
+
+            fun destroyMesh(mesh: Mesh) {
+                attempt("scene mesh entity") { scene?.remove(mesh.entity) }
+                attempt("mesh entity") { activeEngine.destroyEntity(mesh.entity) }
+                attempt("mesh vertex buffer") { activeEngine.destroyVertexBuffer(mesh.vertexBuffer) }
+                attempt("mesh index buffer") { activeEngine.destroyIndexBuffer(mesh.indexBuffer) }
+                attempt("entity manager mesh") { EntityManager.get().destroy(mesh.entity) }
+            }
+            bodies.toList().forEach { destroyMesh(it.mesh) }
+            titleBodies.toList().forEach { destroyMesh(it.body.mesh) }
+            nameBodies.toList().forEach { destroyMesh(it.body.mesh) }
+            shieldMesh?.let(::destroyMesh)
+            shieldRimMesh?.let(::destroyMesh)
+            coreMesh?.let(::destroyMesh)
+
+            if (lightEntity != 0) {
+                attempt("key light scene entity") { scene?.remove(lightEntity) }
+                attempt("key light") { activeEngine.destroyEntity(lightEntity) }
+                attempt("key light entity manager") { EntityManager.get().destroy(lightEntity) }
+            }
+            if (coreLightEntity != 0) {
+                attempt("core light scene entity") { scene?.remove(coreLightEntity) }
+                attempt("core light") { activeEngine.destroyEntity(coreLightEntity) }
+                attempt("core light entity manager") { EntityManager.get().destroy(coreLightEntity) }
+            }
+            rimLightEntities.toList().forEach { entity ->
+                attempt("rim light scene entity") { scene?.remove(entity) }
+                attempt("rim light") { activeEngine.destroyEntity(entity) }
+                attempt("rim light entity manager") { EntityManager.get().destroy(entity) }
+            }
+
+            shieldMaterial?.let { attempt("shield material instance") { activeEngine.destroyMaterialInstance(it) } }
+            shieldRimMaterial?.let { attempt("shield rim material instance") { activeEngine.destroyMaterialInstance(it) } }
+            debrisMaterial?.let { attempt("debris material instance") { activeEngine.destroyMaterialInstance(it) } }
+            titleMaterial?.let { attempt("title material instance") { activeEngine.destroyMaterialInstance(it) } }
+            coreMaterial?.let { attempt("core material instance") { activeEngine.destroyMaterialInstance(it) } }
+            pbrMaterial?.let { attempt("PBR material") { activeEngine.destroyMaterial(it) } }
+            attempt("scene indirect light detach") { scene?.indirectLight = null }
+            attempt("scene skybox detach") { scene?.skybox = null }
+            environmentIndirectLight?.let { attempt("indirect light") { activeEngine.destroyIndirectLight(it) } }
+            environmentSkybox?.let { attempt("skybox") { activeEngine.destroySkybox(it) } }
+            environmentReflectionTexture?.let { attempt("reflection texture") { activeEngine.destroyTexture(it) } }
+            environmentSkyboxTexture?.let { attempt("environment skybox texture") { activeEngine.destroyTexture(it) } }
+            filamentView?.let { attempt("Filament view") { activeEngine.destroyView(it) } }
+            scene?.let { attempt("Filament scene") { activeEngine.destroyScene(it) } }
+            camera?.let { cameraComponent ->
+                attempt("camera component") { activeEngine.destroyCameraComponent(cameraComponent.entity) }
+                attempt("camera entity") { EntityManager.get().destroy(cameraComponent.entity) }
+            }
+            renderer?.let { attempt("Filament renderer") { activeEngine.destroyRenderer(it) } }
+            attempt("Filament engine") { activeEngine.destroy() }
         }
         bodies.clear()
         rimLightEntities.clear()
@@ -1261,6 +1292,18 @@ class GenesisFilamentRendererView(
         shieldMesh = null
         shieldRimMesh = null
         coreMesh = null
+        shieldMaterial = null
+        shieldRimMaterial = null
+        debrisMaterial = null
+        titleMaterial = null
+        coreMaterial = null
+        pbrMaterial = null
+        environmentIndirectLight = null
+        environmentSkybox = null
+        environmentReflectionTexture = null
+        environmentSkyboxTexture = null
+        lightEntity = 0
+        coreLightEntity = 0
         engine = null
         renderer = null
         scene = null
