@@ -510,6 +510,15 @@ class BluetoothCenterActivity : FragmentActivity() {
         setLineSpacing(dp(3).toFloat(), 1f)
     }
     private fun requireProtectionDisarmed(): Boolean {
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress() ||
+            !ConfigurationBackup.recoverPendingRestore(this)
+        ) {
+            showResult(
+                "Settings recovery pending",
+                "Trusted Bluetooth changes are locked until the interrupted configuration restore has been recovered."
+            )
+            return false
+        }
         if (ProtectionStore(this).read().mode == ProtectionMode.DISARMED) return true
         showResult(
             "A2 settings locked",
