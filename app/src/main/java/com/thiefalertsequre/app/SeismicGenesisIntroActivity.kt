@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,9 +59,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
 import kotlin.math.PI
@@ -209,7 +212,25 @@ private fun SeismicGenesisIntroContent(
     onFinished: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val lifecycle = (context as? LifecycleOwner)?.lifecycle
+    val lifecycleOwner = context as? LifecycleOwner
+    val lifecycle = lifecycleOwner?.lifecycle
+    val use3d = remember { GenesisFilamentRendererView.isSupported(context) }
+    var filamentView by remember { mutableStateOf<GenesisFilamentRendererView?>(null) }
+    DisposableEffect(lifecycleOwner, filamentView) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> filamentView?.startRendering()
+                Lifecycle.Event.ON_PAUSE -> filamentView?.pauseRendering()
+                Lifecycle.Event.ON_DESTROY -> filamentView?.release()
+                else -> Unit
+            }
+        }
+        lifecycleOwner?.lifecycle?.addObserver(observer)
+        if (lifecycleOwner?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == true) {
+            filamentView?.startRendering()
+        }
+        onDispose { lifecycleOwner?.lifecycle?.removeObserver(observer) }
+    }
     val progress = remember { Animatable(0f) }
     val logoScale = remember { Animatable(0f) }
     var completionSent by remember { mutableStateOf(false) }
@@ -315,8 +336,23 @@ private fun SeismicGenesisIntroContent(
                 .fillMaxSize()
                 .graphicsLayer { translationX = shakeEnvelope }
         ) {
+            if (use3d) {
+                AndroidView(
+                    factory = { view ->
+                        GenesisFilamentRendererView(view).also { filamentView = it }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    update = { it.setProgress(p) },
+                    onRelease = {
+                        it.release()
+                        if (filamentView === it) filamentView = null
+                    }
+                )
+            }
+
             GenesisFractureCanvas(
                 progress = p,
+                use3d = use3d,
                 modifier = Modifier.fillMaxSize()
             )
 
@@ -525,6 +561,7 @@ private fun drawGenesisRuntimeShader(
 @Composable
 private fun GenesisFractureCanvas(
     progress: Float,
+    use3d: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val materialShader = remember {
@@ -534,7 +571,7 @@ private fun GenesisFractureCanvas(
     }
 
     Canvas(modifier = modifier) {
-        drawRect(Color(0xFF121212))
+        if (!use3d) drawRect(Color(0xFF121212))
         val center = Offset(size.width * 0.5f, size.height * 0.46f)
         val fracture = ((progress - 0.23f) / 0.36f).coerceIn(0f, 1f)
         val native = drawContext.canvas.nativeCanvas
@@ -641,13 +678,13 @@ private fun GenesisFractureCanvas(
             native.drawLine(0f, center.y + 2f, size.width, center.y + 2f, beamPaint)
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && fracture > 0f && materialShader != null) {
+        if (!use3d && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && fracture > 0f && materialShader != null) {
             runCatching {
                 drawGenesisRuntimeShader(native, materialShader, size.width, size.height, fracture)
             }.onFailure {
                 drawRect(Color(0xFF15191D).copy(alpha = fracture))
             }
-        } else if (fracture > 0f) {
+        } else if (!use3d && fracture > 0f) {
             drawRect(
                 brush = Brush.radialGradient(
                     colors = listOf(Color(0xFF343A40), Color(0xFF171B1F), Color(0xFF080A0C)),
@@ -717,7 +754,7 @@ private fun GenesisFractureCanvas(
 
         // Angular concrete fragments receive independent impulse, rotation and gravity.
         val shardProgress = ((progress - 0.235f) / 0.70f).coerceIn(0f, 1f)
-        if (shardProgress > 0f) {
+        if (!use3d && shardProgress > 0f) {
             repeat(30) { index ->
                 val seed = ((index * 61 + 7) % 991) / 991f
                 val angle = index * 2.3999632f + seed * 0.42f
