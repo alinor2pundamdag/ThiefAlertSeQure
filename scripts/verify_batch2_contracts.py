@@ -164,6 +164,12 @@ checks = {
         "fun destroyMesh(mesh: Mesh)" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
         and 'attempt("Filament engine")' in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
         and "catch (error: Throwable)" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8"),
+    "trusted Bluetooth and Device Owner configuration are locked outside DISARMED":
+        "requireProtectionDisarmed()" in (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
+        and "isEnabled = canEditConfiguration" in (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
+        and "ProtectionStore(activity).runIfDisarmed" in managed
+        and "Managed lockdown can be enabled only while protection is DISARMED" in managed
+        and "Managed lockdown can be disabled only while protection is DISARMED" in managed,
     "configuration preferences commit only while disarmed and monitor stop is guarded against active state":
         "runIfDisarmed" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "apply(context, imported)" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
