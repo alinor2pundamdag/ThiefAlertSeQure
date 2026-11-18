@@ -402,13 +402,15 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         val monitorEnabled = SafePreferences.boolean(
             prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
-        if (monitorEnabled && !A2BluetoothReceiverController.ensureBaselineReady(this)) {
+        val state = ProtectionStore(this).read()
+        if (ProtectionMonitorPolicy.shouldRun(monitorEnabled, state.mode) &&
+            !A2BluetoothReceiverController.ensureBaselineReady(this)
+        ) {
             LocalTamperHistory.record(
                 this, "a2_baseline_not_ready",
                 "Trusted Bluetooth separation detection remains disabled until a verified baseline reset succeeds"
             )
         }
-        val state = ProtectionStore(this).read()
         if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
             runCatching {
                 ContextCompat.startForegroundService(
