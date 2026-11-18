@@ -178,6 +178,21 @@ checks = {
         and "configuration_restore_monitor_sync_deferred" in settings
         and "configuration_restore_monitor_stop_deferred" in settings
         and "ProtectionStore(this).runIfDisarmed" in settings,
+    "configuration restore journal operations are serialized and every live protection consumer defers safely":
+        "@Synchronized\n    fun decryptAndRestore" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
+        and "@Synchronized\n    fun recoverPendingRestore" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
+        and "fun isRestoreOrRecoveryInProgress(): Boolean" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
+        and "ConfigurationBackup.isRestoreOrRecoveryInProgress()" in dashboard
+        and "ConfigurationBackup.isRestoreOrRecoveryInProgress()" in settings
+        and "ConfigurationBackup.isRestoreOrRecoveryInProgress()" in managed
+        and "ConfigurationBackup.isRestoreOrRecoveryInProgress()" in (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
+        and "ConfigurationBackup.isRestoreOrRecoveryInProgress()" in (APP / "OwnerAuthenticationCoordinator.kt").read_text(encoding="utf-8")
+        and "ConfigurationBackup.isRestoreOrRecoveryInProgress()" in (APP / "PowerTransitionCoordinator.kt").read_text(encoding="utf-8")
+        and "ConfigurationBackup.isRestoreOrRecoveryInProgress()" in monitor
+        and "ConfigurationBackup.recoverPendingRestore(app)" in (APP / "PowerTransitionReceiver.kt").read_text(encoding="utf-8")
+        and "ConfigurationBackup.recoverPendingRestore(app)" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
+        and "ConfigurationBackup.recoverPendingRestore(app)" in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8")
+        and "ConfigurationBackup.isRestoreOrRecoveryInProgress()" in (APP / "BootReceiver.kt").read_text(encoding="utf-8"),
     "encrypted configuration backup includes the photo-storage preference and accepts old backups":
         "PBKDF2WithHmacSHA256" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "AES/GCM/NoPadding" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
