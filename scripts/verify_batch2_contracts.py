@@ -72,7 +72,7 @@ checks = {
         (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8").index(
             "var removed = write(prefs, remaining)"
         ) < (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8").index(
-            "manager.cancel(pendingIntent(context, address, namespace))"
+            "context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context, address, namespace))"
         )
         and (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8").index(
             "var cleared = prefs.edit().remove(KEY_PENDING).commit()"
