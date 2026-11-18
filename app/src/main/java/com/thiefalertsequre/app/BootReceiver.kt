@@ -31,6 +31,9 @@ class BootReceiver : BroadcastReceiver() {
                 context, "configuration_restore_recovery_pending",
                 "Boot/package/exact-alarm reconciliation was deferred until the interrupted settings restore can be recovered"
             )
+            if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+                A2BluetoothReceiverController.deferBaselineResetForBoot(context)
+            }
             val state = ProtectionStore(context).read()
             when (state.mode) {
                 ProtectionMode.ALARM_TRIGGERED -> {
