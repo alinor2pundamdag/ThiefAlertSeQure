@@ -102,7 +102,7 @@ class MainActivity : FragmentActivity() {
         }
         applyAlarmWindowPolicy()
 
-        val privacyDecision = SafePreferences.string(getSharedPreferences("privacy_notice_v6", MODE_PRIVATE), "decision", null)
+        val privacyDecision = SafePreferences.string(getSharedPreferences(PRIVACY_NOTICE_PREFS, MODE_PRIVATE), "decision", null)
         // Require acknowledgement of this updated notice on every existing
         // install once; it now discloses the optional alarm flashlight and its safety toggle.
         // Privacy acknowledgement remains mandatory for normal app use, but it must
@@ -171,7 +171,7 @@ class MainActivity : FragmentActivity() {
         root.addView(notice, matchWrap())
         root.addView(space(22))
         root.addView(button("I understand & continue") {
-            getSharedPreferences("privacy_notice_v6", MODE_PRIVATE).edit()
+            getSharedPreferences(PRIVACY_NOTICE_PREFS, MODE_PRIVATE).edit()
                 .putString("decision", "acknowledged").putLong("decision_at", System.currentTimeMillis()).apply()
             buildDashboard()
         }, matchWrap())
@@ -1235,6 +1235,7 @@ class MainActivity : FragmentActivity() {
     }
 
     companion object {
+        const val PRIVACY_NOTICE_PREFS = PRIVACY_NOTICE_PREFS
         const val ALARM_DISPLAY_PREFS = "alarm_display_settings_v1"
         const val KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN = "show_alarm_screen_over_lockscreen"
         private const val REQUEST_DEVICE_CREDENTIAL = 4102
