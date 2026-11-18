@@ -2165,6 +2165,16 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun requireProtectionDisarmed(): Boolean {
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress() ||
+            !ConfigurationBackup.recoverPendingRestore(this)
+        ) {
+            android.widget.Toast.makeText(
+                this,
+                "Settings changes are temporarily locked while an interrupted configuration restore is being recovered.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            return false
+        }
         if (ProtectionStore(this).read().mode == ProtectionMode.DISARMED) return true
         android.widget.Toast.makeText(
             this,
