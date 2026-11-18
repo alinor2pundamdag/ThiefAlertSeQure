@@ -96,7 +96,11 @@ internal object ConfigurationBackup {
             require(recoverPendingRestore(context)) {
                 "An earlier configuration restore is still awaiting recovery. Resolve it before creating another backup."
             }
-            val payload = snapshot(context).toString().toByteArray(Charsets.UTF_8)
+            val payload = ProtectionStore(context).runIfDisarmed {
+                snapshot(context).toString().toByteArray(Charsets.UTF_8)
+            } ?: throw IllegalStateException(
+                "Configuration backup is available only while protection is DISARMED."
+            )
             return encryptPayload(payload, password)
         } finally {
             password.fill('\u0000')
@@ -172,7 +176,9 @@ internal object ConfigurationBackup {
             is PreferenceRead.Corrupt -> return false
         }
         if (previousJson == null) {
-            return !journal.contains(JOURNAL_PHASE) || clearRestoreJournal(journal)
+            // The snapshot and phase are committed together. A phase without its
+            // rollback snapshot indicates corruption; never silently discard it.
+            return !journal.contains(JOURNAL_PHASE)
         }
         val phase = when (val read = SafePreferences.readString(journal, JOURNAL_PHASE, JOURNAL_APPLYING)) {
             is PreferenceRead.Value -> read.value
