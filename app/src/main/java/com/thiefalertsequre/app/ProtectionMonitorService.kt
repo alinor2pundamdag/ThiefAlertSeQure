@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Motion sensing is still registered only while protection is ARMED.
  */
 class ProtectionMonitorService : Service(), SensorEventListener {
+    private enum class StopRequestResult { STOPPED, STALE, PREFERENCE_FAILED, STATE_FAILED }
     private val handler = Handler(Looper.getMainLooper())
     private val gravity = FloatArray(3)
     private var gravityInitialized = false
@@ -219,6 +220,113 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
     }
 
+    private fun handleStopRequest(
+        preferenceAlreadyCommitted: Boolean,
+        intent: Intent,
+        flags: Int,
+        startId: Int
+    ): Int? {
+        val result = ProtectionStore(this).runIfDisarmed {
+            val enabledNow = SafePreferences.boolean(
+                prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+            )
+            if (!ProtectionMonitorPolicy.shouldApplyStopRequest(preferenceAlreadyCommitted, enabledNow)) {
+                return@runIfDisarmed StopRequestResult.STALE
+            }
+            if (!preferenceAlreadyCommitted && !prefs.edit().putBoolean(KEY_ENABLED, false).commit()) {
+                return@runIfDisarmed StopRequestResult.PREFERENCE_FAILED
+            }
+            val update = ProtectionStore(this).updatePersisted {
+                ProtectionEngine.disableMonitoring(it, System.currentTimeMillis())
+            }
+            if (!update.persisted) return@runIfDisarmed StopRequestResult.STATE_FAILED
+
+            AlarmScheduler.cancel(this)
+            PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Protection monitor disabled by owner")
+            val deadlinesCleared = A2DisconnectScheduler.clearAll(this)
+            val baselinesCleared = runCatching { TrustedBluetoothRegistry.clearBaselines(prefs); true }.getOrDefault(false)
+            A2BluetoothReceiverController.sync(this)
+            if (!deadlinesCleared || !baselinesCleared) {
+                LocalTamperHistory.record(
+                    this, "monitor_disable_cleanup_incomplete",
+                    "Monitor is OFF, but trusted-device deadline or baseline cleanup could not be confirmed"
+                )
+                ProtectionMonitorRecoveryNotice.show(
+                    this, "Monitoring is OFF, but trusted-device cleanup needs attention. Reopen Bluetooth settings to review it."
+                )
+            }
+            StopRequestResult.STOPPED
+        }
+
+        if (result == null) {
+            val currentMode = ProtectionStore(this).read().mode
+            LocalTamperHistory.record(
+                this, "monitor_stop_rejected_active_protection",
+                "Stop request was rejected because protection is $currentMode; the monitor cannot disarm active protection"
+            )
+            if (currentMode == ProtectionMode.ALARM_TRIGGERED) {
+                runCatching {
+                    ContextCompat.startForegroundService(
+                        this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START)
+                    )
+                }.onFailure {
+                    AlarmRecoveryCoordinator.onStartFailure(
+                        this, "Monitor stop was rejected while the alarm was latched; alarm service restart failed"
+                    )
+                }
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            if (!prefs.edit().putBoolean(KEY_ENABLED, true).commit()) {
+                LocalTamperHistory.record(
+                    this, "active_monitor_preference_repair_failed",
+                    "Active protection was preserved, but the monitor-enabled preference could not be restored"
+                )
+                ProtectionMonitorRecoveryNotice.show(
+                    this, "Active protection still requires its monitor. The saved monitor preference could not be repaired."
+                )
+            }
+            A2BluetoothReceiverController.sync(this)
+            return START_STICKY
+        }
+
+        return when (result) {
+            StopRequestResult.STOPPED -> {
+                stopSelf()
+                START_NOT_STICKY
+            }
+            StopRequestResult.STALE -> {
+                LocalTamperHistory.record(
+                    this, "stale_monitor_stop_ignored",
+                    "A newer owner re-enable setting superseded an older monitor stop request"
+                )
+                null
+            }
+            StopRequestResult.PREFERENCE_FAILED -> {
+                LocalTamperHistory.record(
+                    this, "monitor_disable_preference_persist_failed",
+                    "Android did not confirm that the monitor OFF preference was saved; stop request will be retried"
+                )
+                ProtectionMonitorRecoveryNotice.show(
+                    this, "The monitor could not confirm its OFF setting. Retrying without changing the saved protection state."
+                )
+                scheduleStopRetry(intent, flags, startId)
+                START_STICKY
+            }
+            StopRequestResult.STATE_FAILED -> {
+                LocalTamperHistory.record(
+                    this, "monitor_disable_state_persist_failed",
+                    "Protection state was not durably reconciled as DISARMED; the monitor remains active and the stop request will be retried"
+                )
+                ProtectionMonitorRecoveryNotice.show(
+                    this, "Protection state could not be confirmed as DISARMED. The monitor remains active while the stop request is retried."
+                )
+                scheduleStopRetry(intent, flags, startId)
+                START_STICKY
+            }
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (ConfigurationBackup.isRestoreOrRecoveryInProgress() ||
             !ConfigurationBackup.recoverPendingRestore(this)
@@ -236,105 +344,17 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
         val stopPreferenceAlreadyCommitted =
             intent?.getBooleanExtra(EXTRA_STOP_PREFERENCE_COMMITTED, false) == true
+        if (intent?.action == ACTION_STOP) {
+            handleStopRequest(stopPreferenceAlreadyCommitted, intent, flags, startId)?.let { return it }
+        }
         val monitorEnabled = SafePreferences.boolean(
             prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
-        if (intent?.action == ACTION_STOP) {
-            val currentMode = ProtectionStore(this).read().mode
-            if (!ProtectionMonitorPolicy.canStop(currentMode)) {
-                LocalTamperHistory.record(
-                    this, "monitor_stop_rejected_active_protection",
-                    "Notification stop request was rejected because protection is $currentMode; active protection cannot be disarmed from the notification"
-                )
-                if (currentMode == ProtectionMode.ALARM_TRIGGERED) {
-                    runCatching {
-                        ContextCompat.startForegroundService(
-                            this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START)
-                        )
-                    }.onFailure {
-                        AlarmRecoveryCoordinator.onStartFailure(
-                            this, "Notification stop was rejected while the alarm was latched; alarm service restart failed"
-                        )
-                    }
-                    stopSelf()
-                    return START_NOT_STICKY
-                }
-                if (!monitorEnabled && !prefs.edit().putBoolean(KEY_ENABLED, true).commit()) {
-                    LocalTamperHistory.record(
-                        this, "active_monitor_preference_repair_failed",
-                        "Active protection retained its running monitor, but the monitor-enabled preference could not be restored"
-                    )
-                    ProtectionMonitorRecoveryNotice.show(
-                        this, "Active protection still requires its monitor. The saved monitor preference could not be repaired."
-                    )
-                }
-                return START_STICKY
-            }
-        }
-        if (monitorEnabled && intent?.action != ACTION_STOP &&
-            !A2BluetoothReceiverController.ensureBaselineReady(this)
-        ) {
+        if (monitorEnabled && !A2BluetoothReceiverController.ensureBaselineReady(this)) {
             LocalTamperHistory.record(
                 this, "a2_baseline_not_ready",
                 "Trusted Bluetooth separation detection remains disabled until a verified baseline reset succeeds"
             )
-        }
-        val applyStopRequest = ProtectionMonitorPolicy.shouldApplyStopRequest(
-            stopPreferenceAlreadyCommitted, monitorEnabled
-        )
-        if (intent?.action == ACTION_STOP && !applyStopRequest) {
-            LocalTamperHistory.record(
-                this, "stale_monitor_stop_ignored",
-                "A newer owner re-enable setting superseded an older monitor stop request"
-            )
-        }
-        if (intent?.action == ACTION_STOP && applyStopRequest) {
-            if (!stopPreferenceAlreadyCommitted && !prefs.edit().putBoolean(KEY_ENABLED, false).commit()) {
-                LocalTamperHistory.record(
-                    this, "monitor_disable_preference_persist_failed",
-                    "Android did not confirm that the monitor OFF preference was saved; stop request will be retried"
-                )
-                ProtectionMonitorRecoveryNotice.show(this, "The monitor could not confirm its OFF setting. Retrying without changing the saved protection state.")
-                scheduleStopRetry(intent, flags, startId)
-                return START_STICKY
-            }
-
-            val store = ProtectionStore(this)
-            val current = store.read()
-            val update = if (current.mode == ProtectionMode.ALARM_TRIGGERED) {
-                ProtectionStoreUpdateResult(current, true)
-            } else {
-                store.updatePersisted {
-                    ProtectionEngine.disableMonitoring(it, System.currentTimeMillis())
-                }
-            }
-            if (!update.persisted) {
-                LocalTamperHistory.record(
-                    this, "monitor_disable_state_persist_failed",
-                    "Protection state was not durably disarmed; the existing deadline and alarm state remain authoritative"
-                )
-                ProtectionMonitorRecoveryNotice.show(this, "Protection could not be safely disabled because its state was not saved. Retrying; any existing countdown remains active.")
-                if (update.state.mode == ProtectionMode.COUNTDOWN) AlarmScheduler.scheduleRetry(this, 1_000L)
-                scheduleStopRetry(intent, flags, startId)
-                return START_STICKY
-            }
-
-            if (update.state.mode != ProtectionMode.ALARM_TRIGGERED) {
-                AlarmScheduler.cancel(this)
-                PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Protection monitor disabled by owner")
-            }
-            val deadlinesCleared = A2DisconnectScheduler.clearAll(this)
-            val baselinesCleared = runCatching { TrustedBluetoothRegistry.clearBaselines(prefs); true }.getOrDefault(false)
-            A2BluetoothReceiverController.sync(this)
-            if (!deadlinesCleared || !baselinesCleared) {
-                LocalTamperHistory.record(
-                    this, "monitor_disable_cleanup_incomplete",
-                    "Monitor is OFF, but trusted-device deadline or baseline cleanup could not be confirmed"
-                )
-                ProtectionMonitorRecoveryNotice.show(this, "Monitoring is OFF, but trusted-device cleanup needs attention. Reopen Bluetooth settings to review it.")
-            }
-            stopSelf()
-            return START_NOT_STICKY
         }
         val state = ProtectionStore(this).read()
         if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
