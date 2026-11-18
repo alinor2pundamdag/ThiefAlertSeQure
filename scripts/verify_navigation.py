@@ -145,6 +145,19 @@ if "Skip intro" in intro_activity or "Skip the introduction" in intro_activity:
     errors.append("SeismicGenesisIntroActivity must not contain an unrequested Skip Intro path")
 if "id(\"org.jetbrains.kotlin.plugin.compose\")" not in (ROOT / "app" / "build.gradle.kts").read_text(encoding="utf-8"):
     errors.append("Seismic Genesis must use the requested Jetpack Compose implementation")
+
+renderer_activity = (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
+for required in (
+    "buildStudioHdrEnvironment", "HDRLoader.createTexture", "IBLPrefilterContext.EquirectangularToCubemap",
+    "IBLPrefilterContext.SpecularFilter", "IndirectLight.Builder()", "Skybox.Builder().environment",
+    "bevelDepth = 0.045f", "clipToBisector", "seeds.take(18)", "mass = (area * depth * 18f)",
+    "val normalImpulse", "rimLightEntities"
+):
+    if required not in renderer_activity:
+        errors.append("Genesis 3D renderer missing PBR/fracture contract: " + required)
+filament_gradle = (ROOT / "app" / "build.gradle.kts").read_text(encoding="utf-8")
+if 'com.google.android.filament:filament-utils-android:1.75.0' not in filament_gradle:
+    errors.append("Genesis HDR environment requires the Filament 1.75.0 runtime utilities")
 setup_snapshot = (APP / "SetupStatusSnapshot.kt").read_text(encoding="utf-8")
 setup_activity = (APP / "SetupStatusActivity.kt").read_text(encoding="utf-8")
 if "NotificationSetupStatusPolicy.monitorChannel(monitorChannel?.importance)" not in setup_snapshot:
