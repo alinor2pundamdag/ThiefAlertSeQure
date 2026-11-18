@@ -1,15 +1,16 @@
 # Current Batch Four candidate snapshot — 18 November 2026
 
-- Working branch: `work/batch-4-implementation`; PR #8 is open and unmerged.
+- Working branch: `work/batch-4-implementation`; PR #8 remains open and unmerged. `main` is untouched.
 - Candidate identity: `com.thiefalertsequre.app`, versionName `1.1.5_Developer_Alinor`, versionCode `7`, minSdk 26, compileSdk/targetSdk 36.
-- Latest code-bearing candidate head: `c29c4bffd78a150b3d3ec66802c6b07406e4d7c9`. Android build/tests and CodeQL push + PR runs are pending/in progress for this exact head; do not reuse results from cancelled/intermediate heads.
-- Camera evidence remains opt-in and post-authentication. New JPEGs go to Gallery unencrypted by default; Settings can enable AES-GCM encryption for future captures. Existing photos are not converted when the setting changes. Front-camera JPEG rotation now uses the Camera2 front-facing orientation rule and has regression tests.
-- Settings distinguishes unknown/unavailable evidence counts from a real zero and does not suppress deletion review when integrity or Gallery access cannot be confirmed.
-- The cinematic starting page is shown once per installed versionCode, but a runtime protection guard yields to owner recovery if protection becomes active during the intro. Completion is not persisted if protection is active.
-- Configuration restore is accepted only while protection is DISARMED; ARMED, COUNTDOWN and ALARM_TRIGGERED states are rejected. The monitor setting is reapplied after successful restore.
-- Privacy notice acknowledgement uses one centralized versioned preference key. If the notice is bypassed to prioritize an active alarm, acknowledgement is required after successful owner disarm.
-- The current code-by-code audit is still in progress; the repository has 88 production Kotlin files. High-risk camera/evidence, alarm/flashlight, intro, updater, Settings and backup paths have been reviewed and corrective changes made, but the full 88-file audit is not yet complete.
-- No merge, tag, production publication, emulator, instrumentation, or physical-device test is claimed.
+- Audit scope reviewed: all 89 production Kotlin files, 46 JVM unit-test source files, 10 Python contract scripts, Android manifest/resources, Gradle/version catalog, GitHub Actions workflows, and current privacy/release documentation.
+- The code-by-code audit is complete at the current branch head. Confirmed defects were corrected in the same branch: active-state mutation boundaries; owner-only evidence review/export; Device Owner/A2 state locking; Bluetooth and alarm deadline persistence retries; bounded ACL receiver concurrency; primary-alarm audio priority; evidence queue loss reporting; crash-safe configuration restore journal; fail-closed MediaStore enumeration; full-vault verification before Gallery-source deletion; bounded photo preview decoding; GPS validation; root diagnostic timeout cleanup; and renderer resource cleanup/reduced-motion behavior.
+- Photo storage contract: new photos remain unencrypted and Gallery-visible by default. Settings can encrypt future captures and can explicitly migrate existing app-owned Gallery photos. Migration verifies the complete encrypted vault before removing any Gallery original. The Android Keystore key is non-exportable; clearing app data/uninstalling may make encrypted photos unrecoverable. The separate event-metadata backup does not contain photo bytes.
+- Security behavior: sensitive event details, encrypted photo viewing/export, location evidence capture/export, root authorization diagnostics, and trusted Bluetooth identities are hidden or blocked while protection is active. Security-sensitive settings and Device Owner/A2 changes require DISARMED state.
+- Persistence/recovery: critical protection-state, authentication-throttle, Bluetooth baseline, A2 deadline, and alarm deadline preference commits retry once. Interrupted configuration restore uses a persistent journal and startup rollback/recovery.
+- Verification at this checkpoint: CodeQL passed on an earlier intermediate head. The final Android workflow must pass on the exact latest branch head before software verification is marked green. Previous intermediate Android runs had static contracts and JVM unit tests pass, but later lint/build runs were cancelled by newer commits; do not reuse those results as final-head evidence.
+- No Codespace was opened or used. No emulator, instrumentation build, or instrumented test was run. Physical-device testing is reserved for the owner.
+- Platform limits remain explicit: exact-alarm delivery can be deferred when access is unavailable; Android/OEM background restrictions can affect service recovery; ranging remains a local capability query only and does not start a ranging session or request the RANGING permission.
+- No merge, tag, production publication, or production release has been performed or authorized.
 
 ---
 
