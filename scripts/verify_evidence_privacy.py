@@ -100,6 +100,11 @@ required = {
         and "CameraEvidenceMediaStore.deleteAll(applicationContext)" in settings
         and "var allDeleted = true" in camera_media
         and "queryOwnedImages(context.applicationContext).forEach" in camera_media,
+    "encrypted photo deletion retains its index until ciphertext deletion succeeds":
+        camera_vault.index("val deleted = file.delete() || !file.exists()")
+        < camera_vault.index("if (!writeIndex(app, next)) return false")
+        and camera_vault.index("val allDeleted = files.all")
+        < camera_vault.index("if (!prefs.edit().remove(KEY_INDEX).commit()) return false"),
     "configuration backup schema 2 includes the storage preference and accepts schema 1":
         '"camera_evidence_settings", "encrypt_new_photos"' in configuration
         and 'put("schema", 2)' in configuration
