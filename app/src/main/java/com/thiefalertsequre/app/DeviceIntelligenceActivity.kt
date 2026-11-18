@@ -484,93 +484,113 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     }
 
     private fun writeDiagnosticsReport(uri: android.net.Uri) {
-        val report = runCatching {
-            val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-            val alarmManager = getSystemService(AlarmManager::class.java)
-            val notifications = NotificationManagerCompat.from(this).areNotificationsEnabled()
-            val exactAlarm = Build.VERSION.SDK_INT < 31 || runCatching { alarmManager.canScheduleExactAlarms() }.getOrDefault(false)
-            val secureLock = getSystemService(KeyguardManager::class.java).isDeviceSecure
-            val protectionStore = ProtectionStore(this)
-            val state = protectionStore.read()
-            val storeIntegrity = protectionStore.integritySnapshot()
-            val evidenceIntegrity = LocalEvidenceVault.verifyIntegrity(this)
-            val cameraEvidenceIntegrity = runCatching { CameraEvidenceVault.verifyIntegrity(this) }.getOrDefault(false)
-            val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
-            val cameraPermissionGranted = checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-            val frontCameraFeatureAvailable = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
-            val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(this).size }.getOrDefault(0)
-            val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
-            val monitorProcessRunning = runCatching {
-                getSystemService(ActivityManager::class.java).getRunningServices(100)
-                    .any { it.service.className == ProtectionMonitorService::class.java.name }
-            }.getOrDefault(false)
-            val integritySignals = listOf(
-                IntegritySignal("Protection state storage", if (storeIntegrity.protectionStateHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 3),
-                IntegritySignal("Authentication throttle storage", if (storeIntegrity.authenticationThrottleHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
-                IntegritySignal("Encrypted evidence vault", if (evidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
-                IntegritySignal("Encrypted front-camera photo vault", if (cameraEvidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 1),
-                IntegritySignal("Protection monitor runtime", when {
-                    !monitorEnabled -> IntegrityStatus.UNSUPPORTED
-                    monitorProcessRunning -> IntegrityStatus.VERIFIED
-                    else -> IntegrityStatus.FAILED
-                }, 2)
-            )
-            val integrityScore = ProtectionIntegrityPolicy.calculate(integritySignals)
-            JSONObject().apply {
-                put("schemaVersion", 1)
-                put("generatedAtEpochMs", System.currentTimeMillis())
-                put("appVersion", appVersion())
-                put("manufacturer", Build.MANUFACTURER)
-                put("brand", Build.BRAND)
-                put("model", Build.MODEL)
-                put("androidRelease", Build.VERSION.RELEASE)
-                put("apiLevel", Build.VERSION.SDK_INT)
-                put("targetSdk", applicationInfo.targetSdkVersion)
-                put("protectionMode", state.mode.name)
-                put("protectionStateStoreHealthy", storeIntegrity.protectionStateHealthy)
-                put("authenticationThrottleHealthy", storeIntegrity.authenticationThrottleHealthy)
-                put("evidenceVaultIntegrityHealthy", evidenceIntegrity)
-                put("cameraEvidenceVaultIntegrityHealthy", cameraEvidenceIntegrity)
-                put("cameraEvidenceEnabledByOwner", cameraEvidenceEnabled)
-                put("cameraPermissionGranted", cameraPermissionGranted)
-                put("frontCameraFeatureAvailable", frontCameraFeatureAvailable)
-                put("encryptedCameraPhotoCount", cameraEvidenceCount)
-                put("monitorProcessCurrentlyConfirmed", monitorProcessRunning)
-                put("protectionIntegrityScorePercent", integrityScore.percent)
-                put("protectionIntegrityScorePoints", "${integrityScore.earnedPoints}/${integrityScore.possiblePoints}")
-                put("permissionChangeMonitoring", "Android permission and special-access snapshots are compared when the app resumes")
-                put("recentAlarmOutputEvents", org.json.JSONArray(
-                    LocalTamperHistory.read(this@DeviceIntelligenceActivity, 100)
-                        .filter { line -> listOf("alarm_audio_", "alarm_audio_focus_", "secondary_alarm_", "alarm_haptics_", "alarm_flash_").any(line::contains) }
-                        .takeLast(20).map { LocalTamperHistoryPolicy.eventCodeFromLine(it) }
-                ))
-                put("monitorEnabled", monitorEnabled)
-                put("monitorLastRecordedRunning", SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_RUNNING, false))
-                put("notificationsEnabled", notifications)
-                put("exactAlarmAvailable", exactAlarm)
-                put("secureLockConfigured", secureLock)
-                put("backgroundRestricted", if (Build.VERSION.SDK_INT >= 28) {
-                    runCatching { getSystemService(ActivityManager::class.java).isBackgroundRestricted }.getOrNull()
-                } else JSONObject.NULL)
-                put("deviceIdleMode", runCatching { getSystemService(PowerManager::class.java).isDeviceIdleMode }.getOrDefault(false))
-                put("appStandbyBucket", if (Build.VERSION.SDK_INT >= 28) {
-                    runCatching { standbyBucketLabel(getSystemService(UsageStatsManager::class.java).appStandbyBucket) }.getOrDefault("Unavailable")
-                } else "Not exposed before API 28")
-                put("recentEventCodes", org.json.JSONArray(LocalTamperHistory.read(this@DeviceIntelligenceActivity, 20).map { LocalTamperHistoryPolicy.eventCodeFromLine(it) }))
-                put("privacyNote", "Redacted local diagnostics only. No photo content, location, microphone, credentials, serial, IMEI, MAC, or build fingerprint is exported.")
+        integrityExecutor.execute {
+            val app = applicationContext
+            val reportResult = runCatching {
+                val monitorPrefs = app.getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+                val alarmManager = app.getSystemService(AlarmManager::class.java)
+                val notifications = NotificationManagerCompat.from(app).areNotificationsEnabled()
+                val exactAlarm = Build.VERSION.SDK_INT < 31 || runCatching { alarmManager.canScheduleExactAlarms() }.getOrDefault(false)
+                val secureLock = app.getSystemService(KeyguardManager::class.java).isDeviceSecure
+                val protectionStore = ProtectionStore(app)
+                val state = protectionStore.read()
+                val storeIntegrity = protectionStore.integritySnapshot()
+                val evidenceIntegrity = LocalEvidenceVault.verifyIntegrity(app)
+                val cameraEvidenceIntegrity = runCatching { CameraEvidenceVault.verifyIntegrity(app) }.getOrDefault(false)
+                val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(app)
+                val cameraPermissionGranted = app.checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                val frontCameraFeatureAvailable = app.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
+                val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(app).size }.getOrDefault(-1)
+                val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+                val monitorProcessRunning = runCatching {
+                    app.getSystemService(ActivityManager::class.java).getRunningServices(100)
+                        .any { it.service.className == ProtectionMonitorService::class.java.name }
+                }.getOrDefault(false)
+                val integritySignals = listOf(
+                    IntegritySignal("Protection state storage", if (storeIntegrity.protectionStateHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 3),
+                    IntegritySignal("Authentication throttle storage", if (storeIntegrity.authenticationThrottleHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
+                    IntegritySignal("Encrypted evidence vault", if (evidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
+                    IntegritySignal("Encrypted front-camera photo vault", if (cameraEvidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 1),
+                    IntegritySignal("Protection monitor runtime", when {
+                        !monitorEnabled -> IntegrityStatus.UNSUPPORTED
+                        monitorProcessRunning -> IntegrityStatus.VERIFIED
+                        else -> IntegrityStatus.FAILED
+                    }, 2)
+                )
+                val integrityScore = ProtectionIntegrityPolicy.calculate(integritySignals)
+                JSONObject().apply {
+                    put("schemaVersion", 1)
+                    put("generatedAtEpochMs", System.currentTimeMillis())
+                    put("appVersion", appVersion())
+                    put("manufacturer", Build.MANUFACTURER)
+                    put("brand", Build.BRAND)
+                    put("model", Build.MODEL)
+                    put("androidRelease", Build.VERSION.RELEASE)
+                    put("apiLevel", Build.VERSION.SDK_INT)
+                    put("targetSdk", app.applicationInfo.targetSdkVersion)
+                    put("protectionMode", state.mode.name)
+                    put("protectionStateStoreHealthy", storeIntegrity.protectionStateHealthy)
+                    put("authenticationThrottleHealthy", storeIntegrity.authenticationThrottleHealthy)
+                    put("evidenceVaultIntegrityHealthy", evidenceIntegrity)
+                    put("cameraEvidenceVaultIntegrityHealthy", cameraEvidenceIntegrity)
+                    put("cameraEvidenceEnabledByOwner", cameraEvidenceEnabled)
+                    put("cameraPermissionGranted", cameraPermissionGranted)
+                    put("frontCameraFeatureAvailable", frontCameraFeatureAvailable)
+                    put("encryptedCameraPhotoCount", cameraEvidenceCount)
+                    put("monitorProcessCurrentlyConfirmed", monitorProcessRunning)
+                    put("protectionIntegrityScorePercent", integrityScore.percent)
+                    put("protectionIntegrityScorePoints", "${integrityScore.earnedPoints}/${integrityScore.possiblePoints}")
+                    put("permissionChangeMonitoring", "Android permission and special-access snapshots are compared when the app resumes")
+                    put("recentAlarmOutputEvents", org.json.JSONArray(
+                        LocalTamperHistory.read(app, 100)
+                            .filter { line -> listOf("alarm_audio_", "alarm_audio_focus_", "secondary_alarm_", "alarm_haptics_", "alarm_flash_").any(line::contains) }
+                            .takeLast(20).map { LocalTamperHistoryPolicy.eventCodeFromLine(it) }
+                    ))
+                    put("monitorEnabled", monitorEnabled)
+                    put("monitorLastRecordedRunning", SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_RUNNING, false))
+                    put("notificationsEnabled", notifications)
+                    put("exactAlarmAvailable", exactAlarm)
+                    put("secureLockConfigured", secureLock)
+                    put("backgroundRestricted", if (Build.VERSION.SDK_INT >= 28) {
+                        runCatching { app.getSystemService(ActivityManager::class.java).isBackgroundRestricted }.getOrNull()
+                    } else JSONObject.NULL)
+                    put("deviceIdleMode", runCatching { app.getSystemService(PowerManager::class.java).isDeviceIdleMode }.getOrDefault(false))
+                    put("appStandbyBucket", if (Build.VERSION.SDK_INT >= 28) {
+                        runCatching { standbyBucketLabel(app.getSystemService(UsageStatsManager::class.java).appStandbyBucket) }.getOrDefault("Unavailable")
+                    } else "Not exposed before API 28")
+                    put("recentEventCodes", org.json.JSONArray(LocalTamperHistory.read(app, 20).map { LocalTamperHistoryPolicy.eventCodeFromLine(it) }))
+                    put("privacyNote", "Redacted local diagnostics only. No photo content, location, microphone, credentials, serial, IMEI, MAC, or build fingerprint is exported.")
+                }
             }
-        }.getOrElse {
-            android.widget.Toast.makeText(this, "Could not build diagnostics: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
-            return
-        }
-        runCatching {
-            contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(report.toString(2)) }
-                ?: error("Android could not open the selected export destination.")
-        }.onSuccess {
-            LocalTamperHistory.record(this, "diagnostics_exported", "Owner exported a redacted local diagnostics JSON report")
-            android.widget.Toast.makeText(this, "Redacted diagnostics report exported.", android.widget.Toast.LENGTH_LONG).show()
-        }.onFailure {
-            android.widget.Toast.makeText(this, "Diagnostics export failed: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+            if (reportResult.isFailure) {
+                val message = reportResult.exceptionOrNull()?.message ?: "Unknown diagnostics error"
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) {
+                        android.widget.Toast.makeText(this@DeviceIntelligenceActivity, "Could not build diagnostics: $message", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+                return@execute
+            }
+            val writeResult = runCatching {
+                app.contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use {
+                    it.write(reportResult.getOrThrow().toString(2))
+                } ?: error("Android could not open the selected export destination.")
+            }
+            if (writeResult.isSuccess) {
+                LocalTamperHistory.record(app, "diagnostics_exported", "Owner exported a redacted local diagnostics JSON report")
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (writeResult.isSuccess) {
+                    android.widget.Toast.makeText(this@DeviceIntelligenceActivity, "Redacted diagnostics report exported.", android.widget.Toast.LENGTH_LONG).show()
+                } else {
+                    android.widget.Toast.makeText(
+                        this@DeviceIntelligenceActivity,
+                        "Diagnostics export failed: ${writeResult.exceptionOrNull()?.message}",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         }
     }
 
