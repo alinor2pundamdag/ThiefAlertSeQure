@@ -120,7 +120,10 @@ internal object CameraEvidenceMediaStore {
         val query = queryOwnedImages(app)
         if (!query.success) return MigrationResult(false)
         if (!CameraEvidenceVault.verifyIntegrity(app)) {
-            return MigrationResult(true, copyFailures = query.images.size, vaultIntegrityVerified = false)
+            return MigrationResult(
+                true, copyFailures = query.images.size, vaultIntegrityVerified = false,
+                unverifiedLegacyPhotos = query.unverifiedLegacyCount
+            )
         }
         if (query.images.isEmpty()) {
             return MigrationResult(
@@ -138,6 +141,7 @@ internal object CameraEvidenceMediaStore {
         var removed = 0
         var copyFailures = 0
         var removalFailures = 0
+        val removedLegacyIds = mutableListOf<String>()
         var capacityLimitedDuringMigration = 0
         var blocked = false
         val pendingDeletions = mutableListOf<Pair<Uri, ByteArray>>() // URI plus SHA-256 digest, not the full photo bytes
@@ -221,7 +225,10 @@ internal object CameraEvidenceMediaStore {
                 runCatching { app.contentResolver.delete(uri, null, null) == 1 }.getOrDefault(false)
             }
             when (deleteResult) {
-                true -> removed += 1
+                true -> {
+                    removed += 1
+                    if (Build.VERSION.SDK_INT < 29) uri.lastPathSegment?.let(removedLegacyIds::add)
+                }
                 false -> removalFailures += 1
                 null -> {
                     blocked = true
@@ -230,6 +237,12 @@ internal object CameraEvidenceMediaStore {
             }
         }
 
+        if (removedLegacyIds.isNotEmpty() && !removeLegacyImages(app, removedLegacyIds)) {
+            LocalTamperHistory.record(
+                app, "legacy_gallery_index_cleanup_failed",
+                "Migrated Gallery rows were deleted, but stale encrypted ownership-index entries could not be cleared"
+            )
+        }
         val vaultHealthy = CameraEvidenceVault.verifyIntegrity(app)
         return MigrationResult(
             enumerationSucceeded = true,
