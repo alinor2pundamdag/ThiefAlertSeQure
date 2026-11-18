@@ -100,11 +100,10 @@ internal object A2DisconnectScheduler {
         }
         LocalTamperHistory.record(
             context, "a2_deadline_schedule_failed",
-            "AlarmManager rejected the A2 grace deadline after one retry: ${lastFailure?.javaClass?.simpleName}: ${lastFailure?.message}"
+            "AlarmManager rejected the A2 grace deadline after one retry: ${lastFailure?.javaClass?.simpleName}: ${lastFailure?.message}; encrypted pending record retained for retry"
         )
-        runCatching {
-            cancelInternal(context, pending.address, pending.eventElapsedRealtimeMs, preferencesName, namespace)
-        }
+        // Keep the durable source. A caller can retry immediately, and monitor
+        // startup can re-arm this deadline after a process restart.
         false
     }
 
@@ -165,6 +164,49 @@ internal object A2DisconnectScheduler {
 
     fun wasConfirmedConnectedAfter(address: String, disconnectEventElapsedRealtimeMs: Long): Boolean =
         (confirmedConnections[address.uppercase()] ?: Long.MIN_VALUE) >= disconnectEventElapsedRealtimeMs
+
+    /**
+     * Re-arm encrypted pending deadlines after a same-boot monitor/process restart.
+     * Invalid or obsolete records are removed only after their state is revalidated.
+     */
+    fun reschedulePending(context: Context): Int = synchronized(lock) {
+        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        val records = read(prefs) ?: run {
+            LocalTamperHistory.record(context, "a2_deadline_recovery_unreadable", "Pending A2 deadlines could not be read during monitor recovery; encrypted source retained")
+            return 0
+        }
+        if (records.isEmpty()) return 0
+        val nowElapsed = ProtectionClock.elapsedRealtime()
+        val bootCount = ProtectionClock.bootCount(context)
+        val state = ProtectionStore(context).read()
+        val enabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+        var recovered = 0
+        records.forEach { pending ->
+            val valid = enabled &&
+                state.mode == ProtectionMode.ARMED &&
+                A2DisconnectPolicy.isSameBoot(pending.bootCount, bootCount, pending.eventElapsedRealtimeMs, nowElapsed) &&
+                TrustedBluetoothRegistry.isTrusted(prefs, pending.address) &&
+                !TrustedBluetoothRegistry.isBaselineConnected(prefs, pending.address) &&
+                A2DisconnectPolicy.isPendingDisconnectCurrent(
+                    pending.monitorRevision,
+                    TrustedBluetoothRegistry.revision(prefs),
+                    pending.deviceRevision,
+                    TrustedBluetoothRegistry.deviceRevision(prefs, pending.address)
+                )
+            if (!valid) {
+                cancelInternal(context, pending.address, pending.eventElapsedRealtimeMs, ProtectionMonitorService.PREFS, null)
+            } else {
+                val scheduled = scheduleInternal(context, pending, ProtectionMonitorService.PREFS, null)
+                val retried = scheduled || scheduleRetry(context, pending, 1_000L)
+                if (retried) recovered += 1
+                else LocalTamperHistory.record(
+                    context, "a2_deadline_recovery_failed",
+                    "A pending trusted-device deadline remains encrypted but AlarmManager rejected recovery for accessory " + pending.address
+                )
+            }
+        }
+        recovered
+    }
 
     /** Retry a consumed one-shot deadline without extending the original grace period. */
     fun scheduleRetry(context: Context, pending: Pending, delayMs: Long = 1_000L): Boolean =
