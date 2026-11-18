@@ -24,7 +24,7 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
                 if (callbackIntent.action == A2DisconnectScheduler.ACTION_DEADLINE) {
                     val token = callbackIntent.data?.lastPathSegment
                     if (token != null) A2DisconnectScheduler.find(context, token)?.let {
-                        A2DisconnectScheduler.schedule(context, it)
+                        A2DisconnectScheduler.scheduleRetry(context, it, 1_000L)
                     }
                 } else if (ProtectionStore(context).read().mode == ProtectionMode.ALARM_TRIGGERED) {
                     AlarmRecoveryCoordinator.onStartFailure(
@@ -85,7 +85,15 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             )
         }
         if (!update.persisted) {
-            LocalTamperHistory.record(context, "a2_alarm_state_persist_failed", "A2 alarm was not started because the latched state could not be committed")
+            val retryScheduled = A2DisconnectScheduler.scheduleRetry(context, pending, 1_000L)
+            LocalTamperHistory.record(
+                context, "a2_alarm_state_persist_failed",
+                if (retryScheduled) {
+                    "A2 alarm state commit failed; the original disconnect deadline remains pending for a one-second retry"
+                } else {
+                    "A2 alarm state commit failed and its retry could not be scheduled; owner action may be required"
+                }
+            )
             return
         }
         A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
