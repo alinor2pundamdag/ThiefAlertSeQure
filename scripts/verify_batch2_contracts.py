@@ -192,6 +192,20 @@ checks = {
         and "private fun exportHistory(uri: Uri) {\n        if (!requireProtectionDisarmed()) return" in settings
         and "LocalEvidenceVault.record(this, \"owner_requested_current_location\"" in settings
         and "LocalEvidenceVault.record(this, \"owner_requested_location_snapshot\"" in settings,
+    "root diagnostics have bounded execution and forceful timeout cleanup":
+        "timeoutSeconds.coerceIn(1L, 30L)" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8")
+        and "destroyForcibly()" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8")
+        and "Root Bluetooth diagnostics could not start" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8"),
+    "location evidence rejects invalid coordinates":
+        "latitude.isFinite()" in (APP / "EvidenceLocationCapture.kt").read_text(encoding="utf-8")
+        and "longitude.isFinite()" in (APP / "EvidenceLocationCapture.kt").read_text(encoding="utf-8")
+        and "location.accuracy.isFinite()" in (APP / "EvidenceLocationCapture.kt").read_text(encoding="utf-8"),
+    "encrypted photo previews are bounded against decompression memory exhaustion":
+        "width.toLong() * height.toLong() > 200_000_000L" in settings
+        and "inSampleSize = sampleSize" in settings
+        and "inPreferredConfig = android.graphics.Bitmap.Config.RGB_565" in settings,
+    "intro reduced-motion preference disables animated developer-name spectrum":
+        "effectiveSpectrumPosition = if (reducedMotion) 0f else spectrumPosition" in (APP / "SeismicGenesisIntroActivity.kt").read_text(encoding="utf-8"),
     "configuration preferences commit only while disarmed and monitor stop is guarded against active state":
         "runIfDisarmed" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "apply(context, imported)" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
