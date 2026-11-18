@@ -261,10 +261,10 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
             receiverExecutor.execute(task)
         } catch (_: RejectedExecutionException) {
             pendingResult.finish()
-            LocalEvidenceVault.recordAsync(
+            LocalTamperHistory.record(
                 context.applicationContext,
                 "a2_receiver_queue_full",
-                "A trusted Bluetooth ACL event was rejected because the bounded receiver queue is full"
+                "A trusted Bluetooth ACL event was rejected because the bounded receiver queue is full; no unverified separation alarm was triggered"
             )
         }
     }
