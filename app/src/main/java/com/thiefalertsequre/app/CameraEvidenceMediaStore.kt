@@ -90,6 +90,15 @@ internal object CameraEvidenceMediaStore {
             return null
         }
         runCatching { prune(context.applicationContext, now) }
+        val ownershipCheck = queryOwnedImages(app)
+        if (!ownershipCheck.success || ownershipCheck.images.none { it.first == uri }) {
+            val removed = runCatching { resolver.delete(uri, null, null) == 1 }.getOrDefault(false)
+            LocalTamperHistory.record(
+                app, "gallery_owner_attribution_unverified",
+                "MediaStore did not confirm this newly captured photo as app-owned; the row was ${if (removed) "removed" else "left visible but unmanaged"}"
+            )
+            return null
+        }
         return uri
     }
 
