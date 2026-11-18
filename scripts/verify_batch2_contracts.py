@@ -277,7 +277,10 @@ checks = {
         and "private fun requestDeviceAdministrator() {\n        if (!requireProtectionDisarmed()) return" in settings
         and "ProtectionStore(activity).runIfDisarmed" in managed
         and "Managed lockdown can be enabled only while protection is DISARMED" in managed
-        and "Managed lockdown can be disabled only while protection is DISARMED" in managed,
+        and "Managed lockdown can be disabled only while protection is DISARMED" in managed
+        and "fun recoverPendingRollback(activity: Activity): Boolean" in managed
+        and "ProtectionStore(activity).read().mode != ProtectionMode.DISARMED" in managed
+        and "ManagedProtectionController.startIfConfigured(this)" in dashboard,
     "critical protection, authentication, and deadline preference writes retry once":
         "private fun commitWithOneRetry" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
         and "val saved = commitWithOneRetry" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
