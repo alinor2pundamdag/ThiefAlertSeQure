@@ -69,6 +69,7 @@ internal object A2DisconnectScheduler {
             return false
         }
         val updated = mergePending(records, pending)
+        val effectivePending = updated.first { it.address.equals(addressKey, ignoreCase = true) }
         var persisted = write(prefs, updated)
         if (!persisted) persisted = write(prefs, updated)
         if (!persisted) {
@@ -76,8 +77,8 @@ internal object A2DisconnectScheduler {
             return false
         }
         val manager = context.getSystemService(AlarmManager::class.java)
-        val operation = pendingIntent(context, pending.address, namespace)
-        val deadline = pending.deadlineElapsedRealtimeMs.coerceAtLeast(android.os.SystemClock.elapsedRealtime())
+        val operation = pendingIntent(context, effectivePending.address, namespace)
+        val deadline = effectivePending.deadlineElapsedRealtimeMs.coerceAtLeast(android.os.SystemClock.elapsedRealtime())
         val exactAllowed = Build.VERSION.SDK_INT < 31 || manager.canScheduleExactAlarms()
         if (!exactAllowed) {
             LocalTamperHistory.record(context, "a2_exact_alarm_access_missing", "Using the inexact idle-aware A2 deadline fallback; Android may delay delivery")
@@ -309,8 +310,13 @@ internal object A2DisconnectScheduler {
     }
 
     /** Replace only this accessory's timer while preserving every other device's record. */
-    internal fun mergePending(records: List<Pending>, pending: Pending): List<Pending> =
-        records.filterNot { it.address.equals(pending.address, ignoreCase = true) } + pending
+    internal fun mergePending(records: List<Pending>, pending: Pending): List<Pending> {
+        val current = records.firstOrNull { it.address.equals(pending.address, ignoreCase = true) }
+        val selected = if (current != null &&
+            current.eventElapsedRealtimeMs > pending.eventElapsedRealtimeMs
+        ) current else pending
+        return records.filterNot { it.address.equals(pending.address, ignoreCase = true) } + selected
+    }
 
     private fun read(prefs: android.content.SharedPreferences): List<Pending>? {
         val raw = when (val value = SafePreferences.readString(prefs, KEY_PENDING, null)) {
