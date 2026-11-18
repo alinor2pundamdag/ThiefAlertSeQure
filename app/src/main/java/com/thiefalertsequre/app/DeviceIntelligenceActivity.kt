@@ -319,7 +319,6 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         ))
         val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
         val cameraPermissionGranted = checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        val cameraEvidenceIntegrity = integrity?.cameraVaultHealthy
         val cameraEvidenceCount = integrity?.cameraPhotoCount ?: -1
         if (integrity == null) {
             addCard("PROTECTION INTEGRITY", listOf("Checking encrypted evidence, photo-vault, and protection-state integrity in the background…"))
@@ -386,29 +385,35 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             !frontCameraFeatureAvailable -> "UNSUPPORTED — Android does not report front-facing camera hardware"
             !cameraEvidenceEnabled -> "OPTIONAL OFF — no camera permission is requested until owner opt-in"
             !cameraPermissionGranted -> "OWNER ENABLED — CAMERA permission missing; photo capture is skipped"
-            cameraEvidenceIntegrity -> "OWNER ENABLED — one front-camera still after successful visible owner authentication; $cameraEvidenceCount encrypted photos retained"
+            integrity == null -> "CHECKING — encrypted photo-vault integrity and retained-photo count are being inspected in the background"
+            integrity.error != null -> "UNKNOWN — photo-vault integrity inspection could not complete"
+            integrity.cameraVaultHealthy -> "OWNER ENABLED — one front-camera still after successful visible owner authentication; ${if (cameraEvidenceCount >= 0) "$cameraEvidenceCount encrypted photos retained" else "photo count unavailable"}"
             else -> "FAILED — encrypted camera evidence vault integrity check failed"
+        }
+        val evidenceVaultStatus = when {
+            integrity == null -> "CHECKING"
+            integrity.error != null -> "UNKNOWN — inspection incomplete"
+            integrity.evidenceVaultHealthy -> "OPERATIONAL"
+            else -> "FAILED"
         }
         val dependencyMap = listOf(
             "Charger protection → foreground monitor + power broadcasts + exact scheduling + notifications: $monitorDependency",
             "Bluetooth separation (A2) → owner opt-in + paired trusted device + Bluetooth Connect + fresh baseline: $a2Dependency",
             "Primary alarm → latched protection state + Android alarm audio; optional secondary audio and haptics have independent controls",
             "Flash alert → camera torch hardware + Android torch service + thermal availability: $flashDependency",
-            "Evidence vault → Android Keystore AES-GCM + local storage + integrity-checked records: ${if (evidenceIntegrity) "OPERATIONAL" else "FAILED"}",
+            "Evidence vault → Android Keystore AES-GCM + local storage + integrity-checked records: $evidenceVaultStatus",
             "GPS evidence → explicit owner action + coarse/fine location permission + one-shot provider fix: $gpsDependency",
             "Managed hardening → Device Owner enrollment + Lock Task policy: ${if (ManagedProtectionController.isDeviceOwner(this)) "DEVICE OWNER PRESENT" else "OPTIONAL / NOT ENROLLED"}",
             "Front-camera photo evidence → explicit opt-in + CAMERA permission + successful owner authentication + visible Activity + encrypted local vault: $cameraDependency"
         )
         addCard("FEATURE DEPENDENCY MAP", dependencyMap)
-        val recentOutputEvents = LocalTamperHistory.read(this, 100)
-            .filter { line ->
-                listOf("alarm_audio_", "alarm_audio_focus_", "secondary_alarm_", "alarm_haptics_", "alarm_flash_")
-                    .any(line::contains)
-            }.takeLast(8).map { it.take(180) }
+        val recentOutputEvents = integrity?.recentOutputEvents.orEmpty()
         addCard("ALARM OUTPUT MONITOR", listOf(
             "Primary audio, audio-focus changes, secondary alarm, haptics, torch interruptions, and thermal suppression are recorded locally.",
             "A secondary-output failure does not stop the primary alarm. A successful start event is not proof of audible sound at the speaker.",
-            if (recentOutputEvents.isEmpty()) "No recent alarm-output events have been recorded."
+            if (integrity == null) "Checking recent output events in the background…"
+            else if (integrity.error != null) "Recent output events could not be read."
+            else if (recentOutputEvents.isEmpty()) "No recent alarm-output events have been recorded."
             else "Recent output events:\n${recentOutputEvents.joinToString("\n")}"
         ))
         if (Build.VERSION.SDK_INT >= 36) {
