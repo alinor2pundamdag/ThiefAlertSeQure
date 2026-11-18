@@ -556,8 +556,13 @@ class SettingsActivity : FragmentActivity() {
                 .setMessage("This permanently clears the on-device protection event log. It does not change protection state.")
                 .setNegativeButton("Keep history", null)
                 .setPositiveButton("Clear") { _, _ ->
-                    LocalTamperHistory.clear(this)
-                    LocalTamperHistory.record(this, "history_cleared", "Owner cleared local event history")
+                    val cleared = LocalTamperHistory.clear(this)
+                    if (cleared) {
+                        LocalTamperHistory.record(this, "history_cleared", "Owner cleared local event history")
+                        android.widget.Toast.makeText(this, "Local event history cleared.", android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        android.widget.Toast.makeText(this, "History was not cleared. Disarm protection first or retry after checking storage.", android.widget.Toast.LENGTH_LONG).show()
+                    }
                     render()
                 }.showThemed(this)
         })
@@ -711,13 +716,21 @@ class SettingsActivity : FragmentActivity() {
                     .setNegativeButton("Cancel", null)
                     .setPositiveButton("Delete all") { _, _ ->
                         ioExecutor.execute {
-                            val vaultDeleted = runCatching { CameraEvidenceVault.deleteAll(applicationContext) }.getOrDefault(false)
-                            val galleryDeleted = runCatching { CameraEvidenceMediaStore.deleteAll(applicationContext) }.getOrDefault(false)
-                            val deleted = vaultDeleted && galleryDeleted
+                            val deletion = ProtectionStore(applicationContext).runIfDisarmed {
+                                val vaultDeleted = runCatching { CameraEvidenceVault.deleteAll(applicationContext) }.getOrDefault(false)
+                                val galleryDeleted = runCatching { CameraEvidenceMediaStore.deleteAll(applicationContext) }.getOrDefault(false)
+                                vaultDeleted && galleryDeleted
+                            }
+                            val deleted = deletion == true
                             LocalEvidenceVault.recordAsync(applicationContext, "camera_evidence_deleted", "Owner deleted all app-managed front-camera photo evidence; vault=$vaultDeleted; gallery=$galleryDeleted")
                             runOnUiThread {
                                 if (!isFinishing && !isDestroyed) {
-                                    android.widget.Toast.makeText(this@SettingsActivity, if (deleted) "Front-camera photos deleted." else "Photo deletion could not be confirmed.", android.widget.Toast.LENGTH_LONG).show()
+                                    val message = when (deletion) {
+                                        true -> "Front-camera photos deleted."
+                                        false -> "Photo deletion could not be confirmed; review storage and retry."
+                                        null -> "Photo deletion is blocked while protection is active. Disarm first."
+                                    }
+                                    android.widget.Toast.makeText(this@SettingsActivity, message, android.widget.Toast.LENGTH_LONG).show()
                                     render()
                                 }
                             }
@@ -1181,7 +1194,10 @@ class SettingsActivity : FragmentActivity() {
                     output.toByteArray()
                 } ?: error("Android could not open the selected backup file.")
                 val entries = EvidenceVaultBackup.decrypt(bytes, password)
-                require(LocalEvidenceVault.replaceAll(this, entries)) { "The validated evidence archive could not be stored." }
+                val restored = ProtectionStore(this@SettingsActivity).runIfDisarmed {
+                    LocalEvidenceVault.replaceAll(this@SettingsActivity, entries)
+                } ?: throw IllegalStateException("Evidence restore is available only while protection is DISARMED.")
+                require(restored) { "The validated evidence archive could not be stored." }
                 entries.size
             }.also { password.fill('\u0000') }
             runOnUiThread {
@@ -1401,9 +1417,12 @@ class SettingsActivity : FragmentActivity() {
                                     }
                                     .setNegativeButton("Delete") { _, _ ->
                                         ioExecutor.execute {
-                                            val deleted = runCatching {
-                                                CameraEvidenceVault.delete(applicationContext, entry.id)
-                                            }.getOrDefault(false)
+                                            val deletion = ProtectionStore(applicationContext).runIfDisarmed {
+                                                runCatching {
+                                                    CameraEvidenceVault.delete(applicationContext, entry.id)
+                                                }.getOrDefault(false)
+                                            }
+                                            val deleted = deletion == true
                                             LocalEvidenceVault.recordAsync(
                                                 applicationContext,
                                                 "camera_evidence_deleted",
@@ -1413,7 +1432,11 @@ class SettingsActivity : FragmentActivity() {
                                                 if (!isFinishing && !isDestroyed) {
                                                     android.widget.Toast.makeText(
                                                         this@SettingsActivity,
-                                                        if (deleted) "Photo deleted." else "Photo deletion could not be confirmed.",
+                                                        when (deletion) {
+                                                            true -> "Photo deleted."
+                                                            false -> "Photo deletion could not be confirmed; retry after checking storage."
+                                                            null -> "Photo deletion is blocked while protection is active. Disarm first."
+                                                        },
                                                         android.widget.Toast.LENGTH_LONG
                                                     ).show()
                                                     render()
@@ -1571,8 +1594,8 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun previewFlashPattern() {
-        if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
-            android.widget.Toast.makeText(this, "Flash preview is unavailable during an active alarm; the alarm owns the torch.", android.widget.Toast.LENGTH_LONG).show()
+        if (ProtectionStore(this).read().mode != ProtectionMode.DISARMED) {
+            android.widget.Toast.makeText(this, "Flash preview is available only while protection is DISARMED.", android.widget.Toast.LENGTH_LONG).show()
             return
         }
         stopFlashPreview()
@@ -1609,6 +1632,10 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun previewSound(slot: String) {
+        if (ProtectionStore(this).read().mode != ProtectionMode.DISARMED) {
+            android.widget.Toast.makeText(this, "Sound preview is available only while protection is DISARMED.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
         if (slot == AlarmSoundStore.ALARM && AlarmSoundStore.uri(this, slot) == null) {
             val preset = AlarmSoundStore.selectedBuiltInPreset(this)
             if (preset != AlarmTonePreset.DEFAULT_AUDIO) {
@@ -1631,7 +1658,8 @@ class SettingsActivity : FragmentActivity() {
             }.getOrNull()
             runOnUiThread {
                 if (isFinishing || isDestroyed ||
-                    !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                    !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) ||
+                    ProtectionStore(this@SettingsActivity).read().mode != ProtectionMode.DISARMED
                 ) {
                     runCatching { candidate?.release() }
                     return@runOnUiThread
@@ -1652,6 +1680,10 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun previewBuiltInAlarmTone(preset: AlarmTonePreset) {
+        if (ProtectionStore(this).read().mode != ProtectionMode.DISARMED) {
+            android.widget.Toast.makeText(this, "Sound preview is available only while protection is DISARMED.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
         stopPreview()
         val controller = AlarmToneController(previewToneHandler, preset) { error ->
             runOnUiThread {
