@@ -643,16 +643,18 @@ class MainActivity : FragmentActivity() {
         val state = when {
             !monitorEnabled &&
                 (current.mode == ProtectionMode.ARMED || current.mode == ProtectionMode.COUNTDOWN) -> {
-                val repaired = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-                    .edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
-                if (!repaired) {
+                val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+                val repaired = store.runIfProtectionActive {
+                    monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
+                }
+                if (repaired == false) {
                     LocalTamperHistory.record(
                         this, "active_monitor_preference_repair_failed",
                         "Active protection remains authoritative, but the monitor-enabled preference could not be restored"
                     )
                 }
                 A2BluetoothReceiverController.sync(this)
-                current
+                store.read()
             }
             !monitorEnabled && current.mode == ProtectionMode.DISARMED -> current
             monitorEnabled && current.mode != ProtectionMode.ALARM_TRIGGERED &&
