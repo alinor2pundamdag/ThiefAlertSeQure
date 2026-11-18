@@ -941,9 +941,11 @@ class SettingsActivity : FragmentActivity() {
             12f, R.color.tas_muted
         ))
         root.addView(action("Export encrypted app configuration") {
+            if (!requireProtectionDisarmed()) return@action
             exportConfigurationBackup.launch("ThiefAlertSeQure-configuration.tascfg")
         })
         root.addView(action("Restore encrypted app configuration") {
+            if (!requireProtectionDisarmed()) return@action
             MaterialAlertDialogBuilder(this)
                 .setTitle("Restore owner settings?")
                 .setMessage("Restore is allowed only while protection is DISARMED; it is blocked during ARMED, COUNTDOWN, or ALARM_TRIGGERED states. It restores supported preferences, then reapplies the monitor setting and charger baseline. It does not restore authentication secrets, permissions, evidence, custom audio files, Bluetooth identities, or the active protection/alarm state. Existing settings are retained if validation or a write fails.")
