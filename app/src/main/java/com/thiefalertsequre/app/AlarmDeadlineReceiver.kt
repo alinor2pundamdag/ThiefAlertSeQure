@@ -180,7 +180,7 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun handleDeadline(context: Context, intent: Intent) {
+    internal fun handleDeadline(context: Context, intent: Intent) {
         // Run baseline migration/reconciliation before any persisted deadline can
         // transition state, including callbacks left over from an older APK.
         PowerTransitionCoordinator.initializeBaseline(context)
@@ -193,6 +193,13 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         if (token == "recovery") {
             if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
                 startAlarm(context, "Latched alarm recovery callback")
+            } else {
+                // The same durable recovery token also resumes a persisted charger-unplug
+                // candidate after a transient state commit failure. The retry callback is
+                // one-shot; a later monitor start can retry again if storage is still failing.
+                PowerTransitionCoordinator.recoverPendingDisconnectCandidate(
+                    context, allowRecoveryRetry = false
+                )
             }
             return
         }

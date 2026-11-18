@@ -414,7 +414,7 @@ object PowerTransitionCoordinator {
             DisconnectCandidate(nextGeneration, eventEpochMs, eventElapsedRealtimeMs, eventBootCount)
         } ?: return ProtectionStore(appContext).read()
 
-        return confirmDisconnectCandidate(appContext, candidate)
+        return confirmDisconnectCandidate(appContext, candidate, allowRecoveryRetry = true)
     }
 
     /**
@@ -422,7 +422,10 @@ object PowerTransitionCoordinator {
      * The candidate is accepted only on the same boot and only while it still owns
      * the current generation; an old-boot or superseded event is never replayed.
      */
-    fun recoverPendingDisconnectCandidate(context: Context): ProtectionState {
+    fun recoverPendingDisconnectCandidate(
+        context: Context,
+        allowRecoveryRetry: Boolean = true
+    ): ProtectionState {
         val appContext = context.applicationContext
         val candidate = synchronized(lock) {
             val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -460,12 +463,13 @@ object PowerTransitionCoordinator {
             )
         } ?: return ProtectionStore(appContext).read()
 
-        return confirmDisconnectCandidate(appContext, candidate)
+        return confirmDisconnectCandidate(appContext, candidate, allowRecoveryRetry)
     }
 
     private fun confirmDisconnectCandidate(
         context: Context,
-        candidate: DisconnectCandidate
+        candidate: DisconnectCandidate,
+        allowRecoveryRetry: Boolean
     ): ProtectionState {
         val confirmation = try {
             PowerTransitionSamplingPolicy.confirm(
@@ -535,6 +539,7 @@ object PowerTransitionCoordinator {
                     clearPendingDisconnectLocked(context, prefs)
                 } else {
                     LocalTamperHistory.record(context, "charger_countdown_schedule_pending", "Existing countdown remains durable; pending unplug provenance retained for retry")
+                    AlarmScheduler.scheduleRetry(context, 1_000L)
                     notifyMonitorStateChanged(context)
                 }
                 return@synchronized current
@@ -556,6 +561,9 @@ object PowerTransitionCoordinator {
             val next = update.state
             if (!update.persisted) {
                 LocalTamperHistory.record(context, "charger_countdown_persist_pending", "Protection state commit failed; durable unplug provenance retained for recovery")
+                if (allowRecoveryRetry && !AlarmScheduler.scheduleRecoveryRetry(context, 1_000L)) {
+                    LocalTamperHistory.record(context, "charger_recovery_retry_schedule_failed", "The pending unplug candidate remains durable, but Android did not accept its one-shot recovery callback")
+                }
                 return@synchronized next
             }
             if (next.mode == ProtectionMode.COUNTDOWN) {
@@ -568,12 +576,16 @@ object PowerTransitionCoordinator {
                     notifyMonitorStateChanged(context)
                 } else {
                     LocalTamperHistory.record(context, "charger_countdown_schedule_pending", "Countdown state is durable but alarm scheduling failed; pending unplug provenance retained for recovery")
+                    AlarmScheduler.scheduleRetry(context, 1_000L)
                     notifyMonitorStateChanged(context)
                 }
             } else if (next.mode != ProtectionMode.ARMED) {
                 clearPendingDisconnectLocked(context, prefs)
             } else {
                 LocalTamperHistory.record(context, "charger_countdown_persist_pending", "Protection state write did not commit; durable unplug provenance retained for recovery")
+                if (allowRecoveryRetry && !AlarmScheduler.scheduleRecoveryRetry(context, 1_000L)) {
+                    LocalTamperHistory.record(context, "charger_recovery_retry_schedule_failed", "The pending unplug candidate remains durable, but Android did not accept its one-shot recovery callback")
+                }
             }
             next
         }

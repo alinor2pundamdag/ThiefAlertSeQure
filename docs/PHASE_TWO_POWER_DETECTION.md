@@ -9,6 +9,7 @@ This document records the non-physical-device engineering contract for Phase Two
 - The ten-second charger grace period is anchored to the original disconnect receipt, not the end of sampling.
 - Unknown or opposite samples reset the consecutive count. A disconnected snapshot alone never creates a countdown without a previously confirmed connected baseline and a valid disconnect event.
 - Pending disconnect provenance is persisted before confirmation so a restarted monitor can revalidate same-boot identity and current power state. Reconnect increments the generation and cancels the candidate/countdown. Stale or cross-boot candidates cannot arm an alarm.
+- If the confirmed unplug cannot commit the `COUNTDOWN` state, one durable recovery callback retries the persisted candidate. That retry is deliberately one-shot; if storage still fails, the marker remains for the next monitor-start recovery instead of creating an unbounded alarm loop.
 
 ## Trusted Bluetooth separation (A2)
 

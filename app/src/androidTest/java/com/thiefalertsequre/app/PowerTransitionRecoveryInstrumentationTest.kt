@@ -1,6 +1,7 @@
 package com.thiefalertsequre.app
 
 import android.content.Intent
+import android.net.Uri
 import android.app.Instrumentation
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
@@ -118,8 +119,17 @@ class PowerTransitionRecoveryInstrumentationTest {
                     .commit()
             )
 
-            val recovered = PowerTransitionCoordinator.recoverPendingDisconnectCandidate(context)
+            assertTrue("A one-shot recovery callback must be scheduled with an inexact fallback",
+                AlarmScheduler.scheduleRecoveryRetry(context, 250L))
+            assertTrue(AlarmScheduler.hasPendingIntent(context, "recovery", fallback = true))
+            val recoveryIntent = Intent(context, AlarmDeadlineReceiver::class.java)
+                .setAction("com.thiefalertsequre.DEADLINE")
+                .setData(Uri.parse("thiefalertsequre://alarm/recovery"))
+            AlarmDeadlineReceiver().handleDeadline(context, recoveryIntent)
+            val recovered = store.read()
             assertEquals(ProtectionMode.COUNTDOWN, recovered.mode)
+            assertTrue("Successful countdown scheduling must replace the recovery callback",
+                !AlarmScheduler.hasPendingIntent(context, "recovery", fallback = true))
             assertEquals(eventElapsedMs + COUNTDOWN_MS, recovered.deadlineElapsedRealtimeMs)
 
             // Replaying recovery after the first commit must not create a second
