@@ -194,9 +194,9 @@ object ManagedProtectionController {
     }
 
     fun disable(activity: Activity) {
-        check(!ConfigurationBackup.isRestoreOrRecoveryInProgress() &&
-            ConfigurationBackup.recoverPendingRestore(activity)
-        ) { "Managed lockdown recovery is unavailable until interrupted settings recovery completes." }
+        // Keep the Device Owner emergency exit available even when an unrelated
+        // configuration journal is damaged; this action restores managed policies,
+        // not imported preferences.
         val completed = ProtectionStore(activity).runIfDisarmed {
             disableWhileDisarmed(activity)
             true
