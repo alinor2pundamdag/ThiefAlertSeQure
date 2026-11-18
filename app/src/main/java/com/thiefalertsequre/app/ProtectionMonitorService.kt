@@ -611,6 +611,10 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         ) {
             prefs.edit().putBoolean(KEY_BATTERY_ALERT_FIRED, true).putInt(KEY_LAST_BATTERY_LEVEL, percent).apply()
             LocalTamperHistory.record(this, "battery_threshold_reached", "Battery crossed configured threshold: ${threshold}%")
+            if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                LocalTamperHistory.record(this, "battery_alert_suppressed", "Battery alert suppressed because the theft alarm has priority")
+                return
+            }
             playBatteryAlert()
         } else {
             prefs.edit().putInt(KEY_LAST_BATTERY_LEVEL, percent).apply()
@@ -618,6 +622,10 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     }
 
     private fun playBatteryAlert() {
+        if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+            LocalTamperHistory.record(this, "battery_alert_suppressed", "Battery alert suppressed because the theft alarm has priority")
+            return
+        }
         val uri = AlarmSoundStore.uri(this, AlarmSoundStore.ALERT)
         if (uri == null) {
             LocalTamperHistory.record(this, "battery_alert_sound_missing", "No secondary alert audio selected")
@@ -634,7 +642,13 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                         .build()
                 )
                 setDataSource(this@ProtectionMonitorService, uri)
-                setOnPreparedListener { runCatching { it.start() }.onFailure { _ -> vibrateOnce() } }
+                setOnPreparedListener {
+                    if (ProtectionStore(this@ProtectionMonitorService).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                        releaseAlertPlayer()
+                    } else {
+                        runCatching { it.start() }.onFailure { _ -> vibrateOnce() }
+                    }
+                }
                 setOnCompletionListener { releaseAlertPlayer() }
                 setOnErrorListener { _, what, extra ->
                     LocalTamperHistory.record(this@ProtectionMonitorService, "battery_alert_audio_failed", "MediaPlayer error $what/$extra")
@@ -656,6 +670,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     }
 
     private fun vibrateOnce() {
+        if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) return
         val deviceVibrator = getSystemService(Vibrator::class.java) ?: return
         if (!deviceVibrator.hasVibrator()) return
         runCatching {
