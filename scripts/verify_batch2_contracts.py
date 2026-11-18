@@ -113,6 +113,11 @@ checks = {
         "previewBuiltInAlarmTone" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8") and "postDelayed(stop, 5_000L)" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8"),
     "encrypted evidence vault uses Android Keystore AES-GCM and bounded retention":
         "LocalPreferenceCipher.encrypt(PURPOSE" in vault and "MAX_RECORDS = 100" in vault and "RETENTION_MS" in vault,
+    "encrypted event evidence is recorded even when readable history storage fails":
+        "is PreferenceRead.Corrupt -> {\n                LocalEvidenceVault.recordAsync(context, safeEvent, safeDetail)" in (APP / "LocalTamperHistory.kt").read_text(encoding="utf-8")
+        and "if (!historySaved)" in (APP / "LocalTamperHistory.kt").read_text(encoding="utf-8")
+        and (APP / "LocalTamperHistory.kt").read_text(encoding="utf-8").index("if (!historySaved)")
+            < (APP / "LocalTamperHistory.kt").read_text(encoding="utf-8").index("LocalEvidenceVault.recordAsync(context, safeEvent, safeDetail)", (APP / "LocalTamperHistory.kt").read_text(encoding="utf-8").index("if (!historySaved)")),
     "event evidence writes are bounded asynchronous work":
         "recordAsync(context, safeEvent, safeDetail)" in (APP / "LocalTamperHistory.kt").read_text(encoding="utf-8") and "ArrayBlockingQueue(64)" in vault and "generation.incrementAndGet()" in vault,
     "evidence queue rejection and failed async commits are durably observable without blocking callbacks":
