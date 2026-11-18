@@ -104,7 +104,7 @@ object EvidenceLocationCapture {
         }
 
         fun providerFinished(location: Location?) {
-            if (location != null) {
+            if (location != null && isValidLocation(location)) {
                 finish(location)
             } else if (pendingProviders.decrementAndGet() == 0) {
                 finish(null)
@@ -140,11 +140,19 @@ object EvidenceLocationCapture {
         }
     }
 
-    private fun isValidLocation(location: Location): Boolean =
-        location.latitude.isFinite() &&
+    @Suppress("DEPRECATION")
+    private fun isValidLocation(location: Location): Boolean {
+        val elapsed = location.elapsedRealtimeNanos
+        val now = SystemClock.elapsedRealtimeNanos()
+        val ageNanos = now - elapsed
+        val notFutureDated = elapsed > 0L && ageNanos >= -TimeUnit.SECONDS.toNanos(1)
+        val notMock = if (Build.VERSION.SDK_INT >= 31) !location.isMock else !location.isFromMockProvider
+        return notMock && notFutureDated &&
+            location.latitude.isFinite() &&
             location.longitude.isFinite() &&
             location.latitude in -90.0..90.0 &&
             location.longitude in -180.0..180.0
+    }
 
     internal fun enabledProviders(gpsEnabled: Boolean, networkEnabled: Boolean): List<String> =
         buildList {
