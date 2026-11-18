@@ -53,7 +53,7 @@ internal object A2DisconnectScheduler {
         if (!TrustedBluetoothRegistry.isValidAddress(pending.address) ||
             pending.eventEpochMs <= 0L || pending.eventElapsedRealtimeMs <= 0L ||
             pending.eventElapsedRealtimeMs > android.os.SystemClock.elapsedRealtime() ||
-            pending.bootCount < -1 || pending.monitorRevision < 0L || pending.deviceRevision < 0L
+            pending.bootCount < 0 || pending.monitorRevision < 0L || pending.deviceRevision < 0L
         ) {
             LocalTamperHistory.record(context, "a2_deadline_metadata_rejected", "Invalid trusted-device deadline metadata was rejected")
             return false
