@@ -264,13 +264,20 @@ internal object CameraEvidenceCapture {
                                             }
                                             set(CaptureRequest.JPEG_QUALITY, 85.toByte())
                                             val sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
-                                            val rotation = when (activity.windowManager.defaultDisplay.rotation) {
+                                            val displayRotation = when (activity.windowManager.defaultDisplay.rotation) {
                                                 Surface.ROTATION_90 -> 90
                                                 Surface.ROTATION_180 -> 180
                                                 Surface.ROTATION_270 -> 270
                                                 else -> 0
                                             }
-                                            set(CaptureRequest.JPEG_ORIENTATION, (sensorOrientation - rotation + 360) % 360)
+                                            val frontFacing = characteristics.get(CameraCharacteristics.LENS_FACING) ==
+                                                CameraCharacteristics.LENS_FACING_FRONT
+                                            set(
+                                                CaptureRequest.JPEG_ORIENTATION,
+                                                CameraEvidencePolicy.jpegOrientation(
+                                                    sensorOrientation, displayRotation, frontFacing
+                                                )
+                                            )
                                         }.build()
                                         configured.capture(request, object : CameraCaptureSession.CaptureCallback() {
                                             override fun onCaptureFailed(
