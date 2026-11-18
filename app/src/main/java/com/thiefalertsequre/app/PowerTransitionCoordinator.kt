@@ -387,7 +387,10 @@ object PowerTransitionCoordinator {
         }
         if (state.mode != ProtectionMode.ALARM_TRIGGERED) {
             AlarmScheduler.cancel(context)
-            if (monitorRequired) notifyMonitorStateChanged(context)
+            if (monitorRequired) {
+                A2BluetoothReceiverController.sync(context)
+                notifyMonitorStateChanged(context)
+            }
         }
         LocalTamperHistory.record(context, "charger_connected_confirmed", reason)
         return state
