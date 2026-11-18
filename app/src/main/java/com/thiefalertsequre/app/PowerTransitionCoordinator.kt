@@ -131,8 +131,12 @@ object PowerTransitionCoordinator {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val store = ProtectionStore(context)
         val currentState = store.read()
-        if (currentState.mode == ProtectionMode.ALARM_TRIGGERED) {
-            LocalTamperHistory.record(context, "power_baseline_reset_rejected", "$reason; active alarm remains latched")
+        if (!PowerTransitionRecoveryPolicy.canResetBaseline(currentState.mode)) {
+            LocalTamperHistory.record(
+                context,
+                "power_baseline_reset_rejected",
+                "$reason; protection mode ${currentState.mode} is active and was preserved"
+            )
             return@synchronized
         }
 
