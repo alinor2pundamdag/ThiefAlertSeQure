@@ -308,7 +308,7 @@ class GenesisFilamentRendererView(
         val width = 128
         val height = 64
         val output = ByteArrayOutputStream(32_768)
-        output.write("#?RADIANCE\\nFORMAT=32-bit_rle_rgbe\\n\\n-Y $height +X $width\\n".toByteArray(Charsets.US_ASCII))
+        output.write("#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y $height +X $width\n".toByteArray(Charsets.US_ASCII))
 
         fun rgbe(red: Float, green: Float, blue: Float): ByteArray {
             val peak = max(red, max(green, blue))
@@ -344,7 +344,9 @@ class GenesisFilamentRendererView(
             }
         }
 
-        val hdr = HDRLoader.createTexture(activeEngine, ByteBuffer.wrap(output.toByteArray()))
+        val hdrBytes = output.toByteArray()
+        val hdrBuffer = ByteBuffer.allocateDirect(hdrBytes.size).put(hdrBytes).apply { flip() }
+        val hdr = HDRLoader.createTexture(activeEngine, hdrBuffer)
             ?: error("Unable to decode generated Seismic Genesis HDR environment")
         val prefilter = IBLPrefilterContext(activeEngine)
         val converter = IBLPrefilterContext.EquirectangularToCubemap(prefilter)
