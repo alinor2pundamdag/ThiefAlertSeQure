@@ -79,8 +79,9 @@ checks = {
         ) < (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8").index(
             "records.forEach { manager.cancel(pendingIntent(context, it.address, namespace)) }"
         )
-        and "if (!removed) return false" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
-        and "if (!cleared) return false" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8"),
+        and "if (!removed) {" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
+        and "if (!cleared) {" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
+        and "scheduled callback was retained" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8"),
     "countdown cancellation retains the OS callback if its durable token cannot be cleared":
         (APP / "AlarmScheduler.kt").read_text(encoding="utf-8").index(
             "var cleared = prefs.edit().remove(KEY_LAST_TOKEN).commit()"
