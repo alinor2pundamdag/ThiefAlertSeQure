@@ -1528,7 +1528,7 @@ class SettingsActivity : FragmentActivity() {
                                 runCatching { CameraEvidenceVault.read(applicationContext, entry.id) }.getOrNull()
                             }
                             val bitmap = bytes?.let { payload ->
-                                runCatching { BitmapFactory.decodeByteArray(payload, 0, payload.size) }.getOrNull()
+                                runCatching { decodeCameraEvidencePreview(payload) }.getOrNull()
                             }
                             runOnUiThread photoUi@{
                                 if (isFinishing || isDestroyed) {
@@ -1598,6 +1598,24 @@ class SettingsActivity : FragmentActivity() {
                     .showThemed(this@SettingsActivity)
             }
         }
+    }
+
+    private fun decodeCameraEvidencePreview(bytes: ByteArray): android.graphics.Bitmap? {
+        if (!CameraEvidencePolicy.isValidImageSize(bytes.size)) return null
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        val width = bounds.outWidth
+        val height = bounds.outHeight
+        if (width <= 0 || height <= 0 || width.toLong() * height.toLong() > 200_000_000L) return null
+        var sampleSize = 1
+        while (width / sampleSize > 2_048 || height / sampleSize > 2_048) {
+            sampleSize *= 2
+        }
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
+        }
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
     }
 
     private fun writeCameraEvidenceExport(uri: Uri, id: String) {
