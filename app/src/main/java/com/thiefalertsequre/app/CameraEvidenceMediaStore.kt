@@ -78,7 +78,6 @@ internal object CameraEvidenceMediaStore {
      * ciphertext by reading it back, then removes the original only if the
      * source bytes are still identical and protection remains DISARMED.
      */
-    @Synchronized
     fun migrateAllToEncryptedVault(context: Context): MigrationResult {
         val app = context.applicationContext
         if (ProtectionStore(app).read().mode != ProtectionMode.DISARMED) {
