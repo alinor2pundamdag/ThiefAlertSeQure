@@ -212,6 +212,13 @@ checks = {
         "fun destroyMesh(mesh: Mesh)" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
         and 'attempt("Filament engine")' in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
         and "catch (error: Throwable)" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8"),
+    "Seismic Genesis includes an articulated PBR intruder that fractures into the shared debris simulation":
+        "private data class RigBone" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
+        and "private fun createIntruderRig()" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
+        and "private fun updateIntruderRig(" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
+        and "bodies += body" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
+        and "intruderRig.toList().forEach { destroyMesh(it.body.mesh) }" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
+        and "intruderAccentMaterial" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8"),
     "trusted Bluetooth and Device Owner configuration are locked outside DISARMED":
         "requireProtectionDisarmed()" in (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
         and "toggleA2WhileDisarmed()" in (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
