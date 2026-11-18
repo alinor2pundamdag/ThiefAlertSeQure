@@ -227,7 +227,7 @@ checks = {
         and "MAX_IMAGES = 20" in camera_policy and "RETENTION_MS = 30L" in camera_policy,
     "front-camera photos can be viewed, exported, deleted and integrity-checked":
         "showCameraEvidenceArchive" in settings and "exportCameraEvidence.launch" in settings
-        and "CameraEvidenceVault.delete(this, entry.id)" in settings
+        and "CameraEvidenceVault.delete(applicationContext, entry.id)" in settings
         and "CameraEvidenceVault.deleteAll(applicationContext)" in settings
         and "CameraEvidenceMediaStore.deleteAll(applicationContext)" in settings
         and "var allDeleted = true" in (APP / "CameraEvidenceMediaStore.kt").read_text(encoding="utf-8")
