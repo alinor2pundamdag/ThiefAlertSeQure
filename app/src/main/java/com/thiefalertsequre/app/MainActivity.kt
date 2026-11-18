@@ -1180,22 +1180,28 @@ class MainActivity : FragmentActivity() {
             } else {
                 "Owner authenticated. Alarm stopped. Protection remains disarmed until the charger is reconnected."
             }
-            val authCameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
-            val authCameraPermissionGranted = checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-            when {
-                authCameraEvidenceEnabled && authCameraPermissionGranted ->
-                    details.append(" Front-camera evidence capture is starting.")
-                authCameraEvidenceEnabled ->
-                    details.append(" Front-camera evidence is enabled, but CAMERA permission is missing; no photo was captured.")
-                else ->
-                    details.append(" Front-camera evidence is OFF in Settings; no photo was captured.")
-            }
-            // Optional photo evidence runs only after a fresh successful proof and while this Activity is visible.
-            runCatching { CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this) }
-                .onFailure {
-                    LocalEvidenceVault.recordAsync(this, "camera_evidence_capture_failed", "Optional camera evidence failed safely: ${it.javaClass.simpleName}")
-                    LocalTamperHistory.record(this, "camera_evidence_capture_failed", "Optional camera evidence failed safely: ${it.javaClass.simpleName}")
+            val settingsRecovered = !ConfigurationBackup.isRestoreOrRecoveryInProgress() &&
+                ConfigurationBackup.recoverPendingRestore(this)
+            if (settingsRecovered) {
+                val authCameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
+                val authCameraPermissionGranted = checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                when {
+                    authCameraEvidenceEnabled && authCameraPermissionGranted ->
+                        details.append(" Front-camera evidence capture is starting.")
+                    authCameraEvidenceEnabled ->
+                        details.append(" Front-camera evidence is enabled, but CAMERA permission is missing; no photo was captured.")
+                    else ->
+                        details.append(" Front-camera evidence is OFF in Settings; no photo was captured.")
                 }
+                // Optional photo evidence runs only after a fresh successful proof and while this Activity is visible.
+                runCatching { CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this) }
+                    .onFailure {
+                        LocalEvidenceVault.recordAsync(this, "camera_evidence_capture_failed", "Optional camera evidence failed safely: ${it.javaClass.simpleName}")
+                        LocalTamperHistory.record(this, "camera_evidence_capture_failed", "Optional camera evidence failed safely: ${it.javaClass.simpleName}")
+                    }
+            } else {
+                details.append(" Optional camera evidence was skipped while interrupted settings recovery is pending.")
+            }
             // Active-alarm recovery bypasses the first-run notice so authentication is never
             // blocked. Once the owner has disarmed the alarm, require acknowledgement before
             // returning to normal dashboard use.
