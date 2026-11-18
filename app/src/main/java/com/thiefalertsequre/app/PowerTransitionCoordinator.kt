@@ -30,6 +30,7 @@ object PowerTransitionCoordinator {
     internal fun acceptsPowerConnectedEvent(liveConnected: Boolean?): Boolean = liveConnected == true
 
     private fun configurationReady(context: Context): Boolean {
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress()) return false
         if (ConfigurationBackup.recoverPendingRestore(context)) return true
         LocalTamperHistory.record(
             context, "configuration_restore_recovery_pending",
