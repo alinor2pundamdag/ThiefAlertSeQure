@@ -66,7 +66,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             if (ConfigurationBackup.isRestoreOrRecoveryInProgress()) return
             // Anchor the grace deadline to broadcast receipt, not the time spent
             // validating encrypted trust state and protection guards.
-            if (!SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) return
+            val protectionMode = ProtectionStore(this@ProtectionMonitorService).read().mode
+            val monitorEnabled = SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+            if (!ProtectionMonitorPolicy.shouldRun(monitorEnabled, protectionMode)) return
             val eventUptimeMs = android.os.SystemClock.uptimeMillis()
             val eventElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime()
             val eventEpochMs = System.currentTimeMillis()
