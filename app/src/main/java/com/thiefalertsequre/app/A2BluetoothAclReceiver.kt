@@ -174,7 +174,7 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
                         app, "configuration_restore_recovery_pending",
                         "Trusted Bluetooth event was ignored until interrupted settings recovery completes"
                     )
-                    return@Thread
+                    return@Runnable
                 }
                 val prefs = app.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
                 if (!SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_A2_BOOT_BASELINE_READY, false)) {
@@ -183,23 +183,23 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
                         app, "a2_baseline_not_ready",
                         "Manifest Bluetooth event ignored because a verified boot baseline is not available"
                     )
-                    return@Thread
+                    return@Runnable
                 }
                 if (!SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED) ||
                     !SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-                ) return@Thread
+                ) return@Runnable
                 if (Build.VERSION.SDK_INT >= 31 &&
                     ContextCompat.checkSelfPermission(app, android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
                 ) {
                     A2BluetoothReceiverController.sync(app)
                     LocalTamperHistory.record(app, "bluetooth_permission_missing", "Trusted Bluetooth separation monitoring paused; grant Bluetooth Connect permission")
-                    return@Thread
+                    return@Runnable
                 }
                 val device = runCatching {
                     intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
-                }.getOrNull() ?: return@Thread
-                val address = device.address ?: return@Thread
-                if (!TrustedBluetoothRegistry.isTrusted(prefs, address)) return@Thread
+                }.getOrNull() ?: return@Runnable
+                val address = device.address ?: return@Runnable
+                if (!TrustedBluetoothRegistry.isTrusted(prefs, address)) return@Runnable
 
                 when (intent.action) {
                     BluetoothDevice.ACTION_ACL_CONNECTED -> {
@@ -214,7 +214,7 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
                         val update = TrustedBluetoothRegistry.markConnected(prefs, address, false)
                         if (!update.persisted) {
                             LocalTamperHistory.record(app, "a2_baseline_update_failed", "Bluetooth disconnected, but its encrypted connection baseline could not be committed; no unverified separation alarm was scheduled")
-                            return@Thread
+                            return@Runnable
                         }
                         val hadBaseline = update.hadBaseline
                         if (A2DisconnectPolicy.shouldStartGracePeriod(
@@ -253,7 +253,7 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
             receiverExecutor.execute(task)
         } catch (_: RejectedExecutionException) {
             pendingResult.finish()
-            LocalTamperHistory.recordAsync(
+            LocalEvidenceVault.recordAsync(
                 context.applicationContext,
                 "a2_receiver_queue_full",
                 "A trusted Bluetooth ACL event was rejected because the bounded receiver queue is full"
