@@ -347,18 +347,27 @@ object PowerTransitionCoordinator {
 
         val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
         var monitorEnabled = false
+        var monitorRequired = false
+        var preferenceRepairFailed = false
         val update = ProtectionStore(context).updatePersisted { current ->
             // Read the owner preference inside the same ProtectionStore lock as
-            // the state transition. A concurrent configuration restore/opt-out
-            // cannot be overwritten by a stale pre-lock preference snapshot.
+            // the state transition. Active ARMED/COUNTDOWN state always wins over
+            // a stale OFF preference; an OFF preference only prevents arming from DISARMED.
             monitorEnabled = SafePreferences.boolean(
                 monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
             )
+            val activeProtection = current.mode == ProtectionMode.ARMED ||
+                current.mode == ProtectionMode.COUNTDOWN
+            monitorRequired = monitorEnabled || activeProtection
+            if (activeProtection && !monitorEnabled) {
+                preferenceRepairFailed = !monitorPrefs.edit()
+                    .putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
+            }
             when {
                 current.mode == ProtectionMode.ALARM_TRIGGERED -> current
-                !monitorEnabled -> ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
-                current.mode == ProtectionMode.ARMED -> current
-                else -> ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
+                ProtectionMonitorPolicy.shouldArmOnConfirmedConnection(monitorEnabled, current.mode) ->
+                    ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
+                else -> current
             }
         }
         if (!update.persisted) {
@@ -370,9 +379,15 @@ object PowerTransitionCoordinator {
         }
 
         val state = update.state
+        if (preferenceRepairFailed) {
+            LocalTamperHistory.record(
+                context, "active_monitor_preference_repair_failed",
+                "A confirmed charger connection preserved active protection, but the monitor-enabled preference could not be restored"
+            )
+        }
         if (state.mode != ProtectionMode.ALARM_TRIGGERED) {
             AlarmScheduler.cancel(context)
-            if (monitorEnabled) notifyMonitorStateChanged(context)
+            if (monitorRequired) notifyMonitorStateChanged(context)
         }
         LocalTamperHistory.record(context, "charger_connected_confirmed", reason)
         return state
