@@ -86,6 +86,7 @@ internal object ConfigurationBackup {
         Definition("camera_evidence_settings", "encrypt_new_photos", "boolean", false)
     )
 
+    @Synchronized
     fun encrypt(context: Context, password: CharArray): ByteArray {
         try {
             require(password.size >= 12) { "Configuration backup password must contain at least 12 characters." }
@@ -99,6 +100,7 @@ internal object ConfigurationBackup {
         }
     }
 
+    @Synchronized
     fun decryptAndRestore(context: Context, bytes: ByteArray, password: CharArray): Int {
         try {
             require(password.size >= 12) { "Configuration backup password must contain at least 12 characters." }
@@ -153,6 +155,7 @@ internal object ConfigurationBackup {
     }
 
     /** Recover an interrupted multi-file restore before any app feature consumes settings. */
+    @Synchronized
     fun recoverPendingRestore(context: Context): Boolean {
         val journal = context.applicationContext.getSharedPreferences(JOURNAL_PREFS, Context.MODE_PRIVATE)
         val previousJson = when (val read = SafePreferences.readString(journal, JOURNAL_PREVIOUS, null)) {
