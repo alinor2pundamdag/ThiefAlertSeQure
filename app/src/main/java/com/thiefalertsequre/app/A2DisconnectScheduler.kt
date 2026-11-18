@@ -18,6 +18,7 @@ internal object A2DisconnectScheduler {
     // ACL broadcasts can arrive concurrently for different accessories. Serialize
     // every encrypted read-modify-write so one device cannot overwrite another.
     private val lock = Any()
+    private val confirmedConnections = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     data class Pending(
         val address: String,
@@ -57,6 +58,10 @@ internal object A2DisconnectScheduler {
         ) {
             LocalTamperHistory.record(context, "a2_deadline_metadata_rejected", "Invalid trusted-device deadline metadata was rejected")
             return false
+        }
+        val addressKey = pending.address.uppercase()
+        confirmedConnections.computeIfPresent(addressKey) { _, connectedAt ->
+            if (pending.eventElapsedRealtimeMs > connectedAt) null else connectedAt
         }
         val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
         val records = read(prefs) ?: run {
@@ -119,6 +124,44 @@ internal object A2DisconnectScheduler {
 
     fun cancel(context: Context, address: String, expectedEventElapsedMs: Long? = null): Boolean =
         cancelInternal(context, address, expectedEventElapsedMs, ProtectionMonitorService.PREFS, null)
+
+    /**
+     * A confirmed ACL_CONNECTED event must suppress an older disconnect deadline
+     * even when encrypted registry persistence fails. The in-process timestamp
+     * also closes the race with a callback already executing in this process.
+     */
+    fun cancelAfterConfirmedConnection(
+        context: Context,
+        address: String,
+        connectedAtElapsedRealtimeMs: Long
+    ): Boolean = synchronized(lock) {
+        if (!TrustedBluetoothRegistry.isValidAddress(address) || connectedAtElapsedRealtimeMs <= 0L) return false
+        val key = address.uppercase()
+        confirmedConnections.merge(key, connectedAtElapsedRealtimeMs) { old, next -> maxOf(old, next) }
+        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        val records = read(prefs) ?: return false
+        val matching = records.firstOrNull { it.address.equals(address, ignoreCase = true) }
+            ?: return true
+        // An out-of-order older CONNECTED broadcast must not cancel a newer DISCONNECTED event.
+        if (matching.eventElapsedRealtimeMs > connectedAtElapsedRealtimeMs) return true
+        val remaining = records.filterNot { it.address.equals(address, ignoreCase = true) }
+        var removed = write(prefs, remaining)
+        if (!removed) removed = write(prefs, remaining)
+        val manager = context.getSystemService(AlarmManager::class.java)
+        if (!removed) {
+            // The observed reconnect is authoritative for this older deadline.
+            // Cancel its OS callback rather than risk a false separation alarm;
+            // the stale encrypted record is inert until a later disconnect replaces it.
+            manager.cancel(pendingIntent(context, address))
+            LocalTamperHistory.record(context, "a2_reconnect_cancel_persist_failed", "Reconnect was observed but encrypted deadline removal failed; its older OS callback was cancelled to prevent a false alarm")
+            return false
+        }
+        manager.cancel(pendingIntent(context, address))
+        true
+    }
+
+    fun wasConfirmedConnectedAfter(pending: Pending): Boolean =
+        (confirmedConnections[pending.address.uppercase()] ?: Long.MIN_VALUE) >= pending.eventElapsedRealtimeMs
 
     /** Retry a consumed one-shot deadline without extending the original grace period. */
     fun scheduleRetry(context: Context, pending: Pending, delayMs: Long = 1_000L): Boolean =
