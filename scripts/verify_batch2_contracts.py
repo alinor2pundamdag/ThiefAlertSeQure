@@ -145,6 +145,21 @@ checks = {
         and "ProtectionStore(context).runIfDisarmed" in flash_controller
         and "ProtectionStore(context).runIfDisarmed" in (APP / "AlarmHapticsPolicy.kt").read_text(encoding="utf-8")
         and "ProtectionStore(context).runIfDisarmed" in camera_capture,
+    "multi-file configuration restore has durable process-death recovery":
+        "JOURNAL_APPLYING" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
+        and "JOURNAL_COMMITTED" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
+        and "fun recoverPendingRestore(context: Context): Boolean" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
+        and "ConfigurationBackup.recoverPendingRestore(this)" in (APP / "ThiefAlertSeQureApplication.kt").read_text(encoding="utf-8")
+        and 'android:name=".ThiefAlertSeQureApplication"' in (ROOT / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8"),
+    "state transitions notify dependent settings previews to release alarm outputs":
+        "ACTION_STATE_CHANGED" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
+        and "sendBroadcast(" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
+        and "protectionStateReceiver" in settings
+        and "stopPreview()" in settings and "stopFlashPreview()" in settings,
+    "Filament cleanup attempts every scene resource even after an individual destroy failure":
+        "private fun destroyMesh" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
+        and 'attempt("Filament engine")' in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
+        and "catch (error: Throwable)" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8"),
     "configuration preferences commit only while disarmed and monitor stop is guarded against active state":
         "runIfDisarmed" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "apply(context, imported)" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
