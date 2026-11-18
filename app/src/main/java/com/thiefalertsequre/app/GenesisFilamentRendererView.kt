@@ -39,6 +39,7 @@ import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.math.pow
 import kotlin.math.sqrt
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -312,8 +313,8 @@ class GenesisFilamentRendererView(
         fun rgbe(red: Float, green: Float, blue: Float): ByteArray {
             val peak = max(red, max(green, blue))
             if (peak < 1.0e-8f) return byteArrayOf(0, 0, 0, 0)
-            val exponent = kotlin.math.floor(kotlin.math.ln(peak.toDouble(), 2.0)).toInt() + 1
-            val scale = 256.0 / kotlin.math.pow(2.0, exponent.toDouble())
+            val exponent = kotlin.math.floor(kotlin.math.log(peak.toDouble(), 2.0)).toInt() + 1
+            val scale = 256.0 / 2.0.pow(exponent.toDouble())
             return byteArrayOf(
                 (red * scale).toInt().coerceIn(0, 255).toByte(),
                 (green * scale).toInt().coerceIn(0, 255).toByte(),
