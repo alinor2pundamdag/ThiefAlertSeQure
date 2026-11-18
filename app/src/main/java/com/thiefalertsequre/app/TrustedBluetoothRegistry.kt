@@ -7,6 +7,17 @@ import java.security.MessageDigest
 
 data class TrustedBluetoothDevice(val address: String, val name: String)
 
+enum class BluetoothBaselineUpdateStatus {
+    COMMITTED, INVALID_ADDRESS, CORRUPT_STORE, COMMIT_FAILED
+}
+
+data class BluetoothBaselineUpdateResult(
+    val status: BluetoothBaselineUpdateStatus,
+    val hadBaseline: Boolean
+) {
+    val persisted: Boolean get() = status == BluetoothBaselineUpdateStatus.COMMITTED
+}
+
 /**
  * Local allow-list for A2. Android owns pairing; this registry only stores app trust.
  * MAC addresses, names and connection baselines are encrypted at rest with Android Keystore.
@@ -241,12 +252,20 @@ object TrustedBluetoothRegistry {
         isValidAddress(address) && baselineAddresses(prefs).any { it.equals(address.trim(), ignoreCase = true) }
 
     @Synchronized
-    fun markConnected(prefs: SharedPreferences, address: String, connected: Boolean): Boolean {
-        if (!isValidAddress(address)) return false
+    fun markConnected(
+        prefs: SharedPreferences,
+        address: String,
+        connected: Boolean
+    ): BluetoothBaselineUpdateResult {
+        if (!isValidAddress(address)) {
+            return BluetoothBaselineUpdateResult(BluetoothBaselineUpdateStatus.INVALID_ADDRESS, false)
+        }
         val normalizedAddress = address.trim().uppercase()
         val old = when (val stored = readBaselineAddresses(prefs)) {
             is PreferenceRead.Value -> stored.value
-            is PreferenceRead.Corrupt -> return false
+            is PreferenceRead.Corrupt -> {
+                return BluetoothBaselineUpdateResult(BluetoothBaselineUpdateStatus.CORRUPT_STORE, false)
+            }
         }
         val hadBaseline = old.any { it.equals(normalizedAddress, ignoreCase = true) }
         val updated = old.filterNot { it.equals(normalizedAddress, ignoreCase = true) }.toMutableSet()
@@ -257,7 +276,10 @@ object TrustedBluetoothRegistry {
         }.onFailure {
             Log.e(TAG, "Could not encrypt or commit Bluetooth connection baseline; existing source retained", it)
         }.getOrDefault(false)
-        return committed && hadBaseline
+        return BluetoothBaselineUpdateResult(
+            if (committed) BluetoothBaselineUpdateStatus.COMMITTED else BluetoothBaselineUpdateStatus.COMMIT_FAILED,
+            hadBaseline
+        )
     }
 
     @Synchronized
