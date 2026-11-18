@@ -101,10 +101,14 @@ internal object CameraEvidenceVault {
         val entries = readIndex(app) ?: return false
         if (entries.none { it.id == id }) return false
         val next = entries.filterNot { it.id == id }
-        if (!writeIndex(app, next)) return false
+        // Delete the ciphertext before removing its index entry. If deletion fails,
+        // the index remains intact so the owner can retry instead of leaving an
+        // untracked encrypted file behind.
         val file = evidenceDirectory(app).resolve("$id.aesgcm")
         val deleted = file.delete() || !file.exists()
-        if (deleted && next.isEmpty()) {
+        if (!deleted) return false
+        if (!writeIndex(app, next)) return false
+        if (next.isEmpty()) {
             runCatching {
                 synchronized(keyLock) {
                     KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
@@ -118,18 +122,22 @@ internal object CameraEvidenceVault {
     fun deleteAll(context: Context): Boolean {
         val app = context.applicationContext
         val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (!prefs.edit().remove(KEY_INDEX).commit()) return false
+        // Keep the encrypted index until every ciphertext/temp file is gone.
+        // A failed delete therefore remains discoverable and can be retried.
         val files = evidenceDirectory(app).listFiles().orEmpty()
-        files.forEach { file -> runCatching { file.delete() } }
-        val allDeleted = files.none { it.exists() }
-        if (allDeleted) {
-            runCatching {
-                synchronized(keyLock) {
-                    KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
-                }
+        val allDeleted = files.all { file ->
+            runCatching { file.delete() || !file.exists() }.getOrDefault(false)
+        }
+        if (!allDeleted) return false
+        // If this commit fails, the stale index is still available for a retry;
+        // missing files are treated as successfully deleted on the next attempt.
+        if (!prefs.edit().remove(KEY_INDEX).commit()) return false
+        runCatching {
+            synchronized(keyLock) {
+                KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
             }
         }
-        return allDeleted
+        return true
     }
 
     @Synchronized
