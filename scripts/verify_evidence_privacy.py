@@ -119,11 +119,14 @@ required = {
         and "CameraEvidenceMediaStore.deleteAll(applicationContext)" in settings
         and "var allDeleted = true" in camera_media
         and "queryOwnedImages(context.applicationContext).forEach" in camera_media,
-    "encrypted photo deletion retains its index until ciphertext deletion succeeds":
+    "encrypted photo deletion retains its index until ciphertext and Keystore cleanup succeed":
         camera_vault.index("val deleted = file.delete() || !file.exists()")
+        < camera_vault.index("if (next.isEmpty() && !deleteKeyIfPresent()) return false")
         < camera_vault.index("if (!writeIndex(app, next)) return false")
         and camera_vault.index("val allDeleted = files.all")
-        < camera_vault.index("if (!prefs.edit().remove(KEY_INDEX).commit()) return false"),
+        < camera_vault.index("if (!deleteKeyIfPresent()) return false")
+        < camera_vault.index("if (!prefs.edit().remove(KEY_INDEX).commit()) return false")
+        and "private fun deleteKeyIfPresent(): Boolean" in camera_vault,
     "encrypted photo vault enumeration and integrity checks stay off the Settings UI thread":
         "CameraEvidenceVault.entries(applicationContext)" in camera_settings
         and "CameraEvidenceVault.entries(this)" not in camera_settings
