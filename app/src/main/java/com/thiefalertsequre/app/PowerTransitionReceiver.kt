@@ -26,6 +26,13 @@ class PowerTransitionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         val action = intent?.action ?: return
         if (action != Intent.ACTION_POWER_CONNECTED && action != Intent.ACTION_POWER_DISCONNECTED) return
+        if (!ConfigurationBackup.recoverPendingRestore(context)) {
+            LocalTamperHistory.record(
+                context, "configuration_restore_recovery_pending",
+                "Physical charger transition was ignored until interrupted settings recovery completes"
+            )
+            return
+        }
         val monitorEnabled = SafePreferences.boolean(
             context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE),
             ProtectionMonitorService.KEY_ENABLED,
