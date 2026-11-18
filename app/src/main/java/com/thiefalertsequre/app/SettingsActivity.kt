@@ -456,7 +456,6 @@ class SettingsActivity : FragmentActivity() {
                             // The OFF preference was committed above; this lets the service
                             // reject this request if a newer owner action re-enables monitoring.
                             .putExtra(ProtectionMonitorService.EXTRA_STOP_PREFERENCE_COMMITTED, true)
-                            .putExtra(ProtectionMonitorService.EXTRA_STOP_PREFERENCE_COMMITTED, true)
                     )
                 }.onFailure {
                     android.widget.Toast.makeText(this, "Monitor stop could not be requested: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
