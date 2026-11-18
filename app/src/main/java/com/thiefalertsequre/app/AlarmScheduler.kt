@@ -176,11 +176,15 @@ object AlarmScheduler {
         val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
         when (val stored = SafePreferences.readString(prefs, KEY_LAST_TOKEN, null)) {
             is PreferenceRead.Value -> {
-                stored.value?.let { alarmManager.cancel(pendingIntent(context, it, namespace)) }
+                // Remove the durable token before cancelling the OS callback.
+                // If persistence fails, leave the callback scheduled; its receiver
+                // revalidates the authoritative ProtectionStore state and deadline.
                 var cleared = prefs.edit().remove(KEY_LAST_TOKEN).commit()
                 if (!cleared) cleared = prefs.edit().remove(KEY_LAST_TOKEN).commit()
                 if (!cleared) {
-                    LocalTamperHistory.record(context, "deadline_token_clear_failed", "Scheduled alarm token could not be removed from preferences after one retry")
+                    LocalTamperHistory.record(context, "deadline_token_clear_failed", "Scheduled alarm token could not be removed after one retry; OS callback was retained for safe state revalidation")
+                } else {
+                    stored.value?.let { alarmManager.cancel(pendingIntent(context, it, namespace)) }
                 }
             }
             is PreferenceRead.Corrupt -> LocalTamperHistory.record(
