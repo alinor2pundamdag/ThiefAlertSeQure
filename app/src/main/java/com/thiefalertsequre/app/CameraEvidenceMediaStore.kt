@@ -130,7 +130,17 @@ internal object CameraEvidenceMediaStore {
                 copyFailures += 1
                 continue
             }
-            val entry = CameraEvidenceVault.saveForMigration(app, original, timestamp)
+            val sourceDigest = sha256(original)
+            val sourceDigestHex = sourceDigest.joinToString("") { "%02x".format(it) }
+            // A previous run may have completed the encrypted copy but been
+            // interrupted before deleting its Gallery source. Reuse that exact
+            // timestamp+content entry instead of consuming another vault slot.
+            val existingCopy = CameraEvidenceVault.entries(app).firstOrNull {
+                it.timestampEpochMs == timestamp &&
+                    it.sizeBytes == original.size &&
+                    it.sha256.equals(sourceDigestHex, ignoreCase = true)
+            }
+            val entry = existingCopy ?: CameraEvidenceVault.saveForMigration(app, original, timestamp)
             if (entry == null) {
                 if (ProtectionStore(app).read().mode != ProtectionMode.DISARMED) {
                     blocked = true
@@ -145,12 +155,12 @@ internal object CameraEvidenceMediaStore {
             }
             val verified = CameraEvidenceVault.read(app, entry.id)
             if (verified == null || !MessageDigest.isEqual(original, verified)) {
-                runCatching { CameraEvidenceVault.delete(app, entry.id) }
+                if (existingCopy == null) runCatching { CameraEvidenceVault.delete(app, entry.id) }
                 copyFailures += 1
                 continue
             }
             copied += 1
-            pendingDeletions += uri to sha256(original)
+            pendingDeletions += uri to sourceDigest
         }
 
         val copiedVaultHealthy = CameraEvidenceVault.verifyIntegrity(app)
