@@ -549,11 +549,23 @@ class SettingsActivity : FragmentActivity() {
         val cameraPermissionGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         val frontCameraAvailable = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
         val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(this).size }.getOrDefault(0)
-        val cameraEvidenceIntegrity = runCatching { CameraEvidenceVault.verifyIntegrity(this) }.getOrDefault(false)
-        root.addView(text(
-            "Front-camera photo evidence: ${when { !frontCameraAvailable -> "UNSUPPORTED"; cameraEvidenceEnabled && cameraPermissionGranted -> "ON"; cameraEvidenceEnabled -> "NEEDS CAMERA PERMISSION"; else -> "OFF" }} • $cameraEvidenceCount encrypted photos • integrity ${if (cameraEvidenceIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}",
+        val cameraEvidenceStatus = text(
+            "Front-camera photo evidence: ${when { !frontCameraAvailable -> "UNSUPPORTED"; cameraEvidenceEnabled && cameraPermissionGranted -> "ON"; cameraEvidenceEnabled -> "NEEDS CAMERA PERMISSION"; else -> "OFF" }} • $cameraEvidenceCount encrypted photos • integrity CHECKING",
             12f, R.color.tas_muted
-        ))
+        )
+        root.addView(cameraEvidenceStatus)
+        val evidenceRenderRoot = root
+        ioExecutor.execute {
+            val cameraEvidenceIntegrity = runCatching {
+                CameraEvidenceVault.verifyIntegrity(this@SettingsActivity)
+            }.getOrDefault(false)
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed && root === evidenceRenderRoot) {
+                    cameraEvidenceStatus.text =
+                        "Front-camera photo evidence: ${when { !frontCameraAvailable -> "UNSUPPORTED"; cameraEvidenceEnabled && cameraPermissionGranted -> "ON"; cameraEvidenceEnabled -> "NEEDS CAMERA PERMISSION"; else -> "OFF" }} • $cameraEvidenceCount encrypted photos • integrity ${if (cameraEvidenceIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}"
+                }
+            }
+        }
         root.addView(action("Front-camera evidence after successful owner authentication: ${if (cameraEvidenceEnabled && cameraPermissionGranted) "ON" else "OFF / NEEDS SETUP"}") {
             if (cameraEvidenceEnabled && cameraPermissionGranted) {
                 MaterialAlertDialogBuilder(this)
@@ -571,7 +583,7 @@ class SettingsActivity : FragmentActivity() {
             } else {
                 MaterialAlertDialogBuilder(this)
                     .setTitle("Enable front-camera photo evidence?")
-                    .setMessage("After a successful owner PIN/password or supported strong-biometric verification disarms a latched alarm, ThiefAlertSeQure will take one still photo using the FRONT camera while this app is visible. Android will show its camera privacy indicator. CAMERA permission is requested only after you choose Enable. Photos are encrypted with an Android Keystore AES-GCM key, stored only on this device for up to 30 days (maximum 20 photos, 2 MiB each), and can be viewed, exported or deleted. No photo is taken on failed/cancelled authentication; no background camera service, microphone, or cloud upload is used. If camera access is unavailable, alarm disarming still succeeds.")
+                    .setMessage("After a successful owner PIN/password or supported strong-biometric verification disarms a latched alarm, ThiefAlertSeQure will take one still photo using the FRONT camera while this app is visible. Android will show its camera privacy indicator. CAMERA permission is requested only after you choose Enable. Photos are encrypted with an Android Keystore AES-GCM key, stored only in this app's private storage for up to 30 days (maximum 20 photos, 2 MiB each), and can be viewed, exported or deleted. They do not appear in the public Gallery unless you explicitly export them. No photo is taken on failed/cancelled authentication; no background camera service, microphone, or cloud upload is used. If camera access is unavailable, alarm disarming still succeeds.")
                     .setNegativeButton("Cancel", null)
                     .setPositiveButton("Enable") { _, _ ->
                         if (!packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)) {

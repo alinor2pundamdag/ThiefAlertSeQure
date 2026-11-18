@@ -99,7 +99,7 @@ internal class AlarmFlashController(
         return try {
             // Keep Handler-based pulse timing alive while the display is off.
             // This lock belongs to the torch controller and is released on every stop path.
-            if (!cpuWakeLock.isHeld) cpuWakeLock.acquire()
+            if (pattern != AlarmFlashPattern.STEADY && !cpuWakeLock.isHeld) cpuWakeLock.acquire()
             cameraManager.setTorchMode(selectedCamera, true)
             torchOn = true
             running = true
@@ -109,8 +109,8 @@ internal class AlarmFlashController(
                 pattern, 0, speedPercent, customTimings.first, customTimings.second
             )
             pulseStep = 1
-            handler.postDelayed(pulse, initialDelay)
-            report("alarm_flash_started", "Camera LED pulsing while the theft alarm is latched")
+            if (pattern != AlarmFlashPattern.STEADY) handler.postDelayed(pulse, initialDelay)
+            report("alarm_flash_started", "Camera LED active using ${pattern.label} pattern while the theft alarm is latched")
             true
         } catch (error: Exception) {
             report("alarm_flash_start_failed", error.javaClass.simpleName + ": " + error.message)
