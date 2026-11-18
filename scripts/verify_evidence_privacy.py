@@ -127,6 +127,7 @@ required = {
         and "MessageDigest.isEqual(original, verified)" in camera_media
         and "MessageDigest.isEqual(original, currentSource)" in camera_media
         and "ProtectionStore(app).runIfDisarmed" in camera_media
+        and "CameraEvidenceCapture.isEncryptionEnabled(app)" in camera_media
         and "Encrypt existing Gallery photos into the private vault" in camera_settings
         and "originalsRemoved" in camera_media,
     "owner can view/export encrypted photos and delete both app-managed stores":
