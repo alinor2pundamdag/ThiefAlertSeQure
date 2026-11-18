@@ -1229,11 +1229,11 @@ class SettingsActivity : FragmentActivity() {
                     }
                     output.toByteArray()
                 } ?: error("Android could not open the selected configuration backup file.")
-                ConfigurationBackup.decryptAndRestore(this, bytes, password)
+                ConfigurationBackup.decryptAndRestore(this, bytes, password) { applyRestoredConfiguration() }
             }.also { password.fill('\u0000') }
             runOnUiThread {
                 result.onSuccess { count ->
-                    applyRestoredConfiguration()
+                    if (::root.isInitialized) ThemeRuntime.apply(this, root)
                     android.widget.Toast.makeText(
                         this, "Restored $count supported owner settings. Authentication, permissions, evidence, and active protection state were left unchanged.",
                         android.widget.Toast.LENGTH_LONG
@@ -1280,7 +1280,6 @@ class SettingsActivity : FragmentActivity() {
                 )
             }
         }
-        if (::root.isInitialized) ThemeRuntime.apply(this, root)
     }
 
     private fun showCameraEvidenceArchive() {
