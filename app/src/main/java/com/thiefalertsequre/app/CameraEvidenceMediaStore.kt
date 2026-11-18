@@ -15,6 +15,7 @@ import java.util.UUID
 internal object CameraEvidenceMediaStore {
     private const val DIRECTORY_NAME = "ThiefAlertSeQure"
     private val OWNED_IMAGE_NAME = Regex("^ThiefAlertSeQure-[0-9]{10,13}-[0-9a-f]{8}\\.jpg$")
+    private val MIGRATION_LOCK = Any()
 
     data class MigrationResult(
         val enumerationSucceeded: Boolean,
@@ -78,7 +79,10 @@ internal object CameraEvidenceMediaStore {
      * ciphertext by reading it back, then removes the original only if the
      * source bytes are still identical and protection remains DISARMED.
      */
-    fun migrateAllToEncryptedVault(context: Context): MigrationResult {
+    fun migrateAllToEncryptedVault(context: Context): MigrationResult =
+        synchronized(MIGRATION_LOCK) { migrateAllToEncryptedVaultLocked(context) }
+
+    private fun migrateAllToEncryptedVaultLocked(context: Context): MigrationResult {
         val app = context.applicationContext
         if (ProtectionStore(app).read().mode != ProtectionMode.DISARMED) {
             return MigrationResult(true, blockedByProtection = true)
