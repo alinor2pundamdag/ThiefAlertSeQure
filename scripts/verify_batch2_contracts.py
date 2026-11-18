@@ -110,12 +110,14 @@ checks = {
     "device intelligence reports OEM/background restriction, Doze, and standby bucket states":
         "OEM AND BACKGROUND EXECUTION" in diagnostics and "isBackgroundRestricted" in diagnostics
         and "isDeviceIdleMode" in diagnostics and "appStandbyBucket" in diagnostics,
-    "configuration restore and monitor synchronization are serialized while protection is disarmed":
+    "configuration preferences commit only while disarmed and monitor stop is guarded against active state":
         "runIfDisarmed" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
-        and "afterRestore()" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
+        and "apply(context, imported)" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "internal fun <T> runIfDisarmed" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
         and "protectionMode != ProtectionMode.DISARMED" in settings
-        and "configuration_restore_monitor_sync_deferred" in settings,
+        and "configuration_restore_monitor_sync_deferred" in settings
+        and "configuration_restore_monitor_stop_deferred" in settings
+        and "ProtectionStore(this).runIfDisarmed" in settings,
     "encrypted configuration backup includes the photo-storage preference and accepts old backups":
         "PBKDF2WithHmacSHA256" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "AES/GCM/NoPadding" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
