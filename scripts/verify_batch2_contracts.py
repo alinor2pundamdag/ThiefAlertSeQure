@@ -293,7 +293,7 @@ checks = {
         "ProtectionMonitorPolicy.shouldRun(monitorEnabled, protectionState.mode)" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
         and "ProtectionMonitorPolicy.shouldRun(monitorEnabled, protectionMode)" in monitor
         and "ProtectionMonitorPolicy.shouldRun(monitorEnabled, state.mode) &&" in monitor
-        and monitor.index("val state = ProtectionStore(this).read()") < monitor.index("A2BluetoothReceiverController.ensureBaselineReady(this)"),
+        and monitor.index("val state = ProtectionStore(this).read()", monitor.index("override fun onStartCommand")) < monitor.index("A2BluetoothReceiverController.ensureBaselineReady(this)", monitor.index("override fun onStartCommand")),
     "alarm output preempts battery-alert audio and ACL work is bounded":
         "protectionStateReceiver" in (APP / "ProtectionMonitorService.kt").read_text(encoding="utf-8")
         and "releaseAlertPlayer()" in (APP / "ProtectionMonitorService.kt").read_text(encoding="utf-8")
