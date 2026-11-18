@@ -58,6 +58,10 @@ checks = {
         and "KEY_A2_BOOT_BASELINE_READY" in (APP / "ProtectionMonitorService.kt").read_text(encoding="utf-8")
         and "resetBaselineForBoot(context)" in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
         and "resetBaselineForBoot(this)" in (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8"),
+    "manifest A2 receiver remains enabled while ARMED or COUNTDOWN requires the monitor":
+        "activeProtectionRequiresMonitor" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
+        and "monitorAvailable = monitorEnabled || activeProtectionRequiresMonitor" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
+        and "monitorRequired=enabled||protectionMode==ProtectionMode.ARMED||protectionMode==ProtectionMode.COUNTDOWN" in (APP / "SetupStatusSnapshot.kt").read_text(encoding="utf-8"),
     "A2 boot reset marks the baseline unavailable before disabling its manifest receiver":
         (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8").index(
             "val markedNotReady = commitWithOneRetry"
