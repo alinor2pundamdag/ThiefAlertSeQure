@@ -311,13 +311,21 @@ class ProtectionStore internal constructor(
         return AuthenticationThrottle.recoverCorruptState(nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
     }
 
-    private fun writeUnlocked(state: ProtectionState): Boolean = prefs.edit()
-        .putString("mode", state.mode.name)
-        .putLong("deadline", state.deadlineEpochMs)
-        .putLong("changed", state.changedAtEpochMs)
-        .putLong("deadline_elapsed", state.deadlineElapsedRealtimeMs)
-        .putInt("boot_count", state.bootCount)
-        .let(commitEditor)
+    private fun writeUnlocked(state: ProtectionState): Boolean {
+        val saved = prefs.edit()
+            .putString("mode", state.mode.name)
+            .putLong("deadline", state.deadlineEpochMs)
+            .putLong("changed", state.changedAtEpochMs)
+            .putLong("deadline_elapsed", state.deadlineElapsedRealtimeMs)
+            .putInt("boot_count", state.bootCount)
+            .let(commitEditor)
+        if (saved) runCatching {
+            appContext.sendBroadcast(
+                android.content.Intent(ACTION_STATE_CHANGED).setPackage(appContext.packageName)
+            )
+        }
+        return saved
+    }
 
     private fun writeThrottleUnlocked(state: AuthThrottleState): Boolean = prefs.edit()
         .putInt(KEY_AUTH_FAILURES, state.failedAttempts)
@@ -392,6 +400,7 @@ class ProtectionStore internal constructor(
     }
 
     companion object {
+        const val ACTION_STATE_CHANGED = "com.thiefalertsequre.PROTECTION_STATE_CHANGED"
         private val LOCK = Any()
         private const val CORRUPT_BACKUP_PREFS = "protection_state_corrupt_backup_v1"
         private const val KEY_SNAPSHOT_COUNT = "snapshot_count"
