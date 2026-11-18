@@ -46,8 +46,14 @@ object SetupStatusSnapshot {
   val adapter=runCatching{if(perm)c.getSystemService(BluetoothManager::class.java)?.adapter?.isEnabled else null}.getOrNull()
   x+=BluetoothSetupStatusPolicy.adapter(a2Enabled,adapter)
   val enabled=SafePreferences.boolean(prefs,ProtectionMonitorService.KEY_ENABLED,ProtectionMonitorPolicy.DEFAULT_ENABLED)
+  val protectionMode=ProtectionStore(c).read().mode
   val running=runCatching{c.getSystemService(ActivityManager::class.java).getRunningServices(100).any{it.service.className==ProtectionMonitorService::class.java.name}}.getOrDefault(false)
-  x+=when{!enabled->SetupItem("monitor","Protection monitor",SetupState.NEUTRAL,"Monitor is disabled by owner.");running->SetupItem("monitor","Protection monitor",SetupState.VERIFIED,"Android process list confirms the service is running.");else->SetupItem("monitor","Protection monitor",SetupState.UNKNOWN,"Enabled preference exists, but running service is not confirmed.")}
+  x+=when{
+   protectionMode==ProtectionMode.ALARM_TRIGGERED->SetupItem("monitor","Protection monitor",SetupState.NEUTRAL,"The latched alarm is handled by AlarmService.")
+   !enabled&&protectionMode==ProtectionMode.DISARMED->SetupItem("monitor","Protection monitor",SetupState.NEUTRAL,"Monitor is disabled by owner while protection is disarmed.")
+   running->SetupItem("monitor","Protection monitor",SetupState.VERIFIED,if(enabled)"Android process list confirms the service is running." else "Active protection requires the monitor; it remains running until protection is disarmed.")
+   else->SetupItem("monitor","Protection monitor",SetupState.UNKNOWN,"Enabled preference exists, but running service is not confirmed.")
+  }
   when (val registry=TrustedBluetoothRegistry.readResult(prefs)) {
    is PreferenceRead.Value -> {
     val trustedDevices=registry.value
