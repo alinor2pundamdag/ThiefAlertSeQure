@@ -111,7 +111,7 @@ internal object CameraEvidenceMediaStore {
         var copyFailures = 0
         var removalFailures = 0
         var blocked = false
-        val pendingDeletions = mutableListOf<Pair<Uri, ByteArray>>()
+        val pendingDeletions = mutableListOf<Pair<Uri, ByteArray>>() // URI plus SHA-256 digest, not the full photo bytes
 
         // Copy and verify every selected item first. Do not remove any Gallery
         // source until the complete encrypted vault passes its integrity scan.
@@ -133,7 +133,7 @@ internal object CameraEvidenceMediaStore {
                 continue
             }
             copied += 1
-            pendingDeletions += uri to original
+            pendingDeletions += uri to sha256(original)
         }
 
         val copiedVaultHealthy = CameraEvidenceVault.verifyIntegrity(app)
@@ -149,9 +149,9 @@ internal object CameraEvidenceMediaStore {
 
         // Remove a source only after a fresh byte-for-byte source check and a
         // state-locked DISARMED check. If protection activates, stop immediately.
-        for ((uri, original) in pendingDeletions) {
+        for ((uri, originalDigest) in pendingDeletions) {
             val currentSource = readBoundedImage(app, uri)
-            if (currentSource == null || !MessageDigest.isEqual(original, currentSource)) {
+            if (currentSource == null || !MessageDigest.isEqual(originalDigest, sha256(currentSource))) {
                 removalFailures += 1
                 continue
             }
@@ -180,6 +180,9 @@ internal object CameraEvidenceMediaStore {
             blockedByProtection = blocked
         )
     }
+
+    private fun sha256(bytes: ByteArray): ByteArray =
+        MessageDigest.getInstance("SHA-256").digest(bytes)
 
     private fun readBoundedImage(context: Context, uri: Uri): ByteArray? = runCatching {
         val input = context.contentResolver.openInputStream(uri) ?: return@runCatching null
