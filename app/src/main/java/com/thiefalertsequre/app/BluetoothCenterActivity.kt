@@ -161,6 +161,10 @@ class BluetoothCenterActivity : FragmentActivity() {
             "Monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled by owner"}",
             "Monitor runtime: ${if (monitorRunning) "Running" else "Not confirmed running"}",
             "Protection state: $protectionMode",
+            if (SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_A2_BOOT_BASELINE_READY, false))
+                "Trusted Bluetooth boot baseline: VERIFIED."
+            else
+                "Trusted Bluetooth boot baseline: NOT READY. A2 remains disabled until a fresh baseline reset succeeds; retry A2 while protection is DISARMED.",
             if (canEditConfiguration) "A2 configuration is editable while protection is DISARMED."
             else "A2 configuration is LOCKED while protection is ARMED, COUNTDOWN, or ALARM_TRIGGERED. Disarm first.",
             "Monitoring runs only while A2 is ON and the protection monitor setting is enabled. The foreground service handles live ACL events; a manifest receiver covers ACL connect/disconnect events while its process is absent. Each registered accessory needs a fresh connection baseline; disconnect starts an 8-second grace period, and reconnect cancels its pending alert. Exact-alarm access improves the process-death deadline; without it Android uses an inexact fallback that may be delayed in Doze.",
