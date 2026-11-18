@@ -89,6 +89,13 @@ checks = {
             "alarmManager.cancel(pendingIntent(context, it, namespace))"
         )
         and "else {\n                    stored.value?.let { alarmManager.cancel(pendingIntent(context, it, namespace)) }" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8"),
+    "countdown scheduling is serialized and stale workers cannot replace the current deadline":
+        "private val lock = Any()" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8")
+        and "): Boolean = synchronized(lock) {" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8")
+        and "ProtectionEngine.isCurrentDeadline(" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8")
+        and "fun scheduleRetry(context: Context, delayMs: Long) = synchronized(lock)" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8")
+        and "private fun cancelInternal(" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8")
+        and "private fun replaceTokenAndScheduleInternal(" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8"),
     "orderly shutdown is observed only through the dynamically registered system receiver":
         "Intent.ACTION_SHUTDOWN" in monitor and "ContextCompat.registerReceiver(this, systemReceiver" in monitor,
     "shutdown event is diagnostic and does not claim to block system shutdown":
