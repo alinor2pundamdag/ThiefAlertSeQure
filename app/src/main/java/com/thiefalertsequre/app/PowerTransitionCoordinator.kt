@@ -595,13 +595,33 @@ object PowerTransitionCoordinator {
                 return@synchronized current
             }
 
+            val monitorPrefs = context.getSharedPreferences(
+                ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
+            )
+            var preferenceRepairFailed = false
             val update = store.updatePersisted { old ->
-                if (old.mode == ProtectionMode.ARMED) ProtectionEngine.chargerDisconnected(
-                    old,
-                    candidate.eventEpochMs,
-                    candidate.eventElapsedRealtimeMs,
-                    candidate.eventBootCount
-                ) else old
+                if (old.mode == ProtectionMode.ARMED) {
+                    if (!SafePreferences.boolean(
+                            monitorPrefs, ProtectionMonitorService.KEY_ENABLED,
+                            ProtectionMonitorPolicy.DEFAULT_ENABLED
+                        )
+                    ) {
+                        preferenceRepairFailed = !monitorPrefs.edit()
+                            .putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
+                    }
+                    ProtectionEngine.chargerDisconnected(
+                        old,
+                        candidate.eventEpochMs,
+                        candidate.eventElapsedRealtimeMs,
+                        candidate.eventBootCount
+                    )
+                } else old
+            }
+            if (preferenceRepairFailed) {
+                LocalTamperHistory.record(
+                    context, "active_monitor_preference_repair_failed",
+                    "A confirmed charger disconnect preserved the countdown, but the monitor-enabled preference could not be restored"
+                )
             }
             val next = update.state
             if (!update.persisted) {
@@ -609,6 +629,7 @@ object PowerTransitionCoordinator {
                 return@synchronized next
             }
             if (next.mode == ProtectionMode.COUNTDOWN) {
+                A2BluetoothReceiverController.sync(context)
                 if (AlarmScheduler.schedule(
                         context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount
                     )
