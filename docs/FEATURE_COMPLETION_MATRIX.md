@@ -8,7 +8,7 @@
 
 # ThiefAlertSeQure — Feature Completion Matrix
 
-> **Current Batch Four candidate (18 November 2026):** `work/batch-4-implementation`, version `1.1.5_Developer_Alinor` / versionCode `7`, PR #8 open and unmerged. The FIXALL verification snapshot below is historical and is not exact-head evidence for this candidate. Current camera evidence defaults to unencrypted Gallery storage with an opt-in future-capture AES-GCM vault setting; the cinematic intro is version-gated to one display per installed version.
+> **Current Batch Four candidate (18 November 2026):** `work/batch-4-implementation`, version `1.1.5_Developer_Alinor` / versionCode `7`, PR #8 open and unmerged. The FIXALL verification snapshot below is historical and is not exact-head evidence for this candidate. Current camera evidence defaults to unencrypted Gallery storage with an opt-in future-capture AES-GCM vault setting and an explicit verified migration for existing app-owned Gallery photos; the cinematic intro is version-gated to one display per installed version and now includes an articulated 3D intruder rig that fractures into PBR debris.
 
 > **Historical v1.1.4 feature-branch assessment:** [V1.1.4 Feature Implementation Status](V1.1.4_FEATURE_IMPLEMENTATION_STATUS.md). Its 94% figure is an estimate for the earlier audited branch only; it is not a completion percentage for the current FIXALL work branch.
 
@@ -27,6 +27,7 @@ The production baseline remains v1.1.3. The current feature branch contains the 
 | Cross-screen theme consistency | Main, Settings, Bluetooth Center, Device Intelligence, Theme, and Setup Status screens reapply the selected palette; app-owned Material dialogs use shared theme styling |
 | Theme accessibility | JVM WCAG AA contrast assertions cover primary/muted text, button text, primary accents, and success/warning/danger status labels across all palettes |
 | Theme preview | Representative dashboard, settings, setup-readiness, and confirmation-dialog surfaces; sample actions are explicitly preview-only |
+| Seismic Genesis cinematic intro | Filament 3D PBR shield with procedural HDR studio IBL, 48-cell Voronoi shield fracture plus fine chips, articulated 15-bone tactical intruder rig that breaks into independent rigid-body debris, gravity/contact/floor response, directional wind, bloom/ambient occlusion/depth-of-field/dynamic resolution, and a version-gated developer signature sequence; reduced-motion fallback and lifecycle-safe native-resource teardown |
 | Setup readiness | Live checks distinguish verified, action-required, neutral, unsupported, and unknown; optional Bluetooth and full-screen features do not demand permissions while disabled |
 | Optional Android ranging capability check | API 36+ `RangingManager` local availability callback; no RANGING permission, peer discovery, ranging session, distance measurement or location access; JVM status-label tests |
 | Setup navigation | Action buttons appear only for actionable/unconfirmed states and use destination-specific labels with guarded Android Settings fallbacks |
