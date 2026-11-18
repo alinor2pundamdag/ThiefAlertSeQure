@@ -33,6 +33,14 @@ class ProtectionMonitorPolicyTest {
         assertEquals(false, ProtectionMonitorPolicy.shouldMonitorMotion(true, ProtectionMode.DISARMED))
         assertEquals(false, ProtectionMonitorPolicy.shouldMonitorMotion(true, ProtectionMode.ALARM_TRIGGERED))
     }
+    @Test fun staleMonitorOptOutNeverDisarmsActiveProtectionOnReconnect() {
+        assertTrue(ProtectionMonitorPolicy.shouldArmOnConfirmedConnection(false, ProtectionMode.ARMED))
+        assertTrue(ProtectionMonitorPolicy.shouldArmOnConfirmedConnection(false, ProtectionMode.COUNTDOWN))
+        assertFalse(ProtectionMonitorPolicy.shouldArmOnConfirmedConnection(false, ProtectionMode.DISARMED))
+        assertTrue(ProtectionMonitorPolicy.shouldArmOnConfirmedConnection(true, ProtectionMode.DISARMED))
+        assertFalse(ProtectionMonitorPolicy.shouldArmOnConfirmedConnection(true, ProtectionMode.ALARM_TRIGGERED))
+    }
+
     @Test fun notificationStopIsAllowedOnlyWhileDisarmed() {
         assertTrue(ProtectionMonitorPolicy.canStop(ProtectionMode.DISARMED))
         assertFalse(ProtectionMonitorPolicy.canStop(ProtectionMode.ARMED))
