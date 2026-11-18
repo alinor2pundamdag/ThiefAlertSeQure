@@ -1284,64 +1284,102 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun showCameraEvidenceArchive() {
-        val entries = runCatching { CameraEvidenceVault.entries(this) }.getOrDefault(emptyList())
-        if (entries.isEmpty()) {
-            val integrityHealthy = runCatching { CameraEvidenceVault.verifyIntegrity(this) }.getOrDefault(false)
-            MaterialAlertDialogBuilder(this)
-                .setTitle("Front-camera evidence")
-                .setMessage(if (integrityHealthy) {
-                    "No encrypted-vault photos are stored. New captures go to Gallery by default unless photo encryption is enabled in Settings."
-                } else {
-                    "The encrypted photo vault failed its integrity check. No photo is being displayed or exported. Review local tamper history and preserve the app data for diagnosis."
-                })
-                .setPositiveButton("Close", null)
-                .showThemed(this)
-            return
-        }
-        val formatter = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
-        val labels = entries.map { entry ->
-            "${formatter.format(java.util.Date(entry.timestampEpochMs))} • ${entry.sizeBytes} bytes • SHA-256 ${entry.sha256.take(16)}…"
-        }.toTypedArray()
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Encrypted front-camera photos")
-            .setItems(labels) { _, index ->
-                val entry = entries[index]
-                ioExecutor.execute {
-                    val bytes = runCatching { CameraEvidenceVault.read(this, entry.id) }.getOrNull()
-                    runOnUiThread {
-                        if (bytes == null) {
-                            android.widget.Toast.makeText(this, "Photo failed its integrity check or is unavailable.", android.widget.Toast.LENGTH_LONG).show()
-                            return@runOnUiThread
-                        }
-                        val image = ImageView(this).apply {
-                            contentDescription = "Encrypted front-camera evidence photo captured after successful owner authentication"
-                            setImageBitmap(BitmapFactory.decodeByteArray(bytes, 0, bytes.size))
-                            adjustViewBounds = true
-                            maxHeight = dp(440)
-                            scaleType = ImageView.ScaleType.FIT_CENTER
-                            setPadding(dp(8), dp(8), dp(8), dp(8))
-                        }
-                        MaterialAlertDialogBuilder(this)
-                            .setTitle("Verified encrypted photo")
-                            .setMessage("Captured after successful owner authentication. SHA-256: ${entry.sha256}")
-                            .setView(image)
-                            .setNeutralButton("Export") { _, _ ->
-                                pendingCameraEvidenceExportId = entry.id
-                                exportCameraEvidence.launch("ThiefAlertSeQure-front-camera-${entry.timestampEpochMs}.jpg")
-                            }
-                            .setNegativeButton("Delete") { _, _ ->
-                                val deleted = runCatching { CameraEvidenceVault.delete(this, entry.id) }.getOrDefault(false)
-                                LocalEvidenceVault.recordAsync(this, "camera_evidence_deleted", "Owner deleted photo id=${entry.id}; success=$deleted")
-                                android.widget.Toast.makeText(this, if (deleted) "Photo deleted." else "Photo deletion could not be confirmed.", android.widget.Toast.LENGTH_LONG).show()
-                                render()
-                            }
-                            .setPositiveButton("Close", null)
-                            .showThemed(this)
-                    }
+        // Keystore reads, encrypted index parsing and retention pruning are disk
+        // work. Keep them off the Settings main thread, including the empty state.
+        ioExecutor.execute {
+            val entries = runCatching {
+                CameraEvidenceVault.entries(applicationContext)
+            }.getOrDefault(emptyList())
+            val integrityHealthy = if (entries.isEmpty()) {
+                runCatching { CameraEvidenceVault.verifyIntegrity(applicationContext) }.getOrDefault(false)
+            } else true
+
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (entries.isEmpty()) {
+                    MaterialAlertDialogBuilder(this@SettingsActivity)
+                        .setTitle("Front-camera evidence")
+                        .setMessage(if (integrityHealthy) {
+                            "No encrypted-vault photos are stored. New captures go to Gallery by default unless photo encryption is enabled in Settings."
+                        } else {
+                            "The encrypted photo vault failed its integrity check. No photo is being displayed or exported. Review local tamper history and preserve the app data for diagnosis."
+                        })
+                        .setPositiveButton("Close", null)
+                        .showThemed(this@SettingsActivity)
+                    return@runOnUiThread
                 }
+
+                val formatter = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                val labels = entries.map { entry ->
+                    "${formatter.format(java.util.Date(entry.timestampEpochMs))} • ${entry.sizeBytes} bytes • SHA-256 ${entry.sha256.take(16)}…"
+                }.toTypedArray()
+                MaterialAlertDialogBuilder(this@SettingsActivity)
+                    .setTitle("Encrypted front-camera photos")
+                    .setItems(labels) { _, index ->
+                        val entry = entries[index]
+                        ioExecutor.execute {
+                            val bytes = runCatching {
+                                CameraEvidenceVault.read(applicationContext, entry.id)
+                            }.getOrNull()
+                            val bitmap = bytes?.let { payload ->
+                                runCatching { BitmapFactory.decodeByteArray(payload, 0, payload.size) }.getOrNull()
+                            }
+                            runOnUiThread {
+                                if (isFinishing || isDestroyed) {
+                                    bitmap?.recycle()
+                                    return@runOnUiThread
+                                }
+                                if (bitmap == null) {
+                                    android.widget.Toast.makeText(this@SettingsActivity, "Photo failed its integrity check or is unavailable.", android.widget.Toast.LENGTH_LONG).show()
+                                    return@runOnUiThread
+                                }
+                                val image = ImageView(this@SettingsActivity).apply {
+                                    contentDescription = "Encrypted front-camera evidence photo captured after successful owner authentication"
+                                    setImageBitmap(bitmap)
+                                    adjustViewBounds = true
+                                    maxHeight = dp(440)
+                                    scaleType = ImageView.ScaleType.FIT_CENTER
+                                    setPadding(dp(8), dp(8), dp(8), dp(8))
+                                }
+                                MaterialAlertDialogBuilder(this@SettingsActivity)
+                                    .setTitle("Verified encrypted photo")
+                                    .setMessage("Captured after successful owner authentication. SHA-256: ${entry.sha256}")
+                                    .setView(image)
+                                    .setNeutralButton("Export") { _, _ ->
+                                        pendingCameraEvidenceExportId = entry.id
+                                        exportCameraEvidence.launch("ThiefAlertSeQure-front-camera-${entry.timestampEpochMs}.jpg")
+                                    }
+                                    .setNegativeButton("Delete") { _, _ ->
+                                        ioExecutor.execute {
+                                            val deleted = runCatching {
+                                                CameraEvidenceVault.delete(applicationContext, entry.id)
+                                            }.getOrDefault(false)
+                                            LocalEvidenceVault.recordAsync(
+                                                applicationContext,
+                                                "camera_evidence_deleted",
+                                                "Owner deleted photo id=${entry.id}; success=$deleted"
+                                            )
+                                            runOnUiThread {
+                                                if (!isFinishing && !isDestroyed) {
+                                                    android.widget.Toast.makeText(
+                                                        this@SettingsActivity,
+                                                        if (deleted) "Photo deleted." else "Photo deletion could not be confirmed.",
+                                                        android.widget.Toast.LENGTH_LONG
+                                                    ).show()
+                                                    render()
+                                                }
+                                            }
+                                        }
+                                    }
+                                    .setPositiveButton("Close", null)
+                                    .showThemed(this@SettingsActivity)
+                            }
+                        }
+                    }
+                    .setNegativeButton("Close", null)
+                    .showThemed(this@SettingsActivity)
             }
-            .setNegativeButton("Close", null)
-            .showThemed(this)
+        }
     }
 
     private fun writeCameraEvidenceExport(uri: Uri, id: String) {
