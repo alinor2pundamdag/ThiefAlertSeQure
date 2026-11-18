@@ -161,7 +161,10 @@ internal object A2DisconnectScheduler {
     }
 
     fun wasConfirmedConnectedAfter(pending: Pending): Boolean =
-        (confirmedConnections[pending.address.uppercase()] ?: Long.MIN_VALUE) >= pending.eventElapsedRealtimeMs
+        wasConfirmedConnectedAfter(pending.address, pending.eventElapsedRealtimeMs)
+
+    fun wasConfirmedConnectedAfter(address: String, disconnectEventElapsedRealtimeMs: Long): Boolean =
+        (confirmedConnections[address.uppercase()] ?: Long.MIN_VALUE) >= disconnectEventElapsedRealtimeMs
 
     /** Retry a consumed one-shot deadline without extending the original grace period. */
     fun scheduleRetry(context: Context, pending: Pending, delayMs: Long = 1_000L): Boolean =
