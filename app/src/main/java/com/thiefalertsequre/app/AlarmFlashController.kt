@@ -4,6 +4,7 @@ import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.os.Handler
+import android.os.PowerManager
 
 /**
  * Pulses the device LED through CameraManager's torch API. This does not open
@@ -19,6 +20,11 @@ internal class AlarmFlashController(
     private val onEvent: (String, String) -> Unit
 ) {
     private val cameraManager = context.getSystemService(CameraManager::class.java)
+    private val cpuWakeLock by lazy(LazyThreadSafetyMode.NONE) {
+        context.getSystemService(PowerManager::class.java)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "${context.packageName}:AlarmFlashController")
+            .apply { setReferenceCounted(false) }
+    }
     private var cameraId: String? = null
     private var running = false
     private var torchOn = false
@@ -47,6 +53,7 @@ internal class AlarmFlashController(
             handler.removeCallbacks(pulse)
             torchOn = false
             cameraId = null
+            releaseCpuWakeLock()
             if (torchCallbackRegistered) {
                 runCatching { cameraManager.unregisterTorchCallback(this) }
                 torchCallbackRegistered = false
@@ -90,6 +97,9 @@ internal class AlarmFlashController(
         customTimings = AlarmFlashPatternPolicy.customTimings(context)
         pulseStep = 0
         return try {
+            // Keep Handler-based pulse timing alive while the display is off.
+            // This lock belongs to the torch controller and is released on every stop path.
+            if (!cpuWakeLock.isHeld) cpuWakeLock.acquire()
             cameraManager.setTorchMode(selectedCamera, true)
             torchOn = true
             running = true
@@ -121,6 +131,7 @@ internal class AlarmFlashController(
             runCatching { cameraManager.unregisterTorchCallback(torchCallback) }
             torchCallbackRegistered = false
         }
+        releaseCpuWakeLock()
         val hadState = cameraId != null || torchOn
         torchOn = false
         cameraId = null
@@ -141,6 +152,14 @@ internal class AlarmFlashController(
         candidates.firstOrNull { it.second == CameraCharacteristics.LENS_FACING_BACK }?.first
             ?: candidates.firstOrNull()?.first
     }.getOrNull()
+
+    private fun releaseCpuWakeLock() {
+        runCatching {
+            if (cpuWakeLock.isHeld) cpuWakeLock.release()
+        }.onFailure {
+            report("alarm_flash_wake_lock_release_failed", it.javaClass.simpleName + ": " + it.message)
+        }
+    }
 
     private fun report(event: String, detail: String) {
         runCatching { onEvent(event, detail) }

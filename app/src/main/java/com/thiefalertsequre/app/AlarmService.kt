@@ -26,6 +26,7 @@ class AlarmService : Service() {
     private var player: MediaPlayer? = null
     private var secondaryPlayer: MediaPlayer? = null
     private var toneController: AlarmToneController? = null
+    private var toneWakeLock: android.os.PowerManager.WakeLock? = null
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var vibrator: Vibrator? = null
@@ -228,11 +229,31 @@ class AlarmService : Service() {
         }
     }
 
+    private fun acquireToneWakeLock(): Boolean = runCatching {
+        val lock = toneWakeLock ?: getSystemService(android.os.PowerManager::class.java)
+            .newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "$packageName:AlarmToneController")
+            .apply { setReferenceCounted(false) }
+            .also { toneWakeLock = it }
+        if (!lock.isHeld) lock.acquire()
+        true
+    }.getOrDefault(false)
+
+    private fun releaseToneWakeLock() {
+        val lock = toneWakeLock
+        toneWakeLock = null
+        runCatching {
+            if (lock?.isHeld == true) lock.release()
+        }.onFailure {
+            LocalTamperHistory.record(this, "alarm_tone_wake_lock_release_failed", it.javaClass.simpleName + ": " + it.message)
+        }
+    }
+
     private fun handleTonePresetFailure(error: Throwable) {
         LocalTamperHistory.record(this, "alarm_tone_preset_failed", error.javaClass.simpleName + ": " + error.message)
         volumeHandler.post {
             toneController?.stop()
             toneController = null
+            releaseToneWakeLock()
             if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED && player == null) {
                 val defaultUri = Uri.parse("android.resource://$packageName/${R.raw.default_alarm}")
                 startAlarmAudio(defaultUri, true, defaultUri)
@@ -250,12 +271,17 @@ class AlarmService : Service() {
                     handleTonePresetFailure(error)
                 }
                 requestToneAudioFocus()
-                toneController = controller
-                if (controller.start()) {
-                    LocalTamperHistory.record(this, "alarm_tone_preset_started", "Built-in alarm tone preset active: ${preset.name}")
-                    return
+                if (acquireToneWakeLock()) {
+                    toneController = controller
+                    if (controller.start()) {
+                        LocalTamperHistory.record(this, "alarm_tone_preset_started", "Built-in alarm tone preset active: ${preset.name}")
+                        return
+                    }
+                    toneController = null
+                    releaseToneWakeLock()
+                } else {
+                    LocalTamperHistory.record(this, "alarm_tone_wake_lock_unavailable", "Generated tone was skipped; the packaged MediaPlayer alarm fallback will be used")
                 }
-                toneController = null
             }
         }
         startAlarmAudio(selectedUri ?: defaultUri, selectedUri == null, defaultUri)
@@ -472,6 +498,9 @@ class AlarmService : Service() {
 
     private fun stopAlarm() {
         stopSecondaryAlarm()
+        toneController?.stop()
+        toneController = null
+        releaseToneWakeLock()
         flashController?.stop()
         flashController = null
         runCatching { player?.stop() }

@@ -152,6 +152,16 @@ internal object CameraEvidenceCapture {
         }, CAPTURE_TIMEOUT_MS)
 
         reader.setOnImageAvailableListener({ source ->
+            if (finished.get() || !activityVisible.get()) {
+                runCatching { source.acquireLatestImage()?.close() }
+                if (!finished.get()) {
+                    finish(
+                        "camera_evidence_activity_not_visible",
+                        "App left the visible state before the front-camera evidence photo could be saved"
+                    )
+                }
+                return@setOnImageAvailableListener
+            }
             val image = runCatching { source.acquireLatestImage() }.getOrNull() ?: return@setOnImageAvailableListener
             val jpeg = try {
                 val buffer = image.planes.firstOrNull()?.buffer
