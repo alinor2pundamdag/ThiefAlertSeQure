@@ -40,6 +40,20 @@ internal object OwnerAuthenticationCoordinator {
             )
         }
 
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress() ||
+            !ConfigurationBackup.recoverPendingRestore(appContext)
+        ) {
+            LocalTamperHistory.record(
+                appContext, "configuration_restore_recovery_pending",
+                "Alarm was disarmed after valid owner authentication, but monitoring restart was deferred until interrupted settings recovery completes"
+            )
+            ProtectionMonitorRecoveryNotice.show(
+                appContext, "Alarm disarmed. Monitoring will resume after interrupted settings recovery is completed."
+            )
+            appContext.stopService(Intent(appContext, ProtectionMonitorService::class.java))
+            return authenticated
+        }
+
         // Rebuild the charger baseline only after verified owner authentication.
         // A connected cable returns to ARMED; a disconnected cable remains DISARMED
         // until a new, genuine connect-then-disconnect sequence is observed.
