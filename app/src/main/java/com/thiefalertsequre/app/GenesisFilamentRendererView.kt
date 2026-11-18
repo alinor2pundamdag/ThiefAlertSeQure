@@ -34,6 +34,7 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
 import java.nio.ByteBuffer
@@ -665,6 +666,22 @@ class GenesisFilamentRendererView(
         val activeScene = scene ?: return
         val shield = shieldMesh ?: return
         val transformManager = activeEngine.transformManager
+
+        updateLetterBodies(activeScene, transformManager, titleBodies, progress, 0.18f, 0.245f, 0.82f, true)
+        updateLetterBodies(activeScene, transformManager, nameBodies, progress, 0.39f, 0.455f, 0.82f, false)
+        updateCore(activeScene, transformManager, progress)
+
+        val shake = when {
+            progress in 0.245f..0.278333f ->
+                sin(((progress - 0.245f) / 0.033333f) * 6f * PI).toFloat() * 0.105f
+            progress in 0.405f..0.455f ->
+                sin(((progress - 0.405f) / 0.05f) * 8f * PI).toFloat() * 0.16f
+            progress in 0.82f..0.87f ->
+                sin(((progress - 0.82f) / 0.05f) * 6f * PI).toFloat() * 0.08f
+            else -> 0f
+        }
+        camera?.lookAt(shake, shake * 0.55, 5.4, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+
         val shieldTransform = transformManager.getInstance(shield.entity)
         if (progress < 0.245f) {
             if (debrisAdded) {
@@ -710,7 +727,7 @@ class GenesisFilamentRendererView(
             }
         }
 
-        // Low-cost rigid-body contact approximation for the small, deterministic shard set.
+        // Low-cost rigid-body contact approximation for the small, deterministic shield shard set.
         for (i in bodies.indices) {
             for (j in i + 1 until bodies.size) {
                 val a = bodies[i]
@@ -737,16 +754,98 @@ class GenesisFilamentRendererView(
             }
         }
 
-        bodies.forEach { body ->
-            val instance = transformManager.getInstance(body.mesh.entity)
-            val matrix = FloatArray(16)
-            GlMatrix.setIdentityM(matrix, 0)
-            GlMatrix.translateM(matrix, 0, body.x, body.y, body.z)
-            GlMatrix.rotateM(matrix, 0, body.rx, 1f, 0f, 0f)
-            GlMatrix.rotateM(matrix, 0, body.ry, 0f, 1f, 0f)
-            GlMatrix.rotateM(matrix, 0, body.rz, 0f, 0f, 1f)
-            transformManager.setTransform(instance, matrix)
+        bodies.forEach { setBodyTransform(transformManager, it) }
+    }
+
+    private fun updateLetterBodies(
+        activeScene: Scene,
+        transformManager: com.google.android.filament.TransformManager,
+        letters: List<LetterBody>,
+        progress: Float,
+        startProgress: Float,
+        impactProgress: Float,
+        windStart: Float,
+        isTitle: Boolean
+    ) {
+        var added = if (isTitle) titleAdded else nameAdded
+        if (progress < startProgress) {
+            if (added) letters.forEach { activeScene.removeEntity(it.body.mesh.entity) }
+            added = false
+            if (isTitle) titleAdded = false else nameAdded = false
+            return
         }
+        if (!added) {
+            letters.forEach { activeScene.addEntity(it.body.mesh.entity) }
+            added = true
+            if (isTitle) titleAdded = true else nameAdded = true
+        }
+
+        val fall = ((progress - startProgress) / (impactProgress - startProgress)).coerceIn(0f, 1f)
+        val easedFall = fall * fall * (3f - 2f * fall)
+        val windTime = ((progress - windStart) * 9f).coerceAtLeast(0f)
+        letters.forEachIndexed { index, letter ->
+            val body = letter.body
+            if (progress < impactProgress) {
+                body.x = letter.homeX
+                body.y = letter.startY + (letter.homeY - letter.startY) * easedFall +
+                    sin(fall * PI).toFloat() * abs(letter.fallVelocity) * 0.025f
+                body.z = 0.34f
+                body.rx = -5f * fall
+                body.ry = (if (index % 2 == 0) 1f else -1f) * 3f * fall
+                body.rz = (if (index % 2 == 0) 1f else -1f) * 2.5f * fall
+            } else if (progress < windStart) {
+                body.x = letter.homeX
+                body.y = letter.homeY
+                body.z = 0.34f
+                body.rx = 0f
+                body.ry = 0f
+                body.rz = 0f
+            } else {
+                val side = if (letter.homeX < 0f) -1f else 1f
+                body.x = letter.homeX + (2.15f + index * 0.018f) * windTime + 1.25f * windTime * windTime
+                body.y = letter.homeY + (0.72f + (index % 3) * 0.12f) * windTime - 2.25f * windTime * windTime
+                body.z = 0.34f + sin(windTime * 4f + index) * 0.32f
+                body.rx = windTime * (135f + index * 2f)
+                body.ry = windTime * (112f + index * 3f)
+                body.rz = windTime * (side * 165f + index * 4f)
+            }
+            setBodyTransform(transformManager, body)
+        }
+    }
+
+    private fun updateCore(
+        activeScene: Scene,
+        transformManager: com.google.android.filament.TransformManager,
+        progress: Float
+    ) {
+        val core = coreMesh ?: return
+        val scale = when {
+            progress < 0.16f -> 0.012f
+            progress < 0.245f -> 0.08f + ((progress - 0.16f) / 0.085f).coerceIn(0f, 1f) * 0.92f
+            progress < 0.82f -> 1f + sin(progress * 42f).toFloat() * 0.055f
+            else -> (1f - (progress - 0.82f) / 0.18f).coerceIn(0f, 1f)
+        }
+        val matrix = FloatArray(16)
+        GlMatrix.setIdentityM(matrix, 0)
+        GlMatrix.scaleM(matrix, 0, scale, scale, scale)
+        transformManager.setTransform(transformManager.getInstance(core.entity), matrix)
+        if (progress >= 0.82f) {
+            coreLightEntity.takeIf { it != 0 }?.let(activeScene::removeEntity)
+        }
+    }
+
+    private fun setBodyTransform(
+        transformManager: com.google.android.filament.TransformManager,
+        body: Body
+    ) {
+        val instance = transformManager.getInstance(body.mesh.entity)
+        val matrix = FloatArray(16)
+        GlMatrix.setIdentityM(matrix, 0)
+        GlMatrix.translateM(matrix, 0, body.x, body.y, body.z)
+        GlMatrix.rotateM(matrix, 0, body.rx, 1f, 0f, 0f)
+        GlMatrix.rotateM(matrix, 0, body.ry, 0f, 1f, 0f)
+        GlMatrix.rotateM(matrix, 0, body.rz, 0f, 0f, 1f)
+        transformManager.setTransform(instance, matrix)
     }
 
     fun release() {
