@@ -425,8 +425,8 @@ class GenesisFilamentRendererView(
         var prefilter: IBLPrefilterContext? = null
         var converter: IBLPrefilterContext.EquirectangularToCubemap? = null
         var specularFilter: IBLPrefilterContext.SpecularFilter? = null
-        var skyboxTexture: Texture? = null
-        var reflections: Texture? = null
+        var skyboxTexture: com.google.android.filament.Texture? = null
+        var reflections: com.google.android.filament.Texture? = null
         try {
             val prefilterContext = IBLPrefilterContext(activeEngine)
             prefilter = prefilterContext
