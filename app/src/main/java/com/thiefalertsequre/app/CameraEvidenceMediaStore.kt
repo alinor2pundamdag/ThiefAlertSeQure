@@ -32,9 +32,17 @@ internal object CameraEvidenceMediaStore {
     @Synchronized
     fun save(context: Context, jpeg: ByteArray): Uri? {
         if (!CameraEvidencePolicy.isValidImageSize(jpeg.size)) return null
-        val resolver = context.applicationContext.contentResolver
+        val app = context.applicationContext
+        val resolver = app.contentResolver
         val collection = imageCollectionUri()
         val now = System.currentTimeMillis()
+        // Reserve one Gallery slot before capture. This keeps the hard 20-photo
+        // cap even if protection becomes active before post-insert retention runs.
+        if (ProtectionStore(app).read().mode == ProtectionMode.DISARMED) {
+            runCatching { prune(app, now, maxImages = CameraEvidencePolicy.MAX_IMAGES - 1) }
+        }
+        val currentGallery = queryOwnedImages(app)
+        if (!currentGallery.success || currentGallery.images.size >= CameraEvidencePolicy.MAX_IMAGES) return null
         val fileName = "ThiefAlertSeQure-$now-${UUID.randomUUID().toString().take(8)}.jpg"
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
@@ -240,12 +248,16 @@ internal object CameraEvidenceMediaStore {
     }
 
     @Synchronized
-    private fun prune(context: Context, now: Long) {
+    private fun prune(
+        context: Context,
+        now: Long,
+        maxImages: Int = CameraEvidencePolicy.MAX_IMAGES
+    ) {
         val resolver = context.contentResolver
         val query = queryOwnedImages(context)
         if (!query.success) return
         query.images.sortedByDescending { it.second }.forEachIndexed { index, (uri, timestamp) ->
-            if (!CameraEvidencePolicy.isRetained(timestamp, now) || index >= CameraEvidencePolicy.MAX_IMAGES) {
+            if (!CameraEvidencePolicy.isRetained(timestamp, now) || index >= maxImages) {
                 val deleted = ProtectionStore(context).runIfDisarmed {
                     runCatching { resolver.delete(uri, null, null) == 1 }.getOrDefault(false)
                 }
