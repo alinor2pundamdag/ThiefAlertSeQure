@@ -29,7 +29,17 @@ object PowerTransitionCoordinator {
 
     internal fun acceptsPowerConnectedEvent(liveConnected: Boolean?): Boolean = liveConnected == true
 
+    private fun configurationReady(context: Context): Boolean {
+        if (ConfigurationBackup.recoverPendingRestore(context)) return true
+        LocalTamperHistory.record(
+            context, "configuration_restore_recovery_pending",
+            "Charger transition was deferred because an interrupted settings restore could not be recovered"
+        )
+        return false
+    }
+
     fun initializeBaseline(context: Context, forceBootReconciliation: Boolean = false) = synchronized(lock) {
+        if (!configurationReady(context)) return@synchronized
         initializeBaselineLocked(context, forceBootReconciliation)
     }
 
@@ -128,6 +138,7 @@ object PowerTransitionCoordinator {
 
     /** Establish a fresh non-transition baseline only inside an atomic DISARMED-state transaction. */
     fun resetBaselineToCurrentPower(context: Context, reason: String) = synchronized(lock) {
+        if (!configurationReady(context)) return@synchronized
         val store = ProtectionStore(context)
         val reset = store.runIfDisarmed {
             check(PowerTransitionRecoveryPolicy.canResetBaseline(store.read().mode))
@@ -277,6 +288,7 @@ object PowerTransitionCoordinator {
 
     fun onPowerConnected(context: Context): ProtectionState {
         val appContext = context.applicationContext
+        if (!configurationReady(appContext)) return ProtectionStore(appContext).read()
         // Stop as soon as three consecutive live samples confirm the event.
         // The original OS event timestamp is captured by the receiver before this
         // sampling window, so confirmation time never extends the 10-second grace.
@@ -307,6 +319,7 @@ object PowerTransitionCoordinator {
 
     /** Used only after a live connected-state confirmation, including post-auth recovery. */
     fun confirmConnectedAndArm(context: Context, reason: String): ProtectionState = synchronized(lock) {
+        if (!configurationReady(context)) return@synchronized ProtectionStore(context).read()
         confirmConnectedAndArmLocked(context, reason)
     }
 
@@ -376,6 +389,7 @@ object PowerTransitionCoordinator {
         eventBootCount: Int = ProtectionClock.bootCount(context)
     ): ProtectionState {
         val appContext = context.applicationContext
+        if (!configurationReady(appContext)) return ProtectionStore(appContext).read()
         val candidate = synchronized(lock) {
             val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val currentBoot = ProtectionClock.bootCount(appContext)
@@ -440,6 +454,7 @@ object PowerTransitionCoordinator {
      */
     fun recoverPendingDisconnectCandidate(context: Context): ProtectionState {
         val appContext = context.applicationContext
+        if (!configurationReady(appContext)) return ProtectionStore(appContext).read()
         val candidate = synchronized(lock) {
             val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             if (!SafePreferences.boolean(prefs, PENDING_DISCONNECT, false)) return@synchronized null
