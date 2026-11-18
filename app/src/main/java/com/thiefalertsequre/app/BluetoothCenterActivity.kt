@@ -148,6 +148,7 @@ class BluetoothCenterActivity : FragmentActivity() {
                 .any { it.service.className == ProtectionMonitorService::class.java.name }
         }.getOrDefault(false)
         val protectionMode = ProtectionStore(this).read().mode
+        val canEditConfiguration = protectionMode == ProtectionMode.DISARMED
         addCard("TRUSTED ACCESSORY SEPARATION ALERT (A2)", listOf(
             "Feature: ${when {
                 !registryReadable && enabled -> "UNAVAILABLE — saved trust data unreadable"
@@ -160,30 +161,36 @@ class BluetoothCenterActivity : FragmentActivity() {
             "Monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled by owner"}",
             "Monitor runtime: ${if (monitorRunning) "Running" else "Not confirmed running"}",
             "Protection state: $protectionMode",
+            if (canEditConfiguration) "A2 configuration is editable while protection is DISARMED."
+            else "A2 configuration is LOCKED while protection is ARMED, COUNTDOWN, or ALARM_TRIGGERED. Disarm first.",
             "Monitoring runs only while A2 is ON and the protection monitor setting is enabled. The foreground service handles live ACL events; a manifest receiver covers ACL connect/disconnect events while its process is absent. Each registered accessory needs a fresh connection baseline; disconnect starts an 8-second grace period, and reconnect cancels its pending alert. Exact-alarm access improves the process-death deadline; without it Android uses an inexact fallback that may be delayed in Doze.",
             "Unregistering removes only this app's trust. Android pairing remains unchanged.",
             if (registryReadable) "" else "The encrypted trusted-device registry could not be read. Do not clear app data or re-register devices; resolve the storage/key issue first. A2 cannot be enabled safely."
         ).filter { it.isNotBlank() })
         root.addView(button("Add trusted paired device") { requestTrustedDevicePicker() }.apply {
-            isEnabled = registryReadable
+            isEnabled = registryReadable && canEditConfiguration
         }, matchWrap())
         devices.forEach { device ->
             root.addView(space(6))
-            root.addView(button("Unregister: ${device.name}") { confirmUnregister(device) }, matchWrap())
+            root.addView(button("Unregister: ${device.name}") { confirmUnregister(device) }.apply {
+                isEnabled = canEditConfiguration
+            }, matchWrap())
         }
         root.addView(space(7))
         root.addView(button(if (enabled) "Disable trusted-device separation alert" else "Enable trusted-device separation alert") { toggleA2() }.apply {
-            isEnabled = registryReadable || enabled
+            isEnabled = (registryReadable || enabled) && canEditConfiguration
         }, matchWrap())
         root.addView(space(14))
     }
 
     private fun confirmUnregister(device: TrustedBluetoothDevice) {
+        if (!requireProtectionDisarmed()) return
         MaterialAlertDialogBuilder(this)
             .setTitle("Unregister trusted accessory?")
             .setMessage("${device.name} will no longer be trusted by A2. It will remain paired in Android Bluetooth settings.")
             .setNegativeButton("Keep registered", null)
             .setPositiveButton("Unregister") { _, _ ->
+                if (!requireProtectionDisarmed()) return@setPositiveButton
                 val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
                 val removed = runCatching {
                     TrustedBluetoothRegistry.remove(prefs, device.address)
@@ -205,6 +212,7 @@ class BluetoothCenterActivity : FragmentActivity() {
     }
 
     private fun requestTrustedDevicePicker() {
+        if (!requireProtectionDisarmed()) return
         if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
             enableAfterPermission = false
             connectPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
@@ -213,6 +221,7 @@ class BluetoothCenterActivity : FragmentActivity() {
 
     @Suppress("MissingPermission", "DEPRECATION")
     private fun showTrustedDevicePicker() {
+        if (!requireProtectionDisarmed()) return
         val adapter = getSystemService(BluetoothManager::class.java)?.adapter
         if (adapter == null) {
             showResult("Bluetooth unavailable", "This device does not expose a Bluetooth adapter.")
@@ -234,6 +243,7 @@ class BluetoothCenterActivity : FragmentActivity() {
         MaterialAlertDialogBuilder(this)
             .setTitle("Select trusted paired accessory")
             .setItems(labels) { _, which ->
+                if (!requireProtectionDisarmed()) return@setItems
                 val selected = devices[which]
                 val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
                 val added = runCatching {
@@ -255,6 +265,7 @@ class BluetoothCenterActivity : FragmentActivity() {
     }
 
     private fun toggleA2() {
+        if (!requireProtectionDisarmed()) return
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
         if (SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)) {
             if (!prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).commit()) {
@@ -300,6 +311,7 @@ class BluetoothCenterActivity : FragmentActivity() {
     }
 
     private fun enableA2() {
+        if (!requireProtectionDisarmed()) return
         enableAfterPermission = false
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
         when (val registry = TrustedBluetoothRegistry.readResult(prefs)) {
@@ -465,6 +477,15 @@ class BluetoothCenterActivity : FragmentActivity() {
         text = value; textSize = size; setTextColor(getColor(color)); if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
         setLineSpacing(dp(3).toFloat(), 1f)
     }
+    private fun requireProtectionDisarmed(): Boolean {
+        if (ProtectionStore(this).read().mode == ProtectionMode.DISARMED) return true
+        showResult(
+            "A2 settings locked",
+            "Trusted-device registration and A2 enable/disable are available only while protection is DISARMED."
+        )
+        return false
+    }
+
     private fun button(value: String, action: () -> Unit) = MaterialButton(this).apply { text = value; isAllCaps = false; minHeight = dp(48); setOnClickListener { action() } }
     private fun space(height: Int) = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dp(height)) }
     private fun matchWrap() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
