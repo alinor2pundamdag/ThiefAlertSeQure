@@ -638,21 +638,22 @@ class MainActivity : FragmentActivity() {
             getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE),
             ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
-        // Owner opt-out is authoritative for every non-triggered state. A
-        // connected snapshot may arm only while monitoring is enabled.
+        // A stale or legacy OFF preference must never disarm active protection.
+        // Active ARMED/COUNTDOWN state owns the monitor requirement.
         val state = when {
-            !monitorEnabled && current.mode != ProtectionMode.ALARM_TRIGGERED -> {
-                val update = store.updatePersisted { old ->
-                    ProtectionEngine.disableMonitoring(old, System.currentTimeMillis())
-                }
-                if (!update.persisted) {
+            !monitorEnabled &&
+                (current.mode == ProtectionMode.ARMED || current.mode == ProtectionMode.COUNTDOWN) -> {
+                val repaired = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+                    .edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
+                if (!repaired) {
                     LocalTamperHistory.record(
-                        this, "dashboard_monitor_opt_out_state_persist_failed",
-                        "Monitoring is disabled, but the protection state was not durably disarmed; the prior state remains authoritative"
+                        this, "active_monitor_preference_repair_failed",
+                        "Active protection remains authoritative, but the monitor-enabled preference could not be restored"
                     )
                 }
-                update.state
+                current
             }
+            !monitorEnabled && current.mode == ProtectionMode.DISARMED -> current
             monitorEnabled && current.mode != ProtectionMode.ALARM_TRIGGERED &&
                 ExternalPowerState.readConnected(this) == true ->
                 PowerTransitionCoordinator.confirmConnectedAndArm(this, "Connected power confirmed during app reconciliation")
