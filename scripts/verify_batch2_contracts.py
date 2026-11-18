@@ -170,6 +170,18 @@ checks = {
         and "ProtectionStore(activity).runIfDisarmed" in managed
         and "Managed lockdown can be enabled only while protection is DISARMED" in managed
         and "Managed lockdown can be disabled only while protection is DISARMED" in managed,
+    "critical protection, authentication, and deadline preference writes retry once":
+        "private fun commitWithOneRetry" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
+        and "val saved = commitWithOneRetry" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
+        and "var persisted = write(prefs, updated)" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
+        and "var tokenPersisted = prefs.edit().putString(KEY_LAST_TOKEN, token).commit()" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8")
+        and "for (attempt in 1..2)" in (APP / "TrustedBluetoothRegistry.kt").read_text(encoding="utf-8"),
+    "sensitive evidence review and location capture require DISARMED protection":
+        "Event details are hidden while protection is active" in settings
+        and "private fun showCameraEvidenceArchive() {\n        if (!requireProtectionDisarmed()) return" in settings
+        and "private fun exportHistory(uri: Uri) {\n        if (!requireProtectionDisarmed()) return" in settings
+        and "LocalEvidenceVault.record(this, \"owner_requested_current_location\"" in settings
+        and "LocalEvidenceVault.record(this, \"owner_requested_location_snapshot\"" in settings,
     "configuration preferences commit only while disarmed and monitor stop is guarded against active state":
         "runIfDisarmed" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "apply(context, imported)" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
