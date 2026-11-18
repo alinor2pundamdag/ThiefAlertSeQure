@@ -1,5 +1,6 @@
 package com.thiefalertsequre.app
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,6 +12,23 @@ class CameraEvidencePolicyTest {
         assertFalse(CameraEvidencePolicy.shouldCapture(true, false, true, true))
         assertFalse(CameraEvidencePolicy.shouldCapture(true, true, false, true))
         assertFalse(CameraEvidencePolicy.shouldCapture(true, true, true, false))
+    }
+
+    @Test fun frontCameraJpegOrientationUsesFrontFacingDisplayRotation() {
+        assertEquals(270, CameraEvidencePolicy.jpegOrientation(270, 0, true))
+        assertEquals(0, CameraEvidencePolicy.jpegOrientation(270, 90, true))
+        assertEquals(180, CameraEvidencePolicy.jpegOrientation(270, 270, true))
+    }
+
+    @Test fun backCameraJpegOrientationUsesOppositeDisplayRotation() {
+        assertEquals(90, CameraEvidencePolicy.jpegOrientation(90, 0, false))
+        assertEquals(0, CameraEvidencePolicy.jpegOrientation(90, 90, false))
+        assertEquals(180, CameraEvidencePolicy.jpegOrientation(90, 270, false))
+    }
+
+    @Test fun jpegOrientationNormalizesUnexpectedDegrees() {
+        assertEquals(270, CameraEvidencePolicy.jpegOrientation(-90, 0, true))
+        assertEquals(0, CameraEvidencePolicy.jpegOrientation(450, 90, true))
     }
 
     @Test fun retentionAndImageSizeAreBounded() {
