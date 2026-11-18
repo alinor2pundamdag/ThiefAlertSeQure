@@ -353,6 +353,9 @@ checks = {
         and "ConfigurationBackup.recoverPendingRestore(app)" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
         and "ConfigurationBackup.recoverPendingRestore(app)" in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8")
         and "ConfigurationBackup.isRestoreOrRecoveryInProgress()" in (APP / "BootReceiver.kt").read_text(encoding="utf-8"),
+    "durable charger countdowns request a retry when AlarmManager initially rejects scheduling":
+        (APP / "PowerTransitionCoordinator.kt").read_text(encoding="utf-8").count("AlarmScheduler.scheduleRetry(context, 1_000L)") >= 2
+        and "pending unplug provenance retained and a one-second scheduler retry requested" in (APP / "PowerTransitionCoordinator.kt").read_text(encoding="utf-8"),
     "encrypted configuration backup includes the photo-storage preference and accepts old backups":
         "PBKDF2WithHmacSHA256" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "AES/GCM/NoPadding" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
