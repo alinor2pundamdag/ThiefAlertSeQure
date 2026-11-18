@@ -26,7 +26,7 @@ trusted_registry = (APP / "TrustedBluetoothRegistry.kt").read_text(encoding="utf
 
 checks = {
     "trusted Bluetooth registry serializes compound reads, migrations, and mutations":
-        all(f"@Synchronized\\n    {signature}" in trusted_registry for signature in (
+        all(f"@Synchronized\n    {signature}" in trusted_registry for signature in (
             "fun add(prefs: SharedPreferences, address: String, name: String): Boolean {",
             "fun remove(prefs: SharedPreferences, address: String): Boolean {",
             "fun markConnected(prefs: SharedPreferences, address: String, connected: Boolean): Boolean {",
