@@ -137,6 +137,14 @@ checks = {
     "device intelligence reports OEM/background restriction, Doze, and standby bucket states":
         "OEM AND BACKGROUND EXECUTION" in diagnostics and "isBackgroundRestricted" in diagnostics
         and "isDeviceIdleMode" in diagnostics and "appStandbyBucket" in diagnostics,
+    "security-sensitive settings mutations are transactionally blocked outside DISARMED":
+        "requireProtectionDisarmed()" in settings
+        and "ProtectionStore(this).runIfDisarmed" in settings
+        and "ProtectionStore(context).runIfDisarmed" in (APP / "AlarmSoundStore.kt").read_text(encoding="utf-8")
+        and "ProtectionStore(context).runIfDisarmed" in flash
+        and "ProtectionStore(context).runIfDisarmed" in flash_controller
+        and "ProtectionStore(context).runIfDisarmed" in (APP / "AlarmHapticsPolicy.kt").read_text(encoding="utf-8")
+        and "ProtectionStore(context).runIfDisarmed" in camera_capture,
     "configuration preferences commit only while disarmed and monitor stop is guarded against active state":
         "runIfDisarmed" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
         and "apply(context, imported)" in (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
