@@ -161,6 +161,8 @@ required = {
         and "val existingCopy = CameraEvidenceVault.entries(app).firstOrNull" in camera_media
         and "it.timestampEpochMs == timestamp" in camera_media
         and "it.sha256.equals(sourceDigestHex, ignoreCase = true)" in camera_media
+        and "@Synchronized\n    fun save(context: Context, jpeg: ByteArray): Uri?" in camera_media
+        and "synchronized(this) {\n            synchronized(MIGRATION_LOCK)" in camera_media
         and "CameraEvidenceVault.read(app, entry.id)" in camera_media
         and "MessageDigest.isEqual(original, verified)" in camera_media
         and "pendingDeletions += uri to sha256(original)" in camera_media
