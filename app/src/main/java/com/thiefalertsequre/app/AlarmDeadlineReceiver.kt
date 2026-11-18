@@ -67,17 +67,17 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
     private fun handleA2DisconnectDeadline(context: Context, intent: Intent) {
         val token = intent.data?.lastPathSegment ?: return
         val pending = A2DisconnectScheduler.find(context, token) ?: return
+        if (ProtectionStore(context).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+            A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+            startAlarm(context, "Recovering an already-latched A2 alarm")
+            return
+        }
         if (A2DisconnectScheduler.wasConfirmedConnectedAfter(pending)) {
             A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
             LocalTamperHistory.record(
                 context, "a2_deadline_reconnect_observed",
                 "A confirmed reconnect superseded this disconnect event; no separation alarm was triggered"
             )
-            return
-        }
-        if (ProtectionStore(context).read().mode == ProtectionMode.ALARM_TRIGGERED) {
-            A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
-            startAlarm(context, "Recovering an already-latched A2 alarm")
             return
         }
         val nowElapsed = ProtectionClock.elapsedRealtime()
