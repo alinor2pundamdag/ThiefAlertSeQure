@@ -86,6 +86,14 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val configurationRecovered = ConfigurationBackup.recoverPendingRestore(this)
+        if (!configurationRecovered) {
+            android.widget.Toast.makeText(
+                this,
+                "An interrupted settings restore could not be recovered. Background monitoring remains paused; review settings recovery before arming.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
         val introPrefs = getSharedPreferences(AppLaunchIntroPolicy.PREFS, MODE_PRIVATE)
         val protectionModeAtLaunch = ProtectionStore(this).read().mode
         val installedVersionCode = AppLaunchIntroPolicy.currentVersionCode(this)
