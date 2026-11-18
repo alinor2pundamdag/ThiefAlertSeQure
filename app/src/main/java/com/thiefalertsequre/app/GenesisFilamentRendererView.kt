@@ -54,9 +54,10 @@ import java.io.ByteArrayOutputStream
 /**
  * Actual Filament scene used by the Seismic Genesis intro.
  *
- * The shield and every debris shard are independently extruded triangle meshes.
- * Shards are integrated as rigid bodies (gravity, angular motion, floor response,
- * pairwise sphere contacts and the final directional wind impulse).
+ * The PBR shield, articulated 15-bone intruder and every debris shard are
+ * independently extruded 3D meshes. The intruder rig fractures into the same
+ * rigid-body simulation as the shield (gravity, angular motion, floor response,
+ * pairwise contacts and the final directional wind impulse).
  */
 class GenesisFilamentRendererView(
     context: Context,
