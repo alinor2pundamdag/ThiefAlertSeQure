@@ -166,7 +166,12 @@ checks = {
         and "catch (error: Throwable)" in (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8"),
     "trusted Bluetooth and Device Owner configuration are locked outside DISARMED":
         "requireProtectionDisarmed()" in (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
+        and "toggleA2WhileDisarmed()" in (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
+        and "enableA2WhileDisarmed()" in (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
+        and "ProtectionStore(this).runIfDisarmed" in (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
         and "isEnabled = canEditConfiguration" in (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
+        and "Full-screen app alarm dashboard" in settings
+        and "if (!requireProtectionDisarmed()) return@action" in settings
         and "ProtectionStore(activity).runIfDisarmed" in managed
         and "Managed lockdown can be enabled only while protection is DISARMED" in managed
         and "Managed lockdown can be disabled only while protection is DISARMED" in managed,
