@@ -144,23 +144,33 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     private fun enforceMonitorOptOut(context: Context): ProtectionState {
-        if (monitorEnabled(context)) return ProtectionStore(context).read()
-        A2DisconnectScheduler.clearAll(context)
-        val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
-        runCatching { TrustedBluetoothRegistry.clearBaselines(monitorPrefs) }
-        A2BluetoothReceiverController.sync(context)
-        // Preserve the previous opt-out contract even when Android's sticky
-        // battery snapshot is temporarily unavailable.
         val store = ProtectionStore(context)
-        val update = store.updatePersisted { current ->
-            ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
+        val current = store.read()
+        if (current.mode == ProtectionMode.ALARM_TRIGGERED) return current
+        val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        if (current.mode == ProtectionMode.ARMED || current.mode == ProtectionMode.COUNTDOWN) {
+            if (!monitorEnabled(context) &&
+                !monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
+            ) {
+                LocalTamperHistory.record(
+                    context, "active_monitor_preference_repair_failed",
+                    "Boot preserved active protection, but the monitor-enabled preference could not be restored"
+                )
+            }
+            return current
         }
-        if (!update.persisted) {
+        if (monitorEnabled(context)) return current
+
+        // Owner opt-out may clear optional monitoring state only while the
+        // authoritative protection state is already DISARMED.
+        val deadlinesCleared = A2DisconnectScheduler.clearAll(context)
+        val baselinesCleared = runCatching { TrustedBluetoothRegistry.clearBaselines(monitorPrefs); true }.getOrDefault(false)
+        A2BluetoothReceiverController.sync(context)
+        if (!deadlinesCleared || !baselinesCleared) {
             LocalTamperHistory.record(
-                context, "boot_monitor_opt_out_state_persist_failed",
-                "Monitor is disabled, but the protection state was not durably disarmed; the prior deadline and state remain authoritative"
+                context, "boot_monitor_opt_out_cleanup_incomplete",
+                "Monitor is disabled while DISARMED, but trusted-device cleanup could not be fully confirmed"
             )
-            return update.state
         }
         PowerTransitionCoordinator.resetBaselineToCurrentPower(context, "Protection monitor is disabled")
         return store.read()
