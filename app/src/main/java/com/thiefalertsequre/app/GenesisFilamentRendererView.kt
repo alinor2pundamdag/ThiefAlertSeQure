@@ -610,7 +610,7 @@ class GenesisFilamentRendererView(
             val edgeX = b.x - a.x
             val edgeY = b.y - a.y
             val edgeLength = sqrt(edgeX * edgeX + edgeY * edgeY).coerceAtLeast(0.0001f)
-            val sideNormal = floatArrayOf(edgeY / edgeLength, -edgeX / edgeLength, 0f)
+            val sideNormal = floatArrayOf(-edgeY / edgeLength, edgeX / edgeLength, 0f)
             val aFrontSide = floatArrayOf(a.x, a.y, halfDepth)
             val bFrontSide = floatArrayOf(b.x, b.y, halfDepth)
             val aBackSide = floatArrayOf(a.x, a.y, -halfDepth)
@@ -681,7 +681,7 @@ class GenesisFilamentRendererView(
                 sin(((progress - 0.82f) / 0.05f) * 6f * PI).toFloat() * 0.08f
             else -> 0f
         }
-        camera?.lookAt(shake, shake * 0.55, 5.4, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+        camera?.lookAt(shake.toDouble(), (shake * 0.55f).toDouble(), 5.4, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
 
         val shieldTransform = transformManager.getInstance(shield.entity)
         if (progress < 0.245f) {
