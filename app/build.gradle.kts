@@ -83,6 +83,10 @@ dependencies {
     // Compose 1.11 stable line is compatible with this project's compileSdk 36 / AGP 8.10.x.
     implementation(platform("androidx.compose:compose-bom:2026.04.01"))
     implementation("androidx.compose.ui:ui")
+    // Filament real-time PBR renderer and Android surface helpers (same pinned release).
+    implementation("com.google.android.filament:filament-android:1.81.0")
+    implementation("com.google.android.filament:filament-utils-android:1.81.0")
+    implementation("com.google.android.filament:filamat-android:1.81.0")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.material3:material3")
