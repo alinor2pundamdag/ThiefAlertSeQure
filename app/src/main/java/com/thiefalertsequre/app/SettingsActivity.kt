@@ -1386,12 +1386,25 @@ class SettingsActivity : FragmentActivity() {
                         this, "Configuration restore failed: ${error.message}",
                         android.widget.Toast.LENGTH_LONG
                     ).show()
+                    // A failed import may have rolled back successfully. Reconcile
+                    // the existing monitor state; if recovery is still pending the
+                    // helper below deliberately leaves monitoring paused.
+                    applyRestoredConfiguration()
                 }
             }
         }
     }
 
     private fun applyRestoredConfiguration() {
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress() ||
+            !ConfigurationBackup.recoverPendingRestore(this)
+        ) {
+            stopService(Intent(this, ProtectionMonitorService::class.java))
+            ProtectionMonitorRecoveryNotice.show(
+                this, "Monitoring remains paused until interrupted settings recovery completes."
+            )
+            return
+        }
         val protectionMode = ProtectionStore(this).read().mode
         if (protectionMode != ProtectionMode.DISARMED) {
             // A rollback callback must never stop or re-baseline a monitor after
