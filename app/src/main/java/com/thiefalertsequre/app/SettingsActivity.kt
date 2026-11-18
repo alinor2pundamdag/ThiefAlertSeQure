@@ -1485,6 +1485,7 @@ class SettingsActivity : FragmentActivity() {
 
             runOnUiThread archiveUi@{
                 if (isFinishing || isDestroyed) return@archiveUi
+                if (!requireProtectionDisarmed()) return@archiveUi
                 if (entries.isEmpty()) {
                     MaterialAlertDialogBuilder(this@SettingsActivity)
                         .setTitle("Front-camera evidence")
@@ -1505,17 +1506,23 @@ class SettingsActivity : FragmentActivity() {
                 MaterialAlertDialogBuilder(this@SettingsActivity)
                     .setTitle("Encrypted front-camera photos")
                     .setItems(labels) { _, index ->
+                        if (!requireProtectionDisarmed()) return@setItems
                         val entry = entries[index]
                         ioExecutor.execute {
-                            val bytes = runCatching {
-                                CameraEvidenceVault.read(applicationContext, entry.id)
-                            }.getOrNull()
+                            val bytes = ProtectionStore(applicationContext).runIfDisarmed {
+                                runCatching { CameraEvidenceVault.read(applicationContext, entry.id) }.getOrNull()
+                            }
                             val bitmap = bytes?.let { payload ->
                                 runCatching { BitmapFactory.decodeByteArray(payload, 0, payload.size) }.getOrNull()
                             }
                             runOnUiThread photoUi@{
                                 if (isFinishing || isDestroyed) {
                                     bitmap?.recycle()
+                                    return@photoUi
+                                }
+                                if (ProtectionStore(this@SettingsActivity).read().mode != ProtectionMode.DISARMED) {
+                                    bitmap?.recycle()
+                                    requireProtectionDisarmed()
                                     return@photoUi
                                 }
                                 if (bitmap == null) {
