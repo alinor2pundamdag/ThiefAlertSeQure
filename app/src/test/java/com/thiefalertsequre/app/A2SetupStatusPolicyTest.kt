@@ -11,8 +11,9 @@ class A2SetupStatusPolicyTest {
         adapter: Boolean? = true,
         monitorEnabled: Boolean = true,
         monitorRunning: Boolean = true,
-        baselines: Int = 1
-    ) = A2SetupStatusPolicy.evaluate(a2, trusted, permission, adapter, monitorEnabled, monitorRunning, baselines)
+        baselines: Int = 1,
+        bootIdentityAvailable: Boolean = true
+    ) = A2SetupStatusPolicy.evaluate(a2, trusted, permission, adapter, monitorEnabled, monitorRunning, baselines, bootIdentityAvailable)
 
     @Test fun disabledA2IsNeutral() {
         assertEquals(SetupState.NEUTRAL, evaluate(a2 = false).state)
@@ -50,6 +51,12 @@ class A2SetupStatusPolicyTest {
 
     @Test fun partialMultiDeviceBaselineNeverAppearsVerified() {
         assertEquals(SetupState.ACTION_REQUIRED, evaluate(trusted = 2, baselines = 1).state)
+    }
+
+    @Test fun missingBootIdentityCannotAppearVerifiedForDurableA2Deadline() {
+        val item = evaluate(bootIdentityAvailable = false)
+        assertEquals(SetupState.UNKNOWN, item.state)
+        assert(item.detail.contains("boot identity"))
     }
 
     @Test fun verifiedRequiresEveryPrerequisite() {
