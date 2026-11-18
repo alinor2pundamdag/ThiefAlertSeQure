@@ -136,10 +136,14 @@ object RootCapabilityInspector {
     fun collectBluetoothDiagnostics(timeoutSeconds: Long = 8L): String {
         val suExecutable = findSuExecutable()
             ?: return "No executable su binary was found at a verified absolute path."
-        val process = ProcessBuilder(
-            suExecutable, "-c",
-            "dumpsys bluetooth_manager; echo '\\n--- Bluetooth system properties ---'; getprop | grep -i bluetooth; echo '\\n--- Bluetooth sysfs devices ---'; ls -la /sys/class/bluetooth 2>/dev/null"
-        ).redirectErrorStream(true).start()
+        val process = try {
+            ProcessBuilder(
+                suExecutable, "-c",
+                "dumpsys bluetooth_manager; echo '\\n--- Bluetooth system properties ---'; getprop | grep -i bluetooth; echo '\\n--- Bluetooth sysfs devices ---'; ls -la /sys/class/bluetooth 2>/dev/null"
+            ).redirectErrorStream(true).start()
+        } catch (error: Exception) {
+            return "Root Bluetooth diagnostics could not start: ${error.javaClass.simpleName}"
+        }
         val output = StringBuilder()
         val reader = Thread {
             runCatching {
@@ -170,7 +174,7 @@ object RootCapabilityInspector {
     }
     private fun waitForProcess(process: Process, timeoutSeconds: Long): Boolean {
         val waiter = Thread { runCatching { process.waitFor() } }.apply { isDaemon = true; start() }
-        waiter.join(TimeUnit.SECONDS.toMillis(timeoutSeconds))
+        waiter.join(TimeUnit.SECONDS.toMillis(timeoutSeconds.coerceIn(1L, 30L)))
         if (waiter.isAlive) {
             terminateProcess(process)
             waiter.join(500L)
@@ -181,6 +185,9 @@ object RootCapabilityInspector {
 
     private fun terminateProcess(process: Process) {
         runCatching { process.destroy() }
+        if (runCatching { process.isAlive }.getOrDefault(false)) {
+            runCatching { process.destroyForcibly() }
+        }
     }
 
 }
