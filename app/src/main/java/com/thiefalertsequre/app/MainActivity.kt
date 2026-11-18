@@ -1235,7 +1235,7 @@ class MainActivity : FragmentActivity() {
     }
 
     companion object {
-        const val PRIVACY_NOTICE_PREFS = PRIVACY_NOTICE_PREFS
+        const val PRIVACY_NOTICE_PREFS = "privacy_notice_v6"
         const val ALARM_DISPLAY_PREFS = "alarm_display_settings_v1"
         const val KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN = "show_alarm_screen_over_lockscreen"
         private const val REQUEST_DEVICE_CREDENTIAL = 4102
