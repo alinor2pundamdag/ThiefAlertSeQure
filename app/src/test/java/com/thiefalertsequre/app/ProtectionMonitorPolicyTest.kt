@@ -33,7 +33,11 @@ class ProtectionMonitorPolicyTest {
         assertEquals(false, ProtectionMonitorPolicy.shouldMonitorMotion(true, ProtectionMode.DISARMED))
         assertEquals(false, ProtectionMonitorPolicy.shouldMonitorMotion(true, ProtectionMode.ALARM_TRIGGERED))
     }
-    @Test fun notificationStopAppliesEvenWhenMonitorIsEnabled() {
+    @Test fun notificationStopIsAllowedOnlyWhileDisarmed() {
+        assertTrue(ProtectionMonitorPolicy.canStop(ProtectionMode.DISARMED))
+        assertFalse(ProtectionMonitorPolicy.canStop(ProtectionMode.ARMED))
+        assertFalse(ProtectionMonitorPolicy.canStop(ProtectionMode.COUNTDOWN))
+        assertFalse(ProtectionMonitorPolicy.canStop(ProtectionMode.ALARM_TRIGGERED))
         assertTrue(ProtectionMonitorPolicy.shouldApplyStopRequest(
             preferenceAlreadyCommitted = false,
             monitorEnabled = true
