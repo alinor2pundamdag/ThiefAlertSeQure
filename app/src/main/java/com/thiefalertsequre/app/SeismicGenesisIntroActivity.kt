@@ -156,6 +156,9 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
     }
 
     private fun playOptionalImpact(stage: Int, audioEnabled: Boolean, hapticsEnabled: Boolean) {
+        // The periodic intro guard is a navigation fallback, not an output lock.
+        // Re-check immediately before every cinematic sound/haptic impact.
+        if (ProtectionStore(this).read().mode != ProtectionMode.DISARMED) return
         if (hapticsEnabled) runCatching {
             val vibrator = if (Build.VERSION.SDK_INT >= 31) {
                 getSystemService(Vibrator::class.java)
