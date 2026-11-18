@@ -87,6 +87,11 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     private fun startMonitorIfNeeded(context: Context, state: ProtectionState, source: String) {
+        if (!ConfigurationBackup.recoverPendingRestore(context)) {
+            LocalTamperHistory.record(context, "configuration_restore_recovery_pending", "Background monitor startup blocked because an interrupted configuration restore could not be recovered")
+            ProtectionMonitorRecoveryNotice.show(context, "An interrupted settings restore needs recovery before background monitoring can safely resume.")
+            return
+        }
         val enabled = monitorEnabled(context)
         if (!ProtectionMonitorPolicy.shouldRun(enabled, state.mode)) return
         runCatching {
