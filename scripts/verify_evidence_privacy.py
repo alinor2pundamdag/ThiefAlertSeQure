@@ -116,6 +116,19 @@ required = {
         "OWNED_IMAGE_NAME = Regex" in camera_media
         and "if (OWNED_IMAGE_NAME.matches(displayName)) {" in camera_media
         and "getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)" in camera_media,
+    "active protection hides private photos and blocks plaintext evidence export":
+        "private fun showCameraEvidenceArchive() {\n        if (!requireProtectionDisarmed()) return" in settings
+        and "private fun exportHistory(uri: Uri) {\n        if (!requireProtectionDisarmed()) return" in settings
+        and "Event details are hidden while protection is active" in settings,
+    "asynchronous evidence write failures are durable and visible":
+        "KEY_ASYNC_WRITE_FAILURES" in vault
+        and "fun asyncWriteFailureCount(context: Context)" in vault
+        and "asynchronousEvidenceWriteFailures" in (APP / "DeviceIntelligenceActivity.kt").read_text(encoding="utf-8"),
+    "photo migration validates the complete vault before deleting Gallery sources":
+        "val copiedVaultHealthy = CameraEvidenceVault.verifyIntegrity(app)" in camera_media
+        and "if (!copiedVaultHealthy)" in camera_media
+        and camera_media.index("if (!copiedVaultHealthy)") < camera_media.index("for ((uri, original) in pendingDeletions)")
+        and "ProtectionStore(app).runIfDisarmed" in camera_media,
     "Gallery deletion fails closed when MediaStore enumeration fails":
         "if (!query.success) return false" in camera_media
         and "query.images.forEach" in camera_media
