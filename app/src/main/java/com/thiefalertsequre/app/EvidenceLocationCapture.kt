@@ -49,7 +49,9 @@ object EvidenceLocationCapture {
         val ageMs = TimeUnit.NANOSECONDS.toMillis(
             (SystemClock.elapsedRealtimeNanos() - best.elapsedRealtimeNanos).coerceAtLeast(0L)
         )
-        val accuracy = if (best.hasAccuracy()) best.accuracy else null
+        val accuracy = best.accuracy.takeIf {
+            best.hasAccuracy() && it.isFinite() && it >= 0f
+        }
         return Snapshot(
             latitude = best.latitude,
             longitude = best.longitude,
