@@ -300,10 +300,12 @@ checks = {
         and "stopService(Intent(this, ProtectionMonitorService::class.java))" in (APP / "AlarmService.kt").read_text(encoding="utf-8")
         and "ArrayBlockingQueue(64)" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
         and "RejectedExecutionException" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8"),
-    "manifest ACL receiver uses valid Runnable labels and encrypted queue-overflow evidence":
+    "manifest ACL receiver uses valid Runnable labels and durable queue-overflow history":
         "return@Runnable" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
         and "return@Thread" not in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
-        and "LocalEvidenceVault.recordAsync(" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8"),
+        and '"a2_receiver_queue_full"' in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
+        and "LocalTamperHistory.record(" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
+        and "LocalEvidenceVault.recordAsync(context, safeEvent, safeDetail)" in (APP / "LocalTamperHistory.kt").read_text(encoding="utf-8"),
     "root diagnostics have bounded execution and forceful timeout cleanup":
         "timeoutSeconds.coerceIn(1L, 30L)" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8")
         and "destroyForcibly()" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8")
