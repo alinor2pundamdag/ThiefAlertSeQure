@@ -55,6 +55,7 @@ jobs:
           cache-provider: basic
 
       - name: Install Android API 37 platform
+        if: matrix.language == 'java-kotlin'
         shell: bash
         run: |
           set -euo pipefail
