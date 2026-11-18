@@ -88,6 +88,21 @@ class GenesisFilamentRendererView(
         var angularY: Float = 0f,
         var angularZ: Float = 0f
     )
+    /** Hierarchical articulated intruder skeleton; each bone becomes an independent rigid fragment on impact. */
+    private data class RigBone(
+        val body: Body,
+        val parentIndex: Int,
+        val length: Float,
+        val baseAngle: Float,
+        val swing: Float,
+        val phase: Float,
+        val impactAngle: Float,
+        val offsetX: Float = 0f,
+        val offsetY: Float = 0f,
+        var endX: Float = 0f,
+        var endY: Float = 0f,
+        var worldAngle: Float = 0f
+    )
 
     companion object {
         // Native Filament initialization must fail closed into the Compose
@@ -126,12 +141,17 @@ class GenesisFilamentRendererView(
     private var debrisMaterial: com.google.android.filament.MaterialInstance? = null
     private var titleMaterial: com.google.android.filament.MaterialInstance? = null
     private var coreMaterial: com.google.android.filament.MaterialInstance? = null
+    private var intruderMaterial: com.google.android.filament.MaterialInstance? = null
+    private var intruderAccentMaterial: com.google.android.filament.MaterialInstance? = null
     private var shieldMesh: Mesh? = null
     private var shieldRimMesh: Mesh? = null
     private var coreMesh: Mesh? = null
     private val bodies = mutableListOf<Body>()
     private val titleBodies = mutableListOf<LetterBody>()
     private val nameBodies = mutableListOf<LetterBody>()
+    private val intruderRig = mutableListOf<RigBone>()
+    private var intruderAdded = false
+    private var intruderShattered = false
     private var titleAdded = false
     private var nameAdded = false
     private var coreLightEntity = 0
@@ -288,6 +308,7 @@ class GenesisFilamentRendererView(
             shieldRimMesh = createExtrudedMesh(insetRimOutline, 0.055f, shieldRimMaterial!!)
             scene?.addEntity(shieldRimMesh!!.entity)
             createFractureBodies(shieldOutline)
+            createIntruderRig()
 
             val coreOutline = (0 until 12).map { index ->
                 val angle = index * (2.0 * PI / 12.0)
@@ -981,6 +1002,187 @@ class GenesisFilamentRendererView(
         return Mesh(entity, vertexBuffer, indexBuffer)
     }
 
+    /**
+     * Build a procedural, articulated dark-tactical intruder in the same PBR
+     * scene as the shield. The hierarchy is evaluated as a lightweight bone
+     * rig; on shield impact its body sections detach and join the rigid debris
+     * simulation rather than disappearing as a flat overlay.
+     */
+    private fun createIntruderRig() {
+        val activeMaterial = pbrMaterial ?: return
+        intruderMaterial = activeMaterial.createInstance().apply {
+            setParameter("baseColor", Colors.RgbType.SRGB, 0.075f, 0.095f, 0.13f)
+            setParameter("metallic", 0.76f)
+            setParameter("roughness", 0.48f)
+            setParameter("emissiveColor", 0.012f, 0.018f, 0.028f)
+        }
+        intruderAccentMaterial = activeMaterial.createInstance().apply {
+            setParameter("baseColor", Colors.RgbType.SRGB, 0.30f, 0.035f, 0.025f)
+            setParameter("metallic", 0.68f)
+            setParameter("roughness", 0.31f)
+            setParameter("emissiveColor", 0.16f, 0.006f, 0.002f)
+        }
+
+        fun segment(width: Float, length: Float): List<Point2> = listOf(
+            Point2(-width * 0.50f, -length * 0.50f),
+            Point2(width * 0.50f, -length * 0.50f),
+            Point2(width * 0.39f, length * 0.50f),
+            Point2(-width * 0.39f, length * 0.50f)
+        )
+        fun addBone(
+            parent: Int,
+            width: Float,
+            length: Float,
+            depth: Float,
+            angle: Float,
+            swing: Float = 0f,
+            phase: Float = 0f,
+            impactAngle: Float = 0f,
+            offsetX: Float = 0f,
+            offsetY: Float = 0f,
+            polygon: List<Point2> = segment(width, length),
+            accent: Boolean = false
+        ) {
+            val material = if (accent) intruderAccentMaterial!! else intruderMaterial!!
+            val mesh = createExtrudedMesh(polygon, depth, material, bevelDepth = min(depth * 0.22f, 0.025f))
+            val radius = max(width, length * 0.42f) * 0.48f
+            val body = Body(
+                mesh = mesh,
+                x = 0f, y = 0f, z = 0.48f,
+                vx = 0f, vy = 0f, vz = 0f,
+                rx = 0f, ry = 0f, rz = 0f,
+                radius = radius,
+                mass = (width * length * depth * 16f).coerceAtLeast(0.025f)
+            )
+            intruderRig += RigBone(
+                body = body,
+                parentIndex = parent,
+                length = length,
+                baseAngle = angle,
+                swing = swing,
+                phase = phase,
+                impactAngle = impactAngle,
+                offsetX = offsetX,
+                offsetY = offsetY
+            )
+        }
+
+        // Root pelvis and spine form the two central bones of the articulated rig.
+        addBone(
+            parent = -1, width = 0.38f, length = 0.30f, depth = 0.16f,
+            angle = 0f, polygon = listOf(
+                Point2(-0.19f, -0.15f), Point2(0.19f, -0.15f),
+                Point2(0.22f, 0.06f), Point2(0.13f, 0.15f),
+                Point2(-0.13f, 0.15f), Point2(-0.22f, 0.06f)
+            )
+        )
+        addBone(
+            parent = 0, width = 0.56f, length = 0.68f, depth = 0.19f,
+            angle = 0f, swing = 1.5f, impactAngle = -13f, offsetY = 0.01f,
+            polygon = listOf(
+                Point2(-0.22f, -0.34f), Point2(0.22f, -0.34f),
+                Point2(0.26f, 0.12f), Point2(0.19f, 0.34f),
+                Point2(-0.19f, 0.34f), Point2(-0.26f, 0.12f)
+            ),
+            accent = true
+        )
+        // Helmet/head.
+        val head = (0 until 14).map { index ->
+            val angle = index * (2.0 * PI / 14.0)
+            Point2(cos(angle).toFloat() * 0.145f, sin(angle).toFloat() * 0.17f)
+        }
+        addBone(1, 0.29f, 0.30f, 0.15f, 0f, impactAngle = 18f, offsetY = 0.35f, polygon = head, accent = true)
+
+        // Shoulder, elbow and wrist bones: left and right chains are parented to the torso.
+        addBone(1, 0.17f, 0.43f, 0.13f, -58f, swing = -17f, phase = 0f, impactAngle = -34f, offsetX = -0.27f, offsetY = 0.24f)
+        addBone(3, 0.135f, 0.37f, 0.12f, -13f, swing = -9f, phase = 0.4f, impactAngle = -24f)
+        addBone(4, 0.15f, 0.15f, 0.12f, -8f, impactAngle = -15f)
+        addBone(1, 0.17f, 0.43f, 0.13f, 58f, swing = 17f, phase = PI.toFloat(), impactAngle = 34f, offsetX = 0.27f, offsetY = 0.24f)
+        addBone(6, 0.135f, 0.37f, 0.12f, 13f, swing = 9f, phase = 2.1f, impactAngle = 24f)
+        addBone(7, 0.15f, 0.15f, 0.12f, 8f, impactAngle = 15f)
+
+        // Hip, knee and ankle chains. Each limb is a separate beveled 3D PBR mesh.
+        addBone(0, 0.205f, 0.54f, 0.15f, 176f, swing = 18f, phase = 0f, impactAngle = -28f, offsetX = -0.12f, offsetY = -0.12f)
+        addBone(9, 0.155f, 0.49f, 0.13f, 0f, swing = 9f, phase = 0.3f, impactAngle = -18f)
+        addBone(10, 0.23f, 0.16f, 0.16f, -78f, impactAngle = -22f)
+        addBone(0, 0.205f, 0.54f, 0.15f, 184f, swing = -18f, phase = PI.toFloat(), impactAngle = 28f, offsetX = 0.12f, offsetY = -0.12f)
+        addBone(12, 0.155f, 0.49f, 0.13f, 0f, swing = -9f, phase = 2.1f, impactAngle = 18f)
+        addBone(13, 0.23f, 0.16f, 0.16f, 78f, impactAngle = 22f)
+    }
+
+    private fun updateIntruderRig(
+        activeScene: Scene,
+        transformManager: com.google.android.filament.TransformManager,
+        progress: Float
+    ) {
+        if (progress >= 0.245f) {
+            if (!intruderShattered) {
+                if (intruderAdded) intruderRig.forEach { activeScene.removeEntity(it.body.mesh.entity) }
+                intruderRig.forEachIndexed { index, bone ->
+                    val body = bone.body
+                    val dx = body.x + 0.42f
+                    val dy = body.y + 0.10f
+                    val distance = sqrt(dx * dx + dy * dy).coerceAtLeast(0.001f)
+                    val side = if (index % 2 == 0) 1f else -1f
+                    body.vx = dx / distance * (1.55f + (index % 4) * 0.34f) + side * 0.32f
+                    body.vy = dy / distance * (1.75f + (index % 3) * 0.28f) + 0.72f
+                    body.vz = side * (0.8f + (index % 4) * 0.22f)
+                    body.angularX = side * (3.5f + (index % 5) * 0.8f)
+                    body.angularY = -side * (2.8f + (index % 4) * 0.65f)
+                    body.angularZ = side * (4.2f + (index % 6) * 0.7f)
+                    bodies += body
+                }
+                intruderRig.clear()
+                intruderAdded = false
+                intruderShattered = true
+            }
+            return
+        }
+
+        if (progress < 0.075f) {
+            if (intruderAdded) intruderRig.forEach { activeScene.removeEntity(it.body.mesh.entity) }
+            intruderAdded = false
+            return
+        }
+        if (!intruderAdded) {
+            intruderRig.forEach { activeScene.addEntity(it.body.mesh.entity) }
+            intruderAdded = true
+        }
+
+        val approach = ((progress - 0.075f) / 0.17f).coerceIn(0f, 1f)
+        val stride = sin(approach * PI * 3.0).toFloat()
+        val impact = ((progress - 0.215f) / 0.03f).coerceIn(0f, 1f)
+        val rootX = -0.50f + approach * 0.18f
+        val rootY = -0.12f + approach * 0.04f
+        val rootZ = 0.48f + approach * 0.08f
+
+        intruderRig.forEachIndexed { index, bone ->
+            val parent = intruderRig.getOrNull(bone.parentIndex)
+            val parentAngle = parent?.worldAngle ?: 0f
+            val parentEndX = parent?.endX ?: rootX
+            val parentEndY = parent?.endY ?: rootY - 0.15f
+            val radians = Math.toRadians(parentAngle.toDouble())
+            val startX = parentEndX +
+                (cos(radians).toFloat() * bone.offsetX - sin(radians).toFloat() * bone.offsetY)
+            val startY = parentEndY +
+                (sin(radians).toFloat() * bone.offsetX + cos(radians).toFloat() * bone.offsetY)
+            val walk = sin(approach * PI * 2.4 + bone.phase.toDouble()).toFloat()
+            val localAngle = bone.baseAngle + bone.swing * walk * (1f - impact) + bone.impactAngle * impact
+            val worldAngle = parentAngle + localAngle
+            val direction = Math.toRadians(worldAngle.toDouble())
+            val centerX = startX + sin(direction).toFloat() * bone.length * 0.5f
+            val centerY = startY + cos(direction).toFloat() * bone.length * 0.5f
+            bone.endX = startX + sin(direction).toFloat() * bone.length
+            bone.endY = startY + cos(direction).toFloat() * bone.length
+            bone.worldAngle = worldAngle
+            bone.body.x = centerX
+            bone.body.y = centerY
+            bone.body.z = rootZ + index * 0.0015f
+            bone.body.rz = worldAngle
+            setBodyTransform(transformManager, bone.body)
+        }
+    }
+
     private fun updateScene(progress: Float) {
         val activeEngine = engine ?: return
         val activeScene = scene ?: return
@@ -990,6 +1192,7 @@ class GenesisFilamentRendererView(
         updateLetterBodies(activeScene, transformManager, titleBodies, progress, 0.18f, 0.245f, 0.82f, true)
         updateLetterBodies(activeScene, transformManager, nameBodies, progress, 0.39f, 0.455f, 0.82f, false)
         updateCore(activeScene, transformManager, progress)
+        updateIntruderRig(activeScene, transformManager, progress)
 
         val shake = when {
             progress in 0.245f..0.278333f ->
@@ -1249,6 +1452,7 @@ class GenesisFilamentRendererView(
                 attempt("mesh index buffer") { activeEngine.destroyIndexBuffer(mesh.indexBuffer) }
                 attempt("entity manager mesh") { EntityManager.get().destroy(mesh.entity) }
             }
+            intruderRig.toList().forEach { destroyMesh(it.body.mesh) }
             bodies.toList().forEach { destroyMesh(it.mesh) }
             titleBodies.toList().forEach { destroyMesh(it.body.mesh) }
             nameBodies.toList().forEach { destroyMesh(it.body.mesh) }
@@ -1277,6 +1481,8 @@ class GenesisFilamentRendererView(
             debrisMaterial?.let { attempt("debris material instance") { activeEngine.destroyMaterialInstance(it) } }
             titleMaterial?.let { attempt("title material instance") { activeEngine.destroyMaterialInstance(it) } }
             coreMaterial?.let { attempt("core material instance") { activeEngine.destroyMaterialInstance(it) } }
+            intruderMaterial?.let { attempt("intruder PBR material instance") { activeEngine.destroyMaterialInstance(it) } }
+            intruderAccentMaterial?.let { attempt("intruder accent material instance") { activeEngine.destroyMaterialInstance(it) } }
             pbrMaterial?.let { attempt("PBR material") { activeEngine.destroyMaterial(it) } }
             attempt("scene indirect light detach") { scene?.indirectLight = null }
             attempt("scene skybox detach") { scene?.skybox = null }
@@ -1294,6 +1500,9 @@ class GenesisFilamentRendererView(
             attempt("Filament engine") { activeEngine.destroy() }
         }
         bodies.clear()
+        intruderRig.clear()
+        intruderAdded = false
+        intruderShattered = false
         rimLightEntities.clear()
         titleBodies.clear()
         nameBodies.clear()
@@ -1305,6 +1514,8 @@ class GenesisFilamentRendererView(
         debrisMaterial = null
         titleMaterial = null
         coreMaterial = null
+        intruderMaterial = null
+        intruderAccentMaterial = null
         pbrMaterial = null
         environmentIndirectLight = null
         environmentSkybox = null
