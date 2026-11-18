@@ -22,13 +22,26 @@ class BootReceiver : BroadcastReceiver() {
                 "Boot/package/exact-alarm reconciliation was deferred until the interrupted settings restore can be recovered"
             )
             val state = ProtectionStore(context).read()
-            if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
-                scheduleAlarmRecovery(context, "Latched alarm recovery takes priority over interrupted settings recovery")
-            } else {
-                ProtectionMonitorRecoveryNotice.show(
-                    context, "An interrupted settings restore must be recovered before background protection can resume."
-                )
+            when (state.mode) {
+                ProtectionMode.ALARM_TRIGGERED -> {
+                    scheduleAlarmRecovery(context, "Latched alarm recovery takes priority over interrupted settings recovery")
+                }
+                ProtectionMode.COUNTDOWN -> {
+                    // Preserve/recreate the consumed countdown callback. On a new
+                    // boot AlarmScheduler detects the stale monotonic clock and
+                    // schedules a reconciliation callback instead of firing early.
+                    val scheduled = AlarmScheduler.schedule(
+                        context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount
+                    )
+                    if (!scheduled) {
+                        LocalTamperHistory.record(context, "countdown_recovery_schedule_failed", "Interrupted settings recovery prevented boot reconciliation and the preserved countdown could not be rescheduled")
+                    }
+                }
+                ProtectionMode.ARMED, ProtectionMode.DISARMED -> Unit
             }
+            ProtectionMonitorRecoveryNotice.show(
+                context, "An interrupted settings restore must be recovered before background monitoring can safely resume. Existing alarm/countdown state is preserved and deadlines retry automatically."
+            )
             return
         }
         // BOOT_COMPLETED is authoritative even on devices where Settings.Global.BOOT_COUNT
