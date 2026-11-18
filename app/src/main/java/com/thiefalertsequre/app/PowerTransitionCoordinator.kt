@@ -431,6 +431,27 @@ object PowerTransitionCoordinator {
             val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             if (!SafePreferences.boolean(prefs, PENDING_DISCONNECT, false)) return@synchronized null
 
+            val monitorPrefs = appContext.getSharedPreferences(
+                ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
+            )
+            if (!SafePreferences.boolean(
+                    monitorPrefs,
+                    ProtectionMonitorService.KEY_ENABLED,
+                    ProtectionMonitorPolicy.DEFAULT_ENABLED
+                )
+            ) {
+                // A delayed recovery callback must not resurrect an unplug transition
+                // after the owner has opted out of monitoring.
+                resetBaselineToCurrentPower(
+                    appContext, "Monitor disabled before pending unplug recovery"
+                )
+                LocalTamperHistory.record(
+                    appContext, "pending_unplug_recovery_skipped_monitor_disabled",
+                    "Persisted unplug candidate was not replayed because monitoring is OFF"
+                )
+                return@synchronized null
+            }
+
             val generation = SafePreferences.long(prefs, PENDING_GENERATION, -1L)
             if (generation != SafePreferences.long(prefs, GENERATION, -2L) ||
                 SafePreferences.boolean(prefs, CONNECTED, true)

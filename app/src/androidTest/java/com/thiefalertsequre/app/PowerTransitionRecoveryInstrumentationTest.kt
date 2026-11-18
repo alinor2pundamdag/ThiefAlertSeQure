@@ -153,6 +153,74 @@ class PowerTransitionRecoveryInstrumentationTest {
         }
     }
 
+    @Test fun pendingDisconnectRecoveryCannotStartCountdownAfterMonitorOptOut() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, 0)
+        val previousMonitorEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
+        val transitionPrefs = context.getSharedPreferences("charger_transition_v2", 0)
+        val store = ProtectionStore(context)
+        val originalState = store.read()
+        assumeTrue(
+            "Test requires no pre-existing countdown or latched alarm",
+            originalState.mode != ProtectionMode.COUNTDOWN &&
+                originalState.mode != ProtectionMode.ALARM_TRIGGERED
+        )
+        val bootCount = ProtectionClock.bootCount(context)
+        assumeTrue("This Android build does not expose a usable boot identity", bootCount >= 0)
+
+        try {
+            context.stopService(Intent(context, ProtectionMonitorService::class.java))
+            instrumentation.waitForIdleSync()
+            runShell(instrumentation, "dumpsys battery unplug")
+            assumeTrue(
+                "Emulator did not expose a confirmed disconnected battery snapshot",
+                ExternalPowerState.readConnected(context) == false
+            )
+
+            assertTrue(monitorPrefs.edit()
+                .putBoolean(ProtectionMonitorService.KEY_ENABLED, false)
+                .commit())
+            assertTrue(store.write(
+                ProtectionState(
+                    mode = ProtectionMode.ARMED,
+                    deadlineEpochMs = 0L,
+                    changedAtEpochMs = System.currentTimeMillis()
+                )
+            ))
+            val eventEpochMs = System.currentTimeMillis() - 250L
+            val eventElapsedMs = SystemClock.elapsedRealtime() - 250L
+            assertTrue(eventElapsedMs > 0L)
+            assertTrue(transitionPrefs.edit()
+                .clear()
+                .putBoolean("baseline_known", true)
+                .putBoolean("baseline_connected", false)
+                .putInt("baseline_boot_count", bootCount)
+                .putLong("transition_generation", 12L)
+                .putBoolean("pending_disconnect", true)
+                .putLong("pending_disconnect_epoch_ms", eventEpochMs)
+                .putLong("pending_disconnect_elapsed_ms", eventElapsedMs)
+                .putInt("pending_disconnect_boot_count", bootCount)
+                .putLong("pending_disconnect_generation", 12L)
+                .commit())
+
+            val recovered = PowerTransitionCoordinator.recoverPendingDisconnectCandidate(context)
+            assertEquals("Monitor opt-out must keep protection disarmed", ProtectionMode.DISARMED, recovered.mode)
+            assertTrue("Monitor opt-out must clear the pending unplug marker",
+                !transitionPrefs.getBoolean("pending_disconnect", true))
+        } finally {
+            AlarmScheduler.cancel(context)
+            transitionPrefs.edit().clear().commit()
+            store.write(originalState)
+            monitorPrefs.edit()
+                .putBoolean(ProtectionMonitorService.KEY_ENABLED, previousMonitorEnabled)
+                .commit()
+            runShell(instrumentation, "dumpsys battery reset")
+        }
+    }
+
     private fun runShell(instrumentation: Instrumentation, command: String) {
         val descriptor = instrumentation.uiAutomation.executeShellCommand(command)
         ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
