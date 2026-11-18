@@ -1575,13 +1575,15 @@ class SettingsActivity : FragmentActivity() {
     private fun writeCameraEvidenceExport(uri: Uri, id: String) {
         ioExecutor.execute {
             val result = runCatching {
-                val bytes = runCatching { CameraEvidenceVault.read(this, id) }.getOrNull()
-                    ?: throw IllegalStateException("Photo is missing or failed its integrity check.")
-                contentResolver.openOutputStream(uri)?.use { output ->
-                    output.write(bytes)
-                    output.flush()
-                } ?: throw IllegalStateException("Android could not open the selected export destination.")
-                bytes.size
+                ProtectionStore(applicationContext).runIfDisarmed {
+                    val bytes = runCatching { CameraEvidenceVault.read(applicationContext, id) }.getOrNull()
+                        ?: throw IllegalStateException("Photo is missing or failed its integrity check.")
+                    contentResolver.openOutputStream(uri)?.use { output ->
+                        output.write(bytes)
+                        output.flush()
+                    } ?: throw IllegalStateException("Android could not open the selected export destination.")
+                    bytes.size
+                } ?: throw IllegalStateException("Photo export is available only while protection is DISARMED.")
             }
             runOnUiThread {
                 android.widget.Toast.makeText(
