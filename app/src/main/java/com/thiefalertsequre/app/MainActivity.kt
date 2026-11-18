@@ -86,7 +86,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val configurationRecovered = ConfigurationBackup.recoverPendingRestore(this)
+        val configurationRecovered = !ConfigurationBackup.isRestoreOrRecoveryInProgress() &&
+            ConfigurationBackup.recoverPendingRestore(this)
         if (!configurationRecovered) {
             android.widget.Toast.makeText(
                 this,
