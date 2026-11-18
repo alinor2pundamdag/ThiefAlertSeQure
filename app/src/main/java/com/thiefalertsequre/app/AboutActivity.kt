@@ -176,7 +176,7 @@ class AboutActivity : FragmentActivity() {
         root.addView(text("PRIVACY BY DESIGN", 11f, R.color.tas_primary, true))
         root.addView(space(6))
         root.addView(text(
-            "The core charger alarm works locally. Optional location snapshots require an owner action. Optional front-camera photo evidence requires a separate Settings opt-in and CAMERA permission; one photo is taken only after successful owner authentication that disarms a latched alarm while the app is visible. Photos are encrypted locally and are never uploaded. The flashlight uses Android torch control separately and does not capture images.",
+            "The core charger alarm works locally. Optional location snapshots require an owner action. Optional front-camera photo evidence requires a separate Settings opt-in and CAMERA permission; one photo is taken only after successful owner authentication that disarms a latched alarm while the app is visible. New photos are saved unencrypted in the app's Pictures/ThiefAlertSeQure Gallery folder by default; Settings can enable AES-GCM encryption for future captures in the private app vault. Changing this setting does not convert existing photos. Gallery photos are visible to apps with photo access. Photos are never uploaded. The flashlight uses Android torch control separately and does not capture images.",
             13f, R.color.tas_muted
         ))
         root.addView(space(18))
