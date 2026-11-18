@@ -837,10 +837,21 @@ class SettingsActivity : FragmentActivity() {
                     .setNegativeButton("Cancel", null)
                     .setPositiveButton("Delete all") { _, _ ->
                         ioExecutor.execute {
-                            val deletion = ProtectionStore(applicationContext).runIfDisarmed {
-                                val vaultDeleted = runCatching { CameraEvidenceVault.deleteAll(applicationContext) }.getOrDefault(false)
-                                val galleryDeleted = runCatching { CameraEvidenceMediaStore.deleteAll(applicationContext) }.getOrDefault(false)
-                                vaultDeleted && galleryDeleted
+                            // Remove Gallery originals first, one DISARMED-guarded row at a time.
+                            // Keep the encrypted vault intact if Gallery enumeration/deletion is incomplete.
+                            val galleryDeleted = runCatching {
+                                CameraEvidenceMediaStore.deleteAll(applicationContext)
+                            }.getOrDefault(false)
+                            val vaultDeleted = if (galleryDeleted) {
+                                ProtectionStore(applicationContext).runIfDisarmed {
+                                    runCatching { CameraEvidenceVault.deleteAll(applicationContext) }.getOrDefault(false)
+                                }
+                            } else {
+                                false
+                            }
+                            val deletion: Boolean? = when {
+                                ProtectionStore(applicationContext).read().mode != ProtectionMode.DISARMED -> null
+                                else -> galleryDeleted && vaultDeleted == true
                             }
                             LocalEvidenceVault.recordAsync(
                                 applicationContext,
