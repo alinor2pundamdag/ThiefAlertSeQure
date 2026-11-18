@@ -56,6 +56,34 @@ internal object A2BluetoothReceiverController {
         return saved
     }
 
+    /**
+     * During interrupted configuration recovery, invalidate old-boot A2 state
+     * but leave the manifest receiver disabled. Normal monitor startup retries
+     * the reset and enables it only after settings recovery succeeds.
+     */
+    fun deferBaselineResetForBoot(context: Context): Boolean {
+        val app = context.applicationContext
+        val prefs = app.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        val markedNotReady = commitWithOneRetry {
+            prefs.edit().putBoolean(ProtectionMonitorService.KEY_A2_BOOT_BASELINE_READY, false)
+        }
+        setComponentEnabled(app, false)
+        if (!markedNotReady) {
+            LocalTamperHistory.record(app, "a2_boot_baseline_marker_failed", "A2 remains disabled while settings recovery is pending; boot baseline reset marker could not be saved")
+            return false
+        }
+        val cleared = runCatching {
+            if (!A2DisconnectScheduler.clearAll(app)) return@runCatching false
+            TrustedBluetoothRegistry.clearBaselines(prefs)
+            true
+        }.getOrDefault(false)
+        if (!cleared) {
+            LocalTamperHistory.record(app, "a2_boot_baseline_reset_failed", "A2 remains disabled until interrupted settings recovery and old-boot baseline cleanup complete")
+            return false
+        }
+        return true
+    }
+
     /** A boot always invalidates prior connected-device evidence before re-enabling A2. */
     fun resetBaselineForBoot(context: Context): Boolean {
         val app = context.applicationContext
