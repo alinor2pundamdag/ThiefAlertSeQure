@@ -24,11 +24,13 @@ import java.util.concurrent.atomic.AtomicLong
 object LocalEvidenceVault {
     private const val PREFS = "local_evidence_vault_v1"
     private const val KEY_PAYLOAD = "encrypted_records"
+    private const val KEY_ASYNC_WRITE_FAILURES = "async_write_failure_count"
     private const val PURPOSE = "thiefalertsequre:evidence-vault:v1"
     private const val MAX_RECORDS = 100
     private const val RETENTION_MS = 30L * 24L * 60L * 60L * 1000L
     private val generation = AtomicLong(0L)
-    private val droppedAsyncWrites = AtomicLong(0L)
+    private val asyncWriteFailures = AtomicLong(0L)
+    private val asyncWriteFailureLock = Any()
     private val writer = ThreadPoolExecutor(
         1, 1, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue(64),
         { task -> Thread(task, "tas-evidence-vault").apply { isDaemon = true } },
@@ -42,28 +44,33 @@ object LocalEvidenceVault {
             writer.execute {
                 synchronized(this) {
                     if (generation.get() == submittedGeneration) {
-                        runCatching { record(context, event, detail) }
+                        val stored = runCatching { record(context, event, detail) }.getOrDefault(false)
+                        if (!stored) noteAsyncWriteFailure(context, "evidence-vault commit failed")
                     }
                 }
             }
         } catch (_: RejectedExecutionException) {
-            val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            val dropped = synchronized(droppedWriteLock) {
-                val persisted = SafePreferences.long(prefs, KEY_DROPPED_ASYNC_WRITES, 0L).coerceAtLeast(0L)
-                val next = maxOf(droppedAsyncWrites.get(), persisted) + 1L
-                droppedAsyncWrites.set(next)
-                // apply() updates the in-memory count immediately without blocking alarm callbacks on disk I/O.
-                prefs.edit().putLong(KEY_DROPPED_ASYNC_WRITES, next).apply()
-                next
-            }
-            Log.w("LocalEvidenceVault", "Bounded evidence queue is full; async event was not stored (dropped=$dropped)")
+            noteAsyncWriteFailure(context, "bounded evidence queue is full")
         }
     }
 
-    /** Durable count of async evidence events rejected because the bounded queue was full. */
-    fun droppedAsyncWriteCount(context: Context): Long {
+    private fun noteAsyncWriteFailure(context: Context, reason: String) {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        return maxOf(droppedAsyncWrites.get(), SafePreferences.long(prefs, KEY_DROPPED_ASYNC_WRITES, 0L))
+        val count = synchronized(asyncWriteFailureLock) {
+            val persisted = SafePreferences.long(prefs, KEY_ASYNC_WRITE_FAILURES, 0L).coerceAtLeast(0L)
+            val next = maxOf(asyncWriteFailures.get(), persisted) + 1L
+            asyncWriteFailures.set(next)
+            // apply() updates the in-memory count immediately without blocking alarm callbacks on disk I/O.
+            prefs.edit().putLong(KEY_ASYNC_WRITE_FAILURES, next).apply()
+            next
+        }
+        Log.w("LocalEvidenceVault", "Async evidence event was not stored ($reason; failures=$count)")
+    }
+
+    /** Durable count of asynchronous evidence writes that could not be stored. */
+    fun asyncWriteFailureCount(context: Context): Long {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        return maxOf(asyncWriteFailures.get(), SafePreferences.long(prefs, KEY_ASYNC_WRITE_FAILURES, 0L))
     }
 
     data class Entry(
