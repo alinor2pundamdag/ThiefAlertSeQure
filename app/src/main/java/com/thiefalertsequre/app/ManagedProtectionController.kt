@@ -90,6 +90,16 @@ object ManagedProtectionController {
 
     fun enable(activity: Activity): Boolean {
         if (Build.VERSION.SDK_INT < 28) return false
+        val result = ProtectionStore(activity).runIfDisarmed {
+            enableWhileDisarmed(activity)
+        }
+        check(result != null) {
+            "Managed lockdown can be enabled only while protection is DISARMED."
+        }
+        return result
+    }
+
+    private fun enableWhileDisarmed(activity: Activity): Boolean {
         check(isDeviceOwner(activity)) {
             "Device Owner provisioning is required. Standard device-admin activation is not sufficient."
         }
@@ -181,6 +191,16 @@ object ManagedProtectionController {
     }
 
     fun disable(activity: Activity) {
+        val completed = ProtectionStore(activity).runIfDisarmed {
+            disableWhileDisarmed(activity)
+            true
+        }
+        check(completed == true) {
+            "Managed lockdown can be disabled only while protection is DISARMED."
+        }
+    }
+
+    private fun disableWhileDisarmed(activity: Activity) {
         check(isDeviceOwner(activity)) {
             "Only the enrolled Device Owner can remove managed policies."
         }
