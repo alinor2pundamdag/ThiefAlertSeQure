@@ -311,7 +311,9 @@ checks = {
         and "fun reschedulePending(context: Context): Int" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
         and "A2DisconnectScheduler.scheduleRetry(app, pending, 1_000L)" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
         and "A2DisconnectScheduler.reschedulePending(this)" in monitor
-        and "A2DisconnectScheduler.scheduleRetry(" in monitor,
+        and "A2DisconnectScheduler.scheduleRetry(" in monitor
+        and "val effectivePending = updated.first" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
+        and "staleDisconnectEventCannotReplaceANewerDeadlineForTheSameAccessory" in (ROOT / "app/src/test/java/com/thiefalertsequre/app/A2DisconnectSchedulerMergeTest.kt").read_text(encoding="utf-8"),
     "root diagnostics have bounded execution and forceful timeout cleanup":
         "timeoutSeconds.coerceIn(1L, 30L)" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8")
         and "destroyForcibly()" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8")
