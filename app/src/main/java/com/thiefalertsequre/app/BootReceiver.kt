@@ -145,21 +145,23 @@ class BootReceiver : BroadcastReceiver() {
 
     private fun enforceMonitorOptOut(context: Context): ProtectionState {
         val store = ProtectionStore(context)
-        val current = store.read()
-        if (current.mode == ProtectionMode.ALARM_TRIGGERED) return current
         val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
-        if (current.mode == ProtectionMode.ARMED || current.mode == ProtectionMode.COUNTDOWN) {
-            if (!monitorEnabled(context) &&
-                !monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
-            ) {
+        val activeRepair = store.runIfProtectionActive {
+            if (monitorEnabled(context)) true
+            else monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
+        }
+        if (activeRepair != null) {
+            if (!activeRepair) {
                 LocalTamperHistory.record(
                     context, "active_monitor_preference_repair_failed",
                     "Boot preserved active protection, but the monitor-enabled preference could not be restored"
                 )
             }
             A2BluetoothReceiverController.sync(context)
-            return current
+            return store.read()
         }
+        val current = store.read()
+        if (current.mode == ProtectionMode.ALARM_TRIGGERED) return current
         if (monitorEnabled(context)) return current
 
         // Owner opt-out may clear optional monitoring state only while the
