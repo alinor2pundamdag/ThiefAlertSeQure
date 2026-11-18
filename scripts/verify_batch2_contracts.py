@@ -81,6 +81,13 @@ checks = {
         )
         and "if (!removed) return false" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
         and "if (!cleared) return false" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8"),
+    "countdown cancellation retains the OS callback if its durable token cannot be cleared":
+        (APP / "AlarmScheduler.kt").read_text(encoding="utf-8").index(
+            "var cleared = prefs.edit().remove(KEY_LAST_TOKEN).commit()"
+        ) < (APP / "AlarmScheduler.kt").read_text(encoding="utf-8").index(
+            "alarmManager.cancel(pendingIntent(context, it, namespace))"
+        )
+        and "else {\n                    stored.value?.let { alarmManager.cancel(pendingIntent(context, it, namespace)) }" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8"),
     "orderly shutdown is observed only through the dynamically registered system receiver":
         "Intent.ACTION_SHUTDOWN" in monitor and "ContextCompat.registerReceiver(this, systemReceiver" in monitor,
     "shutdown event is diagnostic and does not claim to block system shutdown":
