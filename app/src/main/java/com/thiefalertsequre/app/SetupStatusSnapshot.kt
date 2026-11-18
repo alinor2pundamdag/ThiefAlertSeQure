@@ -47,6 +47,7 @@ object SetupStatusSnapshot {
   x+=BluetoothSetupStatusPolicy.adapter(a2Enabled,adapter)
   val enabled=SafePreferences.boolean(prefs,ProtectionMonitorService.KEY_ENABLED,ProtectionMonitorPolicy.DEFAULT_ENABLED)
   val protectionMode=ProtectionStore(c).read().mode
+  val monitorRequired=enabled||protectionMode==ProtectionMode.ARMED||protectionMode==ProtectionMode.COUNTDOWN
   val running=runCatching{c.getSystemService(ActivityManager::class.java).getRunningServices(100).any{it.service.className==ProtectionMonitorService::class.java.name}}.getOrDefault(false)
   x+=when{
    protectionMode==ProtectionMode.ALARM_TRIGGERED->SetupItem("monitor","Protection monitor",SetupState.NEUTRAL,"The latched alarm is handled by AlarmService.")
@@ -59,7 +60,7 @@ object SetupStatusSnapshot {
    is PreferenceRead.Value -> {
     val trustedDevices=registry.value
     val baselineCount=trustedDevices.count{TrustedBluetoothRegistry.isBaselineConnected(prefs,it.address)}
-    x+=A2SetupStatusPolicy.evaluate(a2Enabled,trustedDevices.size,perm,adapter,enabled,running,baselineCount,ProtectionClock.bootCount(c)>=0)
+    x+=A2SetupStatusPolicy.evaluate(a2Enabled,trustedDevices.size,perm,adapter,monitorRequired,running,baselineCount,ProtectionClock.bootCount(c)>=0)
    }
    is PreferenceRead.Corrupt -> x+=SetupItem(
     "a2_registry","Trusted Bluetooth registry",SetupState.UNKNOWN,
