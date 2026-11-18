@@ -63,6 +63,11 @@ required = {
         and main.index("OwnerAuthenticationCoordinator.complete(this, proof)") < main.index("CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this)")
         and "Lifecycle.State.STARTED" in camera_capture
         and "authenticationSucceeded && activityVisible" in camera_policy,
+    "camera callbacks use lifecycle state snapshots without reading Activity state off-thread":
+        camera_capture.count("isActivityVisible(activity)") == 1
+        and "if (!activityVisible.get())" in camera_capture
+        and "val displayRotationDegrees = when (activity.windowManager.defaultDisplay.rotation)" in camera_capture
+        and "val displayRotation = when (activity.windowManager.defaultDisplay.rotation)" not in camera_capture,
     "Gallery is the default and encryption is an explicit future-capture setting":
         "KEY_ENCRYPT_NEW_PHOTOS" in camera_capture
         and "SafePreferences.readBoolean" in camera_capture
