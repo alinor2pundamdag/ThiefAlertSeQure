@@ -98,25 +98,34 @@ class AlarmService : Service() {
             return START_NOT_STICKY
         }
         try {
-            // Promote immediately before locking the device; lockNow() may
-            // turn the display off and must not delay the FGS startup deadline.
+            // Promote immediately, then start primary audio before any optional
+            // UI, telemetry, or Device Owner work.
             startForeground(NOTIFICATION_ID, notification())
-            // Start the primary audible alarm immediately after foreground
-            // promotion. Dashboard refresh and optional Device Owner locking
-            // must never delay the core alarm output.
             if (player == null && toneController == null) startAlarmAudio()
-            BatchThreeUiBridge.refresh(this)
-            AlarmRecoveryCoordinator.onServiceStarted(this)
-            val alarmStartedAt = ProtectionStore(this).read().changedAtEpochMs
-            lockDeviceIfAdminEnabled(alarmStartedAt)
-            LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active; primary alarm output requested; device-lock request issued")
         } catch (error: Exception) {
-            LocalTamperHistory.record(this, "alarm_service_start_failed", error.javaClass.simpleName + ": " + error.message)
-            AlarmRecoveryCoordinator.onStartFailure(
-                this, "Android refused to keep the alarm foreground service running"
-            )
+            runCatching {
+                LocalTamperHistory.record(this, "alarm_service_start_failed", error.javaClass.simpleName + ": " + error.message)
+            }
+            runCatching {
+                AlarmRecoveryCoordinator.onStartFailure(
+                    this, "Android refused to keep the alarm foreground service running"
+                )
+            }
             stopSelf()
             return START_NOT_STICKY
+        }
+        // Secondary integrations are isolated: their failures must never stop
+        // the already-running primary alarm output.
+        runCatching { BatchThreeUiBridge.refresh(this) }.onFailure {
+            runCatching { LocalTamperHistory.record(this, "alarm_dashboard_refresh_failed", it.javaClass.simpleName + ": " + it.message) }
+        }
+        runCatching { AlarmRecoveryCoordinator.onServiceStarted(this) }.onFailure {
+            runCatching { LocalTamperHistory.record(this, "alarm_recovery_state_clear_failed", it.javaClass.simpleName + ": " + it.message) }
+        }
+        val alarmStartedAt = runCatching { ProtectionStore(this).read().changedAtEpochMs }.getOrDefault(0L)
+        lockDeviceIfAdminEnabled(alarmStartedAt)
+        runCatching {
+            LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active; primary alarm output requested; device-lock request issued")
         }
         syncAlarmFlash()
         syncSecondaryAlarm()
