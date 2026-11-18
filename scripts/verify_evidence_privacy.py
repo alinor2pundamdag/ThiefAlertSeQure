@@ -112,6 +112,10 @@ required = {
         and "RETENTION_MS = 30L" in camera_policy
         and "CameraEvidencePolicy.isRetained" in camera_media
         and "CameraEvidencePolicy.MAX_IMAGES" in camera_media,
+    "Gallery management only targets exact app-generated photo filenames":
+        "OWNED_IMAGE_NAME = Regex" in camera_media
+        and "if (!OWNED_IMAGE_NAME.matches(displayName)) continue" in camera_media
+        and "getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)" in camera_media,
     "Gallery deletion fails closed when MediaStore enumeration fails":
         "if (!query.success) return false" in camera_media
         and "query.images.forEach" in camera_media
