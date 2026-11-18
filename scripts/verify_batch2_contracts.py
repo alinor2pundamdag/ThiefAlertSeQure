@@ -41,10 +41,18 @@ checks = {
         all(f"@Synchronized\n    {signature}" in trusted_registry for signature in (
             "fun add(prefs: SharedPreferences, address: String, name: String): Boolean {",
             "fun remove(prefs: SharedPreferences, address: String): Boolean {",
-            "fun markConnected(prefs: SharedPreferences, address: String, connected: Boolean): Boolean {",
+            "fun markConnected(\n        prefs: SharedPreferences,\n        address: String,\n        connected: Boolean\n    ): BluetoothBaselineUpdateResult {",
             "fun clearBaselines(prefs: SharedPreferences) {",
             "private fun readStrict(prefs: SharedPreferences): PreferenceRead<List<TrustedBluetoothDevice>> {"
         )),
+    "trusted Bluetooth baseline commits expose storage status separately from prior connection state":
+        "enum class BluetoothBaselineUpdateStatus" in trusted_registry
+        and "val persisted: Boolean get() = status == BluetoothBaselineUpdateStatus.COMMITTED" in trusted_registry
+        and "if (!update.persisted)" in (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
+        and "if (!update.persisted)" in monitor,
+    "A2 deadline callback retries when the protection-state commit fails":
+        "fun scheduleRetry(context: Context, pending: Pending" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
+        and "A2DisconnectScheduler.scheduleRetry(context, pending, 1_000L)" in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8"),
     "orderly shutdown is observed only through the dynamically registered system receiver":
         "Intent.ACTION_SHUTDOWN" in monitor and "ContextCompat.registerReceiver(this, systemReceiver" in monitor,
     "shutdown event is diagnostic and does not claim to block system shutdown":
