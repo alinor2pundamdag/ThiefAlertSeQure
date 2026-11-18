@@ -125,7 +125,8 @@ required = {
         and "CameraEvidenceVault.save(app, original, timestamp)" in camera_media
         and "CameraEvidenceVault.read(app, entry.id)" in camera_media
         and "MessageDigest.isEqual(original, verified)" in camera_media
-        and "MessageDigest.isEqual(original, currentSource)" in camera_media
+        and "pendingDeletions += uri to sha256(original)" in camera_media
+        and "MessageDigest.isEqual(originalDigest, sha256(currentSource))" in camera_media
         and "ProtectionStore(app).runIfDisarmed" in camera_media
         and "CameraEvidenceCapture.isEncryptionEnabled(app)" in camera_media
         and "Encrypt existing Gallery photos into the private vault" in camera_settings
