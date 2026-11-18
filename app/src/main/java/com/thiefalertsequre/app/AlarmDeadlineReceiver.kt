@@ -26,7 +26,7 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
                 if (A2DisconnectScheduler.isDeadlineAction(callbackIntent.action)) {
                     val token = callbackIntent.data?.lastPathSegment
                     if (token != null) A2DisconnectScheduler.find(context, token)?.let {
-                        A2DisconnectScheduler.schedule(context, it)
+                        A2DisconnectScheduler.scheduleRetry(context, it, 1_000L)
                     }
                 } else if (ProtectionStore(context).read().mode == ProtectionMode.ALARM_TRIGGERED) {
                     AlarmRecoveryCoordinator.onStartFailure(
@@ -115,7 +115,25 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             )
         }
         if (!update.persisted) {
-            LocalTamperHistory.record(context, "a2_alarm_state_persist_failed", "A2 alarm was not started because the latched state could not be committed")
+            LocalTamperHistory.record(
+                context, "a2_alarm_state_persist_failed",
+                "A2 alarm state could not be committed; the current deadline is retained for a bounded retry"
+            )
+            when (update.state.mode) {
+                ProtectionMode.ARMED -> {
+                    if (!A2DisconnectScheduler.scheduleRetry(context, pending, 1_000L)) {
+                        LocalTamperHistory.record(
+                            context, "a2_alarm_retry_unavailable",
+                            "The expired A2 deadline remains persisted, but no retry callback could be scheduled"
+                        )
+                    }
+                }
+                ProtectionMode.ALARM_TRIGGERED -> {
+                    A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+                    startAlarm(context, "Recovering a fail-closed A2 alarm state")
+                }
+                else -> A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+            }
             return
         }
         A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)

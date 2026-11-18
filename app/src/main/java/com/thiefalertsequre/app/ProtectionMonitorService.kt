@@ -47,105 +47,20 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private val powerTransitionReceiver = PowerTransitionReceiver()
     private val pendingBluetoothRunnables = mutableMapOf<String, Runnable>()
     private val bluetoothSeparationReceiver = object : BroadcastReceiver() {
-        @Suppress("DEPRECATION", "MissingPermission")
         override fun onReceive(context: Context, intent: Intent) {
-            A2DisconnectStateLock.withLock {
-            // Anchor the grace deadline to broadcast receipt, not the time spent
-            // validating encrypted trust state and protection guards.
-            if (!SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) return
-            val eventUptimeMs = android.os.SystemClock.uptimeMillis()
-            val eventElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime()
-            val eventEpochMs = System.currentTimeMillis()
-            if (!SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false)) return
-            if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                A2BluetoothReceiverController.sync(context)
-                LocalTamperHistory.record(context, "bluetooth_permission_missing", "Trusted Bluetooth disconnect monitoring paused; grant Bluetooth Connect permission")
-                return
-            }
-            val device = runCatching { intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE) }.getOrNull() ?: return
-            val address = device.address ?: return
-            if (!TrustedBluetoothRegistry.isTrusted(prefs, address)) return
-            when (intent.action) {
-                BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                    TrustedBluetoothRegistry.markConnected(prefs, address, true)
-                    pendingBluetoothRunnables.remove(address)?.let(handler::removeCallbacks)
-                    A2DisconnectScheduler.cancel(context, address)
-                    LocalTamperHistory.record(context, "trusted_bluetooth_connected", "A registered trusted Bluetooth device connected")
-                }
-                BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
-                    val hadConnectionBaseline = TrustedBluetoothRegistry.markConnected(prefs, address, false)
-                    if (A2DisconnectPolicy.shouldStartGracePeriod(
-                            alertEnabled = SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false),
-                            trusted = TrustedBluetoothRegistry.isTrusted(prefs, address),
-                            hadConnectionBaseline = hadConnectionBaseline,
-                            protectionMode = ProtectionStore(context).read().mode
-                        )
-                    ) {
-                        pendingBluetoothRunnables.remove(address)?.let(handler::removeCallbacks)
-                        val monitorRevision = TrustedBluetoothRegistry.revision(prefs)
-                        val deviceRevision = TrustedBluetoothRegistry.deviceRevision(prefs, address)
-                        val runnable = Runnable {
-                            A2DisconnectStateLock.withLock {
-                                pendingBluetoothRunnables.remove(address)
-                            val stillTrusted = TrustedBluetoothRegistry.isTrusted(prefs, address)
-                            val pendingDisconnectCurrent = A2DisconnectPolicy.isPendingDisconnectCurrent(
-                                monitorRevision,
-                                TrustedBluetoothRegistry.revision(prefs),
-                                deviceRevision,
-                                TrustedBluetoothRegistry.deviceRevision(prefs, address)
-                            )
-                            val stillDisconnected = !TrustedBluetoothRegistry.isBaselineConnected(prefs, address)
-                            if (A2DisconnectPolicy.shouldTriggerAlarm(
-                                    alertEnabled = SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false),
-                                    trusted = stillTrusted,
-                                    pendingDisconnectCurrent = pendingDisconnectCurrent,
-                                    stillDisconnected = stillDisconnected,
-                                    protectionMode = ProtectionStore(this@ProtectionMonitorService).read().mode
-                                )
-                            ) {
-                                val now = System.currentTimeMillis()
-                                var transitioned = false
-                                val update = ProtectionStore(this@ProtectionMonitorService).updatePersisted { current ->
-                                    if (current.mode != ProtectionMode.ARMED) current else {
-                                        transitioned = true
-                                        ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, now, 0L, ProtectionClock.bootCount(this@ProtectionMonitorService))
-                                    }
-                                }
-                                val next = update.state
-                                if (transitioned && update.persisted && next.mode == ProtectionMode.ALARM_TRIGGERED) {
-                                    LocalTamperHistory.record(this@ProtectionMonitorService, "trusted_bluetooth_separation_alarm", "A registered trusted Bluetooth device remained disconnected beyond grace period")
-                                    unregisterMotionSensor()
-                                    startTheftAlarm()
-                                }
-                            }
-                            }
-                        }
-                        pendingBluetoothRunnables[address] = runnable
-                        val durableScheduled = A2DisconnectScheduler.schedule(
-                            this@ProtectionMonitorService,
-                            A2DisconnectScheduler.Pending(
-                                address = address,
-                                eventEpochMs = eventEpochMs,
-                                eventElapsedRealtimeMs = eventElapsedRealtimeMs,
-                                bootCount = ProtectionClock.bootCount(this@ProtectionMonitorService),
-                                monitorRevision = monitorRevision,
-                                deviceRevision = deviceRevision
-                            )
-                        )
-                        if (!durableScheduled) {
-                            LocalTamperHistory.record(context, "a2_durable_deadline_unavailable", "Using the in-process grace timer because the durable A2 deadline could not be scheduled")
-                        }
-                        handler.postAtTime(
-                            runnable,
-                            A2DisconnectPolicy.graceDeadlineUptimeMs(eventUptimeMs, BLUETOOTH_DISCONNECT_GRACE_MS)
-                        )
-                        LocalTamperHistory.record(context, "trusted_bluetooth_disconnected", "Registered trusted device disconnected; 8-second grace period started")
-                    }
-                }
-            }
-            }
+            val receipt = A2BluetoothEventReceipt.capture(context)
+            val pendingResult = goAsync()
+            enqueueA2BluetoothEvent(
+                context = context,
+                intent = intent,
+                receipt = receipt,
+                source = "a2_runtime_receiver",
+                onResult = ::handleBluetoothEventResult,
+                onFinished = { pendingResult.finish() }
+            )
         }
     }
+    private var serviceDestroyed = false
     private var alertPlayer: MediaPlayer? = null
     private val prefs by lazy { getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
 
@@ -315,6 +230,121 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         isBluetoothReceiverRegistered = true
         A2BluetoothReceiverController.sync(this)
         LocalTamperHistory.record(this, "trusted_bluetooth_receiver_registered", "Trusted Bluetooth separation monitoring active; manifest receiver covers process-death ACL events")
+    }
+
+    private fun handleBluetoothEventResult(result: A2BluetoothEventResult) {
+        A2DisconnectStateLock.withLock {
+            if (serviceDestroyed || !bluetoothReceiverRegistered) return@withLock
+            when (result) {
+                is A2BluetoothEventResult.Connected -> {
+                    pendingBluetoothRunnables.remove(result.address)?.let(handler::removeCallbacks)
+                }
+                is A2BluetoothEventResult.Disconnected -> {
+                    val candidate = result.candidate
+                    val address = candidate.pending.address
+                    pendingBluetoothRunnables.remove(address)?.let(handler::removeCallbacks)
+                    val runnable = Runnable { handleBluetoothDisconnectDeadline(candidate) }
+                    pendingBluetoothRunnables[address] = runnable
+                    val deadline = A2DisconnectPolicy.graceDeadlineUptimeMs(
+                        candidate.eventUptimeMs, BLUETOOTH_DISCONNECT_GRACE_MS
+                    )
+                    if (!handler.postAtTime(runnable, deadline)) {
+                        pendingBluetoothRunnables.remove(address)
+                        LocalTamperHistory.record(
+                            this, "a2_in_process_timer_unavailable",
+                            "Android did not accept the in-process A2 grace timer; the durable AlarmManager deadline remains authoritative"
+                        )
+                    }
+                }
+                A2BluetoothEventResult.Ignored -> Unit
+            }
+        }
+    }
+
+    private fun handleBluetoothDisconnectDeadline(candidate: A2BluetoothDisconnectCandidate) {
+        A2DisconnectStateLock.withLock {
+            val pending = candidate.pending
+            pendingBluetoothRunnables.remove(pending.address)
+            val monitorEnabled = SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+            val alertEnabled = SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false)
+            val permissionGranted = A2DisconnectPolicy.hasBluetoothConnectPermission(
+                Build.VERSION.SDK_INT,
+                checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            )
+            val store = ProtectionStore(this)
+            val currentMode = store.read().mode
+            if (currentMode == ProtectionMode.ALARM_TRIGGERED) {
+                A2DisconnectScheduler.cancel(this, pending.address, pending.eventElapsedRealtimeMs)
+                startTheftAlarm()
+                return@withLock
+            }
+            val stillTrusted = TrustedBluetoothRegistry.isTrusted(prefs, pending.address)
+            val pendingDisconnectCurrent = A2DisconnectPolicy.isPendingDisconnectCurrent(
+                pending.monitorRevision,
+                TrustedBluetoothRegistry.revision(prefs),
+                pending.deviceRevision,
+                TrustedBluetoothRegistry.deviceRevision(prefs, pending.address)
+            )
+            val stillDisconnected = !TrustedBluetoothRegistry.isBaselineConnected(prefs, pending.address)
+            val valid = monitorEnabled && permissionGranted &&
+                A2DisconnectPolicy.shouldTriggerAlarm(
+                    alertEnabled = alertEnabled,
+                    trusted = stillTrusted,
+                    pendingDisconnectCurrent = pendingDisconnectCurrent,
+                    stillDisconnected = stillDisconnected,
+                    protectionMode = currentMode
+                )
+            if (!valid) {
+                A2DisconnectScheduler.cancel(this, pending.address, pending.eventElapsedRealtimeMs)
+                return@withLock
+            }
+
+            val now = System.currentTimeMillis()
+            var transitioned = false
+            val update = store.updatePersisted { current ->
+                if (current.mode != ProtectionMode.ARMED) current else {
+                    transitioned = true
+                    ProtectionState(
+                        ProtectionMode.ALARM_TRIGGERED, 0L, now, 0L,
+                        ProtectionClock.bootCount(this)
+                    )
+                }
+            }
+            if (!update.persisted) {
+                LocalTamperHistory.record(
+                    this, "a2_alarm_state_persist_failed",
+                    "In-process A2 alarm state commit failed; the durable deadline will retry if its record is still current"
+                )
+                when (update.state.mode) {
+                    ProtectionMode.ARMED -> {
+                        if (!A2DisconnectScheduler.scheduleRetry(this, pending, 1_000L)) {
+                            LocalTamperHistory.record(
+                                this, "a2_alarm_retry_unavailable",
+                                "The A2 state commit failed and no current durable retry callback could be scheduled"
+                            )
+                        }
+                    }
+                    ProtectionMode.ALARM_TRIGGERED -> {
+                        A2DisconnectScheduler.cancel(this, pending.address, pending.eventElapsedRealtimeMs)
+                        startTheftAlarm()
+                    }
+                    else -> A2DisconnectScheduler.cancel(this, pending.address, pending.eventElapsedRealtimeMs)
+                }
+                return@withLock
+            }
+
+            A2DisconnectScheduler.cancel(this, pending.address, pending.eventElapsedRealtimeMs)
+            if (update.state.mode == ProtectionMode.ALARM_TRIGGERED) {
+                if (transitioned) {
+                    LocalTamperHistory.record(
+                        this, "trusted_bluetooth_separation_alarm",
+                        "A registered trusted Bluetooth device remained disconnected beyond grace period"
+                    )
+                }
+                unregisterMotionSensor()
+                startTheftAlarm()
+            }
+        }
     }
 
     private fun reconcileStablePowerState() {
@@ -669,6 +699,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         if (powerReceiverRegistered) runCatching { unregisterReceiver(powerTransitionReceiver) }
         powerReceiverRegistered = false
         A2DisconnectStateLock.withLock {
+            serviceDestroyed = true
             pendingBluetoothRunnables.values.forEach(handler::removeCallbacks)
             pendingBluetoothRunnables.clear()
             isBluetoothReceiverRegistered = false

@@ -17,20 +17,28 @@ object A2DisconnectPolicy {
     fun hasBluetoothConnectPermission(apiLevel: Int, permissionGranted: Boolean): Boolean =
         apiLevel < 31 || permissionGranted
 
-    /** Rejects stale timers after reboot, including OEMs where BOOT_COUNT is unreadable. */
+    /** A durable callback requires a verifiable boot identity; elapsedRealtime alone is insufficient. */
     fun isSameBoot(
         storedBootCount: Int,
         currentBootCount: Int,
         eventElapsedRealtimeMs: Long,
         currentElapsedRealtimeMs: Long
     ): Boolean {
-        // elapsedRealtime must move forward within the same boot. Boot count
-        // alone must not legitimize a corrupt or future-dated persisted event.
+        if (storedBootCount < 0 || currentBootCount < 0 || storedBootCount != currentBootCount) return false
         if (eventElapsedRealtimeMs <= 0L || currentElapsedRealtimeMs < eventElapsedRealtimeMs) return false
-        if (storedBootCount >= 0 || currentBootCount >= 0) {
-            return storedBootCount >= 0 && currentBootCount >= 0 && storedBootCount == currentBootCount
-        }
         return true
+    }
+
+    /** Retry callbacks never move before the original grace deadline. */
+    fun retryDeadlineElapsedRealtimeMs(
+        originalDeadlineElapsedRealtimeMs: Long,
+        nowElapsedRealtimeMs: Long,
+        retryDelayMs: Long
+    ): Long {
+        require(originalDeadlineElapsedRealtimeMs >= 0L && nowElapsedRealtimeMs >= 0L && retryDelayMs >= 0L)
+        val retryAt = if (Long.MAX_VALUE - nowElapsedRealtimeMs < retryDelayMs) Long.MAX_VALUE
+            else nowElapsedRealtimeMs + retryDelayMs
+        return maxOf(originalDeadlineElapsedRealtimeMs, retryAt)
     }
 
     fun shouldStartGracePeriod(

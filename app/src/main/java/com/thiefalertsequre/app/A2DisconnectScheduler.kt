@@ -32,10 +32,17 @@ internal object A2DisconnectScheduler {
     }
 
     fun schedule(context: Context, pending: Pending): Boolean = A2DisconnectStateLock.withLock {
+        if (pending.bootCount < 0) {
+            LocalTamperHistory.record(
+                context, "a2_deadline_boot_identity_unavailable",
+                "A durable A2 deadline was not scheduled because Android did not expose a verifiable boot count; the in-process timer remains available while the service is alive"
+            )
+            return@withLock false
+        }
         if (!TrustedBluetoothRegistry.isValidAddress(pending.address) ||
             pending.eventEpochMs <= 0L || pending.eventElapsedRealtimeMs <= 0L ||
             pending.eventElapsedRealtimeMs > android.os.SystemClock.elapsedRealtime() ||
-            pending.bootCount < -1 || pending.monitorRevision < 0L || pending.deviceRevision < 0L
+            pending.monitorRevision < 0L || pending.deviceRevision < 0L
         ) {
             LocalTamperHistory.record(context, "a2_deadline_metadata_rejected", "Invalid trusted-device deadline metadata was rejected")
             return@withLock false
@@ -63,8 +70,46 @@ internal object A2DisconnectScheduler {
             return@withLock false
         }
         var allScheduled = true
-        records.forEach { if (!scheduleCallbacks(context, it)) allScheduled = false }
+        records.forEach { pending ->
+            if (pending.bootCount < 0) {
+                allScheduled = false
+                LocalTamperHistory.record(
+                    context, "a2_deadline_boot_identity_unavailable",
+                    "A persisted A2 deadline was not rescheduled because its boot identity cannot be verified"
+                )
+            } else if (!scheduleCallbacks(context, pending)) {
+                allScheduled = false
+            }
+        }
         allScheduled
+    }
+
+    /** Re-schedule a still-current expired deadline after a transient state-store commit failure. */
+    fun scheduleRetry(context: Context, pending: Pending, delayMs: Long): Boolean = A2DisconnectStateLock.withLock {
+        if (pending.bootCount < 0 || delayMs < 0L) return@withLock false
+        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        val records = read(prefs) ?: run {
+            LocalTamperHistory.record(context, "a2_deadline_retry_store_unreadable", "A2 retry could not read the encrypted deadline; source retained")
+            return@withLock false
+        }
+        val current = records.firstOrNull {
+            it.address.equals(pending.address, true) &&
+                it.eventElapsedRealtimeMs == pending.eventElapsedRealtimeMs &&
+                it.monitorRevision == pending.monitorRevision &&
+                it.deviceRevision == pending.deviceRevision
+        } ?: return@withLock false
+        val nowElapsed = android.os.SystemClock.elapsedRealtime()
+        val retryAt = A2DisconnectPolicy.retryDeadlineElapsedRealtimeMs(
+            current.deadlineElapsedRealtimeMs, nowElapsed, delayMs.coerceAtLeast(250L)
+        )
+        val scheduled = scheduleCallbacks(context, current, retryAt)
+        if (!scheduled) {
+            LocalTamperHistory.record(
+                context, "a2_deadline_retry_schedule_failed",
+                "The current A2 deadline remains persisted, but Android did not accept its retry callback"
+            )
+        }
+        scheduled
     }
 
     fun find(context: Context, token: String): Pending? = A2DisconnectStateLock.withLock {
@@ -169,11 +214,19 @@ internal object A2DisconnectScheduler {
         .digest(address.trim().uppercase().toByteArray(StandardCharsets.UTF_8))
         .joinToString("") { "%02x".format(it) }
 
-    private fun scheduleCallbacks(context: Context, pending: Pending): Boolean = runCatching {
+    private fun scheduleCallbacks(
+        context: Context,
+        pending: Pending,
+        minimumTriggerAtElapsedRealtimeMs: Long? = null
+    ): Boolean = runCatching {
         val manager = context.getSystemService(AlarmManager::class.java)
         val exactOperation = pendingIntent(context, pending.address, fallback = false)
         val fallbackOperation = pendingIntent(context, pending.address, fallback = true)
-        val deadline = pending.deadlineElapsedRealtimeMs.coerceAtLeast(android.os.SystemClock.elapsedRealtime())
+        val deadline = maxOf(
+            pending.deadlineElapsedRealtimeMs,
+            android.os.SystemClock.elapsedRealtime(),
+            minimumTriggerAtElapsedRealtimeMs ?: 0L
+        )
         val exactAllowed = A2DisconnectPolicy.shouldScheduleExactAlarm(
             Build.VERSION.SDK_INT,
             Build.VERSION.SDK_INT < 31 || manager.canScheduleExactAlarms()
