@@ -194,6 +194,9 @@ object ManagedProtectionController {
     }
 
     fun disable(activity: Activity) {
+        check(!ConfigurationBackup.isRestoreOrRecoveryInProgress() &&
+            ConfigurationBackup.recoverPendingRestore(activity)
+        ) { "Managed lockdown recovery is unavailable until interrupted settings recovery completes." }
         val completed = ProtectionStore(activity).runIfDisarmed {
             disableWhileDisarmed(activity)
             true
