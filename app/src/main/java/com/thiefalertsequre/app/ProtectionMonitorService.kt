@@ -80,9 +80,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             if (!TrustedBluetoothRegistry.isTrusted(prefs, address)) return
             when (intent.action) {
                 BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                    val update = TrustedBluetoothRegistry.markConnected(prefs, address, true)
                     pendingBluetoothRunnables.remove(address)?.let(handler::removeCallbacks)
                     A2DisconnectScheduler.cancelAfterConfirmedConnection(context, address, eventElapsedRealtimeMs)
+                    val update = TrustedBluetoothRegistry.markConnected(prefs, address, true)
                     if (!update.persisted) {
                         LocalTamperHistory.record(context, "a2_baseline_update_failed", "Bluetooth connected, but its encrypted connection baseline could not be committed; disconnect detection may require reconnecting the accessory")
                     }
