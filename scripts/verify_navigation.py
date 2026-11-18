@@ -151,7 +151,8 @@ for required in (
     "buildStudioHdrEnvironment", "HDRLoader.createTexture", "IBLPrefilterContext.EquirectangularToCubemap",
     "IBLPrefilterContext.SpecularFilter", "IndirectLight.Builder()", "Skybox.Builder().environment",
     "bevelDepth = 0.045f", "clipToBisector", "seeds.take(18)", "mass = (area * depth * 18f)",
-    "val normalImpulse", "rimLightEntities"
+    "val normalImpulse", "rimLightEntities", "FogOptions()", "fogColorFromIbl = true",
+    "BloomOptions()", "DepthOfFieldOptions()", "AmbientOcclusionOptions()", "DynamicResolutionOptions()"
 ):
     if required not in renderer_activity:
         errors.append("Genesis 3D renderer missing PBR/fracture contract: " + required)
