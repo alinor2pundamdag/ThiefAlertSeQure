@@ -539,6 +539,108 @@ private fun GenesisFractureCanvas(
         val fracture = ((progress - 0.23f) / 0.36f).coerceIn(0f, 1f)
         val native = drawContext.canvas.nativeCanvas
 
+        // Security awakening: restrained perimeter scan, concentric detection pulses,
+        // and a moving red scan beam establish the anti-theft identity before impact.
+        val awakening = ((progress - 0.025f) / 0.205f).coerceIn(0f, 1f)
+        if (awakening > 0f && progress < 0.245f) {
+            val fade = (1f - ((progress - 0.19f) / 0.055f).coerceIn(0f, 1f))
+            val ringPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                style = AndroidPaint.Style.STROKE
+                strokeWidth = 1.05f
+                color = android.graphics.Color.rgb(255, 48, 55)
+                alpha = (fade * 48f).toInt().coerceIn(0, 48)
+            }
+            val ringRadius = size.minDimension * (0.10f + awakening * 0.37f)
+            native.drawCircle(center.x, center.y, ringRadius, ringPaint)
+            native.drawCircle(center.x, center.y, ringRadius * 0.72f, ringPaint.apply {
+                strokeWidth = 0.65f
+                alpha = (fade * 30f).toInt().coerceIn(0, 30)
+            })
+            val scanAngle = progress * 2f * PI.toFloat() * 5.2f
+            val scanLength = size.minDimension * (0.12f + awakening * 0.43f)
+            val scanPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.rgb(255, 66, 72)
+                alpha = (fade * 118f).toInt().coerceIn(0, 118)
+                strokeWidth = 1.35f
+            }
+            native.drawLine(
+                center.x, center.y,
+                center.x + cos(scanAngle) * scanLength,
+                center.y + sin(scanAngle) * scanLength,
+                scanPaint
+            )
+            val reticlePaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.rgb(255, 83, 89)
+                alpha = (fade * 86f).toInt().coerceIn(0, 86)
+                strokeWidth = 1.0f
+            }
+            val reticle = size.minDimension * 0.045f
+            native.drawLine(center.x - reticle, center.y, center.x + reticle, center.y, reticlePaint)
+            native.drawLine(center.x, center.y - reticle, center.x, center.y + reticle, reticlePaint)
+        }
+
+        // A restrained red subsurface core becomes visible through the fractures.
+        val coreProgress = ((progress - 0.235f) / 0.19f).coerceIn(0f, 1f)
+        if (coreProgress > 0f && progress < 0.79f) {
+            val coreFade = (1f - ((progress - 0.66f) / 0.13f).coerceIn(0f, 1f))
+            val pulse = 0.72f + 0.28f * sin(progress * 94f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFFFF2938).copy(alpha = coreFade * pulse * 0.28f),
+                        Color(0xFFB40D20).copy(alpha = coreFade * pulse * 0.16f),
+                        Color(0xFF5A0710).copy(alpha = coreFade * 0.07f),
+                        Color.Transparent
+                    ),
+                    center = center,
+                    radius = size.minDimension * (0.12f + coreProgress * 0.38f)
+                ),
+                radius = size.minDimension * (0.12f + coreProgress * 0.38f),
+                center = center
+            )
+        }
+
+        // Two physical-looking pressure fronts: the shield strike and the heavier
+        // developer-name impact. The rings illuminate and displace the dust field.
+        val firstWave = ((progress - 0.245f) / 0.18f).coerceIn(0f, 1f)
+        val nameWave = ((progress - 0.405f) / 0.31f).coerceIn(0f, 1f)
+        fun drawPressureFront(amount: Float, strength: Float) {
+            if (amount <= 0f || amount >= 1f) return
+            val radius = size.minDimension * (0.035f + amount * 0.78f)
+            val alpha = ((1f - amount) * strength).toInt().coerceIn(0, 255)
+            val frontPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                style = AndroidPaint.Style.STROKE
+                strokeWidth = (1.2f + (1f - amount) * 5.0f)
+                color = android.graphics.Color.rgb(255, 54, 64)
+                this.alpha = alpha
+                setShadowLayer(10f, 0f, 0f, android.graphics.Color.rgb(255, 35, 45))
+            }
+            native.drawCircle(center.x, center.y, radius, frontPaint)
+            frontPaint.clearShadowLayer()
+            frontPaint.strokeWidth = 0.8f
+            frontPaint.alpha = (alpha * 0.38f).toInt()
+            native.drawCircle(center.x, center.y, radius * 1.055f, frontPaint)
+        }
+        drawPressureFront(firstWave, 82f)
+        drawPressureFront(nameWave, 126f)
+
+        // Cinematic anamorphic light streaks are brief and tied to the impact,
+        // rather than persistent decorative lens flares.
+        val impactLight = maxOf(
+            (1f - kotlin.math.abs(progress - 0.265f) / 0.055f).coerceIn(0f, 1f),
+            (1f - kotlin.math.abs(progress - 0.445f) / 0.095f).coerceIn(0f, 1f)
+        )
+        if (impactLight > 0f) {
+            val beamPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.rgb(255, 94, 99)
+                alpha = (impactLight * 58f).toInt().coerceIn(0, 58)
+                strokeWidth = 1.0f
+            }
+            native.drawLine(0f, center.y, size.width, center.y, beamPaint)
+            beamPaint.alpha = (impactLight * 22f).toInt().coerceIn(0, 22)
+            native.drawLine(0f, center.y + 2f, size.width, center.y + 2f, beamPaint)
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && fracture > 0f && materialShader != null) {
             runCatching {
                 drawGenesisRuntimeShader(native, materialShader, size.width, size.height, fracture)
@@ -598,10 +700,13 @@ private fun GenesisFractureCanvas(
                 val seed = ((index * 73 + 19) % 997) / 997f
                 val angle = index * 2.3999632f + seed * 0.55f
                 val travel = dustProgress * size.maxDimension * (0.10f + seed * 0.43f)
-                val x = center.x + cos(angle) * travel
+                val windAmount = ((progress - 0.79f) / 0.21f).coerceIn(0f, 1f)
+                val x = center.x + cos(angle) * travel + windAmount * size.width * (0.48f + seed * 0.42f)
                 val y = center.y + sin(angle) * travel * 0.78f +
-                    dustProgress * dustProgress * size.height * (0.06f + seed * 0.16f)
-                val life = (1f - dustProgress * (0.78f + seed * 0.18f)).coerceIn(0f, 1f)
+                    dustProgress * dustProgress * size.height * (0.06f + seed * 0.16f) -
+                    windAmount * size.height * (0.06f + seed * 0.11f)
+                val life = (1f - dustProgress * (0.78f + seed * 0.18f)) *
+                    (1f - windAmount * (0.72f + seed * 0.22f)).coerceIn(0f, 1f)
                 dustPaint.color = if (index % 4 == 0) android.graphics.Color.rgb(190, 198, 202)
                     else android.graphics.Color.rgb(105, 116, 124)
                 dustPaint.alpha = (life * (34f + seed * 100f)).toInt().coerceIn(0, 120)
@@ -617,10 +722,13 @@ private fun GenesisFractureCanvas(
                 val seed = ((index * 61 + 7) % 991) / 991f
                 val angle = index * 2.3999632f + seed * 0.42f
                 val travel = shardProgress * size.maxDimension * (0.12f + seed * 0.46f)
-                val x = center.x + cos(angle) * travel
+                val windAmount = ((progress - 0.82f) / 0.18f).coerceIn(0f, 1f)
+                val x = center.x + cos(angle) * travel + windAmount * size.width * (0.52f + seed * 0.36f)
                 val y = center.y + sin(angle) * travel * 0.66f +
-                    shardProgress * shardProgress * size.height * (0.10f + seed * 0.20f)
-                val life = (1f - shardProgress * (0.72f + seed * 0.24f)).coerceIn(0f, 1f)
+                    shardProgress * shardProgress * size.height * (0.10f + seed * 0.20f) -
+                    windAmount * size.height * (0.03f + seed * 0.07f)
+                val life = ((1f - shardProgress * (0.72f + seed * 0.24f)) *
+                    (1f - windAmount * (0.78f + seed * 0.20f))).coerceIn(0f, 1f)
                 val shardSize = (2.0f + seed * 8.0f) * (1f - shardProgress * 0.12f)
                 val fragment = android.graphics.Path().apply {
                     moveTo(-shardSize, -shardSize * 0.32f)
@@ -677,10 +785,14 @@ private fun GenesisFractureCanvas(
                 alpha = ((1f - windProgress) * 82f).toInt().coerceIn(0, 82)
                 strokeWidth = 0.8f
             }
-            repeat(56) { index ->
-                val y = (index * 37f + windProgress * size.height * 0.72f) % size.height
-                val x = (index * 67f + windProgress * size.width * 1.7f) % size.width
-                native.drawLine(x, y, x + 10f + windProgress * 28f, y - 0.8f, windPaint)
+            repeat(88) { index ->
+                val seed = ((index * 43 + 17) % 997) / 997f
+                val y = (index * 37f + windProgress * size.height * (0.54f + seed * 0.62f)) % size.height
+                val x = (index * 67f + windProgress * size.width * (1.35f + seed * 1.2f)) % size.width
+                val length = 12f + seed * 34f + windProgress * 52f
+                windPaint.alpha = ((1f - windProgress * 0.78f) * (26f + seed * 66f)).toInt().coerceIn(0, 82)
+                windPaint.strokeWidth = 0.45f + seed * 0.85f
+                native.drawLine(x, y, x + length, y - (seed - 0.5f) * 4f, windPaint)
             }
         }
     }
