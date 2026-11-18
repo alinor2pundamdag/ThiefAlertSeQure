@@ -89,9 +89,18 @@ class GenesisFilamentRendererView(
     )
 
     companion object {
-        init { Filament.init() }
+        // Native Filament initialization must fail closed into the Compose
+        // fallback. A static initializer exception would otherwise crash the
+        // intro before initializeScene() can catch renderer failures.
+        private val filamentInitializationReady by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+            runCatching {
+                Filament.init()
+                true
+            }.getOrDefault(false)
+        }
 
         fun isSupported(context: Context): Boolean {
+            if (!filamentInitializationReady) return false
             if (android.os.Build.VERSION.SDK_INT < 26) return false
             val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
                 ?: return false
