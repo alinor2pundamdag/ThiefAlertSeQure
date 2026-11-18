@@ -111,6 +111,10 @@ required = {
         "PRIVACY_NOTICE_PREFS" in main
         and "MainActivity.PRIVACY_NOTICE_PREFS" in settings
         and "privacy_notice_v5" not in settings,
+    "privacy acknowledgement is deferred during alarm recovery and rechecked afterward":
+        "protectionModeAtLaunch != ProtectionMode.ALARM_TRIGGERED" in main
+        and "privacyDecision" in main[main.index("private fun completeOwnerAuthentication"):]
+        and "showPrivacyScreen()" in main[main.index("private fun completeOwnerAuthentication"):],
     "camera privacy notice and policy preserve explicit opt-in and no-upload boundary":
         "front-camera photo evidence" in main
         and "CAMERA permission is requested only after you choose Enable" in settings
