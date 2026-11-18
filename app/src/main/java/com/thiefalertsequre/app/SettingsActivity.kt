@@ -567,8 +567,9 @@ class SettingsActivity : FragmentActivity() {
         val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
         val cameraPermissionGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         val frontCameraAvailable = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
-        val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(this).size }.getOrDefault(0)
+        val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(this).size }.getOrDefault(-1)
         var galleryEvidenceCount = -1
+        var cameraEvidenceIntegrityVerified = false
         val encryptNewPhotos = CameraEvidenceCapture.isEncryptionEnabled(this)
         val galleryStoragePermissionRequired = !encryptNewPhotos && Build.VERSION.SDK_INT < 29
         val galleryStoragePermissionGranted = !galleryStoragePermissionRequired || (
@@ -587,12 +588,15 @@ class SettingsActivity : FragmentActivity() {
             }.getOrDefault(false)
             val galleryCount = runCatching {
                 CameraEvidenceMediaStore.count(applicationContext)
-            }.getOrDefault(0)
+            }.getOrDefault(-1)
             runOnUiThread {
                 if (!isFinishing && !isDestroyed && root === evidenceRenderRoot) {
                     galleryEvidenceCount = galleryCount
+                    cameraEvidenceIntegrityVerified = cameraEvidenceIntegrity
+                    val encryptedCountLabel = if (cameraEvidenceCount >= 0) "$cameraEvidenceCount encrypted" else "encrypted count UNKNOWN"
+                    val galleryCountLabel = if (galleryCount >= 0) "$galleryCount Gallery" else "Gallery count UNKNOWN (permission/storage unavailable)"
                     cameraEvidenceStatus.text =
-                        "Front-camera photo evidence: ${when { !frontCameraAvailable -> "UNSUPPORTED"; cameraEvidenceEnabled && !cameraPermissionGranted -> "NEEDS CAMERA PERMISSION"; cameraEvidenceEnabled && !galleryStoragePermissionGranted -> "NEEDS GALLERY PERMISSION"; cameraEvidenceEnabled -> "ON"; else -> "OFF" }} • new photos: ${if (encryptNewPhotos) "ENCRYPTED PRIVATE VAULT" else "GALLERY (UNENCRYPTED)"} • $cameraEvidenceCount encrypted / $galleryEvidenceCount Gallery • vault integrity ${if (cameraEvidenceIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}"
+                        "Front-camera photo evidence: ${when { !frontCameraAvailable -> "UNSUPPORTED"; cameraEvidenceEnabled && !cameraPermissionGranted -> "NEEDS CAMERA PERMISSION"; cameraEvidenceEnabled && !galleryStoragePermissionGranted -> "NEEDS GALLERY PERMISSION"; cameraEvidenceEnabled -> "ON"; else -> "OFF" }} • new photos: ${if (encryptNewPhotos) "ENCRYPTED PRIVATE VAULT" else "GALLERY (UNENCRYPTED)"} • $encryptedCountLabel / $galleryCountLabel • vault integrity ${if (cameraEvidenceIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}"
                 }
             }
         }
@@ -692,7 +696,7 @@ class SettingsActivity : FragmentActivity() {
             showCameraEvidenceArchive()
         })
         root.addView(action("Delete all front-camera photos") {
-            if (cameraEvidenceCount == 0 && galleryEvidenceCount == 0) {
+            if (cameraEvidenceCount == 0 && galleryEvidenceCount == 0 && cameraEvidenceIntegrityVerified) {
                 android.widget.Toast.makeText(this, "No app-managed front-camera photos are stored.", android.widget.Toast.LENGTH_SHORT).show()
             } else {
                 MaterialAlertDialogBuilder(this)
