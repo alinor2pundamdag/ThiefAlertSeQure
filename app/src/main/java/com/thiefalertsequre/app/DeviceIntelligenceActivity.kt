@@ -644,11 +644,19 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     }
 
     private fun confirmRootCheck() {
+        if (ProtectionStore(this).read().mode != ProtectionMode.DISARMED) {
+            Toast.makeText(this, "Root authorization diagnostics are available only while protection is DISARMED.", Toast.LENGTH_LONG).show()
+            return
+        }
         MaterialAlertDialogBuilder(this)
             .setTitle("Check root access?")
             .setMessage("This runs the read-only command su -c id. Your Magisk or other superuser manager may display an authorization prompt. The check does not modify files, settings, firmware, or protection behavior. Continue?")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Run check") { _, _ ->
+                if (ProtectionStore(this).read().mode != ProtectionMode.DISARMED) {
+                    Toast.makeText(this, "Protection became active. Root diagnostics were not started.", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
                 rootStatusView.text = "ROOT ACCESS: CHECKING…"
                 rootCheckExecutor.execute {
                     val report = RootCapabilityInspector.verifyRootAuthorization()
