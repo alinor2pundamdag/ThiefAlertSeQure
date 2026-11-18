@@ -80,18 +80,22 @@ internal object CameraEvidenceVault {
         val committed = when (disarmedCommit) {
             true -> true
             false -> false
-            null -> synchronized(this) {
-                // After owner authentication a connected charger may immediately
-                // re-arm protection. In that state, allow a new photo only if there
-                // is free capacity; never evict or prune existing evidence.
-                val currentEntries = readIndex(app) ?: return@synchronized false
-                if (currentEntries.size >= CameraEvidencePolicy.MAX_IMAGES) return@synchronized false
-                val next = (currentEntries + entry)
-                    .sortedBy { it.timestampEpochMs }
-                    .takeLast(CameraEvidencePolicy.MAX_IMAGES)
-                if (next.none { it.id == id }) return@synchronized false
-                writeIndex(app, next)
-            }
+            null -> ProtectionStore(app).runIfProtectionActive { currentState ->
+                // A connected charger may immediately re-arm protection after
+                // successful owner authentication. Preserve that just-captured
+                // evidence only in ARMED; never write a photo during COUNTDOWN
+                // or a newly latched ALARM_TRIGGERED state.
+                if (currentState.mode != ProtectionMode.ARMED) return@runIfProtectionActive false
+                synchronized(this) {
+                    val currentEntries = readIndex(app) ?: return@synchronized false
+                    if (currentEntries.size >= CameraEvidencePolicy.MAX_IMAGES) return@synchronized false
+                    val next = (currentEntries + entry)
+                        .sortedBy { it.timestampEpochMs }
+                        .takeLast(CameraEvidencePolicy.MAX_IMAGES)
+                    if (next.none { it.id == id }) return@synchronized false
+                    writeIndex(app, next)
+                }
+            } == true
         }
         if (!committed) {
             file.delete()
