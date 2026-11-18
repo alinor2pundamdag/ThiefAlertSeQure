@@ -775,9 +775,12 @@ class SettingsActivity : FragmentActivity() {
                                     result.blockedByProtection -> "Migration stopped because protection became active. Remaining Gallery originals were kept."
                                     result.blockedByEncryptionSetting -> "Migration was not started because encryption is OFF. Enable it first."
                                     !result.enumerationSucceeded -> "Gallery photos could not be enumerated. No Gallery originals were removed."
+                                    result.copiedToVault == 0 && result.copyFailures == 0 && result.capacityLimited == 0 &&
+                                        result.unverifiedLegacyPhotos > 0 ->
+                                        "${result.unverifiedLegacyPhotos} older Gallery photo(s) could not be proven app-owned on this Android version, so they were left untouched. Only photos recorded in the app's encrypted ownership index can be migrated or deleted safely."
                                     result.copiedToVault == 0 && result.copyFailures == 0 && result.capacityLimited == 0 ->
-                                        "No app-owned Gallery photos were available to migrate."
-                                    else -> "Encrypted copies verified: ${result.copiedToVault}. Gallery originals removed: ${result.originalsRemoved}. Copy failures: ${result.copyFailures}. Originals kept because removal was not confirmed: ${result.removalFailures}. Capacity-limited originals kept in Gallery: ${result.capacityLimited}. Vault integrity: ${if (result.vaultIntegrityVerified) "VERIFIED" else "FAILED / UNKNOWN"}."
+                                        "No verified app-owned Gallery photos were available to migrate."
+                                    else -> "Encrypted copies verified: ${result.copiedToVault}. Gallery originals removed: ${result.originalsRemoved}. Copy failures: ${result.copyFailures}. Originals kept because removal was not confirmed: ${result.removalFailures}. Capacity-limited originals kept in Gallery: ${result.capacityLimited}. Unverified legacy photos left untouched: ${result.unverifiedLegacyPhotos}. Vault integrity: ${if (result.vaultIntegrityVerified) "VERIFIED" else "FAILED / UNKNOWN"}."
                                 }
                                 MaterialAlertDialogBuilder(this@SettingsActivity)
                                     .setTitle("Photo migration report")
