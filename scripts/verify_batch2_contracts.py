@@ -199,6 +199,10 @@ checks = {
         and "SECTION_PRIVACY" in (APP / "AboutActivity.kt").read_text(encoding="utf-8"),
     "authentication and tamper evidence remain reachable from the owner-authentication section":
         "Review authentication & tamper evidence" in dashboard and "Intent(this, SettingsActivity::class.java)" in dashboard,
+    "baseline reset cannot erase armed or countdown protection":
+        "canResetBaseline(currentState.mode)" in (APP / "PowerTransitionCoordinator.kt").read_text(encoding="utf-8")
+        and "mode == ProtectionMode.DISARMED" in (APP / "PowerTransitionRecoveryPolicy.kt").read_text(encoding="utf-8")
+        and "baselineResetIsAllowedOnlyWhenProtectionIsDisarmed" in (ROOT / "app/src/test/java/com/thiefalertsequre/app/PowerTransitionRecoveryPolicyTest.kt").read_text(encoding="utf-8"),
     "charger countdown remains exactly ten seconds":
         "const val COUNTDOWN_MS = 10_000L" in engine,
 }
