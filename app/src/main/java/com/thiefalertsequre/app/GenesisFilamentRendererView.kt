@@ -217,7 +217,7 @@ class GenesisFilamentRendererView(
                 Point2(0f, -0.94f), Point2(-0.48f, -0.54f),
                 Point2(-0.73f, 0.10f)
             )
-            shieldMesh = createExtrudedMesh(shieldOutline, 0.18f, shieldMaterial!!)
+            shieldMesh = createExtrudedMesh(shieldOutline, 0.18f, shieldMaterial!!, bevelDepth = 0.045f)
             scene?.addEntity(shieldMesh!!.entity)
             shieldRimMaterial = pbrMaterial?.createInstance()?.apply {
                 setParameter("baseColor", Colors.RgbType.SRGB, 0.68f, 0.76f, 0.86f)
@@ -731,7 +731,8 @@ class GenesisFilamentRendererView(
     private fun createExtrudedMesh(
         polygon: List<Point2>,
         depth: Float,
-        material: com.google.android.filament.MaterialInstance
+        material: com.google.android.filament.MaterialInstance,
+        bevelDepth: Float = 0f
     ): Mesh {
         val positions = ArrayList<Float>(512)
         val tangents = ArrayList<Float>(512)
@@ -759,29 +760,54 @@ class GenesisFilamentRendererView(
 
         val centerX = polygon.map { it.x }.average().toFloat()
         val centerY = polygon.map { it.y }.average().toFloat()
+        val bevel = bevelDepth.coerceIn(0f, halfDepth * 0.8f)
+        val insetScale = if (bevel > 0f) 0.925f else 1f
+        val inset = polygon.map { point ->
+            Point2(centerX + (point.x - centerX) * insetScale, centerY + (point.y - centerY) * insetScale)
+        }
         for (i in polygon.indices) {
             val a = polygon[i]
             val b = polygon[(i + 1) % polygon.size]
+            val ia = inset[i]
+            val ib = inset[(i + 1) % inset.size]
             val centerFront = floatArrayOf(centerX, centerY, halfDepth)
-            val aFront = floatArrayOf(a.x, a.y, halfDepth)
-            val bFront = floatArrayOf(b.x, b.y, halfDepth)
-            addTriangle(centerFront, aFront, bFront, floatArrayOf(0f, 0f, 1f))
+            val iaFront = floatArrayOf(ia.x, ia.y, halfDepth)
+            val ibFront = floatArrayOf(ib.x, ib.y, halfDepth)
+            addTriangle(centerFront, iaFront, ibFront, floatArrayOf(0f, 0f, 1f))
 
             val centerBack = floatArrayOf(centerX, centerY, -halfDepth)
-            val aBack = floatArrayOf(a.x, a.y, -halfDepth)
-            val bBack = floatArrayOf(b.x, b.y, -halfDepth)
-            addTriangle(centerBack, bBack, aBack, floatArrayOf(0f, 0f, -1f))
+            val iaBack = floatArrayOf(ia.x, ia.y, -halfDepth)
+            val ibBack = floatArrayOf(ib.x, ib.y, -halfDepth)
+            addTriangle(centerBack, ibBack, iaBack, floatArrayOf(0f, 0f, -1f))
 
             val edgeX = b.x - a.x
             val edgeY = b.y - a.y
             val edgeLength = sqrt(edgeX * edgeX + edgeY * edgeY).coerceAtLeast(0.0001f)
             val sideNormal = floatArrayOf(-edgeY / edgeLength, edgeX / edgeLength, 0f)
-            val aFrontSide = floatArrayOf(a.x, a.y, halfDepth)
-            val bFrontSide = floatArrayOf(b.x, b.y, halfDepth)
-            val aBackSide = floatArrayOf(a.x, a.y, -halfDepth)
-            val bBackSide = floatArrayOf(b.x, b.y, -halfDepth)
-            addTriangle(aFrontSide, aBackSide, bBackSide, sideNormal)
-            addTriangle(aFrontSide, bBackSide, bFrontSide, sideNormal)
+            val frontOuterA = floatArrayOf(a.x, a.y, halfDepth - bevel)
+            val frontOuterB = floatArrayOf(b.x, b.y, halfDepth - bevel)
+            val frontInnerA = floatArrayOf(ia.x, ia.y, halfDepth)
+            val frontInnerB = floatArrayOf(ib.x, ib.y, halfDepth)
+            val backOuterA = floatArrayOf(a.x, a.y, -halfDepth + bevel)
+            val backOuterB = floatArrayOf(b.x, b.y, -halfDepth + bevel)
+            val backInnerA = floatArrayOf(ia.x, ia.y, -halfDepth)
+            val backInnerB = floatArrayOf(ib.x, ib.y, -halfDepth)
+
+            if (bevel > 0f) {
+                val frontBevelNormal = floatArrayOf(
+                    sideNormal[0] * 0.72f, sideNormal[1] * 0.72f, 0.69f
+                )
+                val backBevelNormal = floatArrayOf(
+                    sideNormal[0] * 0.72f, sideNormal[1] * 0.72f, -0.69f
+                )
+                addTriangle(frontOuterA, frontOuterB, frontInnerB, frontBevelNormal)
+                addTriangle(frontOuterA, frontInnerB, frontInnerA, frontBevelNormal)
+                addTriangle(backOuterA, backInnerB, backOuterB, backBevelNormal)
+                addTriangle(backOuterA, backInnerA, backInnerB, backBevelNormal)
+            }
+
+            addTriangle(frontOuterA, backOuterA, backOuterB, sideNormal)
+            addTriangle(frontOuterA, backOuterB, frontOuterB, sideNormal)
         }
 
         val vertexCount = positions.size / 3
