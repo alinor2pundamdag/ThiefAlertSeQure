@@ -136,6 +136,15 @@ required = {
         and "if (!copiedVaultHealthy)" in camera_media
         and camera_media.index("if (!copiedVaultHealthy)") < camera_media.index("for ((uri, originalDigest) in pendingDeletions)")
         and "ProtectionStore(app).runIfDisarmed" in camera_media,
+    "camera evidence retention is non-destructive while protection is active":
+        "ProtectionStore(context).runIfDisarmed" in camera_vault
+        and "readEntry(app, it.id, enforceRetention = false)" in camera_vault
+        and "val noInterruptedWrites" in camera_vault
+        and "currentEntries.size >= CameraEvidencePolicy.MAX_IMAGES" in camera_vault
+        and "ProtectionStore(context).runIfDisarmed" in camera_media
+        and "ProtectionStore(context.applicationContext).runIfDisarmed" in camera_media
+        and "val galleryDeleted = runCatching" in settings
+        and "val vaultDeleted = if (galleryDeleted)" in settings,
     "Gallery deletion fails closed when MediaStore enumeration fails":
         "if (!query.success) return false" in camera_media
         and "query.images.forEach" in camera_media
