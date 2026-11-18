@@ -117,12 +117,16 @@ required = {
         and "RETENTION_MS = 30L" in camera_policy
         and "CameraEvidencePolicy.isRetained" in camera_media
         and "CameraEvidencePolicy.MAX_IMAGES" in camera_media,
-    "Gallery management requires exact app-generated names and MediaStore owner attribution where supported":
+    "Gallery management proves ownership with MediaStore attribution or an encrypted legacy row-ID index":
         "OWNED_IMAGE_NAME = Regex" in camera_media
-        and "if (ownerMatches && OWNED_IMAGE_NAME.matches(displayName)) {" in camera_media
+        and "if (generatedName && ownerMatches)" in camera_media
         and "MediaStore.MediaColumns.OWNER_PACKAGE_NAME" in camera_media
         and "it.getString(ownerCol) == context.packageName" in camera_media
-        and "getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)" in camera_media,
+        and "getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)" in camera_media
+        and "LocalPreferenceCipher.decrypt(LEGACY_INDEX_PURPOSE, encoded)" in camera_media
+        and "legacyIndex.any { entry -> entry.id == id && entry.name == displayName }" in camera_media
+        and "rememberLegacyImage(app, uri, fileName)" in camera_media
+        and "unverifiedLegacyCount += 1" in camera_media,
     "active protection hides private photos and blocks plaintext evidence export":
         "private fun showCameraEvidenceArchive() {\n        if (!requireProtectionDisarmed()) return" in settings
         and "private fun exportHistory(uri: Uri) {\n        if (!requireProtectionDisarmed()) return" in settings
