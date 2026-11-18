@@ -307,6 +307,224 @@ class GenesisFilamentRendererView(
         }
     }
 
+
+    private fun createTextBodies(
+        text: String,
+        material: com.google.android.filament.MaterialInstance,
+        startY: Float,
+        fallVelocity: Float,
+        targetY: Float
+    ): List<LetterBody> {
+        val glyphs = mutableListOf<Pair<Mesh?, Float>>()
+        var totalWidth = 0f
+        text.forEach { character ->
+            if (character.isWhitespace()) {
+                glyphs += null to 0.14f
+                totalWidth += 0.14f
+            } else {
+                val (mesh, width) = createVoxelGlyphMesh(character, material)
+                glyphs += mesh to width
+                totalWidth += width + 0.035f
+            }
+        }
+        totalWidth = (totalWidth - 0.035f).coerceAtLeast(0.1f)
+        var cursor = -totalWidth * 0.5f
+        val result = mutableListOf<LetterBody>()
+        glyphs.forEach { (mesh, width) ->
+            if (mesh != null) {
+                val homeX = cursor + width * 0.5f
+                val body = Body(
+                    mesh = mesh,
+                    x = homeX,
+                    y = startY,
+                    z = 0.34f,
+                    vx = 0f,
+                    vy = fallVelocity,
+                    vz = 0f,
+                    rx = 0f,
+                    ry = 0f,
+                    rz = 0f,
+                    radius = 0.12f
+                )
+                result += LetterBody(body, homeX, targetY, startY, fallVelocity)
+                cursor += width + 0.035f
+            } else {
+                cursor += width
+            }
+        }
+        return result
+    }
+
+    /**
+     * Rasterizes one glyph and extrudes its alpha silhouette into a real voxel-cut 3D
+     * concrete letter. Each character is its own Filament renderable and rigid body.
+     */
+    private fun createVoxelGlyphMesh(
+        character: Char,
+        material: com.google.android.filament.MaterialInstance
+    ): Pair<Mesh, Float> {
+        val bitmap = Bitmap.createBitmap(48, 64, Bitmap.Config.ARGB_8888)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+            textSize = 54f
+        }
+        val glyph = character.toString()
+        val bounds = Rect()
+        paint.getTextBounds(glyph, 0, glyph.length, bounds)
+        val drawX = (bitmap.width - paint.measureText(glyph)) * 0.5f - bounds.left
+        val baseline = (bitmap.height - bounds.height()) * 0.5f - bounds.top
+        Canvas(bitmap).drawText(glyph, drawX, baseline, paint)
+
+        val gridWidth = 24
+        val gridHeight = 32
+        val cell = 0.012f
+        val depth = 0.14f
+        val halfDepth = depth * 0.5f
+        val occupied = Array(gridHeight) { BooleanArray(gridWidth) }
+        var minX = gridWidth
+        var maxX = -1
+        var minY = gridHeight
+        var maxY = -1
+        for (y in 0 until gridHeight) {
+            for (x in 0 until gridWidth) {
+                val px = ((x + 0.5f) * bitmap.width / gridWidth).toInt().coerceIn(0, bitmap.width - 1)
+                val py = ((y + 0.5f) * bitmap.height / gridHeight).toInt().coerceIn(0, bitmap.height - 1)
+                if (android.graphics.Color.alpha(bitmap.getPixel(px, py)) > 70) {
+                    occupied[y][x] = true
+                    minX = min(minX, x)
+                    maxX = max(maxX, x)
+                    minY = min(minY, y)
+                    maxY = max(maxY, y)
+                }
+            }
+        }
+        bitmap.recycle()
+        check(maxX >= minX && maxY >= minY) { "Unable to rasterize 3D glyph: $character" }
+
+        val width = (maxX - minX + 1) * cell
+        val height = (maxY - minY + 1) * cell
+        val positions = ArrayList<Float>(8_192)
+        val tangents = ArrayList<Float>(10_000)
+        val indices = ArrayList<Short>(6_000)
+
+        fun addVertex(point: FloatArray, normal: FloatArray) {
+            positions.add(point[0]); positions.add(point[1]); positions.add(point[2])
+            val tangent = FloatArray(4)
+            MathUtils.packTangentFrame(
+                1f, 0f, 0f,
+                0f, 1f, 0f,
+                normal[0], normal[1], normal[2],
+                tangent
+            )
+            tangents.add(tangent[0]); tangents.add(tangent[1])
+            tangents.add(tangent[2]); tangents.add(tangent[3])
+        }
+
+        fun addTriangle(a: FloatArray, b: FloatArray, c: FloatArray, normal: FloatArray) {
+            val base = (positions.size / 3).toShort()
+            addVertex(a, normal); addVertex(b, normal); addVertex(c, normal)
+            indices.add(base); indices.add((base + 1).toShort()); indices.add((base + 2).toShort())
+        }
+
+        fun addQuad(a: FloatArray, b: FloatArray, c: FloatArray, d: FloatArray, normal: FloatArray) {
+            addTriangle(a, b, c, normal)
+            addTriangle(a, c, d, normal)
+        }
+
+        for (y in minY..maxY) {
+            for (x in minX..maxX) {
+                if (!occupied[y][x]) continue
+                val x0 = (x - minX) * cell - width * 0.5f
+                val x1 = x0 + cell
+                val y0 = (maxY - y) * cell - height * 0.5f
+                val y1 = y0 + cell
+                val front = halfDepth
+                val back = -halfDepth
+
+                addQuad(
+                    floatArrayOf(x0, y0, front), floatArrayOf(x1, y0, front),
+                    floatArrayOf(x1, y1, front), floatArrayOf(x0, y1, front),
+                    floatArrayOf(0f, 0f, 1f)
+                )
+                addQuad(
+                    floatArrayOf(x0, y0, back), floatArrayOf(x0, y1, back),
+                    floatArrayOf(x1, y1, back), floatArrayOf(x1, y0, back),
+                    floatArrayOf(0f, 0f, -1f)
+                )
+
+                if (x == minX || !occupied[y][x - 1]) {
+                    addQuad(
+                        floatArrayOf(x0, y0, back), floatArrayOf(x0, y0, front),
+                        floatArrayOf(x0, y1, front), floatArrayOf(x0, y1, back),
+                        floatArrayOf(-1f, 0f, 0f)
+                    )
+                }
+                if (x == maxX || !occupied[y][x + 1]) {
+                    addQuad(
+                        floatArrayOf(x1, y0, front), floatArrayOf(x1, y0, back),
+                        floatArrayOf(x1, y1, back), floatArrayOf(x1, y1, front),
+                        floatArrayOf(1f, 0f, 0f)
+                    )
+                }
+                if (y == maxY || !occupied[y + 1][x]) {
+                    addQuad(
+                        floatArrayOf(x0, y0, front), floatArrayOf(x0, y0, back),
+                        floatArrayOf(x1, y0, back), floatArrayOf(x1, y0, front),
+                        floatArrayOf(0f, -1f, 0f)
+                    )
+                }
+                if (y == minY || !occupied[y - 1][x]) {
+                    addQuad(
+                        floatArrayOf(x0, y1, back), floatArrayOf(x0, y1, front),
+                        floatArrayOf(x1, y1, front), floatArrayOf(x1, y1, back),
+                        floatArrayOf(0f, 1f, 0f)
+                    )
+                }
+            }
+        }
+
+        val vertexCount = positions.size / 3
+        val vertexSize = 28
+        val vertexData = ByteBuffer.allocateDirect(vertexCount * vertexSize).order(ByteOrder.nativeOrder())
+        for (i in 0 until vertexCount) {
+            vertexData.putFloat(positions[i * 3])
+            vertexData.putFloat(positions[i * 3 + 1])
+            vertexData.putFloat(positions[i * 3 + 2])
+            vertexData.putFloat(tangents[i * 4])
+            vertexData.putFloat(tangents[i * 4 + 1])
+            vertexData.putFloat(tangents[i * 4 + 2])
+            vertexData.putFloat(tangents[i * 4 + 3])
+        }
+        vertexData.flip()
+        val indexData = ByteBuffer.allocateDirect(indices.size * 2).order(ByteOrder.nativeOrder())
+        indices.forEach { indexData.putShort(it) }
+        indexData.flip()
+
+        val activeEngine = checkNotNull(engine)
+        val vertexBuffer = VertexBuffer.Builder()
+            .bufferCount(1)
+            .vertexCount(vertexCount)
+            .attribute(VertexBuffer.VertexAttribute.POSITION, 0, VertexBuffer.AttributeType.FLOAT3, 0, vertexSize)
+            .attribute(VertexBuffer.VertexAttribute.TANGENTS, 0, VertexBuffer.AttributeType.FLOAT4, 12, vertexSize)
+            .build(activeEngine)
+        vertexBuffer.setBufferAt(activeEngine, 0, vertexData)
+        val indexBuffer = IndexBuffer.Builder()
+            .indexCount(indices.size)
+            .bufferType(IndexBuffer.Builder.IndexType.USHORT)
+            .build(activeEngine)
+        indexBuffer.setBuffer(activeEngine, indexData)
+
+        val entity = EntityManager.get().create()
+        RenderableManager.Builder(1)
+            .boundingBox(Box(-width * 0.5f, -height * 0.5f, -halfDepth, width * 0.5f, height * 0.5f, halfDepth))
+            .geometry(0, RenderableManager.PrimitiveType.TRIANGLES, vertexBuffer, indexBuffer, 0, indices.size)
+            .material(0, material)
+            .culling(false)
+            .build(activeEngine, entity)
+        return Mesh(entity, vertexBuffer, indexBuffer) to width
+    }
+
     private fun createFractureBodies(outline: List<Point2>) {
         val center = Point2(0f, 0.05f)
         val subdivisions = 3
