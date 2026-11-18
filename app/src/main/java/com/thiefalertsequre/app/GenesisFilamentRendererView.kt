@@ -10,11 +10,6 @@ import android.opengl.Matrix as GlMatrix
 import android.view.Choreographer
 import android.view.Surface
 import android.view.TextureView
-import com.google.android.filament.AmbientOcclusionOptions
-import com.google.android.filament.BloomOptions
-import com.google.android.filament.DepthOfFieldOptions
-import com.google.android.filament.DynamicResolutionOptions
-import com.google.android.filament.FogOptions
 import com.google.android.filament.Box
 import com.google.android.filament.Camera
 import com.google.android.filament.Colors
@@ -32,6 +27,11 @@ import com.google.android.filament.Skybox
 import com.google.android.filament.SwapChain
 import com.google.android.filament.VertexBuffer
 import com.google.android.filament.View
+import com.google.android.filament.View.AmbientOcclusionOptions
+import com.google.android.filament.View.BloomOptions
+import com.google.android.filament.View.DepthOfFieldOptions
+import com.google.android.filament.View.DynamicResolutionOptions
+import com.google.android.filament.View.FogOptions
 import com.google.android.filament.Viewport
 import com.google.android.filament.android.FilamentHelper
 import com.google.android.filament.android.UiHelper
@@ -225,8 +225,8 @@ class GenesisFilamentRendererView(
                 enabled = true
             }
             filamentView?.dynamicResolutionOptions = DynamicResolutionOptions().apply {
-                minScale = floatArrayOf(0.82f, 0.82f)
-                maxScale = floatArrayOf(1f, 1f)
+                minScale = 0.82f
+                maxScale = 1f
                 sharpness = 0.92f
                 homogeneousScaling = true
                 quality = View.QualityLevel.HIGH
