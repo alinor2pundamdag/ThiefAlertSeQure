@@ -1,8 +1,6 @@
 package com.thiefalertsequre.app
 
 import android.content.Context
-import android.graphics.Matrix
-import android.opengl.GLES20
 import android.opengl.Matrix as GlMatrix
 import android.view.Choreographer
 import android.view.Surface
@@ -27,11 +25,7 @@ import com.google.android.filament.Viewport
 import com.google.android.filament.android.FilamentHelper
 import com.google.android.filament.android.UiHelper
 import com.google.android.filament.filamat.MaterialBuilder
-import kotlin.math.atan2
-import kotlin.math.cos
 import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.sin
 import kotlin.math.sqrt
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -145,10 +139,7 @@ class GenesisFilamentRendererView(context: Context) : TextureView(context) {
             filamentView?.isPostProcessingEnabled = true
             scene?.skybox = Skybox.Builder().color(0f, 0f, 0f, 1f).build(activeEngine)
 
-            val materialPackage = buildPbrMaterial(activeEngine)
-            pbrMaterial = Material.Builder()
-                .payload(materialPackage, materialPackage.remaining())
-                .build(activeEngine)
+            pbrMaterial = buildPbrMaterial(activeEngine)
             shieldMaterial = pbrMaterial?.createInstance()?.apply {
                 setParameter("baseColor", Colors.RgbType.SRGB, 0.34f, 0.43f, 0.52f)
                 setParameter("metallic", 0.92f)
@@ -219,7 +210,7 @@ class GenesisFilamentRendererView(context: Context) : TextureView(context) {
         }
     }
 
-    private fun buildPbrMaterial(activeEngine: Engine): ByteBuffer {
+    private fun buildPbrMaterial(activeEngine: Engine): Material {
         MaterialBuilder.init()
         try {
             val result = MaterialBuilder()
@@ -244,7 +235,7 @@ class GenesisFilamentRendererView(context: Context) : TextureView(context) {
                 .optimization(MaterialBuilder.Optimization.NONE)
                 .build(activeEngine)
             check(result.isValid) { "Filament PBR material compilation failed" }
-            return result.buffer
+            return Material.Builder().payload(result.buffer, result.buffer.remaining()).build(activeEngine)
         } finally {
             MaterialBuilder.shutdown()
         }
@@ -357,7 +348,7 @@ class GenesisFilamentRendererView(context: Context) : TextureView(context) {
         vertexData.flip()
 
         val indexData = ByteBuffer.allocateDirect(indices.size * 2).order(ByteOrder.nativeOrder())
-        indices.forEach(indexData::putShort)
+        indices.forEach { indexData.putShort(it) }
         indexData.flip()
 
         val activeEngine = checkNotNull(engine)
