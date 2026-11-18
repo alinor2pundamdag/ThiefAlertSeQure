@@ -49,11 +49,12 @@ class SettingsActivity : FragmentActivity() {
         override fun onReceive(context: android.content.Context, intent: Intent?) {
             val mode = ProtectionStore(this@SettingsActivity).read().mode
             if (mode != ProtectionMode.DISARMED) {
+                val flashPreviewWasActive = flashPreviewController != null
                 // Release preview-owned audio/torch first. If the alarm latched
                 // during a flash preview, refresh its outputs after the torch is free.
                 stopPreview()
                 stopFlashPreview()
-                if (mode == ProtectionMode.ALARM_TRIGGERED) {
+                if (mode == ProtectionMode.ALARM_TRIGGERED && flashPreviewWasActive) {
                     runCatching {
                         ContextCompat.startForegroundService(
                             this@SettingsActivity,
