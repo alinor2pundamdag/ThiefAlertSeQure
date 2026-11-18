@@ -34,9 +34,23 @@ import java.util.concurrent.Executors
 
 /** Read-only, on-device capability and readiness report. No hardware identifiers are collected. */
 class DeviceIntelligenceActivity : FragmentActivity() {
+    private data class IntegritySnapshot(
+        val protectionStateHealthy: Boolean,
+        val authenticationThrottleHealthy: Boolean,
+        val evidenceVaultHealthy: Boolean,
+        val cameraVaultHealthy: Boolean,
+        val cameraPhotoCount: Int,
+        val recentOutputEvents: List<String>,
+        val error: String? = null
+    )
+
     private lateinit var root: LinearLayout
     private lateinit var rootStatusView: TextView
     private val rootCheckExecutor = Executors.newSingleThreadExecutor()
+    private val integrityExecutor = Executors.newSingleThreadExecutor()
+    @Volatile private var integritySnapshot: IntegritySnapshot? = null
+    @Volatile private var integrityCheckInFlight = false
+    private var hasResumedOnce = false
     private var rangingStatus: String? = null
     private var stopRangingQuery: (() -> Unit)? = null
     private val exportDiagnostics = registerForActivityResult(
@@ -47,11 +61,56 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         PermissionChangeMonitor.check(this)
-        // Re-read permissions, platform capabilities and service status after Android Settings.
-        if (::root.isInitialized) render()
+        // Refresh expensive integrity checks after returning from Android Settings.
+        if (::root.isInitialized) {
+            if (hasResumedOnce) integritySnapshot = null
+            hasResumedOnce = true
+            render()
+        }
+    }
+
+    private fun scheduleIntegritySnapshot() {
+        if (integrityCheckInFlight) return
+        integrityCheckInFlight = true
+        integrityExecutor.execute {
+            val snapshot = runCatching {
+                val integrity = ProtectionStore(applicationContext).integritySnapshot()
+                val evidenceHealthy = LocalEvidenceVault.verifyIntegrity(applicationContext)
+                val cameraHealthy = runCatching {
+                    CameraEvidenceVault.verifyIntegrity(applicationContext)
+                }.getOrDefault(false)
+                val photoCount = runCatching {
+                    CameraEvidenceVault.entries(applicationContext).size
+                }.getOrDefault(-1)
+                val recent = LocalTamperHistory.read(applicationContext, 100)
+                    .filter { line ->
+                        listOf("alarm_audio_", "alarm_audio_focus_", "secondary_alarm_", "alarm_haptics_", "alarm_flash_")
+                            .any(line::contains)
+                    }.takeLast(8).map { it.take(180) }
+                IntegritySnapshot(
+                    integrity.protectionStateHealthy,
+                    integrity.authenticationThrottleHealthy,
+                    evidenceHealthy,
+                    cameraHealthy,
+                    photoCount,
+                    recent
+                )
+            }.getOrElse {
+                IntegritySnapshot(false, false, false, false, -1, emptyList(), it.message ?: it.javaClass.simpleName)
+            }
+            integritySnapshot = snapshot
+            integrityCheckInFlight = false
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed &&
+                    lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                ) render()
+            }
+        }
     }
 
     private fun render() {
+        val integrity = integritySnapshot
+        if (integrity == null) scheduleIntegritySnapshot()
         val scroll = ScrollView(this).apply { isFillViewport = true; setBackgroundColor(getColor(R.color.tas_background)) }
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(22), dp(20), dp(30)) }
         scroll.addView(root)
@@ -642,6 +701,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     override fun onDestroy() {
         clearRangingCallback()
         rootCheckExecutor.shutdownNow()
+        integrityExecutor.shutdownNow()
         super.onDestroy()
     }
 }
