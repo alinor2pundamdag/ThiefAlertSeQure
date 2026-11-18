@@ -35,8 +35,10 @@ object AlarmFlashPatternPolicy {
 
     fun saveSpeedPercent(context: Context, value: Int): Boolean {
         require(value in 50..200)
-        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putInt(KEY_SPEED_PERCENT, value).commit()
+        return ProtectionStore(context).runIfDisarmed {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putInt(KEY_SPEED_PERCENT, value).commit()
+        } == true
     }
 
     fun customTimings(context: Context): Pair<Long, Long> {
@@ -48,18 +50,27 @@ object AlarmFlashPatternPolicy {
 
     fun saveCustomTimings(context: Context, onMs: Long, offMs: Long): Boolean {
         require(onMs in 100L..2_000L && offMs in 100L..2_000L)
-        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putLong(KEY_CUSTOM_ON_MS, onMs).putLong(KEY_CUSTOM_OFF_MS, offMs).commit()
+        return ProtectionStore(context).runIfDisarmed {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putLong(KEY_CUSTOM_ON_MS, onMs).putLong(KEY_CUSTOM_OFF_MS, offMs).commit()
+        } == true
     }
 
     fun save(context: Context, pattern: AlarmFlashPattern): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putString(KEY_PATTERN, pattern.name).commit()
+        ProtectionStore(context).runIfDisarmed {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(KEY_PATTERN, pattern.name).commit()
+        } == true
 
     fun next(context: Context): AlarmFlashPattern {
         val current = read(context)
-        val next = patterns[(patterns.indexOf(current) + 1) % patterns.size]
-        return if (save(context, next)) next else current
+        return ProtectionStore(context).runIfDisarmed {
+            val latest = read(context)
+            val next = patterns[(patterns.indexOf(latest) + 1) % patterns.size]
+            val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(KEY_PATTERN, next.name).commit()
+            if (saved) next else latest
+        } ?: current
     }
 
     fun delayMs(
