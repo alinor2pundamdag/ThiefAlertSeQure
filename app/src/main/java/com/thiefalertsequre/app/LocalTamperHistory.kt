@@ -43,10 +43,12 @@ object LocalTamperHistory {
             LocalTamperHistoryPolicy.newestFirst(value, limit)
         }
 
-    fun clear(context: Context): Boolean {
-        val historyCleared = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().remove(KEY_EVENTS).commit()
-        val evidenceCleared = LocalEvidenceVault.deleteAll(context)
-        return historyCleared && evidenceCleared
-    }
+    fun clear(context: Context): Boolean =
+        ProtectionStore(context).runIfDisarmed {
+            val historyPrefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val historyCleared = historyPrefs.edit().remove(KEY_EVENTS).commit()
+            if (!historyCleared) return@runIfDisarmed false
+            val evidenceCleared = LocalEvidenceVault.deleteAll(context)
+            historyCleared && evidenceCleared
+        } ?: false
 }
