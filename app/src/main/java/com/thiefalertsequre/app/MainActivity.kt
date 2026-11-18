@@ -899,17 +899,25 @@ class MainActivity : FragmentActivity() {
         } else {
             "Independent motion alarm: OFF; charger-removal-only behavior is active."
         }
-        val monitorMessage = if (SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
-            "Charger protection monitor: ENABLED; keep its persistent notification visible. $motionMessage"
-        } else {
-            "Charger protection monitor: OFF by owner choice; automatic plug/unplug detection is unavailable until re-enabled."
+        val monitorMessage = when {
+            state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN ->
+                if (monitorRunning) "Charger protection monitor: ACTIVE for the current armed/countdown state. The monitor remains running until protection is disarmed. $motionMessage"
+                else "Charger protection monitor: NOT CONFIRMED while protection is active. Open Setup Status and review Android background restrictions. $motionMessage"
+            state.mode == ProtectionMode.ALARM_TRIGGERED ->
+                "The latched theft alarm is handled by AlarmService. $motionMessage"
+            SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED) ->
+                "Charger protection monitor: ENABLED; keep its persistent notification visible. $motionMessage"
+            else ->
+                "Charger protection monitor: OFF by owner choice while protection is disarmed; automatic plug/unplug detection is unavailable until re-enabled."
         }
         val keyguard = getSystemService(KeyguardManager::class.java)
         val secureCredentialReady = keyguard.isDeviceSecure
         val exactAlarmReady = Build.VERSION.SDK_INT < 31 || getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
         val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         val monitorRunning = ProtectionMonitorService.isRunning
-        shield.update(state.mode, monitorEnabled && monitorRunning)
+        val activeProtectionRequiresMonitor = state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN
+        val monitorActive = monitorRunning && (monitorEnabled || activeProtectionRequiresMonitor)
+        shield.update(state.mode, monitorActive)
         val bootIdentityReady = ProtectionClock.bootCount(this) >= 0
         val bootIdentityMessage = if (bootIdentityReady) {
             "Boot identity: available for monotonic countdown recovery."
@@ -923,8 +931,10 @@ class MainActivity : FragmentActivity() {
         if (!notificationsAllowed) readinessIssues.add("Allow notifications")
         if (!exactAlarmReady) readinessIssues.add("Allow Alarms & reminders for exact deadline recovery")
         if (!alarmChannelReady) readinessIssues.add("Set Anti-theft alarm notification importance to High")
-        if (!monitorEnabled) readinessIssues.add("Enable charger monitoring")
-        if (monitorEnabled && state.mode != ProtectionMode.ALARM_TRIGGERED && !monitorRunning) {
+        if (!monitorEnabled && state.mode == ProtectionMode.DISARMED) readinessIssues.add("Enable charger monitoring")
+        if ((monitorEnabled || activeProtectionRequiresMonitor) &&
+            state.mode != ProtectionMode.ALARM_TRIGGERED && !monitorRunning
+        ) {
             readinessIssues.add("Wait for the charger-monitor foreground service to start")
         }
         val batteryPowerManager = getSystemService(PowerManager::class.java)
