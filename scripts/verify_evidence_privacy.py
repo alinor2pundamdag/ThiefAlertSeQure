@@ -43,6 +43,11 @@ required = {
         "getLastKnownLocation" in location and "getCurrentLocation" in location and "requestSingleUpdate" in location and "requestLocationUpdates" not in location and "CURRENT_LOCATION_TIMEOUT_MS = 20_000L" in location,
     "freshness is based on monotonic fix age":
         "elapsedRealtimeNanos" in location and "RECENT_CACHED_FIX" in location and "STALE_CACHED_FIX" in location,
+    "location evidence rejects mock and future-dated fixes without discarding other providers":
+        "location.isMock" in location
+        and "location.isFromMockProvider" in location
+        and "ageNanos >= -TimeUnit.SECONDS.toNanos(1)" in location
+        and "location != null && isValidLocation(location)" in location,
     "owner sees explicit consent before location permission request":
         "Save a location snapshot?" in settings and "requestEvidenceLocation.launch" in settings and "Request a current location?" in settings and "requestCurrentEvidenceLocation.launch" in settings,
     "event vault uses AES-GCM local encryption with purpose-bound AAD":
