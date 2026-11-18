@@ -101,6 +101,18 @@ class SettingsActivity : FragmentActivity() {
         }
         render()
     }
+    private val requestGalleryMigrationPermissions = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ ->
+        val readGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        val writeGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        Toast.makeText(
+            this,
+            if (readGranted && writeGranted) "Gallery access granted. Tap Encrypt existing Gallery photos again to start the verified migration."
+            else "Gallery migration was not started because read/write permission was not granted.",
+            Toast.LENGTH_LONG
+        ).show()
+    }
     private val requestCameraEvidencePermissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { _ ->
@@ -710,6 +722,15 @@ class SettingsActivity : FragmentActivity() {
         })
         root.addView(action("Encrypt existing Gallery photos into the private vault") {
             if (!requireProtectionDisarmed()) return@action
+            if (Build.VERSION.SDK_INT < 29 && (
+                ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED ||
+                    ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+            )) {
+                requestGalleryMigrationPermissions.launch(
+                    arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                )
+                return@action
+            }
             if (!CameraEvidenceCapture.isEncryptionEnabled(this)) {
                 android.widget.Toast.makeText(
                     this,
