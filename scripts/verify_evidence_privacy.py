@@ -105,6 +105,11 @@ required = {
         < camera_vault.index("if (!writeIndex(app, next)) return false")
         and camera_vault.index("val allDeleted = files.all")
         < camera_vault.index("if (!prefs.edit().remove(KEY_INDEX).commit()) return false"),
+    "encrypted photo vault enumeration and integrity checks stay off the Settings UI thread":
+        "CameraEvidenceVault.entries(applicationContext)" in settings
+        and "CameraEvidenceVault.entries(this)" not in settings
+        and settings.index("ioExecutor.execute {", settings.index("CAMERA EVIDENCE STORAGE"))
+        < settings.index("CameraEvidenceVault.entries(applicationContext)"),
     "configuration backup schema 2 includes the storage preference and accepts schema 1":
         '"camera_evidence_settings", "encrypt_new_photos"' in configuration
         and 'put("schema", 2)' in configuration
