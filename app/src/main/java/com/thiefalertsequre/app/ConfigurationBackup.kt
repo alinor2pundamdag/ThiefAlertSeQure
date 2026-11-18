@@ -21,6 +21,16 @@ import javax.crypto.spec.SecretKeySpec
  * Owner policy snapshots, Bluetooth identities, permission grants, custom audio
  * content URIs, and the separate evidence vault.
  */
+internal object ConfigurationBackupPolicy {
+    fun canRestore(mode: ProtectionMode): Boolean = mode == ProtectionMode.DISARMED
+
+    fun requireSafeRestoreMode(mode: ProtectionMode) {
+        require(canRestore(mode)) {
+            "Configuration restore is blocked while protection is armed, counting down, or latched. Disarm protection first."
+        }
+    }
+}
+
 internal object ConfigurationBackup {
     private val MAGIC = byteArrayOf(0x54, 0x41, 0x53, 0x43, 0x46, 0x31) // TASCF1
     private val AAD = "ThiefAlertSeQure configuration backup v1".toByteArray(Charsets.UTF_8)
@@ -84,9 +94,7 @@ internal object ConfigurationBackup {
     fun decryptAndRestore(context: Context, bytes: ByteArray, password: CharArray): Int {
         try {
             require(password.size >= 12) { "Configuration backup password must contain at least 12 characters." }
-            require(ProtectionStore(context).read().mode != ProtectionMode.ALARM_TRIGGERED) {
-                "Configuration restore is blocked while protection is latched. Complete fresh owner authentication first."
-            }
+            ConfigurationBackupPolicy.requireSafeRestoreMode(ProtectionStore(context).read().mode)
             val payload = decryptPayload(bytes, password)
             val imported = parse(payload)
             // Validate current values before changing any settings and retain a rollback snapshot.
