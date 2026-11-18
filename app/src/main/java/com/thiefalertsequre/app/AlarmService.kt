@@ -33,7 +33,9 @@ class AlarmService : Service() {
     private var hapticsActive = false
     private var activeHapticPattern: AlarmHapticPattern? = null
     private var flashController: AlarmFlashController? = null
-    private var thermalFlashSuppressed = false
+    // API 29+ must remain fail-closed if thermal controller construction or
+    // initial status lookup fails. API 26–28 has no public thermal listener.
+    private var thermalFlashSuppressed = Build.VERSION.SDK_INT >= 29
     private var thermalFlashController: ThermalFlashController? = null
     private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { change ->
         val label = when (change) {
