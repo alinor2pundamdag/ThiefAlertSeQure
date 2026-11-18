@@ -12,6 +12,7 @@ object AlarmScheduler {
     private const val KEY_LAST_TOKEN = "last_token"
     private const val REQUEST_CODE = 1001
     private const val BOOT_RECONCILIATION_RETRY_MS = 5_000L
+    private val lock = Any()
 
     fun schedule(
         context: Context,
@@ -41,8 +42,17 @@ object AlarmScheduler {
         deadlineBootCount: Int,
         preferencesName: String,
         namespace: String?
-    ): Boolean {
-        if (deadlineEpochMs <= 0L) return false
+    ): Boolean = synchronized(lock) {
+        if (deadlineEpochMs <= 0L) return@synchronized false
+        // A stale worker must never replace the timer for a newer countdown.
+        // Isolated test schedulers intentionally use their own state fixture.
+        if (preferencesName == PREFS && namespace == null) {
+            val current = ProtectionStore(context).read()
+            if (!ProtectionEngine.isCurrentDeadline(
+                    current, deadlineEpochMs, deadlineElapsedRealtimeMs, deadlineBootCount
+                )
+            ) return@synchronized false
+        }
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val token = deadlineToken(deadlineEpochMs, deadlineElapsedRealtimeMs, deadlineBootCount)
         val currentBootCount = ProtectionClock.bootCount(context)
@@ -135,9 +145,9 @@ object AlarmScheduler {
         return scheduled
     }
 
-    fun scheduleRetry(context: Context, delayMs: Long) {
+    fun scheduleRetry(context: Context, delayMs: Long) = synchronized(lock) {
         val state = ProtectionStore(context).read()
-        if (state.mode != ProtectionMode.COUNTDOWN || state.deadlineEpochMs <= 0L) return
+        if (state.mode != ProtectionMode.COUNTDOWN || state.deadlineEpochMs <= 0L) return@synchronized
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val token = deadlineToken(state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
         val scheduled = replaceTokenAndSchedule(context, token) {
@@ -171,7 +181,7 @@ object AlarmScheduler {
         preferencesName: String,
         namespace: String?,
         includeLegacy: Boolean
-    ) {
+    ) = synchronized(lock) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
         when (val stored = SafePreferences.readString(prefs, KEY_LAST_TOKEN, null)) {
@@ -226,7 +236,7 @@ object AlarmScheduler {
         preferencesName: String,
         namespace: String?,
         schedule: () -> Unit
-    ): Boolean {
+    ): Boolean = synchronized(lock) {
         val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
         val previous = when (val stored = SafePreferences.readString(prefs, KEY_LAST_TOKEN, null)) {
             is PreferenceRead.Value -> stored.value
