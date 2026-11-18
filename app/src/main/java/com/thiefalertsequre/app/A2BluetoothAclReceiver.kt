@@ -67,9 +67,12 @@ internal object A2BluetoothReceiverController {
         val markedNotReady = commitWithOneRetry {
             prefs.edit().putBoolean(ProtectionMonitorService.KEY_A2_BOOT_BASELINE_READY, false)
         }
-        setComponentEnabled(app, false)
-        if (!markedNotReady) {
-            LocalTamperHistory.record(app, "a2_boot_baseline_marker_failed", "A2 remains disabled while settings recovery is pending; boot baseline reset marker could not be saved")
+        val receiverDisabled = setComponentEnabled(app, false)
+        if (!markedNotReady || !receiverDisabled) {
+            LocalTamperHistory.record(
+                app, "a2_boot_baseline_marker_failed",
+                "A2 remains disabled while settings recovery is pending; readiness marker or manifest receiver disable could not be confirmed"
+            )
             return false
         }
         val cleared = runCatching {
@@ -87,12 +90,21 @@ internal object A2BluetoothReceiverController {
     /** A boot always invalidates prior connected-device evidence before re-enabling A2. */
     fun resetBaselineForBoot(context: Context): Boolean {
         val app = context.applicationContext
-        setComponentEnabled(app, false)
         val prefs = app.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        // Persist "not ready" before touching receiver state. A racing ACL
+        // broadcast will then fail closed even if Android has not disabled the
+        // manifest component yet.
         val markedNotReady = commitWithOneRetry {
             prefs.edit().putBoolean(ProtectionMonitorService.KEY_A2_BOOT_BASELINE_READY, false)
         }
-        if (!markedNotReady) return false
+        val receiverDisabled = setComponentEnabled(app, false)
+        if (!markedNotReady || !receiverDisabled) {
+            LocalTamperHistory.record(
+                app, "a2_boot_baseline_marker_failed",
+                "A2 remains disabled because boot readiness or manifest receiver disable could not be confirmed"
+            )
+            return false
+        }
         val cleared = runCatching {
             if (!A2DisconnectScheduler.clearAll(app)) return@runCatching false
             TrustedBluetoothRegistry.clearBaselines(prefs)
