@@ -576,8 +576,9 @@ class SettingsActivity : FragmentActivity() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
                 ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         )
+        val cameraEvidenceCountLabel = if (cameraEvidenceCount >= 0) cameraEvidenceCount.toString() else "unknown"
         val cameraEvidenceStatus = text(
-            "Front-camera photo evidence: ${when { !frontCameraAvailable -> "UNSUPPORTED"; cameraEvidenceEnabled && !cameraPermissionGranted -> "NEEDS CAMERA PERMISSION"; cameraEvidenceEnabled && !galleryStoragePermissionGranted -> "NEEDS GALLERY PERMISSION"; cameraEvidenceEnabled -> "ON"; else -> "OFF" }} • new photos: ${if (encryptNewPhotos) "ENCRYPTED PRIVATE VAULT" else "GALLERY (UNENCRYPTED)"} • $cameraEvidenceCount encrypted / Gallery count CHECKING • vault integrity CHECKING",
+            "Front-camera photo evidence: ${when { !frontCameraAvailable -> "UNSUPPORTED"; cameraEvidenceEnabled && !cameraPermissionGranted -> "NEEDS CAMERA PERMISSION"; cameraEvidenceEnabled && !galleryStoragePermissionGranted -> "NEEDS GALLERY PERMISSION"; cameraEvidenceEnabled -> "ON"; else -> "OFF" }} • new photos: ${if (encryptNewPhotos) "ENCRYPTED PRIVATE VAULT" else "GALLERY (UNENCRYPTED)"} • ${if (cameraEvidenceCount >= 0) "$cameraEvidenceCount encrypted" else "encrypted count CHECKING"} / Gallery count CHECKING • vault integrity CHECKING",
             12f, R.color.tas_muted
         )
         root.addView(cameraEvidenceStatus)
@@ -692,7 +693,7 @@ class SettingsActivity : FragmentActivity() {
                     }.showThemed(this)
             }
         })
-        root.addView(action("Review / view / export encrypted-vault photos ($cameraEvidenceCount)") {
+        root.addView(action("Review / view / export encrypted-vault photos ($cameraEvidenceCountLabel)") {
             showCameraEvidenceArchive()
         })
         root.addView(action("Delete all front-camera photos") {
