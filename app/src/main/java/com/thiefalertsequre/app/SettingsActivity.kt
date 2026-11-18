@@ -708,7 +708,10 @@ class SettingsActivity : FragmentActivity() {
                     galleryEvidenceCount = galleryCount
                     cameraEvidenceIntegrityVerified = cameraEvidenceIntegrity
                     val encryptedCountLabel = if (cameraEvidenceCount >= 0) "$cameraEvidenceCount encrypted" else "encrypted count UNKNOWN"
-                    val galleryCountLabel = if (galleryCount >= 0) "$galleryCount Gallery" else "Gallery count UNKNOWN (permission/storage unavailable)"
+                    val galleryCountLabel = if (galleryCount >= 0) {
+                        if (Build.VERSION.SDK_INT < 29) "$galleryCount Gallery (legacy ownership verified by private index)"
+                        else "$galleryCount Gallery"
+                    } else "Gallery count UNKNOWN (permission/storage unavailable)"
                     cameraEvidenceStatus.text =
                         "Front-camera photo evidence: ${when { !frontCameraAvailable -> "UNSUPPORTED"; cameraEvidenceEnabled && !cameraPermissionGranted -> "NEEDS CAMERA PERMISSION"; cameraEvidenceEnabled && !galleryStoragePermissionGranted -> "NEEDS GALLERY PERMISSION"; cameraEvidenceEnabled -> "ON"; else -> "OFF" }} • new photos: ${if (encryptNewPhotos) "ENCRYPTED PRIVATE VAULT" else "GALLERY (UNENCRYPTED)"} • $encryptedCountLabel / $galleryCountLabel • vault integrity ${if (cameraEvidenceIntegrity) "VERIFIED" else "FAILED / UNKNOWN"}"
                 }
@@ -874,7 +877,7 @@ class SettingsActivity : FragmentActivity() {
             } else {
                 MaterialAlertDialogBuilder(this)
                     .setTitle("Delete all front-camera photos?")
-                    .setMessage("This permanently deletes encrypted-vault photos and Gallery images saved by ThiefAlertSeQure in Pictures/ThiefAlertSeQure. It does not delete unrelated Gallery images or change the owner-authentication setting.")
+                    .setMessage("This permanently deletes encrypted-vault photos and Gallery images whose app ownership can be verified. On Android 8–9, older Gallery photos without a private ownership-index record are left untouched. Unrelated Gallery images are never deleted. This does not change the owner-authentication setting.")
                     .setNegativeButton("Cancel", null)
                     .setPositiveButton("Delete all") { _, _ ->
                         ioExecutor.execute {
