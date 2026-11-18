@@ -236,23 +236,33 @@ class BluetoothCenterActivity : FragmentActivity() {
     private fun toggleA2() {
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
         if (SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)) {
-            if (!prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).commit()) {
-                showResult("Could not disable A2", "Android did not confirm the preference change. The previous setting is retained.")
+            var deadlinesCleared = false
+            var baselinesCleared = false
+            var receiverSynced = false
+            val disabled = A2DisconnectStateLock.withLock {
+                if (!prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).commit()) {
+                    return@withLock false
+                }
+                deadlinesCleared = A2DisconnectScheduler.clearAll(this)
+                baselinesCleared = runCatching {
+                    TrustedBluetoothRegistry.clearBaselines(prefs)
+                    true
+                }.getOrDefault(false)
+                receiverSynced = A2BluetoothReceiverController.sync(this)
+                true
+            }
+            if (!disabled) {
+                showResult("Could not disable A2", "Android did not confirm the OFF setting. The previous configuration remains authoritative.")
                 return
             }
-            val deadlinesCleared = A2DisconnectScheduler.clearAll(this)
-            val baselinesCleared = runCatching {
-                TrustedBluetoothRegistry.clearBaselines(prefs)
-                true
-            }.getOrDefault(false)
-            A2BluetoothReceiverController.sync(this)
-            if (!baselinesCleared || !deadlinesCleared) {
+            if (!baselinesCleared || !deadlinesCleared || !receiverSynced) {
                 showResult(
                     "A2 disabled; cleanup needs attention",
                     "The OFF setting was saved. " +
                         if (!baselinesCleared && !deadlinesCleared) "The connection baseline and pending deadlines could not both be confirmed as cleared; source data was retained."
                         else if (!baselinesCleared) "The connection baseline could not be cleared; source data was retained."
-                        else "Pending deadline cleanup could not be confirmed; callbacks still check the OFF setting and revision guards."
+                        else if (!deadlinesCleared) "Pending deadline cleanup could not be confirmed; callbacks still check the OFF setting and revision guards."
+                        else "The manifest receiver state could not be confirmed; it will still check the OFF setting before processing events."
                 )
             } else {
                 showResult("A2 disabled", "Trusted-device separation alerts are now off.")
@@ -287,34 +297,34 @@ class BluetoothCenterActivity : FragmentActivity() {
             showResult("Alarm is active", "Do not change Bluetooth alert configuration while the theft alarm is active.")
             return
         }
-        if (!A2DisconnectScheduler.clearAll(this)) {
-            showResult("Could not enable A2", "Existing trusted-device deadlines could not be safely cleared. A2 remains OFF; resolve the stored schedule before retrying.")
-            return
-        }
-        if (!prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, true).commit()) {
-            showResult("Could not enable A2", "Android did not confirm that the ON setting was saved.")
-            return
-        }
-        val baselinesCleared = runCatching {
-            TrustedBluetoothRegistry.clearBaselines(prefs)
-            true
-        }.getOrDefault(false)
-        if (!baselinesCleared) {
-            val rolledBack = prefs.edit()
-                .putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-                .commit()
-            showResult(
-                "Could not enable A2",
-                "The trusted-device baseline could not be reset." +
+        val configurationError = A2DisconnectStateLock.withLock {
+            if (!A2DisconnectScheduler.clearAll(this)) {
+                return@withLock "Existing trusted-device deadlines could not be safely cleared. A2 remains OFF; resolve the stored schedule before retrying."
+            }
+            if (!prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, true).commit()) {
+                return@withLock "Android did not confirm that the ON setting was saved."
+            }
+            val baselinesCleared = runCatching {
+                TrustedBluetoothRegistry.clearBaselines(prefs)
+                true
+            }.getOrDefault(false)
+            if (!baselinesCleared) {
+                val rolledBack = prefs.edit()
+                    .putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+                    .commit()
+                return@withLock "The trusted-device baseline could not be reset." +
                     if (rolledBack) " A2 was rolled back to OFF." else " WARNING: the OFF rollback could not be saved; verify the setting before leaving this screen."
-            )
-            render()
-            return
+            }
+            if (!A2BluetoothReceiverController.sync(this)) {
+                val rolledBack = prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).commit()
+                A2BluetoothReceiverController.sync(this)
+                return@withLock if (rolledBack) "The background Bluetooth receiver could not be enabled; A2 was rolled back to OFF."
+                    else "The Bluetooth receiver could not be enabled and the OFF rollback was not confirmed."
+            }
+            null
         }
-        if (!A2BluetoothReceiverController.sync(this)) {
-            val rolledBack = prefs.edit().putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false).commit()
-            A2BluetoothReceiverController.sync(this)
-            showResult("Could not enable A2", if (rolledBack) "The background Bluetooth receiver could not be enabled; A2 was rolled back to OFF." else "The Bluetooth receiver could not be enabled and the OFF rollback was not confirmed.")
+        if (configurationError != null) {
+            showResult("Could not enable A2", configurationError)
             render()
             return
         }
@@ -322,9 +332,13 @@ class BluetoothCenterActivity : FragmentActivity() {
             ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
             true
         }.getOrElse {
-            val rolledBack = prefs.edit()
-                .putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-                .commit()
+            val rolledBack = A2DisconnectStateLock.withLock {
+                val saved = prefs.edit()
+                    .putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+                    .commit()
+                A2BluetoothReceiverController.sync(this)
+                saved
+            }
             showResult(
                 "Could not start monitoring",
                 "${it.javaClass.simpleName}: ${it.message ?: "Android blocked the foreground service."}" +

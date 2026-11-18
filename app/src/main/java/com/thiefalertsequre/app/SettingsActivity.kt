@@ -262,31 +262,81 @@ class SettingsActivity : FragmentActivity() {
         val monitorEnabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         root.addView(action(if (monitorEnabled) "Disable background monitoring" else "Enable background monitoring") {
             val enabled = !monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
-            monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).apply()
-            val state = ProtectionStore(this).read()
-            if (enabled && state.mode != ProtectionMode.ALARM_TRIGGERED) {
-                PowerTransitionCoordinator.resetBaselineToCurrentPower(
-                    this, "Owner re-enabled background monitoring"
-                )
-                runCatching {
-                    ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
-                }.onFailure {
-                    android.widget.Toast.makeText(this, "Monitor could not start: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+            var cleanupIncomplete = false
+            var retryDisableThroughService = false
+            var failureMessage: String? = null
+            val saved = A2DisconnectStateLock.withLock {
+                if (!monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).commit()) {
+                    failureMessage = "Android did not confirm the monitor setting. The previous setting remains authoritative."
+                    return@withLock false
                 }
-            } else if (!enabled) {
-                // Explicit owner opt-out stops pending charger countdowns too,
-                // but never clears a latched alarm without authentication.
-                val disabledState = ProtectionStore(this).update { current ->
-                    if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
-                    else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+                if (!enabled) {
+                    // Serialize owner opt-out with A2 deadline callbacks. A failed state
+                    // commit must not cancel an existing charger countdown.
+                    val store = ProtectionStore(this)
+                    val current = store.read()
+                    val disabledUpdate = if (current.mode == ProtectionMode.ALARM_TRIGGERED) {
+                        ProtectionStoreUpdateResult(current, true)
+                    } else {
+                        store.updatePersisted {
+                            if (it.mode == ProtectionMode.ALARM_TRIGGERED) it
+                            else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+                        }
+                    }
+                    if (!disabledUpdate.persisted) {
+                        val rolledBack = monitorPrefs.edit()
+                            .putBoolean(ProtectionMonitorService.KEY_ENABLED, true)
+                            .commit()
+                        retryDisableThroughService = !rolledBack
+                        failureMessage = "Protection could not be safely disarmed because its state was not saved." +
+                            if (rolledBack) " Monitoring remains ON; retry when storage is available."
+                            else " The OFF preference could not be rolled back; the service will retry the safe stop path."
+                        return@withLock false
+                    }
+                    if (disabledUpdate.state.mode != ProtectionMode.ALARM_TRIGGERED) AlarmScheduler.cancel(this)
+                    val deadlinesCleared = A2DisconnectScheduler.clearAll(this)
+                    val baselinesCleared = runCatching {
+                        TrustedBluetoothRegistry.clearBaselines(monitorPrefs)
+                        true
+                    }.getOrDefault(false)
+                    val receiverSynced = A2BluetoothReceiverController.sync(this)
+                    cleanupIncomplete = !deadlinesCleared || !baselinesCleared || !receiverSynced
                 }
-                if (disabledState.mode != ProtectionMode.ALARM_TRIGGERED) AlarmScheduler.cancel(this)
-                A2DisconnectScheduler.clearAll(this)
-                runCatching { TrustedBluetoothRegistry.clearBaselines(monitorPrefs) }
-                A2BluetoothReceiverController.sync(this)
-                stopService(Intent(this, ProtectionMonitorService::class.java))
+                true
+            }
+            if (!saved) {
+                if (retryDisableThroughService) {
+                    runCatching {
+                        startService(Intent(this, ProtectionMonitorService::class.java).setAction(ProtectionMonitorService.ACTION_STOP))
+                    }
+                }
+                android.widget.Toast.makeText(this, failureMessage ?: "Monitor setting could not be saved.", android.widget.Toast.LENGTH_LONG).show()
+                render()
+                return@action
+            }
+            if (enabled) {
+                val state = ProtectionStore(this).read()
+                if (state.mode != ProtectionMode.ALARM_TRIGGERED) {
+                    PowerTransitionCoordinator.resetBaselineToCurrentPower(
+                        this, "Owner re-enabled background monitoring"
+                    )
+                    runCatching {
+                        ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
+                    }.onFailure {
+                        android.widget.Toast.makeText(this, "Monitor could not start: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                } else {
+                    android.widget.Toast.makeText(this, "Monitoring will resume after owner authentication.", android.widget.Toast.LENGTH_LONG).show()
+                }
             } else {
-                android.widget.Toast.makeText(this, "Monitoring will resume after owner authentication.", android.widget.Toast.LENGTH_LONG).show()
+                stopService(Intent(this, ProtectionMonitorService::class.java))
+                if (cleanupIncomplete) {
+                    android.widget.Toast.makeText(
+                        this,
+                        "Monitoring is OFF, but trusted-device cleanup could not be fully confirmed. Reopen Bluetooth settings to review it.",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
             }
             render()
         })

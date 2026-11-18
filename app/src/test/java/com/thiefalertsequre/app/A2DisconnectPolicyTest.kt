@@ -27,10 +27,18 @@ class A2DisconnectPolicyTest {
             A2DisconnectPolicy.isSameBoot(4, 4, 13_000L, 12_000L))
     }
 
-    @Test fun elapsedRealtimeDetectsRebootWhenBootCountUnavailable() {
-        assertTrue(A2DisconnectPolicy.isSameBoot(-1, -1, 12_000L, 13_000L))
+    @Test fun unknownBootIdentityCannotAuthorizeDurableDeadline() {
+        assertFalse(A2DisconnectPolicy.isSameBoot(-1, -1, 12_000L, 13_000L))
         assertFalse(A2DisconnectPolicy.isSameBoot(-1, -1, 12_000L, 500L))
         assertFalse(A2DisconnectPolicy.isSameBoot(4, -1, 12_000L, 13_000L))
+        assertFalse(A2DisconnectPolicy.isSameBoot(-1, 4, 12_000L, 13_000L))
+    }
+
+    @Test fun retryDeadlineNeverPrecedesOriginalGraceDeadline() {
+        assertEquals(9_000L, A2DisconnectPolicy.retryDeadlineElapsedRealtimeMs(9_000L, 5_000L, 1_000L))
+        assertEquals(6_000L, A2DisconnectPolicy.retryDeadlineElapsedRealtimeMs(3_000L, 4_000L, 2_000L))
+        assertEquals(Long.MAX_VALUE,
+            A2DisconnectPolicy.retryDeadlineElapsedRealtimeMs(0L, Long.MAX_VALUE - 1L, 5L))
     }
 
     @Test fun gracePeriodRequiresEnabledTrustedDeviceWithConfirmedBaselineWhileArmed() {

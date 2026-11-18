@@ -12,6 +12,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.junit.runner.RunWith
+import org.junit.Assume.assumeTrue
 
 @RunWith(AndroidJUnit4::class)
 class A2DisconnectSchedulerInstrumentationTest {
@@ -144,6 +145,36 @@ class A2DisconnectSchedulerInstrumentationTest {
             A2DisconnectScheduler.clearAll(context)
         }
     }
+    @Test fun failedDeadlineCommitRetryOnlyReschedulesTheCurrentPendingEvent() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, 0)
+        val address = "02:00:00:00:02:60"
+        val key = "trusted_bluetooth_pending_disconnects_v1"
+        val boot = ProtectionClock.bootCount(context)
+        assumeTrue("The emulator must expose BOOT_COUNT for durable deadline tests", boot >= 0)
+        A2DisconnectScheduler.cancel(context, address)
+        try {
+            val nowEpoch = System.currentTimeMillis()
+            val nowElapsed = SystemClock.elapsedRealtime()
+            val pending = A2DisconnectScheduler.Pending(
+                address, nowEpoch - 20_000L, nowElapsed - 20_000L, boot, 55L, 12L
+            )
+            val raw = "${pending.address}|${pending.eventEpochMs}|${pending.eventElapsedRealtimeMs}|${pending.bootCount}|${pending.monitorRevision}|${pending.deviceRevision}"
+            assertTrue(prefs.edit().putString(key, LocalPreferenceCipher.encrypt(key, raw)).commit())
+
+            assertTrue("A transient state-store failure should retain a retry callback",
+                A2DisconnectScheduler.scheduleRetry(context, pending, 1_000L))
+            assertTrue(A2DisconnectScheduler.hasPendingIntent(context, address, fallback = true))
+
+            assertTrue(A2DisconnectScheduler.cancel(context, address, pending.eventElapsedRealtimeMs))
+            assertTrue("A stale retry must not resurrect a reconnected device's deadline",
+                !A2DisconnectScheduler.scheduleRetry(context, pending, 1_000L))
+            assertTrue(!A2DisconnectScheduler.hasPendingIntent(context, address, fallback = true))
+        } finally {
+            A2DisconnectScheduler.cancel(context, address)
+        }
+    }
+
     @Test fun concurrentDisconnectEventsPreserveEveryAccessoryDeadline() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, 0)
