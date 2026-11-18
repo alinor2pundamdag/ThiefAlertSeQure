@@ -40,6 +40,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         val evidenceVaultHealthy: Boolean,
         val cameraVaultHealthy: Boolean,
         val cameraPhotoCount: Int,
+        val evidenceQueueDroppedCount: Long,
         val recentOutputEvents: List<String>,
         val error: String? = null
     )
@@ -82,6 +83,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                 val photoCount = runCatching {
                     CameraEvidenceVault.entries(applicationContext).size
                 }.getOrDefault(-1)
+                val evidenceQueueDroppedCount = LocalEvidenceVault.droppedAsyncWriteCount(applicationContext)
                 val recent = LocalTamperHistory.read(applicationContext, 100)
                     .filter { line ->
                         listOf("alarm_audio_", "alarm_audio_focus_", "secondary_alarm_", "alarm_haptics_", "alarm_flash_")
@@ -93,10 +95,11 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                     evidenceHealthy,
                     cameraHealthy,
                     photoCount,
+                    evidenceQueueDroppedCount,
                     recent
                 )
             }.getOrElse {
-                IntegritySnapshot(false, false, false, false, -1, emptyList(), it.message ?: it.javaClass.simpleName)
+                IntegritySnapshot(false, false, false, false, -1, 0L, emptyList(), it.message ?: it.javaClass.simpleName)
             }
             integritySnapshot = snapshot
             integrityCheckInFlight = false
@@ -417,6 +420,9 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             "A secondary-output failure does not stop the primary alarm. A successful start event is not proof of audible sound at the speaker.",
             if (integrity == null) "Checking recent output events in the background…"
             else if (integrity.error != null) "Recent output events could not be read."
+            else "Rejected asynchronous evidence events: ${integrity.evidenceQueueDroppedCount}",
+            if (integrity == null) "Checking recent output events in the background…"
+            else if (integrity.error != null) "Recent output events could not be read."
             else if (recentOutputEvents.isEmpty()) "No recent alarm-output events have been recorded."
             else "Recent output events:\n${recentOutputEvents.joinToString("\n")}"
         ))
@@ -538,6 +544,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
                     put("protectionStateStoreHealthy", storeIntegrity.protectionStateHealthy)
                     put("authenticationThrottleHealthy", storeIntegrity.authenticationThrottleHealthy)
                     put("evidenceVaultIntegrityHealthy", evidenceIntegrity)
+                    put("evidenceQueueDroppedEvents", LocalEvidenceVault.droppedAsyncWriteCount(app))
                     put("cameraEvidenceVaultIntegrityHealthy", cameraEvidenceIntegrity)
                     put("cameraEvidenceEnabledByOwner", cameraEvidenceEnabled)
                     put("cameraPermissionGranted", cameraPermissionGranted)
