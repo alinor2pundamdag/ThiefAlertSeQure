@@ -241,20 +241,6 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             }
             if (!update.persisted) return@runIfDisarmed StopRequestResult.STATE_FAILED
 
-            AlarmScheduler.cancel(this)
-            PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Protection monitor disabled by owner")
-            val deadlinesCleared = A2DisconnectScheduler.clearAll(this)
-            val baselinesCleared = runCatching { TrustedBluetoothRegistry.clearBaselines(prefs); true }.getOrDefault(false)
-            A2BluetoothReceiverController.sync(this)
-            if (!deadlinesCleared || !baselinesCleared) {
-                LocalTamperHistory.record(
-                    this, "monitor_disable_cleanup_incomplete",
-                    "Monitor is OFF, but trusted-device deadline or baseline cleanup could not be confirmed"
-                )
-                ProtectionMonitorRecoveryNotice.show(
-                    this, "Monitoring is OFF, but trusted-device cleanup needs attention. Reopen Bluetooth settings to review it."
-                )
-            }
             StopRequestResult.STOPPED
         }
 
@@ -292,6 +278,20 @@ class ProtectionMonitorService : Service(), SensorEventListener {
 
         return when (result) {
             StopRequestResult.STOPPED -> {
+                AlarmScheduler.cancel(this)
+                PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Protection monitor disabled by owner")
+                val deadlinesCleared = A2DisconnectScheduler.clearAll(this)
+                val baselinesCleared = runCatching { TrustedBluetoothRegistry.clearBaselines(prefs); true }.getOrDefault(false)
+                A2BluetoothReceiverController.sync(this)
+                if (!deadlinesCleared || !baselinesCleared) {
+                    LocalTamperHistory.record(
+                        this, "monitor_disable_cleanup_incomplete",
+                        "Monitor is OFF, but trusted-device deadline or baseline cleanup could not be confirmed"
+                    )
+                    ProtectionMonitorRecoveryNotice.show(
+                        this, "Monitoring is OFF, but trusted-device cleanup needs attention. Reopen Bluetooth settings to review it."
+                    )
+                }
                 stopSelf()
                 START_NOT_STICKY
             }
