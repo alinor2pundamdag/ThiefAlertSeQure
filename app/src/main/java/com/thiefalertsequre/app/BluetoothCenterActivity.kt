@@ -192,10 +192,12 @@ class BluetoothCenterActivity : FragmentActivity() {
             .setPositiveButton("Unregister") { _, _ ->
                 if (!requireProtectionDisarmed()) return@setPositiveButton
                 val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-                val removed = runCatching {
-                    TrustedBluetoothRegistry.remove(prefs, device.address)
-                }.getOrDefault(false)
-                if (removed) {
+                val removed = ProtectionStore(this).runIfDisarmed {
+                    runCatching {
+                        TrustedBluetoothRegistry.remove(prefs, device.address)
+                    }.getOrDefault(false)
+                }
+                if (removed == true) {
                     val deadlineCancelled = A2DisconnectScheduler.cancel(this, device.address)
                     A2BluetoothReceiverController.sync(this)
                     if (deadlineCancelled) {
@@ -204,7 +206,11 @@ class BluetoothCenterActivity : FragmentActivity() {
                         showResult("Accessory unregistered; cleanup needs attention", "${device.name} is no longer trusted. Its per-device revision invalidates any old deadline, but Android did not confirm that the stored deadline record was cleared.")
                     }
                 } else {
-                    showResult("Unregister failed", "The trust record was not confirmed as removed. The existing record has been left unchanged where possible.")
+                    showResult(
+                        if (removed == null) "A2 settings locked" else "Unregister failed",
+                        if (removed == null) "Protection became active before the trusted-device record could be removed."
+                        else "The trust record was not confirmed as removed. The existing record has been left unchanged where possible."
+                    )
                 }
                 render()
             }
@@ -246,17 +252,23 @@ class BluetoothCenterActivity : FragmentActivity() {
                 if (!requireProtectionDisarmed()) return@setItems
                 val selected = devices[which]
                 val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-                val added = runCatching {
-                    TrustedBluetoothRegistry.add(
-                        prefs,
-                        selected.address,
-                        selected.name ?: "Bluetooth accessory"
-                    )
-                }.getOrDefault(false)
-                if (added) {
+                val added = ProtectionStore(this).runIfDisarmed {
+                    runCatching {
+                        TrustedBluetoothRegistry.add(
+                            prefs,
+                            selected.address,
+                            selected.name ?: "Bluetooth accessory"
+                        )
+                    }.getOrDefault(false)
+                }
+                if (added == true) {
                     showResult("Accessory registered", "${selected.name ?: "Bluetooth accessory"} was saved as an A2 trusted device. Reconnect it to establish a fresh connection baseline.")
                 } else {
-                    showResult("Registration failed", "The trusted-device record could not be saved. No success was reported.")
+                    showResult(
+                        if (added == null) "A2 settings locked" else "Registration failed",
+                        if (added == null) "Protection became active before the trusted-device record could be saved."
+                        else "The trusted-device record could not be saved. No success was reported."
+                    )
                 }
                 render()
             }
