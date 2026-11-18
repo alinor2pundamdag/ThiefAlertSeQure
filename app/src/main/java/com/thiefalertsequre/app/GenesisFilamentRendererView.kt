@@ -44,7 +44,10 @@ import java.nio.ByteOrder
  * Shards are integrated as rigid bodies (gravity, angular motion, floor response,
  * pairwise sphere contacts and the final directional wind impulse).
  */
-class GenesisFilamentRendererView(context: Context) : TextureView(context) {
+class GenesisFilamentRendererView(
+    context: Context,
+    private val onInitializationFailed: (() -> Unit)? = null
+) : TextureView(context) {
     private data class Point2(val x: Float, val y: Float)
     private data class Mesh(val entity: Int, val vertexBuffer: VertexBuffer, val indexBuffer: IndexBuffer)
     private data class LetterBody(
@@ -107,8 +110,8 @@ class GenesisFilamentRendererView(context: Context) : TextureView(context) {
     private var released = false
     private var surfaceWidth = 1
     private var surfaceHeight = 1
-    private var isReady = false
-    private val onInitializationFailed: (() -> Unit)? = null
+    var isReady: Boolean = false
+        private set
 
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
