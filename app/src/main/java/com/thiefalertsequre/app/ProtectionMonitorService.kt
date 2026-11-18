@@ -1,7 +1,6 @@
 package com.thiefalertsequre.app
 
 import android.app.Notification
-import android.bluetooth.BluetoothDevice
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent

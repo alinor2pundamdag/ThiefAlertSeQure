@@ -33,9 +33,10 @@ class PowerTransitionReceiver : BroadcastReceiver() {
         )
         if (!monitorEnabled) return
 
-        // Capture the physical event time before serialized debounce work. Otherwise
-        // the five-sample confirmation (~1.4 s) is incorrectly added before the
-        // user's ten-second grace period even begins.
+        // Capture the physical event time before serialized debounce work. Three
+        // stable samples finish in about 200 ms; the five-sample cap is about 400 ms.
+        // The ten-second grace starts at receipt, while Android and hardware scheduling
+        // can still add delivery latency beyond this bounded confirmation window.
         val eventEpochMs = System.currentTimeMillis()
         val eventElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime()
         val eventBootCount = ProtectionClock.bootCount(context)

@@ -147,11 +147,16 @@ if "connectedBaselineCount < trustedDeviceCount" not in a2_policy:
     errors.append("A2 setup readiness must require a fresh baseline for every registered device")
 
 registry = (APP / "TrustedBluetoothRegistry.kt").read_text(encoding="utf-8")
+acl_receiver = (APP / "A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
 service = (APP / "ProtectionMonitorService.kt").read_text(encoding="utf-8")
-if "fun deviceRevision(" not in registry or "TrustedBluetoothRegistry.deviceRevision(prefs, address)" not in service:
-    errors.append("A2 disconnect timers must use per-device registry revisions")
-if "TrustedBluetoothRegistry.revision(prefs)" not in service:
-    errors.append("A2 disconnect timers must retain global monitor-reset invalidation")
+if "fun deviceRevision(" not in registry:
+    errors.append("Trusted Bluetooth registry must expose per-device revisions")
+if "deviceRevision = TrustedBluetoothRegistry.deviceRevision(prefs, address)" not in acl_receiver or "monitorRevision = TrustedBluetoothRegistry.revision(prefs)" not in acl_receiver:
+    errors.append("A2 disconnect event capture must bind per-device and global registry revisions")
+if "TrustedBluetoothRegistry.deviceRevision(prefs, pending.address)" not in service or "TrustedBluetoothRegistry.revision(prefs)" not in service:
+    errors.append("A2 disconnect deadlines must validate per-device and global registry revisions")
+if "enqueueA2BluetoothEvent" not in acl_receiver or "enqueueA2BluetoothEvent" not in service:
+    errors.append("Manifest and runtime ACL sources must share the serial event queue")
 
 if errors:
     print("\n".join("ERROR: " + item for item in errors))

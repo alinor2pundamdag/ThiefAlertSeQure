@@ -183,10 +183,13 @@ internal fun enqueueA2BluetoothEvent(
     }
 }
 
-/** The manifest receiver owns events when no runtime receiver was registered at receipt. */
+/**
+ * The manifest copy remains enabled while A2 is active so process death does not
+ * remove ACL coverage. The runtime receiver may see the same broadcast; both
+ * copies enter the same serial queue and the registry baseline makes duplicates idempotent.
+ */
 class A2BluetoothAclReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (ProtectionMonitorService.isBluetoothReceiverRegistered) return
         val receipt = A2BluetoothEventReceipt.capture(context)
         val pendingResult = goAsync()
         enqueueA2BluetoothEvent(
