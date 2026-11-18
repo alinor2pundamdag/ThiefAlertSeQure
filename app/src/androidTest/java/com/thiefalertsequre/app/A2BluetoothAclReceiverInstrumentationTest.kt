@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class A2BluetoothAclReceiverInstrumentationTest {
-    @Test fun sharedProcessorPersistsDisconnectAndReconnectCancelsItWithoutTheServiceWithoutTheService() {
+    @Test fun sharedProcessorPersistsDisconnectAndReconnectCancelsItWithoutTheService() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, 0)

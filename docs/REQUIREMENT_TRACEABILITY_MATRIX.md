@@ -9,10 +9,10 @@
 | Branch / identity | Working branch `dev/fixall-data-integrity`, based on Phase One verified baseline `72cfad5e3f7e539a385cc09d6dd820d0de80dffa`; production branch `main` remains untouched; package `com.thiefalertsequre.app`; minSdk 26, compile/target SDK 36; Java/Kotlin 17; versionCode 6 / versionName 1.1.4 | Phase Two candidate remains unmerged and unreleased |
 | Phase One baseline build and static checks | Workflow run [#1270](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43734061025), exact Phase One baseline; build, unit tests, navigation verification, lint, asset/config checks, APK assembly and package/version/signer validation | PASS on that exact Phase One source head |
 | Phase Two exact-head CI | Android workflow on this branch runs build, unit tests, navigation, lint, asset/config, APK/package/signer checks and instrumentation on API 36/37; CodeQL also runs on dev/** | Use the newest workflow run for the current branch head as the authoritative result; emulator CI is not physical-device acceptance |
-| Instrumentation API 26 / 28 | 25 tests per API; zero failures and errors; one documented biometric-enrollment skip per API | PASS; skip is expected when emulator has no enrolled strong biometric |
-| Instrumentation API 30 | 25 tests; zero failures and errors; one documented biometric-enrollment skip | PASS; earlier ADB-offline failure was superseded by this successful exact-head run |
-| Instrumentation API 32 / 34 / 35 / 36 | 25 tests per API; zero failures and errors; one documented biometric-enrollment skip per API | PASS on exact head |
-| Diagnostics | All seven API diagnostic artifacts from run #1270 were inspected, including XML reports and logcat/crash context | No ThiefAlertSeQure process crash or test failure found; emulator system-process noise was identified separately |
+| Instrumentation API 26 / 28 | 25 tests per API; zero failures and errors; one documented biometric-enrollment skip per API | PASS on Phase One baseline run #1270; not rerun on the Phase Two candidate head |
+| Instrumentation API 30 | 25 tests; zero failures and errors; one documented biometric-enrollment skip | PASS on Phase One baseline run #1270; not rerun on the Phase Two candidate head |
+| Instrumentation API 32 / 34 / 35 / 36 | 25 tests per API; zero failures and errors; one documented biometric-enrollment skip per API | PASS on Phase One baseline run #1270; not rerun on the Phase Two candidate head |
+| Instrumentation API 36 / 37 (Phase Two) | Current branch workflow matrix; exact-head results are recorded in the newest Phase Two Actions run | Do not infer API 37 or current-head status from Phase One run #1270 |
 | Architecture / event ownership | Source-backed map covers charger, countdown/alarm, authentication, Bluetooth, boot, settings, theme, history and updater paths | Documented and source-checked for Phase 1; hardware/OEM behavior remains device-dependent |
 | Physical-device acceptance | HONOR 200 Pro testing for changed v1.1.4 behavior | Reserved for Phase 12; not a Phase 1 blocker and not inferred from emulator results |
 | Release boundary | No merge, tag, production APK publication or official release in this work | Not authorized |
@@ -60,7 +60,7 @@
 
 | ID | Requirement / acceptance condition | Primary owner(s) | Existing test / evidence | Baseline status |
 |---|---|---|---|---|
-| AND-01 | minSdk 26 and target/compile SDK 36 are consistent with the owner-approved project invariant | `app/build.gradle.kts` | Build/lint on exact head | Source configuration minSdk 26; exact-head build and instrumentation matrix passed in run #1270 |
+| AND-01 | minSdk 26 and target/compile SDK 36 are consistent with the owner-approved project invariant | `app/build.gradle.kts` | Build/lint | Source configuration minSdk 26; Phase One baseline passed run #1270; Phase Two API36/37 is tracked by the current branch workflow |
 | AND-02 | Charger events are registered at runtime from foreground monitor; do not rely on manifest-only implicit broadcast delivery | monitor service, receiver, manifest | source inspection | Implemented; Android-version device matrix required |
 | AND-03 | Foreground-service declarations/types/permissions match service behavior and target SDK | manifest, monitor/alarm service | CI lint/build | Needs API 34–36 emulator/instrumentation validation and policy review |
 | AND-04 | Exact-alarm denial does not silently claim precise delivery; fallback/recovery is surfaced | scheduler, boot receiver, UI | `A2DisconnectSchedulerInstrumentationTest`; Settings and Setup Status expose exact-alarm access | Inexact idle-aware fallback is implemented and recorded; Android can defer it substantially in Doze, so precise eight-second delivery is not claimed |

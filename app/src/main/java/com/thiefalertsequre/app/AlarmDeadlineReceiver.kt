@@ -51,7 +51,7 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
                 runCatching {
                     AlarmRecoveryCoordinator.onStartFailure(
                         appContext,
-                        "The A2 alarm is latched, but Android deferred foreground alarm playback. Open the app to resume it."
+                        "The A2 alarm is latched, but the alarm service could not start. Open the app to resume it."
                     )
                 }.onFailure { recoveryError ->
                     LocalTamperHistory.record(

@@ -184,14 +184,11 @@ internal fun enqueueA2BluetoothEvent(
 }
 
 /**
- * The manifest copy remains enabled while A2 is active so process death does not
- * remove ACL coverage. The runtime receiver may see the same broadcast; both
- * copies enter the same serial queue and the registry baseline makes duplicates idempotent.
- */
-/**
- * Manifest entry point for Android-protected ACL broadcasts. Exported intentionally so the
- * privileged Bluetooth stack UID can deliver events while the app process is absent. The
- * controller enables this component only while monitoring, A2, and Bluetooth permission are active.
+ * Manifest entry point for Android-protected ACL broadcasts. Exported intentionally because
+ * the Bluetooth stack may send from a privileged non-system UID. The controller enables this
+ * component only while monitoring, A2, and Bluetooth permission are active, preserving ACL
+ * coverage when the app process is absent. The runtime receiver may see the same broadcast;
+ * both copies enter the same serial queue and the registry baseline makes duplicates idempotent.
  */
 class A2BluetoothAclReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
