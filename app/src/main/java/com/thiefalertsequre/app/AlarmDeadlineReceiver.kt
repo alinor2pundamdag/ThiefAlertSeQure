@@ -14,12 +14,25 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
                 val app = context.applicationContext
                 val alarmAlreadyLatched = ProtectionStore(app).read().mode == ProtectionMode.ALARM_TRIGGERED
                 if (!ConfigurationBackup.recoverPendingRestore(app) && !alarmAlreadyLatched) {
+                    // AlarmManager one-shot callbacks are consumed when delivered.
+                    // Persist a retry so an interrupted settings rollback cannot
+                    // silently erase an active countdown or trusted-device grace deadline.
+                    if (callbackIntent.action == A2DisconnectScheduler.ACTION_DEADLINE) {
+                        val token = callbackIntent.data?.lastPathSegment
+                        if (token != null) {
+                            A2DisconnectScheduler.find(app, token)?.let { pendingDeadline ->
+                                A2DisconnectScheduler.scheduleRetry(app, pendingDeadline, 30_000L)
+                            }
+                        }
+                    } else if (ProtectionStore(app).read().mode == ProtectionMode.COUNTDOWN) {
+                        AlarmScheduler.scheduleRetry(app, 30_000L)
+                    }
                     LocalTamperHistory.record(
                         app, "configuration_restore_recovery_pending",
-                        "A non-alarm deadline was deferred because interrupted settings could not be recovered"
+                        "A non-alarm deadline was deferred and a 30-second retry was requested because interrupted settings could not be recovered"
                     )
                     ProtectionMonitorRecoveryNotice.show(
-                        app, "An interrupted settings restore must be recovered before protection deadlines can be processed."
+                        app, "An interrupted settings restore must be recovered before protection deadlines can be processed. The deadline will retry automatically."
                     )
                     return@Thread
                 }
