@@ -213,6 +213,14 @@ checks = {
     "device intelligence reports OEM/background restriction, Doze, and standby bucket states":
         "OEM AND BACKGROUND EXECUTION" in diagnostics and "isBackgroundRestricted" in diagnostics
         and "isDeviceIdleMode" in diagnostics and "appStandbyBucket" in diagnostics,
+    "monitor notification cannot disarm ARMED or COUNTDOWN protection":
+        "fun canStop(mode: ProtectionMode): Boolean = mode == ProtectionMode.DISARMED" in monitor
+        and "if (!ProtectionMonitorPolicy.canStop(currentMode))" in monitor
+        and "monitor_stop_rejected_active_protection" in monitor
+        and "if (ProtectionMonitorPolicy.canStop(mode))" in monitor
+        and "if (!monitorEnabled && state.mode == ProtectionMode.DISARMED)" in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8")
+        and "ProtectionEngine.disableMonitoring(current" not in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8")
+        and "notificationStopIsAllowedOnlyWhileDisarmed" in (ROOT / "app/src/test/java/com/thiefalertsequre/app/ProtectionMonitorPolicyTest.kt").read_text(encoding="utf-8"),
     "security-sensitive settings mutations are transactionally blocked outside DISARMED":
         "requireProtectionDisarmed()" in settings
         and "ProtectionStore(this).runIfDisarmed" in settings
