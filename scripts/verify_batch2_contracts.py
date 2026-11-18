@@ -149,7 +149,7 @@ checks = {
         and "ALARM OUTPUT MONITOR" in diagnostics and "recentAlarmOutputEvents" in diagnostics,
     "protection integrity score uses verified stores and evidence integrity":
         "ProtectionIntegrityPolicy.calculate" in diagnostics
-        and "integritySnapshot()" in diagnostics and "verifyIntegrity(this)" in diagnostics,
+        and "integritySnapshot()" in diagnostics and "verifyIntegrity(applicationContext)" in diagnostics,
     "dependency map and emergency recovery guide are available":
         "FEATURE DEPENDENCY MAP" in diagnostics and "showEmergencyRecoveryGuide" in diagnostics,
     "front-camera photo evidence runs only after successful visible owner authentication":
