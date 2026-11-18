@@ -178,6 +178,12 @@ internal object AlarmFlashSettings {
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE), KEY_ENABLED, true
         )
 
+    fun setEnabled(context: Context, enabled: Boolean): Boolean =
+        ProtectionStore(context).runIfDisarmed {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_ENABLED, enabled).commit()
+        } == true
+
     fun shouldRun(mode: ProtectionMode): Boolean = mode == ProtectionMode.ALARM_TRIGGERED
 
     fun nextTorchState(currentTorchOn: Boolean): Boolean = !currentTorchOn
