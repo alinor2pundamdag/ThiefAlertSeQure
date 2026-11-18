@@ -55,15 +55,21 @@ internal object CameraEvidenceCapture {
         }
     }.getOrDefault(true)
 
-    fun setEncryptionEnabled(context: Context, enabled: Boolean): Boolean = runCatching {
-        context.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE)
-            .edit().putBoolean(KEY_ENCRYPT_NEW_PHOTOS, enabled).commit()
-    }.getOrDefault(false)
+    fun setEncryptionEnabled(context: Context, enabled: Boolean): Boolean =
+        ProtectionStore(context).runIfDisarmed {
+            runCatching {
+                context.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE)
+                    .edit().putBoolean(KEY_ENCRYPT_NEW_PHOTOS, enabled).commit()
+            }.getOrDefault(false)
+        } == true
 
-    fun setEnabled(context: Context, enabled: Boolean): Boolean = runCatching {
-        context.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE)
-            .edit().putBoolean(KEY_ENABLED, enabled).commit()
-    }.getOrDefault(false)
+    fun setEnabled(context: Context, enabled: Boolean): Boolean =
+        ProtectionStore(context).runIfDisarmed {
+            runCatching {
+                context.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE)
+                    .edit().putBoolean(KEY_ENABLED, enabled).commit()
+            }.getOrDefault(false)
+        } == true
 
     fun captureAfterSuccessfulAuthentication(activity: Activity) {
         val app = activity.applicationContext
