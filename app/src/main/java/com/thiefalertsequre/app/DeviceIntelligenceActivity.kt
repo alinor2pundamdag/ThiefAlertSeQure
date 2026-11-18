@@ -494,8 +494,20 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     }
 
     private fun writeDiagnosticsReport(uri: android.net.Uri) {
+        if (ProtectionStore(this).read().mode != ProtectionMode.DISARMED) {
+            Toast.makeText(this, "Diagnostics export is available only while protection is DISARMED.", Toast.LENGTH_LONG).show()
+            return
+        }
         integrityExecutor.execute {
             val app = applicationContext
+            if (ProtectionStore(app).read().mode != ProtectionMode.DISARMED) {
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) {
+                        Toast.makeText(this, "Protection became active. Diagnostics were not exported.", Toast.LENGTH_LONG).show()
+                    }
+                }
+                return@execute
+            }
             val reportResult = runCatching {
                 val monitorPrefs = app.getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
                 val alarmManager = app.getSystemService(AlarmManager::class.java)
