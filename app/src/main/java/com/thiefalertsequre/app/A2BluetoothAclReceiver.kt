@@ -71,12 +71,20 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
 
                 when (intent.action) {
                     BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                        TrustedBluetoothRegistry.markConnected(prefs, address, true)
+                        val update = TrustedBluetoothRegistry.markConnected(prefs, address, true)
                         A2DisconnectScheduler.cancel(app, address)
+                        if (!update.persisted) {
+                            LocalTamperHistory.record(app, "a2_baseline_update_failed", "Bluetooth connected, but its encrypted connection baseline could not be committed; disconnect detection may require reconnecting the accessory")
+                        }
                         LocalTamperHistory.record(app, "trusted_bluetooth_connected", "A registered trusted Bluetooth device connected while the monitor process was absent")
                     }
                     BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
-                        val hadBaseline = TrustedBluetoothRegistry.markConnected(prefs, address, false)
+                        val update = TrustedBluetoothRegistry.markConnected(prefs, address, false)
+                        if (!update.persisted) {
+                            LocalTamperHistory.record(app, "a2_baseline_update_failed", "Bluetooth disconnected, but its encrypted connection baseline could not be committed; no unverified separation alarm was scheduled")
+                            return@Thread
+                        }
+                        val hadBaseline = update.hadBaseline
                         if (A2DisconnectPolicy.shouldStartGracePeriod(
                                 alertEnabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false),
                                 trusted = TrustedBluetoothRegistry.isTrusted(prefs, address),
