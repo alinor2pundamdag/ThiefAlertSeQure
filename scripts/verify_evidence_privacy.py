@@ -112,13 +112,20 @@ required = {
         and "RETENTION_MS = 30L" in camera_policy
         and "CameraEvidencePolicy.isRetained" in camera_media
         and "CameraEvidencePolicy.MAX_IMAGES" in camera_media,
+    "Gallery deletion fails closed when MediaStore enumeration fails":
+        "if (!query.success) return false" in camera_media
+        and "query.images.forEach" in camera_media
+        and "?: return QueryResult(false, emptyList())" in camera_media,
     "owner can view/export encrypted photos and delete both app-managed stores":
         "showCameraEvidenceArchive" in settings and "exportCameraEvidence.launch" in settings
         and "CameraEvidenceVault.delete(applicationContext, entry.id)" in settings
         and "CameraEvidenceVault.deleteAll(applicationContext)" in settings
         and "CameraEvidenceMediaStore.deleteAll(applicationContext)" in settings
         and "var allDeleted = true" in camera_media
-        and "queryOwnedImages(context.applicationContext).forEach" in camera_media,
+        and "if (!query.success) return false" in camera_media
+        and "query.images.forEach" in camera_media
+        and "val cursor = context.contentResolver.query(" in camera_media
+        and "?: return QueryResult(false, emptyList())" in camera_media,
     "encrypted photo deletion retains its index until ciphertext and Keystore cleanup succeed":
         camera_vault.index("val deleted = file.delete() || !file.exists()")
         < camera_vault.index("if (next.isEmpty() && !deleteKeyIfPresent()) return false")
