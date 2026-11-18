@@ -342,7 +342,7 @@ internal object CameraEvidenceCapture {
             sourceHeight.toFloat() / PREFERRED_HEIGHT
         )
         var sampleSize = 1
-        while (sampleSize * 2 <= requiredSampleRatio) sampleSize *= 2
+        while (sampleSize.toFloat() * 2f <= requiredSampleRatio) sampleSize *= 2
         val decodeOptions = BitmapFactory.Options().apply {
             inSampleSize = sampleSize
             inPreferredConfig = Bitmap.Config.ARGB_8888
