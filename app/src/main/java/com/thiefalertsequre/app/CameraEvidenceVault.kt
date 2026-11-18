@@ -33,7 +33,6 @@ internal object CameraEvidenceVault {
         val sizeBytes: Int
     )
 
-    @Synchronized
     fun save(
         context: Context,
         jpeg: ByteArray,
@@ -63,17 +62,19 @@ internal object CameraEvidenceVault {
         }
         val entry = Entry(id, timestampEpochMs, sha256(jpeg), jpeg.size)
         val committed = ProtectionStore(app).runIfDisarmed {
-            val currentEntries = readIndex(app) ?: return@runIfDisarmed false
-            val retained = currentEntries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
-            val next = (retained + entry)
-                .sortedBy { it.timestampEpochMs }
-                .takeLast(CameraEvidencePolicy.MAX_IMAGES)
-            if (next.none { it.id == id }) return@runIfDisarmed false
-            if (!writeIndex(app, next)) return@runIfDisarmed false
-            // Retention eviction and orphan cleanup are destructive; keep them
-            // inside the same DISARMED state lock as the index commit.
-            removeUnreferencedFiles(app, next)
-            true
+            synchronized(this) {
+                val currentEntries = readIndex(app) ?: return@synchronized false
+                val retained = currentEntries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
+                val next = (retained + entry)
+                    .sortedBy { it.timestampEpochMs }
+                    .takeLast(CameraEvidencePolicy.MAX_IMAGES)
+                if (next.none { it.id == id }) return@synchronized false
+                if (!writeIndex(app, next)) return@synchronized false
+                // Retention eviction and orphan cleanup are destructive; keep them
+                // inside the same DISARMED state lock as the index commit.
+                removeUnreferencedFiles(app, next)
+                true
+            }
         }
         if (committed != true) {
             file.delete()
@@ -82,15 +83,16 @@ internal object CameraEvidenceVault {
         return entry
     }
 
-    @Synchronized
     fun entries(context: Context): List<Entry> {
         val app = context.applicationContext
         pruneExpired(app)
         val now = System.currentTimeMillis()
-        return (readIndex(app) ?: emptyList())
-            .filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
-            .takeLast(CameraEvidencePolicy.MAX_IMAGES)
-            .asReversed()
+        return synchronized(this) {
+            (readIndex(app) ?: emptyList())
+                .filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
+                .takeLast(CameraEvidencePolicy.MAX_IMAGES)
+                .asReversed()
+        }
     }
 
     fun read(context: Context, id: String): ByteArray? =
@@ -275,21 +277,24 @@ internal object CameraEvidenceVault {
     }
 
     private fun pruneExpired(context: Context) {
+        // Lock order is always ProtectionStore -> vault monitor.
         ProtectionStore(context).runIfDisarmed {
-            val entries = readIndex(context) ?: return@runIfDisarmed
-            val now = System.currentTimeMillis()
-            val retained = entries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
-            val indexReady = retained.size == entries.size || writeIndex(context, retained)
-            if (indexReady) {
-                removeUnreferencedFiles(context, retained)
-                val remainingFiles = evidenceDirectory(context).listFiles() ?: return@runIfDisarmed
-                val noPhotoFilesRemain = remainingFiles.none {
-                    it.name.endsWith(".aesgcm") || it.name.endsWith(".tmp")
-                }
-                if (retained.isEmpty() && noPhotoFilesRemain) {
-                    runCatching {
-                        synchronized(keyLock) {
-                            KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
+            synchronized(this) {
+                val entries = readIndex(context) ?: return@synchronized
+                val now = System.currentTimeMillis()
+                val retained = entries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
+                val indexReady = retained.size == entries.size || writeIndex(context, retained)
+                if (indexReady) {
+                    removeUnreferencedFiles(context, retained)
+                    val remainingFiles = evidenceDirectory(context).listFiles() ?: return@synchronized
+                    val noPhotoFilesRemain = remainingFiles.none {
+                        it.name.endsWith(".aesgcm") || it.name.endsWith(".tmp")
+                    }
+                    if (retained.isEmpty() && noPhotoFilesRemain) {
+                        runCatching {
+                            synchronized(keyLock) {
+                                KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
+                            }
                         }
                     }
                 }
