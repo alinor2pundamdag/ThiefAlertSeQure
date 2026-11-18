@@ -516,7 +516,7 @@ private fun GenesisFractureCanvas(
     }
 
     Canvas(modifier = modifier) {
-        drawRect(Color.Black)
+        drawRect(Color(0xFF121212))
         val center = Offset(size.width * 0.5f, size.height * 0.46f)
         val fracture = ((progress - 0.23f) / 0.36f).coerceIn(0f, 1f)
         val native = drawContext.canvas.nativeCanvas
