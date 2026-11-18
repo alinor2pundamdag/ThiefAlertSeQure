@@ -613,6 +613,21 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun reconcileCharging() {
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress() ||
+            !ConfigurationBackup.recoverPendingRestore(this)
+        ) {
+            if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                runCatching {
+                    ContextCompat.startForegroundService(
+                        this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START)
+                    )
+                }.onFailure {
+                    LocalTamperHistory.record(this, "activity_alarm_restore_failed", it.javaClass.simpleName + ": " + it.message)
+                    AlarmScheduler.scheduleImmediateRecovery(this)
+                }
+            }
+            return
+        }
         // A battery snapshot is state evidence, not proof of a physical transition.
         // Only PowerTransitionReceiver may create a charger countdown.
         PowerTransitionCoordinator.initializeBaseline(this)
@@ -664,6 +679,12 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun syncProtectionMonitor(state: ProtectionState) {
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress() ||
+            !ConfigurationBackup.recoverPendingRestore(this)
+        ) {
+            stopService(Intent(this, ProtectionMonitorService::class.java))
+            return
+        }
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
         val enabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         if (ProtectionMonitorPolicy.shouldRun(enabled, state.mode)) {
