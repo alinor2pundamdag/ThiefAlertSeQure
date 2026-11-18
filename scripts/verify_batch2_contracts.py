@@ -96,6 +96,11 @@ checks = {
         and "fun scheduleRetry(context: Context, delayMs: Long) = synchronized(lock)" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8")
         and "private fun cancelInternal(" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8")
         and "private fun replaceTokenAndScheduleInternal(" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8"),
+    "latched-alarm recovery retries fall back to inexact allow-while-idle scheduling":
+        "fun scheduleRecoveryRetry(context: Context, delayMs: Long): Boolean {" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8")
+        and "val scheduled = scheduleRecovery(context, delayMs)" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8")
+        and "alarm_recovery_inexact_retry" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8")
+        and "setAndAllowWhileIdle(" in (APP / "AlarmScheduler.kt").read_text(encoding="utf-8"),
     "orderly shutdown is observed only through the dynamically registered system receiver":
         "Intent.ACTION_SHUTDOWN" in monitor and "ContextCompat.registerReceiver(this, systemReceiver" in monitor,
     "shutdown event is diagnostic and does not claim to block system shutdown":
