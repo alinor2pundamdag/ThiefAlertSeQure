@@ -48,6 +48,19 @@ class ProtectionStore internal constructor(
     fun update(transform: (ProtectionState) -> ProtectionState): ProtectionState =
         updatePersisted(transform).state
 
+    /**
+     * Runs a short owner-settings transaction while the authoritative state is
+     * DISARMED. Charger/alarm transitions share LOCK and therefore cannot race
+     * a restore that is explicitly restricted to the disarmed state.
+     */
+    internal fun <T> runIfDisarmed(block: () -> T): T? = synchronized(LOCK) {
+        val current = readUnlocked()
+        if (stateCorruptionDetected || current.mode != ProtectionMode.DISARMED) {
+            return@synchronized null
+        }
+        block()
+    }
+
     /** Returns the actual commit result so callers do not cancel alarms on an unpersisted transition. */
     fun updatePersisted(transform: (ProtectionState) -> ProtectionState): ProtectionStoreUpdateResult =
         synchronized(LOCK) {
