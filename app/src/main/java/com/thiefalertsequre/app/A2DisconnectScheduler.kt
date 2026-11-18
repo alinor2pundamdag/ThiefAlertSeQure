@@ -220,7 +220,8 @@ internal object A2DisconnectScheduler {
             val decoded = if (LocalPreferenceCipher.isEncrypted(raw)) {
                 LocalPreferenceCipher.decrypt(KEY_PENDING, raw)
             } else {
-                check(prefs.edit().putString(KEY_PENDING, LocalPreferenceCipher.encrypt(KEY_PENDING, raw)).commit())
+                val encrypted = LocalPreferenceCipher.encrypt(KEY_PENDING, raw)
+                check(commitWithOneRetry { prefs.edit().putString(KEY_PENDING, encrypted) })
                 raw
             }
             val records = decoded.lineSequence().filter { it.isNotBlank() }.map { line ->
@@ -246,13 +247,18 @@ internal object A2DisconnectScheduler {
     }
 
     private fun write(prefs: android.content.SharedPreferences, records: List<Pending>): Boolean {
-        if (records.isEmpty()) return prefs.edit().remove(KEY_PENDING).commit()
+        if (records.isEmpty()) return commitWithOneRetry { prefs.edit().remove(KEY_PENDING) }
         val raw = records.distinctBy { it.address.uppercase() }.joinToString("\n") {
             "${it.address.uppercase()}|${it.eventEpochMs}|${it.eventElapsedRealtimeMs}|${it.bootCount}|${it.monitorRevision}|${it.deviceRevision}"
         }
-        return runCatching {
-            prefs.edit().putString(KEY_PENDING, LocalPreferenceCipher.encrypt(KEY_PENDING, raw)).commit()
-        }.getOrDefault(false)
+        val encrypted = runCatching { LocalPreferenceCipher.encrypt(KEY_PENDING, raw) }.getOrNull() ?: return false
+        return commitWithOneRetry { prefs.edit().putString(KEY_PENDING, encrypted) }
+    }
+
+    private fun commitWithOneRetry(editorFactory: () -> android.content.SharedPreferences.Editor): Boolean {
+        val first = runCatching { editorFactory().commit() }.getOrDefault(false)
+        if (first) return true
+        return runCatching { editorFactory().commit() }.getOrDefault(false)
     }
 
     private fun tokenFor(address: String): String = MessageDigest.getInstance("SHA-256")
