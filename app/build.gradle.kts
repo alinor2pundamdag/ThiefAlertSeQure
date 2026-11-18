@@ -85,6 +85,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     // Filament real-time PBR renderer and Android surface helpers (same pinned release).
     implementation("com.google.android.filament:filament-android:1.75.0")
+    implementation("com.google.android.filament:filament-utils-android:1.75.0")
     implementation("com.google.android.filament:filamat-android:1.75.0")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.animation:animation")
