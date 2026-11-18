@@ -1235,7 +1235,7 @@ class SettingsActivity : FragmentActivity() {
                 result.onSuccess { count ->
                     if (::root.isInitialized) ThemeRuntime.apply(this, root)
                     android.widget.Toast.makeText(
-                        this, "Restored $count supported owner settings. Authentication, permissions, evidence, and active protection state were left unchanged.",
+                        this, "Restored $count supported owner settings. Protection/alarm state, authentication, permissions, and evidence were not imported; monitor synchronization ran only while DISARMED.",
                         android.widget.Toast.LENGTH_LONG
                     ).show()
                     render()
@@ -1250,14 +1250,22 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun applyRestoredConfiguration() {
+        val protectionMode = ProtectionStore(this).read().mode
+        if (protectionMode != ProtectionMode.DISARMED) {
+            // A rollback callback must never stop or re-baseline a monitor after
+            // the first synchronization has already advanced protection state.
+            LocalTamperHistory.record(
+                this, "configuration_restore_monitor_sync_deferred",
+                "Protection became active during restore recovery; existing monitor and protection state were left untouched"
+            )
+            return
+        }
         val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
         val monitorEnabled = SafePreferences.boolean(
             monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
         if (monitorEnabled) {
-            if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED) {
-                PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Owner restored configuration backup")
-            }
+            PowerTransitionCoordinator.resetBaselineToCurrentPower(this, "Owner restored configuration backup")
             runCatching {
                 ContextCompat.startForegroundService(
                     this, Intent(this, ProtectionMonitorService::class.java).setAction(ProtectionMonitorService.ACTION_REFRESH)
