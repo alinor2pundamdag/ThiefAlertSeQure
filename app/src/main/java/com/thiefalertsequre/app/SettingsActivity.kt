@@ -923,6 +923,7 @@ class SettingsActivity : FragmentActivity() {
             }
         })
         root.addView(action("Export encrypted evidence backup") {
+            if (!requireProtectionDisarmed()) return@action
             exportEvidenceBackup.launch("ThiefAlertSeQure-evidence-backup.tasbackup")
         })
         root.addView(action("Restore encrypted evidence backup") {
@@ -1285,13 +1286,16 @@ class SettingsActivity : FragmentActivity() {
     private fun writeEvidenceBackup(uri: Uri, password: CharArray) {
         ioExecutor.execute {
             val result = runCatching {
-                val entries = LocalEvidenceVault.read(this, 100)
-                val bytes = EvidenceVaultBackup.encrypt(entries, password)
-                contentResolver.openOutputStream(uri)?.use { stream ->
-                    stream.write(bytes)
-                    stream.flush()
-                } ?: error("Android could not open the selected backup destination.")
-                bytes.size
+                val exportedBytes = ProtectionStore(applicationContext).runIfDisarmed {
+                    val entries = LocalEvidenceVault.read(applicationContext, 100)
+                    val bytes = EvidenceVaultBackup.encrypt(entries, password)
+                    contentResolver.openOutputStream(uri)?.use { stream ->
+                        stream.write(bytes)
+                        stream.flush()
+                    } ?: error("Android could not open the selected backup destination.")
+                    bytes.size
+                } ?: throw IllegalStateException("Evidence backup export is available only while protection is DISARMED.")
+                exportedBytes
             }.also { password.fill('\u0000') }
             runOnUiThread {
                 android.widget.Toast.makeText(
@@ -1621,15 +1625,15 @@ class SettingsActivity : FragmentActivity() {
     private fun writeCameraEvidenceExport(uri: Uri, id: String) {
         ioExecutor.execute {
             val result = runCatching {
-                val bytes = ProtectionStore(applicationContext).runIfDisarmed {
-                    runCatching { CameraEvidenceVault.read(applicationContext, id) }.getOrNull()
+                ProtectionStore(applicationContext).runIfDisarmed {
+                    val bytes = runCatching { CameraEvidenceVault.read(applicationContext, id) }.getOrNull()
                         ?: throw IllegalStateException("Photo is missing or failed its integrity check.")
+                    contentResolver.openOutputStream(uri)?.use { output ->
+                        output.write(bytes)
+                        output.flush()
+                    } ?: throw IllegalStateException("Android could not open the selected export destination.")
+                    bytes.size
                 } ?: throw IllegalStateException("Photo export is available only while protection is DISARMED.")
-                contentResolver.openOutputStream(uri)?.use { output ->
-                    output.write(bytes)
-                    output.flush()
-                } ?: throw IllegalStateException("Android could not open the selected export destination.")
-                bytes.size
             }
             runOnUiThread {
                 android.widget.Toast.makeText(
@@ -1683,30 +1687,37 @@ class SettingsActivity : FragmentActivity() {
 
     private fun exportHistory(uri: Uri) {
         if (!requireProtectionDisarmed()) return
-        runCatching {
-            val output = contentResolver.openOutputStream(uri)
-                ?: error("Android could not open the selected export destination.")
-            output.bufferedWriter(Charsets.UTF_8).use { writer ->
-                fun csv(value: String) = "\"" + value.replace("\"", "\"\"") + "\""
-                writer.appendLine("record_type,event,timestamp_epoch_ms,timezone_offset_minutes,detail,integrity_sha256")
-                LocalTamperHistory.read(this, 100).asReversed().forEach { event ->
-                    writer.appendLine(listOf("event_history", event, "", "", "", "").joinToString(",") { csv(it) })
-                }
-                LocalEvidenceVault.read(this, 100).asReversed().forEach { entry ->
-                    writer.appendLine(listOf(
-                        "encrypted_evidence",
-                        entry.event,
-                        entry.timestampEpochMs.toString(),
-                        entry.timezoneOffsetMinutes.toString(),
-                        entry.detail,
-                        entry.integritySha256
-                    ).joinToString(",") { csv(it) })
+        ioExecutor.execute {
+            val result = runCatching {
+                ProtectionStore(applicationContext).runIfDisarmed {
+                    val output = contentResolver.openOutputStream(uri)
+                        ?: error("Android could not open the selected export destination.")
+                    output.bufferedWriter(Charsets.UTF_8).use { writer ->
+                        fun csv(value: String) = "\"" + value.replace("\"", "\"\"") + "\""
+                        writer.appendLine("record_type,event,timestamp_epoch_ms,timezone_offset_minutes,detail,integrity_sha256")
+                        LocalTamperHistory.read(applicationContext, 100).asReversed().forEach { event ->
+                            writer.appendLine(listOf("event_history", event, "", "", "", "").joinToString(",") { csv(it) })
+                        }
+                        LocalEvidenceVault.read(applicationContext, 100).asReversed().forEach { entry ->
+                            writer.appendLine(listOf(
+                                "encrypted_evidence",
+                                entry.event,
+                                entry.timestampEpochMs.toString(),
+                                entry.timezoneOffsetMinutes.toString(),
+                                entry.detail,
+                                entry.integritySha256
+                            ).joinToString(",") { csv(it) })
+                        }
+                    }
+                } ?: throw IllegalStateException("Event-history export is available only while protection is DISARMED.")
+            }
+            runOnUiThread {
+                result.onSuccess {
+                    android.widget.Toast.makeText(this@SettingsActivity, "Event history exported.", android.widget.Toast.LENGTH_LONG).show()
+                }.onFailure {
+                    android.widget.Toast.makeText(this@SettingsActivity, "Export failed: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
                 }
             }
-        }.onSuccess {
-            android.widget.Toast.makeText(this, "Event history exported.", android.widget.Toast.LENGTH_LONG).show()
-        }.onFailure {
-            android.widget.Toast.makeText(this, "Export failed: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
         }
     }
 
