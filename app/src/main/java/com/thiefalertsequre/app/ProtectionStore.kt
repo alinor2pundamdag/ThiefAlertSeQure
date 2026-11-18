@@ -413,6 +413,7 @@ class ProtectionStore internal constructor(
     }
 
     companion object {
+        private const val TAG = "ProtectionStore"
         const val ACTION_STATE_CHANGED = "com.thiefalertsequre.PROTECTION_STATE_CHANGED"
         private val LOCK = Any()
         private const val CORRUPT_BACKUP_PREFS = "protection_state_corrupt_backup_v1"
