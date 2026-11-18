@@ -108,13 +108,17 @@ checks = {
         "LocalPreferenceCipher.encrypt(PURPOSE" in vault and "MAX_RECORDS = 100" in vault and "RETENTION_MS" in vault,
     "event evidence writes are bounded asynchronous work":
         "recordAsync(context, safeEvent, safeDetail)" in (APP / "LocalTamperHistory.kt").read_text(encoding="utf-8") and "ArrayBlockingQueue(64)" in vault and "generation.incrementAndGet()" in vault,
-    "evidence queue overflow is observable and failed archive commits do not invalidate queued writes":
+    "evidence queue rejection and failed async commits are durably observable without blocking callbacks":
         "ThreadPoolExecutor.AbortPolicy()" in vault
-        and "droppedAsyncWrites.incrementAndGet()" in vault
+        and "private fun noteAsyncWriteFailure" in vault
+        and "if (!stored) noteAsyncWriteFailure(context" in vault
+        and "catch (_: RejectedExecutionException)" in vault
+        and "KEY_ASYNC_WRITE_FAILURES" in vault
+        and "fun asyncWriteFailureCount(context: Context)" in vault
         and vault.index("val committed", vault.index("fun replaceAll")) <
             vault.index("if (committed) generation.incrementAndGet()", vault.index("fun replaceAll"))
         and vault.index("val committed", vault.index("fun deleteAll")) <
-            vault.index("if (committed) generation.incrementAndGet()", vault.index("fun deleteAll")) ,
+            vault.index("if (committed) generation.incrementAndGet()", vault.index("fun deleteAll")),
     "cached and bounded current location evidence are owner-requested":
         "getLastKnownLocation" in location and "getCurrentLocation" in location and "requestSingleUpdate" in location and "CURRENT_LOCATION_TIMEOUT_MS = 20_000L" in location,
     "current location tries every enabled GPS/network provider with bounded completion":
