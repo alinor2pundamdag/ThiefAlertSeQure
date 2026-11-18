@@ -16,7 +16,7 @@ val releaseSigningReady = listOf(
 
 android {
     namespace = "com.thiefalertsequre.app"
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig {
         applicationId = "com.thiefalertsequre.app"
         minSdk = 26
