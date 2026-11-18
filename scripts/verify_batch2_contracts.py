@@ -213,6 +213,12 @@ checks = {
     "device intelligence reports OEM/background restriction, Doze, and standby bucket states":
         "OEM AND BACKGROUND EXECUTION" in diagnostics and "isBackgroundRestricted" in diagnostics
         and "isDeviceIdleMode" in diagnostics and "appStandbyBucket" in diagnostics,
+    "confirmed charger reconnect cannot turn a stale OFF preference into an unauthenticated disarm":
+        "shouldArmOnConfirmedConnection(monitorEnabled, current.mode)" in (APP / "PowerTransitionCoordinator.kt").read_text(encoding="utf-8")
+        and "val activeProtection = current.mode == ProtectionMode.ARMED" in (APP / "PowerTransitionCoordinator.kt").read_text(encoding="utf-8")
+        and "monitorRequired = monitorEnabled || activeProtection" in (APP / "PowerTransitionCoordinator.kt").read_text(encoding="utf-8")
+        and "fun shouldArmOnConfirmedConnection(" in monitor
+        and "staleMonitorOptOutNeverDisarmsActiveProtectionOnReconnect" in (ROOT / "app/src/test/java/com/thiefalertsequre/app/ProtectionMonitorPolicyTest.kt").read_text(encoding="utf-8"),
     "dashboard and boot reconciliation never disarm active protection because of an OFF preference":
         "ProtectionEngine.disableMonitoring(" not in (APP / "MainActivity.kt").read_text(encoding="utf-8")
         and "ProtectionEngine.disableMonitoring(" not in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
