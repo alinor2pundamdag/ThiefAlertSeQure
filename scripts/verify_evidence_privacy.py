@@ -23,6 +23,9 @@ camera_section_end = settings.index(
     camera_section_start
 )
 camera_settings = settings[camera_section_start:camera_section_end]
+camera_archive_start = settings.index("private fun showCameraEvidenceArchive()")
+camera_archive_end = settings.index("private fun writeCameraEvidenceExport", camera_archive_start)
+camera_archive = settings[camera_archive_start:camera_archive_end]
 privacy = (ROOT / "docs/PRIVACY_POLICY.md").read_text(encoding="utf-8")
 main = (APP / "MainActivity.kt").read_text(encoding="utf-8")
 intro = (APP / "SeismicGenesisIntroActivity.kt").read_text(encoding="utf-8")
@@ -121,6 +124,14 @@ required = {
         and "CameraEvidenceVault.entries(this)" not in camera_settings
         and camera_settings.index("ioExecutor.execute {")
         < camera_settings.index("CameraEvidenceVault.entries(applicationContext)"),
+    "encrypted photo archive enumeration, decode and deletion stay off the Settings UI thread":
+        camera_archive.index("ioExecutor.execute {")
+        < camera_archive.index("CameraEvidenceVault.entries(applicationContext)")
+        and "CameraEvidenceVault.entries(this)" not in camera_archive
+        and "BitmapFactory.decodeByteArray(payload, 0, payload.size)" in camera_archive
+        and camera_archive.index("BitmapFactory.decodeByteArray(payload, 0, payload.size)")
+        < camera_archive.index("runOnUiThread {")
+        and "CameraEvidenceVault.delete(applicationContext, entry.id)" in camera_archive,
     "configuration backup schema 2 includes the storage preference and accepts schema 1":
         '"camera_evidence_settings", "encrypt_new_photos"' in configuration
         and 'put("schema", 2)' in configuration
