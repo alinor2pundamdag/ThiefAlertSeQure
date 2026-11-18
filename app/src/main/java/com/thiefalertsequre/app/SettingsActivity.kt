@@ -679,7 +679,7 @@ class SettingsActivity : FragmentActivity() {
                 .setTitle(if (encryptNewPhotos) "Save new photos to Gallery?" else "Encrypt new camera photos?")
                 .setMessage(if (encryptNewPhotos)
                     "Turning encryption OFF saves future evidence photos as normal, unencrypted images in Pictures/ThiefAlertSeQure so they appear in Gallery. Existing encrypted-vault photos stay encrypted."
-                    else "Turning encryption ON stores future evidence photos in the app private AES-GCM vault; they will not appear in Gallery unless exported. Existing Gallery photos remain unencrypted.")
+                    else "Turning encryption ON stores future evidence photos in the app private AES-GCM vault; they will not appear in Gallery unless exported. Existing Gallery photos remain visible until you explicitly use the verified migration action below.")
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton(if (encryptNewPhotos) "Save to Gallery" else "Encrypt new photos") { _, _ ->
                     if (encryptNewPhotos && Build.VERSION.SDK_INT < 29 && (
@@ -693,6 +693,46 @@ class SettingsActivity : FragmentActivity() {
                     if (saved) LocalTamperHistory.record(this, "camera_evidence_encryption_setting_changed", "Encrypt future captures: ${!encryptNewPhotos}")
                     Toast.makeText(this, if (saved) "Storage setting updated for future photos." else "Could not save the storage setting.", Toast.LENGTH_LONG).show()
                     render()
+                }
+                .showThemed(this)
+        })
+        root.addView(action("Encrypt existing Gallery photos into the private vault") {
+            if (!requireProtectionDisarmed()) return@action
+            if (!CameraEvidenceCapture.isEncryptionEnabled(this)) {
+                android.widget.Toast.makeText(
+                    this,
+                    "Turn ON encryption for new photos first, then run the existing-photo migration.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                return@action
+            }
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Encrypt existing Gallery photos?")
+                .setMessage(
+                    "The app will copy each app-owned Gallery photo into the AES-GCM private vault, read it back and verify the exact bytes, then remove the Gallery original only if it is still unchanged and protection remains DISARMED. If verification, deletion, or storage capacity prevents a safe move, the original stays in Gallery. The vault retains up to ${CameraEvidencePolicy.MAX_IMAGES} photos."
+                )
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Encrypt and verify") { _, _ ->
+                    android.widget.Toast.makeText(this, "Encrypting and verifying existing photos…", android.widget.Toast.LENGTH_SHORT).show()
+                    ioExecutor.execute {
+                        val result = runCatching {
+                            CameraEvidenceMediaStore.migrateAllToEncryptedVault(applicationContext)
+                        }.getOrNull()
+                        runOnUiThread {
+                            if (!isFinishing && !isDestroyed) {
+                                val message = when {
+                                    result == null -> "Migration could not complete. Gallery originals were not intentionally removed by the failed operation."
+                                    result.blockedByProtection -> "Migration stopped because protection became active. Remaining Gallery originals were kept."
+                                    !result.enumerationSucceeded -> "Gallery photos could not be enumerated. No Gallery originals were removed."
+                                    result.copiedToVault == 0 && result.copyFailures == 0 && result.capacityLimited == 0 ->
+                                        "No app-owned Gallery photos were available to migrate."
+                                    else -> "Encrypted copies verified: ${result.copiedToVault}. Gallery originals removed: ${result.originalsRemoved}. Copy failures: ${result.copyFailures}. Originals kept because removal was not confirmed: ${result.removalFailures}. Capacity-limited originals kept in Gallery: ${result.capacityLimited}. Vault integrity: ${if (result.vaultIntegrityVerified) "VERIFIED" else "FAILED / UNKNOWN"}."
+                                }
+                                android.widget.Toast.makeText(this@SettingsActivity, message, android.widget.Toast.LENGTH_LONG).show()
+                                render()
+                            }
+                        }
+                    }
                 }
                 .showThemed(this)
         })
