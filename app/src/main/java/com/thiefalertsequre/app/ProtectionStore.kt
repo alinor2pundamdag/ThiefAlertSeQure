@@ -365,20 +365,10 @@ class ProtectionStore internal constructor(
         if (count == Long.MAX_VALUE) return false
         val snapshot = count + 1L
         val rawValues = runCatching { prefs.all }.getOrNull() ?: return false
-        val editor = backup.edit()
-        for ((key, value) in rawValues) {
-            val snapshotKey = "snapshot_${snapshot}_$key"
+        for ((_, value) in rawValues) {
             when (value) {
-                is String -> editor.putString(snapshotKey, value)
-                is Int -> editor.putInt(snapshotKey, value)
-                is Long -> editor.putLong(snapshotKey, value)
-                is Float -> editor.putFloat(snapshotKey, value)
-                is Boolean -> editor.putBoolean(snapshotKey, value)
-                is Set<*> -> {
-                    val strings = value.filterIsInstance<String>()
-                    if (strings.size != value.size) return false
-                    editor.putStringSet(snapshotKey, strings.toSet())
-                }
+                is String, is Int, is Long, is Float, is Boolean -> Unit
+                is Set<*> -> if (value.filterIsInstance<String>().size != value.size) return false
                 else -> return false
             }
         }
