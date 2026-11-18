@@ -52,14 +52,6 @@ jobs:
           test -s "$HOME/.config/.android/debug.keystore"
           echo "Gradle debug keystore prepared at the resolved AGP path."
 
-      - name: Inspect Gradle debug signing resolution
-        shell: bash
-        run: |
-          set -euo pipefail
-          ./gradlew :app:signingReport --no-daemon --console=plain | tee "$RUNNER_TEMP/signing-report.txt"
-          grep -F "Store: $HOME/.config/.android/debug.keystore" "$RUNNER_TEMP/signing-report.txt"
-          keytool -list -v -keystore "$HOME/.config/.android/debug.keystore" -storepass android -alias androiddebugkey 2>&1 | grep -E 'Alias name:|SHA256:|SHA-256:'
-
       - name: Mark branch and pull-request builds as development-only
         run: echo "RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
 
@@ -74,6 +66,14 @@ jobs:
  
       - name: Verify Batch 2 cross-file integration contracts
         run: python3 scripts/verify_batch2_contracts.py
+
+      - name: Inspect Gradle debug signing resolution
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew :app:signingReport --no-daemon --console=plain | tee "$RUNNER_TEMP/signing-report.txt"
+          grep -F "Store: $HOME/.config/.android/debug.keystore" "$RUNNER_TEMP/signing-report.txt"
+          keytool -list -v -keystore "$HOME/.config/.android/debug.keystore" -storepass android -alias androiddebugkey 2>&1 | grep -E 'Alias name:|SHA256:|SHA-256:'
 
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
