@@ -111,7 +111,10 @@ internal object CameraEvidenceMediaStore {
         var copyFailures = 0
         var removalFailures = 0
         var blocked = false
+        val pendingDeletions = mutableListOf<Pair<Uri, ByteArray>>()
 
+        // Copy and verify every selected item first. Do not remove any Gallery
+        // source until the complete encrypted vault passes its integrity scan.
         for ((uri, timestamp) in selected) {
             val original = readBoundedImage(app, uri)
             if (original == null || !CameraEvidencePolicy.isValidImageSize(original.size)) {
@@ -130,9 +133,23 @@ internal object CameraEvidenceMediaStore {
                 continue
             }
             copied += 1
+            pendingDeletions += uri to original
+        }
 
-            // Re-read the Gallery row immediately before deletion. If its contents
-            // changed after the encrypted copy was made, preserve the source row.
+        val copiedVaultHealthy = CameraEvidenceVault.verifyIntegrity(app)
+        if (!copiedVaultHealthy) {
+            return MigrationResult(
+                enumerationSucceeded = true,
+                copiedToVault = copied,
+                copyFailures = copyFailures,
+                capacityLimited = (query.images.size - selected.size).coerceAtLeast(0),
+                vaultIntegrityVerified = false
+            )
+        }
+
+        // Remove a source only after a fresh byte-for-byte source check and a
+        // state-locked DISARMED check. If protection activates, stop immediately.
+        for ((uri, original) in pendingDeletions) {
             val currentSource = readBoundedImage(app, uri)
             if (currentSource == null || !MessageDigest.isEqual(original, currentSource)) {
                 removalFailures += 1
