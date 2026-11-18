@@ -17,6 +17,7 @@ import com.google.android.filament.Engine
 import com.google.android.filament.EntityManager
 import com.google.android.filament.Filament
 import com.google.android.filament.IndexBuffer
+import com.google.android.filament.IndirectLight
 import com.google.android.filament.LightManager
 import com.google.android.filament.Material
 import com.google.android.filament.MathUtils
@@ -29,6 +30,8 @@ import com.google.android.filament.View
 import com.google.android.filament.Viewport
 import com.google.android.filament.android.FilamentHelper
 import com.google.android.filament.android.UiHelper
+import com.google.android.filament.utils.HDRLoader
+import com.google.android.filament.utils.IBLPrefilterContext
 import com.google.android.filament.filamat.MaterialBuilder
 import kotlin.math.PI
 import kotlin.math.abs
@@ -39,6 +42,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.io.ByteArrayOutputStream
 
 /**
  * Actual Filament scene used by the Seismic Genesis intro.
@@ -92,6 +96,10 @@ class GenesisFilamentRendererView(
     private var engine: Engine? = null
     private var renderer: com.google.android.filament.Renderer? = null
     private var scene: Scene? = null
+    private var environmentSkybox: Skybox? = null
+    private var environmentIndirectLight: IndirectLight? = null
+    private var environmentSkyboxTexture: com.google.android.filament.Texture? = null
+    private var environmentReflectionTexture: com.google.android.filament.Texture? = null
     private var filamentView: View? = null
     private var camera: Camera? = null
     private var uiHelper: UiHelper? = null
@@ -174,7 +182,7 @@ class GenesisFilamentRendererView(
             filamentView?.camera = camera
             filamentView?.scene = scene
             filamentView?.isPostProcessingEnabled = true
-            scene?.skybox = Skybox.Builder().color(0f, 0f, 0f, 1f).build(activeEngine)
+            buildStudioHdrEnvironment(activeEngine)
 
             pbrMaterial = buildPbrMaterial(activeEngine)
             shieldMaterial = pbrMaterial?.createInstance()?.apply {
@@ -288,6 +296,75 @@ class GenesisFilamentRendererView(
             android.util.Log.e("Genesis3D", "Filament scene initialization failed", error)
             release()
             post { onInitializationFailed?.invoke() }
+        }
+    }
+
+    /**
+     * Builds a compact procedural HDR studio probe and prefilters it into Filament's
+     * cubemap reflection data. This avoids network access and keeps the intro self-contained.
+     */
+    private fun buildStudioHdrEnvironment(activeEngine: Engine) {
+        val width = 128
+        val height = 64
+        val output = ByteArrayOutputStream(32_768)
+        output.write("#?RADIANCE\\nFORMAT=32-bit_rle_rgbe\\n\\n-Y $height +X $width\\n".toByteArray(Charsets.US_ASCII))
+
+        fun rgbe(red: Float, green: Float, blue: Float): ByteArray {
+            val peak = max(red, max(green, blue))
+            if (peak < 1.0e-8f) return byteArrayOf(0, 0, 0, 0)
+            val exponent = kotlin.math.floor(kotlin.math.ln(peak.toDouble(), 2.0)).toInt() + 1
+            val scale = 256.0 / kotlin.math.pow(2.0, exponent.toDouble())
+            return byteArrayOf(
+                (red * scale).toInt().coerceIn(0, 255).toByte(),
+                (green * scale).toInt().coerceIn(0, 255).toByte(),
+                (blue * scale).toInt().coerceIn(0, 255).toByte(),
+                (exponent + 128).coerceIn(0, 255).toByte()
+            )
+        }
+
+        for (y in 0 until height) {
+            output.write(byteArrayOf(2, 2, (width shr 8).toByte(), (width and 255).toByte()))
+            val channels = Array(4) { ByteArray(width) }
+            for (x in 0 until width) {
+                val u = x.toFloat() / (width - 1)
+                val v = y.toFloat() / (height - 1)
+                val horizon = kotlin.math.exp(-kotlin.math.abs(v - 0.52f) * 18f)
+                val overheadStrip = if (v < 0.30f && (u in 0.12f..0.38f || u in 0.62f..0.88f)) 7.5f else 0f
+                val warmPanel = if (u in 0.46f..0.54f && v < 0.58f) 2.4f else 0f
+                val red = 0.025f + horizon * 0.12f + overheadStrip + warmPanel
+                val green = 0.032f + horizon * 0.15f + overheadStrip * 0.94f + warmPanel * 0.10f
+                val blue = 0.05f + horizon * 0.20f + overheadStrip * 0.86f + warmPanel * 0.035f
+                val pixel = rgbe(red, green, blue)
+                for (channel in 0..3) channels[channel][x] = pixel[channel]
+            }
+            for (channel in 0..3) {
+                output.write(width)
+                output.write(channels[channel])
+            }
+        }
+
+        val hdr = HDRLoader.createTexture(activeEngine, ByteBuffer.wrap(output.toByteArray()))
+            ?: error("Unable to decode generated Seismic Genesis HDR environment")
+        val prefilter = IBLPrefilterContext(activeEngine)
+        val converter = IBLPrefilterContext.EquirectangularToCubemap(prefilter)
+        val specularFilter = IBLPrefilterContext.SpecularFilter(prefilter)
+        try {
+            val skyboxTexture = checkNotNull(converter.run(hdr)) { "HDR to cubemap conversion failed" }
+            val reflections = checkNotNull(specularFilter.run(skyboxTexture)) { "HDR reflection prefilter failed" }
+            environmentSkyboxTexture = skyboxTexture
+            environmentReflectionTexture = reflections
+            environmentIndirectLight = IndirectLight.Builder()
+                .reflections(reflections)
+                .intensity(24_000f)
+                .build(activeEngine)
+            environmentSkybox = Skybox.Builder().environment(skyboxTexture).build(activeEngine)
+            scene?.indirectLight = environmentIndirectLight
+            scene?.skybox = environmentSkybox
+        } finally {
+            activeEngine.destroyTexture(hdr)
+            specularFilter.destroy()
+            converter.destroy()
+            prefilter.destroy()
         }
     }
 
@@ -964,6 +1041,12 @@ class GenesisFilamentRendererView(
                 titleMaterial?.let(activeEngine::destroyMaterialInstance)
                 coreMaterial?.let(activeEngine::destroyMaterialInstance)
                 pbrMaterial?.let(activeEngine::destroyMaterial)
+                scene?.indirectLight = null
+                scene?.skybox = null
+                environmentIndirectLight?.let(activeEngine::destroyIndirectLight)
+                environmentSkybox?.let(activeEngine::destroySkybox)
+                environmentReflectionTexture?.let(activeEngine::destroyTexture)
+                environmentSkyboxTexture?.let(activeEngine::destroyTexture)
                 filamentView?.let(activeEngine::destroyView)
                 scene?.let(activeEngine::destroyScene)
                 camera?.let { activeEngine.destroyCameraComponent(it.entity); EntityManager.get().destroy(it.entity) }
