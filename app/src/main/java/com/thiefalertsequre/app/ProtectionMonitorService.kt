@@ -325,10 +325,15 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                         stopSelf()
                         return START_NOT_STICKY
                     }
-                    if (!ProtectionMonitorPolicy.canStop(currentMode) &&
-                        !SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
-                    ) {
-                        prefs.edit().putBoolean(KEY_ENABLED, true).commit()
+                    val activeRepair = ProtectionStore(this).runIfProtectionActive {
+                        if (SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) true
+                        else prefs.edit().putBoolean(KEY_ENABLED, true).commit()
+                    }
+                    if (activeRepair == false) {
+                        LocalTamperHistory.record(
+                            this, "active_monitor_preference_repair_failed",
+                            "Active protection was preserved, but the monitor-enabled preference could not be restored"
+                        )
                     }
                     if (SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
                         A2BluetoothReceiverController.ensureBaselineReady(this)
