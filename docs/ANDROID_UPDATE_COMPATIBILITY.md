@@ -1,6 +1,6 @@
 # Android update compatibility contract
 
-**Permanent release invariant:** v1.1.3 → v1.1.4 and every later official update.
+**Current candidate snapshot (18 November 2026):** branch `work/batch-4-implementation`, PR #8 open/unmerged, versionName `1.1.5_Developer_Alinor`, versionCode `7`. This is not a production release. The last documented official baseline remains v1.1.3 / versionCode 5; v1.1.4 / code 6 was an intermediate candidate.
 
 ## Immutable production identity
 
@@ -8,7 +8,8 @@
 - Official signing certificate SHA-256: `9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64`
 - Preserve the original owner-controlled production keystore, private key, alias and credentials. Never regenerate or replace them to make CI pass.
 - v1.1.3 baseline: versionCode 5, versionName 1.1.3, minSdk 26.
-- v1.1.4 official candidate: versionCode 6, versionName `1.1.4_Developer_Alinor`, minSdk 26. The isolated debug test variant uses versionName `1.1.4-test`, package suffix `.v114test`, and the same versionCode 6. The next official release must use versionCode 7 and versionName `1.1.5_Developer_Alinor`.
+- Historical v1.1.4 candidate: versionCode 6, versionName `1.1.4_Developer_Alinor`, minSdk 26. It was not confirmed as a published official release in this repository snapshot.
+- Current v1.1.5 candidate: versionCode 7, versionName `1.1.5_Developer_Alinor`, minSdk 26. The debug test variant is isolated as package suffix `.v114test` and versionName `1.1.5-test`; it is never accepted by the production updater.
 - Preserve the owner-approved minSdk 26 invariant; do not lower it or raise it without an explicit compatibility decision.
 - Every subsequent official release must have a strictly higher versionCode.
 
@@ -25,7 +26,7 @@
 
 
 
-**Current owner scope (17 November 2026):** The `adb install -r` marker scenario above is retained as a separate future release-install acceptance check. It is **not executed** during the current Phase 0–12 software task. No emulator, instrumentation compilation/execution, or physical-device testing is authorized for this task; this item is not a blocker for code/repository completion.
+**Current verification boundary (18 November 2026):** The `adb install -r` marker scenario remains a separate release-install acceptance check. No emulator, instrumentation compilation/execution, or physical-device test is claimed for the current Batch Four candidate. CI/build results must be recorded against the exact latest commit; they do not establish physical-device acceptance.
 
 ## Data preservation
 
