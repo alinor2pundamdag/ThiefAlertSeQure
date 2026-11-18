@@ -130,7 +130,7 @@ required = {
         and "CameraEvidenceVault.entries(this)" not in camera_archive
         and "BitmapFactory.decodeByteArray(payload, 0, payload.size)" in camera_archive
         and camera_archive.index("BitmapFactory.decodeByteArray(payload, 0, payload.size)")
-        < camera_archive.index("runOnUiThread {")
+        < camera_archive.index("runOnUiThread {", camera_archive.index("BitmapFactory.decodeByteArray(payload, 0, payload.size)"))
         and "CameraEvidenceVault.delete(applicationContext, entry.id)" in camera_archive,
     "configuration backup schema 2 includes the storage preference and accepts schema 1":
         '"camera_evidence_settings", "encrypt_new_photos"' in configuration
