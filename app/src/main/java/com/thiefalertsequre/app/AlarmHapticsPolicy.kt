@@ -18,8 +18,10 @@ object AlarmHapticsPolicy {
         SafePreferences.boolean(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE), KEY_ENABLED, true)
 
     fun setEnabled(context: Context, enabled: Boolean): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putBoolean(KEY_ENABLED, enabled).commit()
+        ProtectionStore(context).runIfDisarmed {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_ENABLED, enabled).commit()
+        } == true
 
     fun readPattern(context: Context): AlarmHapticPattern {
         val raw = SafePreferences.string(
@@ -32,12 +34,15 @@ object AlarmHapticsPolicy {
     }
 
     fun nextPattern(context: Context): AlarmHapticPattern {
-        val patterns = AlarmHapticPattern.entries
         val current = readPattern(context)
-        val next = patterns[(patterns.indexOf(current) + 1) % patterns.size]
-        return if (context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit().putString(KEY_PATTERN, next.name).commit()
-        ) next else current
+        return ProtectionStore(context).runIfDisarmed {
+            val patterns = AlarmHapticPattern.entries
+            val latest = readPattern(context)
+            val next = patterns[(patterns.indexOf(latest) + 1) % patterns.size]
+            if (context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().putString(KEY_PATTERN, next.name).commit()
+            ) next else latest
+        } ?: current
     }
 
     fun waveform(pattern: AlarmHapticPattern): LongArray = when (pattern) {
