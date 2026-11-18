@@ -127,7 +127,7 @@ required = {
     "photo migration validates the complete vault before deleting Gallery sources":
         "val copiedVaultHealthy = CameraEvidenceVault.verifyIntegrity(app)" in camera_media
         and "if (!copiedVaultHealthy)" in camera_media
-        and camera_media.index("if (!copiedVaultHealthy)") < camera_media.index("for ((uri, original) in pendingDeletions)")
+        and camera_media.index("if (!copiedVaultHealthy)") < camera_media.index("for ((uri, originalDigest) in pendingDeletions)")
         and "ProtectionStore(app).runIfDisarmed" in camera_media,
     "Gallery deletion fails closed when MediaStore enumeration fails":
         "if (!query.success) return false" in camera_media
@@ -176,6 +176,13 @@ required = {
         and camera_archive.index("BitmapFactory.decodeByteArray(payload, 0, payload.size)")
         < camera_archive.index("runOnUiThread {", camera_archive.index("BitmapFactory.decodeByteArray(payload, 0, payload.size)"))
         and "CameraEvidenceVault.delete(applicationContext, entry.id)" in camera_archive,
+    "configuration restore recovery is serialized, fail-closed and snapshots only while DISARMED":
+        "@Synchronized\n    fun decryptAndRestore" in configuration
+        and "@Synchronized\n    fun recoverPendingRestore" in configuration
+        and "return !journal.contains(JOURNAL_PHASE)" in configuration
+        and "ProtectionStore(context).runIfDisarmed" in configuration
+        and "ConfigurationBackup.isRestoreOrRecoveryInProgress()" in (APP / "MainActivity.kt").read_text(encoding="utf-8")
+        and "ConfigurationBackup.isRestoreOrRecoveryInProgress()" in (APP / "ProtectionMonitorService.kt").read_text(encoding="utf-8"),
     "configuration backup schema 2 includes the storage preference and accepts schema 1":
         '"camera_evidence_settings", "encrypt_new_photos"' in configuration
         and 'put("schema", 2)' in configuration
