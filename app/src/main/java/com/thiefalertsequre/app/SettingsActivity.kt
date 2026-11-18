@@ -826,8 +826,11 @@ class SettingsActivity : FragmentActivity() {
                                 val galleryDeleted = runCatching { CameraEvidenceMediaStore.deleteAll(applicationContext) }.getOrDefault(false)
                                 vaultDeleted && galleryDeleted
                             }
-                            val deleted = deletion == true
-                            LocalEvidenceVault.recordAsync(applicationContext, "camera_evidence_deleted", "Owner deleted all app-managed front-camera photo evidence; vault=$vaultDeleted; gallery=$galleryDeleted")
+                            LocalEvidenceVault.recordAsync(
+                                applicationContext,
+                                "camera_evidence_deleted",
+                                "Owner requested deletion of all app-managed front-camera photo evidence; fullyConfirmed=${deletion == true}"
+                            )
                             runOnUiThread {
                                 if (!isFinishing && !isDestroyed) {
                                     val message = when (deletion) {
