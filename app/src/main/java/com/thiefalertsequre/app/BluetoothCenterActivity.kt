@@ -265,6 +265,16 @@ class BluetoothCenterActivity : FragmentActivity() {
     }
 
     private fun toggleA2() {
+        val changed = ProtectionStore(this).runIfDisarmed {
+            toggleA2WhileDisarmed()
+            true
+        }
+        if (changed != true) {
+            showResult("A2 settings locked", "Trusted-device registration and A2 enable/disable are available only while protection is DISARMED.")
+        }
+    }
+
+    private fun toggleA2WhileDisarmed() {
         if (!requireProtectionDisarmed()) return
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
         if (SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)) {
@@ -311,6 +321,16 @@ class BluetoothCenterActivity : FragmentActivity() {
     }
 
     private fun enableA2() {
+        val changed = ProtectionStore(this).runIfDisarmed {
+            enableA2WhileDisarmed()
+            true
+        }
+        if (changed != true) {
+            showResult("A2 settings locked", "Trusted-device registration and A2 enable/disable are available only while protection is DISARMED.")
+        }
+    }
+
+    private fun enableA2WhileDisarmed() {
         if (!requireProtectionDisarmed()) return
         enableAfterPermission = false
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
