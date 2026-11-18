@@ -584,7 +584,8 @@ object PowerTransitionCoordinator {
                 ) {
                     clearPendingDisconnectLocked(context, prefs)
                 } else {
-                    LocalTamperHistory.record(context, "charger_countdown_schedule_pending", "Existing countdown remains durable; pending unplug provenance retained for retry")
+                    AlarmScheduler.scheduleRetry(context, 1_000L)
+                    LocalTamperHistory.record(context, "charger_countdown_schedule_pending", "Existing countdown remains durable; pending unplug provenance retained and a one-second scheduler retry requested")
                     notifyMonitorStateChanged(context)
                 }
                 return@synchronized current
@@ -638,7 +639,8 @@ object PowerTransitionCoordinator {
                     LocalTamperHistory.record(context, "charger_countdown_started", "OS unplug event confirmed by stable live-state samples; recovered candidates retain their original event time")
                     notifyMonitorStateChanged(context)
                 } else {
-                    LocalTamperHistory.record(context, "charger_countdown_schedule_pending", "Countdown state is durable but alarm scheduling failed; pending unplug provenance retained for recovery")
+                    AlarmScheduler.scheduleRetry(context, 1_000L)
+                    LocalTamperHistory.record(context, "charger_countdown_schedule_pending", "Countdown state is durable but alarm scheduling failed; pending unplug provenance retained and a one-second scheduler retry requested")
                     notifyMonitorStateChanged(context)
                 }
             } else if (next.mode != ProtectionMode.ARMED) {
