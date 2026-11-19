@@ -105,7 +105,7 @@ Managed lockdown is a separate, opt-in mode. It is enabled only if DevicePolicyM
 - No cloud/backend/analytics/ad SDK.
 - Do not collect device passwords, patterns or PINs.
 - No unnecessary contacts, location, camera, microphone, SMS or storage permissions.
-- Charger receiver is not exported to third-party apps.
+- `PowerTransitionReceiver` is exported so Android can deliver its protected power broadcasts while the app process is absent. Android marks `ACTION_POWER_CONNECTED` and `ACTION_POWER_DISCONNECTED` as protected system intents; ordinary third-party apps cannot send them. No additional receiver permission is needed.
 - DeviceAdminReceiver is exported only with BIND_DEVICE_ADMIN protection.
 - Keep app backup disabled so security state is not restored into a different device unexpectedly.
 

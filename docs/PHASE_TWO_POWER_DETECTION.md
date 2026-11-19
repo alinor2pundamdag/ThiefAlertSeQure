@@ -5,6 +5,7 @@ This document records the non-physical-device engineering contract for Phase Two
 ## Charger and power detection
 
 - `PowerTransitionReceiver` captures the OS event's wall-clock and elapsed-realtime timestamps before asynchronous queueing.
+- The receiver is manifest-registered for Android's protected `ACTION_POWER_CONNECTED` and `ACTION_POWER_DISCONNECTED` broadcasts. Android documents these actions as receivable through manifest receivers and as waking apps; the monitor service no longer registers a duplicate runtime receiver.
 - The live `ACTION_BATTERY_CHANGED` snapshot must produce three consecutive matching samples, with a five-sample hard cap and 100 ms spacing. Stable confirmation normally adds about 200 ms; the cap is about 400 ms, excluding Android broadcast delivery and hardware latency.
 - The ten-second charger grace period is anchored to the original disconnect receipt, not the end of sampling.
 - Unknown or opposite samples reset the consecutive count. A disconnected snapshot alone never creates a countdown without a previously confirmed connected baseline and a valid disconnect event.

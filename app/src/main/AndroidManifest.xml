@@ -49,6 +49,13 @@
             </intent-filter>
         </receiver>
         <!-- Bluetooth ACL actions are platform-protected. Export is required because the Bluetooth stack may send from a privileged non-system UID. The controller keeps this receiver disabled unless monitor, A2, and BLUETOOTH_CONNECT are active. -->
+        <!-- Protected power broadcasts are manifest-receivable and wake the app even when its monitor service is not running. -->
+        <receiver android:name=".PowerTransitionReceiver" android:enabled="true" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
+            </intent-filter>
+        </receiver>
         <receiver android:name=".A2BluetoothAclReceiver" android:enabled="false" android:exported="true">
             <intent-filter>
                 <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />

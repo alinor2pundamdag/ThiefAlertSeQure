@@ -39,7 +39,7 @@ The production baseline remains v1.1.3. The current feature branch contains the 
 | Original alarm sound | Packaged Ogg Opus asset in res/raw, looping MediaPlayer (resource filename must use `.ogg`) |
 | Audio fallback | Repeating vibration if selected and packaged audio both fail |
 | Alarm volume | Saves prior alarm-stream volume, raises to device maximum during alarm, restores after successful disarm; malformed saved-volume metadata is detected and removed rather than crashing recovery (the original value cannot be reconstructed if corrupted) |
-| Charger auto-arm | Runtime-registered PowerTransitionReceiver from the user-enabled foreground monitor plus persisted connected-baseline validation, monitor opt-out recheck during live and pending recovery, newer-event deadline replacement, independent exact/inexact callback retention, one-shot durable retry after a transient countdown-state commit failure, and one-second in-process/AlarmManager backoff when expiry-state persistence fails |
+| Charger auto-arm | Manifest-registered protected PowerTransitionReceiver supports process-absent charger events; persisted connected-baseline validation, monitor opt-out recheck during live and pending recovery, newer-event deadline replacement, independent exact/inexact callback retention, one-shot durable retry after a transient countdown-state commit failure, and one-second in-process/AlarmManager backoff when expiry-state persistence fails |
 | 10-second unplug countdown | ProtectionEngine + AlarmScheduler |
 | Reconnect before deadline | Returns to ARMED |
 | Reconnect after trigger | Cannot clear ALARM_TRIGGERED |

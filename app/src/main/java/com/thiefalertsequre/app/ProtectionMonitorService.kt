@@ -28,9 +28,10 @@ import androidx.core.content.ContextCompat
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * User-visible, persistent charger monitor. It remains active while DISARMED,
- * ARMED or COUNTDOWN so plug/unplug transitions are detected without an Activity.
- * Motion sensing is still registered only while protection is ARMED.
+ * User-visible persistent monitor for motion, battery-threshold alerts and
+ * trusted Bluetooth fast-path handling. Protected charger connect/disconnect
+ * broadcasts are delivered by PowerTransitionReceiver even when this service
+ * or process is absent; motion sensing remains ARMED-only.
  */
 class ProtectionMonitorService : Service(), SensorEventListener {
     private val handler = Handler(Looper.getMainLooper())
@@ -42,9 +43,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private var accelerometer: Sensor? = null
     private var sensorRegistered = false
     private var receiverRegistered = false
-    private var powerReceiverRegistered = false
     private var bluetoothReceiverRegistered = false
-    private val powerTransitionReceiver = PowerTransitionReceiver()
     private val pendingBluetoothRunnables = mutableMapOf<String, Runnable>()
     private val bluetoothSeparationReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -169,7 +168,6 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
 
         registerSystemReceiver()
-        registerPowerTransitionReceiver()
         registerBluetoothSeparationReceiver()
         if (bluetoothReceiverRegistered && !A2DisconnectScheduler.rescheduleAll(this)) {
             LocalTamperHistory.record(
@@ -193,25 +191,6 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
         ContextCompat.registerReceiver(this, systemReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         receiverRegistered = true
-    }
-
-    /**
-     * Power connected/disconnected are implicit broadcasts. Register them at runtime
-     * from this persistent foreground service; a manifest-only receiver is not
-     * reliable for apps targeting Android 8+.
-     */
-    private fun registerPowerTransitionReceiver() {
-        if (powerReceiverRegistered) return
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_POWER_CONNECTED)
-            addAction(Intent.ACTION_POWER_DISCONNECTED)
-        }
-        // These actions are protected system broadcasts; third-party apps cannot send them.
-        ContextCompat.registerReceiver(
-            this, powerTransitionReceiver, filter, ContextCompat.RECEIVER_EXPORTED
-        )
-        powerReceiverRegistered = true
-        LocalTamperHistory.record(this, "power_event_receiver_registered", "Runtime charger connect/disconnect receiver active")
     }
 
     private fun registerBluetoothSeparationReceiver() = A2DisconnectStateLock.withLock {
@@ -717,8 +696,6 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         unregisterMotionSensor()
         if (receiverRegistered) runCatching { unregisterReceiver(systemReceiver) }
         receiverRegistered = false
-        if (powerReceiverRegistered) runCatching { unregisterReceiver(powerTransitionReceiver) }
-        powerReceiverRegistered = false
         A2DisconnectStateLock.withLock {
             serviceDestroyed = true
             pendingBluetoothRunnables.values.forEach(handler::removeCallbacks)
