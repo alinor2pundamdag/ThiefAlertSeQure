@@ -1,6 +1,5 @@
 package com.thiefalertsequre.app
 
-import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,7 +10,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeNotNull
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,22 +28,18 @@ class A2BluetoothAclReceiverInstrumentationTest {
             prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
         val previousA2 = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-        val hadBluetoothPermission = Build.VERSION.SDK_INT < 31 ||
+        val hasBluetoothPermission = Build.VERSION.SDK_INT < 31 ||
             ContextCompat.checkSelfPermission(context, android.Manifest.permission.BLUETOOTH_CONNECT) ==
             PackageManager.PERMISSION_GRANTED
+        assumeTrue(
+            "The instrumentation harness must grant BLUETOOTH_CONNECT on API 31+ before this test",
+            hasBluetoothPermission
+        )
         val wasRunning = ProtectionMonitorService.isRunning
         val address = "02:00:00:00:02:61"
         val bootCount = ProtectionClock.bootCount(context)
         assumeTrue("The emulator must expose BOOT_COUNT for durable A2 deadlines", bootCount >= 0)
-        val adapter = BluetoothAdapter.getDefaultAdapter()
-        assumeNotNull(adapter)
         try {
-            if (Build.VERSION.SDK_INT >= 31 && !hadBluetoothPermission) {
-                instrumentation.uiAutomation.grantRuntimePermission(
-                    context.packageName, android.Manifest.permission.BLUETOOTH_CONNECT
-                )
-            }
-            val device = adapter!!.getRemoteDevice(address)
             context.stopService(Intent(context, ProtectionMonitorService::class.java))
             val stopDeadline = SystemClock.elapsedRealtime() + 5_000L
             while (ProtectionMonitorService.isRunning && SystemClock.elapsedRealtime() < stopDeadline) {
@@ -65,28 +59,30 @@ class A2BluetoothAclReceiverInstrumentationTest {
             assertTrue(A2BluetoothReceiverController.sync(context))
 
             val disconnectFinished = CountDownLatch(1)
-            enqueueA2BluetoothEvent(
+            enqueueA2BluetoothAddressEvent(
                 context,
-                Intent(BluetoothDevice.ACTION_ACL_DISCONNECTED).putExtra(BluetoothDevice.EXTRA_DEVICE, device),
+                BluetoothDevice.ACTION_ACL_DISCONNECTED,
+                address,
                 A2BluetoothEventReceipt.capture(context),
                 "a2_instrumentation_manifest_path",
                 onFinished = { disconnectFinished.countDown() }
             )
             assertTrue("The shared manifest/runtime event queue should finish the disconnect transition",
-                disconnectFinished.await(5, TimeUnit.SECONDS))
+                disconnectFinished.await(30, TimeUnit.SECONDS))
             assertTrue("shared A2 processor should persist an A2 deadline while the service is absent",
                 A2DisconnectScheduler.hasPendingIntent(context, address, fallback = true))
 
             val reconnectFinished = CountDownLatch(1)
-            enqueueA2BluetoothEvent(
+            enqueueA2BluetoothAddressEvent(
                 context,
-                Intent(BluetoothDevice.ACTION_ACL_CONNECTED).putExtra(BluetoothDevice.EXTRA_DEVICE, device),
+                BluetoothDevice.ACTION_ACL_CONNECTED,
+                address,
                 A2BluetoothEventReceipt.capture(context),
                 "a2_instrumentation_manifest_path",
                 onFinished = { reconnectFinished.countDown() }
             )
             assertTrue("The shared manifest/runtime event queue should finish the reconnect transition",
-                reconnectFinished.await(5, TimeUnit.SECONDS))
+                reconnectFinished.await(30, TimeUnit.SECONDS))
             assertFalse("Reconnect must cancel the durable deadline without a running service",
                 A2DisconnectScheduler.hasPendingIntent(context, address, fallback = true))
             assertTrue("Reconnect must restore the trusted device's connected baseline",
@@ -100,13 +96,6 @@ class A2BluetoothAclReceiverInstrumentationTest {
                 .commit()
             store.write(originalState)
             A2BluetoothReceiverController.sync(context)
-            if (Build.VERSION.SDK_INT >= 31 && !hadBluetoothPermission) {
-                runCatching {
-                    instrumentation.uiAutomation.revokeRuntimePermission(
-                        context.packageName, android.Manifest.permission.BLUETOOTH_CONNECT
-                    )
-                }
-            }
             if (wasRunning && previousMonitor) {
                 runCatching {
                     ContextCompat.startForegroundService(

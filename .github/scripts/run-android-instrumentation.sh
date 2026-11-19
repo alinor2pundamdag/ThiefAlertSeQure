@@ -88,8 +88,26 @@ capture_android_diagnostics() {
 
 trap capture_android_diagnostics EXIT
 
+# Install the target package first so the disposable emulator can grant the
+# Bluetooth runtime permission before AndroidX starts the instrumentation process.
+# This is test-harness setup only; the app never auto-grants or auto-requests it here.
+prepare_instrumentation_permissions() {
+  ./gradlew :app:installRelease -PsignReleaseForTests=true -PinstrumentationTestBuild=true --no-daemon
+  adb shell pm grant com.thiefalertsequre.app android.permission.BLUETOOTH_CONNECT
+  local permission_state
+  permission_state="$(adb shell pm check-permission android.permission.BLUETOOTH_CONNECT com.thiefalertsequre.app | tr -d '\r')"
+  if [[ "$permission_state" != "granted" ]]; then
+    echo "::error::BLUETOOTH_CONNECT was not granted to the instrumentation target package (state: $permission_state)."
+    return 1
+  fi
+  echo "Granted BLUETOOTH_CONNECT to the disposable instrumentation target package."
+}
+
 if [[ "$api_level" =~ ^[0-9]+$ ]]; then
   wait_for_stable_emulator || exit 1
+fi
+if [[ "$api_level" =~ ^[0-9]+$ ]]; then
+  prepare_instrumentation_permissions || exit 1
 fi
 
 run_instrumentation_attempt() {

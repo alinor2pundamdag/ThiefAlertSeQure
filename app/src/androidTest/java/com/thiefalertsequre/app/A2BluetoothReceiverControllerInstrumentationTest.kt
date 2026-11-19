@@ -23,7 +23,7 @@ class A2BluetoothReceiverControllerInstrumentationTest {
         val component = ComponentName(context, A2BluetoothAclReceiver::class.java)
         assertTrue(
             "Bluetooth ACL receiver must be exported so Android's privileged Bluetooth UID can deliver protected broadcasts after process death",
-            context.packageManager.getReceiverInfo(component, 0).exported
+            context.packageManager.getReceiverInfo(component, PackageManager.MATCH_DISABLED_COMPONENTS).exported
         )
         try {
             assertTrue(prefs.edit()

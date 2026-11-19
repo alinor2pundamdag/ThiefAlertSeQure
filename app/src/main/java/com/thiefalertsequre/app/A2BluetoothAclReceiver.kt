@@ -75,12 +75,36 @@ internal object A2BluetoothAclEventProcessor {
         receipt: A2BluetoothEventReceipt
     ): A2BluetoothEventResult = A2DisconnectStateLock.withLock {
         val app = context.applicationContext
+        processLocked(app, intent.action, receipt) {
+            runCatching {
+                intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+            }.getOrNull()?.address
+        }
+    }
+
+    /** Address-based entry point keeps event-policy tests independent of emulator Bluetooth hardware. */
+    fun processAddress(
+        context: Context,
+        action: String?,
+        address: String,
+        receipt: A2BluetoothEventReceipt
+    ): A2BluetoothEventResult = A2DisconnectStateLock.withLock {
+        processLocked(context.applicationContext, action, receipt) { address }
+    }
+
+    @Suppress("MissingPermission")
+    private fun processLocked(
+        app: Context,
+        action: String?,
+        receipt: A2BluetoothEventReceipt,
+        addressProvider: () -> String?
+    ): A2BluetoothEventResult {
         val prefs = app.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
         val monitorEnabled = SafePreferences.boolean(
             prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
         val alertEnabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-        if (!monitorEnabled || !alertEnabled) return@withLock A2BluetoothEventResult.Ignored
+        if (!monitorEnabled || !alertEnabled) return A2BluetoothEventResult.Ignored
 
         if (Build.VERSION.SDK_INT >= 31 &&
             ContextCompat.checkSelfPermission(app, android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
@@ -90,16 +114,15 @@ internal object A2BluetoothAclEventProcessor {
                 app, "bluetooth_permission_missing",
                 "Trusted Bluetooth separation monitoring paused; grant Bluetooth Connect permission"
             )
-            return@withLock A2BluetoothEventResult.Ignored
+            return A2BluetoothEventResult.Ignored
         }
 
-        val device = runCatching {
-            intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
-        }.getOrNull() ?: return@withLock A2BluetoothEventResult.Ignored
-        val address = device.address ?: return@withLock A2BluetoothEventResult.Ignored
-        if (!TrustedBluetoothRegistry.isTrusted(prefs, address)) return@withLock A2BluetoothEventResult.Ignored
+        val address = runCatching(addressProvider).getOrNull() ?: return A2BluetoothEventResult.Ignored
+        if (!TrustedBluetoothRegistry.isValidAddress(address) ||
+            !TrustedBluetoothRegistry.isTrusted(prefs, address)
+        ) return A2BluetoothEventResult.Ignored
 
-        when (intent.action) {
+        when (action) {
             BluetoothDevice.ACTION_ACL_CONNECTED -> {
                 TrustedBluetoothRegistry.markConnected(prefs, address, true)
                 A2DisconnectScheduler.cancel(app, address)
@@ -114,7 +137,7 @@ internal object A2BluetoothAclEventProcessor {
                         hadConnectionBaseline = hadBaseline,
                         protectionMode = ProtectionStore(app).read().mode
                     )
-                ) return@withLock A2BluetoothEventResult.Ignored
+                ) return A2BluetoothEventResult.Ignored
 
                 val pending = A2DisconnectScheduler.Pending(
                     address = address,
@@ -141,7 +164,6 @@ internal object A2BluetoothAclEventProcessor {
         }
     }
 }
-
 /** All ACL sources share one serial queue so a service restart cannot reorder a reconnect. */
 internal object A2BluetoothEventQueue {
     private val executor = Executors.newSingleThreadExecutor { runnable ->
@@ -161,6 +183,41 @@ internal fun enqueueA2BluetoothEvent(
     onResult: ((A2BluetoothEventResult) -> Unit)? = null,
     onFinished: () -> Unit
 ) {
+    enqueueA2BluetoothWork(
+        context = context,
+        source = source,
+        processor = { app -> A2BluetoothAclEventProcessor.process(app, intent, receipt) },
+        onResult = onResult,
+        onFinished = onFinished
+    )
+}
+
+/** Testable event entry point; production receivers still obtain addresses from platform ACL intents. */
+internal fun enqueueA2BluetoothAddressEvent(
+    context: Context,
+    action: String?,
+    address: String,
+    receipt: A2BluetoothEventReceipt,
+    source: String,
+    onResult: ((A2BluetoothEventResult) -> Unit)? = null,
+    onFinished: () -> Unit
+) {
+    enqueueA2BluetoothWork(
+        context = context,
+        source = source,
+        processor = { app -> A2BluetoothAclEventProcessor.processAddress(app, action, address, receipt) },
+        onResult = onResult,
+        onFinished = onFinished
+    )
+}
+
+private fun enqueueA2BluetoothWork(
+    context: Context,
+    source: String,
+    processor: (Context) -> A2BluetoothEventResult,
+    onResult: ((A2BluetoothEventResult) -> Unit)?,
+    onFinished: () -> Unit
+) {
     val app = context.applicationContext
     val finished = AtomicBoolean(false)
     fun finishOnce() {
@@ -169,7 +226,7 @@ internal fun enqueueA2BluetoothEvent(
     try {
         A2BluetoothEventQueue.execute {
             try {
-                val result = A2BluetoothAclEventProcessor.process(app, intent, receipt)
+                val result = processor(app)
                 onResult?.invoke(result)
             } catch (error: Exception) {
                 LocalTamperHistory.record(app, "${source}_error", error.javaClass.simpleName + ": " + error.message)
@@ -182,7 +239,6 @@ internal fun enqueueA2BluetoothEvent(
         LocalTamperHistory.record(app, "${source}_queue_failed", error.javaClass.simpleName + ": " + error.message)
     }
 }
-
 /**
  * Manifest entry point for Android-protected ACL broadcasts. Exported intentionally because
  * the Bluetooth stack may send from a privileged non-system UID. The controller enables this
