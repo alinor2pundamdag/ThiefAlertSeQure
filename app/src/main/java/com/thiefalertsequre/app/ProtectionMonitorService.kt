@@ -171,6 +171,12 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         registerSystemReceiver()
         registerPowerTransitionReceiver()
         registerBluetoothSeparationReceiver()
+        if (bluetoothReceiverRegistered && !A2DisconnectScheduler.rescheduleAll(this)) {
+            LocalTamperHistory.record(
+                this, "a2_startup_deadline_reschedule_incomplete",
+                "One or more persisted A2 deadlines remain stored but Android did not accept every callback during service startup"
+            )
+        }
         PowerTransitionCoordinator.initializeBaseline(this)
         PowerTransitionReceiver.enqueuePendingRecovery(this)
         reconcileStablePowerState()

@@ -118,6 +118,32 @@ class A2DisconnectSchedulerInstrumentationTest {
         }
     }
 
+    @Test fun persistedPendingDeadlineCanBeRescheduledAfterServiceRestart() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, 0)
+        val address = "02:00:00:00:00:54"
+        val key = "trusted_bluetooth_pending_disconnects_v1"
+        val boot = ProtectionClock.bootCount(context)
+        assumeTrue("The emulator must expose BOOT_COUNT for durable deadline tests", boot >= 0)
+        A2DisconnectScheduler.clearAll(context)
+        try {
+            val nowEpoch = System.currentTimeMillis()
+            val nowElapsed = SystemClock.elapsedRealtime()
+            val pending = A2DisconnectScheduler.Pending(
+                address, nowEpoch - 250L, nowElapsed - 250L, boot, 23L, 10L
+            )
+            val raw = "${pending.address}|${pending.eventEpochMs}|${pending.eventElapsedRealtimeMs}|${pending.bootCount}|${pending.monitorRevision}|${pending.deviceRevision}"
+            assertTrue(prefs.edit().putString(key, LocalPreferenceCipher.encrypt(key, raw)).commit())
+
+            assertTrue("A restarted monitor must be able to reinstall the persisted deadline callback",
+                A2DisconnectScheduler.rescheduleAll(context))
+            assertTrue(A2DisconnectScheduler.hasPendingIntent(context, address, fallback = true))
+            assertNotNull(prefs.getString(key, null))
+        } finally {
+            A2DisconnectScheduler.clearAll(context)
+        }
+    }
+
     @Test fun staleReconnectCannotCancelANewerDeadlineForTheSameDevice() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, 0)

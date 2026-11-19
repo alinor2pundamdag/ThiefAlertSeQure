@@ -58,7 +58,14 @@ internal object A2DisconnectScheduler {
             return@withLock false
         }
         val scheduled = scheduleCallbacks(context, pending)
-        if (!scheduled) cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+        if (!scheduled) {
+            // Keep the encrypted pending record. A later service/app start can retry
+            // AlarmManager registration; deleting it here would lose process-death recovery.
+            LocalTamperHistory.record(
+                context, "a2_deadline_callbacks_unavailable",
+                "The encrypted deadline remains persisted for a later reschedule; Android has not accepted a process-absent callback yet"
+            )
+        }
         scheduled
     }
 
