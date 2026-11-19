@@ -20,13 +20,6 @@ class A2DisconnectPolicyTest {
         assertTrue(A2DisconnectPolicy.shouldScheduleExactAlarm(31, true))
     }
 
-    @Test fun eitherAcceptedAlarmCallbackKeepsTheDeadlineScheduled() {
-        assertTrue(A2DisconnectPolicy.hasUsableDeadlineCallback(exactScheduled = true, fallbackScheduled = false))
-        assertTrue(A2DisconnectPolicy.hasUsableDeadlineCallback(exactScheduled = false, fallbackScheduled = true))
-        assertTrue(A2DisconnectPolicy.hasUsableDeadlineCallback(exactScheduled = true, fallbackScheduled = true))
-        assertFalse(A2DisconnectPolicy.hasUsableDeadlineCallback(exactScheduled = false, fallbackScheduled = false))
-    }
-
     @Test fun sameBootRequiresMatchingKnownBootCounts() {
         assertTrue(A2DisconnectPolicy.isSameBoot(4, 4, 12_000L, 13_000L))
         assertFalse(A2DisconnectPolicy.isSameBoot(4, 5, 12_000L, 13_000L))

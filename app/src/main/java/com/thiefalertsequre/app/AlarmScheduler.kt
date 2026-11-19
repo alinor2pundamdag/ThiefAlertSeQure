@@ -163,14 +163,16 @@ object AlarmScheduler {
             alarmManager.canScheduleExactAlarms()
         }.getOrDefault(false)
 
+        var exactScheduled = false
         if (exactAllowed) {
             try {
                 alarmManager.setExactAndAllowWhileIdle(clockType, triggerAt, exactOperation)
+                exactScheduled = true
             } catch (error: Exception) {
                 runCatching { cancelPendingIntent(alarmManager, exactOperation) }
                 LocalTamperHistory.record(
                     context, "deadline_exact_schedule_failed",
-                    error.javaClass.simpleName + ": " + error.message + "; inexact fallback remains scheduled"
+                    error.javaClass.simpleName + ": " + error.message + "; trying the inexact fallback"
                 )
             }
         } else {
@@ -181,10 +183,23 @@ object AlarmScheduler {
             )
         }
 
-        // A distinct inexact alarm survives exact-alarm permission revocation.
-        alarmManager.setAndAllowWhileIdle(clockType, triggerAt, fallbackOperation)
-    }
+        var fallbackScheduled = false
+        try {
+            alarmManager.setAndAllowWhileIdle(clockType, triggerAt, fallbackOperation)
+            fallbackScheduled = true
+        } catch (error: Exception) {
+            LocalTamperHistory.record(
+                context, "deadline_inexact_fallback_schedule_failed",
+                error.javaClass.simpleName + ": " + error.message
+            )
+        }
 
+        // Do not discard a working exact callback merely because the independent
+        // inexact fallback was rejected (or vice versa).
+        if (!AlarmCallbackPolicy.hasUsableDeadlineCallback(exactScheduled, fallbackScheduled)) {
+            throw IllegalStateException("Android rejected both exact and inexact alarm callbacks")
+        }
+    }
     private fun cancelCallbacks(context: Context, token: String) {
         val manager = context.getSystemService(AlarmManager::class.java)
         cancelPendingIntent(manager, pendingIntent(context, token, fallback = false))

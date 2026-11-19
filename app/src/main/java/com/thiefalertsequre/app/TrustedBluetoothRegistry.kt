@@ -207,6 +207,17 @@ object TrustedBluetoothRegistry {
         check(edit.commit()) { "Could not securely migrate trusted-device revision keys." }
     }
 
+    /** True only when the encrypted baseline is readable and explicitly contains this device. */
+    fun hasConfirmedConnectionBaseline(prefs: SharedPreferences, address: String): Boolean =
+        A2DisconnectStateLock.withLock {
+            if (!isValidAddress(address)) return@withLock false
+            when (val stored = readBaselineAddresses(prefs)) {
+                is PreferenceRead.Value -> stored.value.any { it.equals(address.trim(), ignoreCase = true) }
+                is PreferenceRead.Corrupt -> false
+            }
+        }
+
+    /** Corrupt/unknown baseline is treated as connected so it cannot trigger a false alarm. */
     fun isBaselineConnected(prefs: SharedPreferences, address: String): Boolean =
         A2DisconnectStateLock.withLock {
             if (!isValidAddress(address)) return@withLock false

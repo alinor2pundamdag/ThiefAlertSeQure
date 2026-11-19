@@ -259,9 +259,13 @@ class SettingsActivity : FragmentActivity() {
             13f, R.color.tas_muted
         ))
         val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        val monitorEnabled = monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        val monitorEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
         root.addView(action(if (monitorEnabled) "Disable background monitoring" else "Enable background monitoring") {
-            val enabled = !monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+            val enabled = !SafePreferences.boolean(
+                monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+            )
             var cleanupIncomplete = false
             var retryDisableThroughService = false
             var failureMessage: String? = null
@@ -340,12 +344,12 @@ class SettingsActivity : FragmentActivity() {
             }
             render()
         })
-        val motionEnabled = monitorPrefs.getBoolean(
-            ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED
+        val motionEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED
         )
         root.addView(action("Independent motion alarm: ${if (motionEnabled) "ON" else "OFF"}") {
-            val enabled = !monitorPrefs.getBoolean(
-                ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED
+            val enabled = !SafePreferences.boolean(
+                monitorPrefs, ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED
             )
             monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_MOTION_ENABLED, enabled).apply()
             sendBroadcast(Intent(ProtectionMonitorService.ACTION_REFRESH).setPackage(packageName))

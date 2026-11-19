@@ -268,7 +268,7 @@ internal object A2DisconnectScheduler {
             )
         }
 
-        if (!A2DisconnectPolicy.hasUsableDeadlineCallback(exactScheduled, fallbackScheduled)) {
+        if (!AlarmCallbackPolicy.hasUsableDeadlineCallback(exactScheduled, fallbackScheduled)) {
             throw IllegalStateException("Android rejected both exact and inexact A2 deadline callbacks")
         }
         true

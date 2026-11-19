@@ -13,10 +13,6 @@ object A2DisconnectPolicy {
     fun shouldScheduleExactAlarm(apiLevel: Int, canScheduleExactAlarms: Boolean): Boolean =
         apiLevel < 31 || canScheduleExactAlarms
 
-    /** At least one independently scheduled callback must remain available. */
-    fun hasUsableDeadlineCallback(exactScheduled: Boolean, fallbackScheduled: Boolean): Boolean =
-        exactScheduled || fallbackScheduled
-
     /** Bluetooth ACL monitoring requires CONNECT permission from API 31 onward. */
     fun hasBluetoothConnectPermission(apiLevel: Int, permissionGranted: Boolean): Boolean =
         apiLevel < 31 || permissionGranted
