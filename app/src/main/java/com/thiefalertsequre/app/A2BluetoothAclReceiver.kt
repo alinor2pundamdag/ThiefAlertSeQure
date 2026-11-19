@@ -122,7 +122,7 @@ internal object A2BluetoothAclEventProcessor {
             !TrustedBluetoothRegistry.isTrusted(prefs, address)
         ) return A2BluetoothEventResult.Ignored
 
-        when (action) {
+        return when (action) {
             BluetoothDevice.ACTION_ACL_CONNECTED -> {
                 TrustedBluetoothRegistry.markConnected(prefs, address, true)
                 A2DisconnectScheduler.cancel(app, address)
