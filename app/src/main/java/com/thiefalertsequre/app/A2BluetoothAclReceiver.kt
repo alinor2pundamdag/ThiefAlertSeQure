@@ -14,29 +14,63 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /** Dynamically enables the manifest ACL listener only while the owner enabled A2 monitoring. */
 internal object A2BluetoothReceiverController {
-    fun sync(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
-        val monitorEnabled = SafePreferences.boolean(
-            prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
-        )
-        val alertEnabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-        val permissionGranted = Build.VERSION.SDK_INT < 31 ||
-            ContextCompat.checkSelfPermission(context, android.Manifest.permission.BLUETOOTH_CONNECT) ==
-            PackageManager.PERMISSION_GRANTED
-        val enabled = monitorEnabled && alertEnabled && permissionGranted
-        return runCatching {
-            val component = ComponentName(context, A2BluetoothAclReceiver::class.java)
-            val expectedState = if (enabled) PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-            context.packageManager.setComponentEnabledSetting(
-                component, expectedState, PackageManager.DONT_KILL_APP
+    /**
+     * A disabled manifest receiver is a safety boundary: before re-enabling it,
+     * discard any old connection baseline and require a fresh ACL connect event.
+     * Boot can force this reset even when the component was previously enabled.
+     */
+    fun sync(context: Context, requireFreshBaseline: Boolean = false): Boolean =
+        A2DisconnectStateLock.withLock {
+            val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+            val monitorEnabled = SafePreferences.boolean(
+                prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
             )
-            context.packageManager.getComponentEnabledSetting(component) == expectedState
-        }.getOrElse {
-            LocalTamperHistory.record(context, "a2_manifest_receiver_sync_failed", it.javaClass.simpleName + ": " + it.message)
-            false
+            val alertEnabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+            val permissionGranted = Build.VERSION.SDK_INT < 31 ||
+                ContextCompat.checkSelfPermission(context, android.Manifest.permission.BLUETOOTH_CONNECT) ==
+                PackageManager.PERMISSION_GRANTED
+            val enabled = monitorEnabled && alertEnabled && permissionGranted
+            val component = ComponentName(context, A2BluetoothAclReceiver::class.java)
+            val currentState = runCatching {
+                context.packageManager.getComponentEnabledSetting(component)
+            }.getOrElse {
+                LocalTamperHistory.record(context, "a2_manifest_receiver_state_read_failed", it.javaClass.simpleName + ": " + it.message)
+                return@withLock false
+            }
+
+            if (requireFreshBaseline ||
+                (enabled && currentState != PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
+            ) {
+                try {
+                    TrustedBluetoothRegistry.clearBaselines(prefs)
+                } catch (error: Exception) {
+                    runCatching {
+                        context.packageManager.setComponentEnabledSetting(
+                            component,
+                            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                            PackageManager.DONT_KILL_APP
+                        )
+                    }
+                    LocalTamperHistory.record(
+                        context, "a2_baseline_reset_blocked_receiver",
+                        error.javaClass.simpleName + ": " + error.message + "; ACL listeners remain disabled until a safe reset succeeds"
+                    )
+                    return@withLock false
+                }
+            }
+
+            runCatching {
+                val expectedState = if (enabled) PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                    else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                context.packageManager.setComponentEnabledSetting(
+                    component, expectedState, PackageManager.DONT_KILL_APP
+                )
+                context.packageManager.getComponentEnabledSetting(component) == expectedState
+            }.getOrElse {
+                LocalTamperHistory.record(context, "a2_manifest_receiver_sync_failed", it.javaClass.simpleName + ": " + it.message)
+                false
+            }
         }
-    }
 }
 
 internal data class A2BluetoothEventReceipt(

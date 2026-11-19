@@ -210,14 +210,17 @@ class ProtectionMonitorService : Service(), SensorEventListener {
 
     private fun registerBluetoothSeparationReceiver() = A2DisconnectStateLock.withLock {
         if (bluetoothReceiverRegistered) return@withLock
-        if (!SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false)) {
-            A2BluetoothReceiverController.sync(this)
+        if (!A2BluetoothReceiverController.sync(this)) {
+            LocalTamperHistory.record(
+                this, "trusted_bluetooth_receiver_registration_blocked",
+                "ACL listeners were not registered because the current-boot connection baseline could not be safely verified"
+            )
             return@withLock
         }
+        if (!SafePreferences.boolean(prefs, KEY_BT_ALERT_ENABLED, false)) return@withLock
         if (Build.VERSION.SDK_INT >= 31 &&
             checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED
         ) {
-            A2BluetoothReceiverController.sync(this)
             LocalTamperHistory.record(this, "bluetooth_permission_missing", "Trusted Bluetooth separation alert cannot monitor without Bluetooth Connect permission")
             return@withLock
         }
@@ -228,7 +231,6 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         ContextCompat.registerReceiver(this, bluetoothSeparationReceiver, filter, ContextCompat.RECEIVER_EXPORTED)
         bluetoothReceiverRegistered = true
         isBluetoothReceiverRegistered = true
-        A2BluetoothReceiverController.sync(this)
         LocalTamperHistory.record(this, "trusted_bluetooth_receiver_registered", "Runtime and manifest ACL listeners share the serialized A2 event queue; duplicate broadcasts are idempotent")
     }
 
