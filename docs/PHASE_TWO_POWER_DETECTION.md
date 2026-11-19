@@ -20,6 +20,8 @@ This document records the non-physical-device engineering contract for Phase Two
 - The manifest receiver is intentionally `exported=true`: Android's Bluetooth stack can send from a privileged non-system UID. The receiver filter is limited to the platform-protected `ACL_CONNECTED` and `ACL_DISCONNECTED` actions; the controller keeps the component disabled outside the active A2 state. No new permission was added for this correction.
 - A single serialized event queue and the encrypted per-device registry make duplicate deliveries idempotent. Per-device and monitor revisions, the connected baseline, boot identity, and the expected event timestamp prevent stale callbacks from latching an alarm or cancelling another device's deadline.
 - Each accessory has its own encrypted AlarmManager deadline and immutable PendingIntent identity. Reconnect cancels both exact and fallback callbacks for that accessory; unregistering removes only this app's trust relationship and does not unpair Android Bluetooth.
+- Exact and inexact callbacks are independently attempted. If Android accepts either one, that callback remains scheduled even when the other scheduling call fails; the deadline is rejected only when neither callback is accepted.
+- An unreadable or corrupt encrypted connection baseline is treated as connected/unknown during deadline validation, never as proof of disconnection. Registry mutations stop and preserve the corrupt source rather than overwriting it.
 - On reboot, old-boot deadlines and all connection baselines are invalidated. A fresh current-boot ACL connection event is required before a later disconnect can start an A2 grace period.
 - When the service is alive, the Handler path is the fast path. The manifest receiver plus PendingIntent deadline provides a durable process-absent path when a verifiable boot identity is available. Without it, the in-process timer remains available but a process-absent callback is not persisted. Force-stop remains outside app control.
 
@@ -34,7 +36,7 @@ This document records the non-physical-device engineering contract for Phase Two
 ## Automated evidence
 
 - Unit: `PowerTransitionSamplingPolicyTest`, `A2DisconnectPolicyTest`, `A2DisconnectSchedulerMergeTest`, and `A2BluetoothEventQueueTest`.
-- Instrumentation: `PowerTransitionRecoveryInstrumentationTest`, `A2DisconnectSchedulerInstrumentationTest`, `A2BluetoothReceiverControllerInstrumentationTest`, `A2BluetoothAclReceiverInstrumentationTest`, `AlarmSchedulerInstrumentationTest`, and `AlarmDeadlineReceiverInstrumentationTest`.
+- Instrumentation: `PowerTransitionRecoveryInstrumentationTest`, `A2DisconnectSchedulerInstrumentationTest`, `A2BluetoothReceiverControllerInstrumentationTest`, `A2BluetoothAclReceiverInstrumentationTest`, `TrustedBluetoothRegistryEncryptionTest`, `AlarmSchedulerInstrumentationTest`, and `AlarmDeadlineReceiverInstrumentationTest`.
 - The receiver-controller test verifies the manifest receiver's exported contract and enable/disable gating. The shared-processor test runs with the service stopped; it does not kill the app process or prove actual Bluetooth-stack delivery on every OEM.
 - Android's broadcast guidance explains why Bluetooth-originated broadcasts may require an exported receiver, and the alarm/FGS guidance defines the exact-versus-inexact background-start boundary:
   - [Broadcast receiver guidance](https://developer.android.com/develop/background-work/background-tasks/broadcasts)

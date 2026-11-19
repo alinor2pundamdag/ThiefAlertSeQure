@@ -209,7 +209,14 @@ object TrustedBluetoothRegistry {
 
     fun isBaselineConnected(prefs: SharedPreferences, address: String): Boolean =
         A2DisconnectStateLock.withLock {
-            isValidAddress(address) && baselineAddresses(prefs).any { it.equals(address.trim(), ignoreCase = true) }
+            if (!isValidAddress(address)) return@withLock false
+            when (val stored = readBaselineAddresses(prefs)) {
+                is PreferenceRead.Value -> stored.value.any { it.equals(address.trim(), ignoreCase = true) }
+                is PreferenceRead.Corrupt -> {
+                    Log.e(TAG, "Bluetooth baseline is unreadable; treating it as connected/unknown to prevent a false separation alarm")
+                    true
+                }
+            }
         }
 
     fun markConnected(prefs: SharedPreferences, address: String, connected: Boolean): Boolean = A2DisconnectStateLock.withLock {
@@ -243,12 +250,6 @@ object TrustedBluetoothRegistry {
             .putLong(KEY_REVISION, nextRevision)
             .commit()) { "Could not securely clear trusted Bluetooth baselines." }
     }
-
-    private fun baselineAddresses(prefs: SharedPreferences): Set<String> =
-        when (val stored = readBaselineAddresses(prefs)) {
-            is PreferenceRead.Value -> stored.value
-            is PreferenceRead.Corrupt -> emptySet()
-        }
 
     private fun readBaselineAddresses(prefs: SharedPreferences): PreferenceRead<Set<String>> {
         val raw = when (val stored = SafePreferences.readString(prefs, KEY_BASELINES, null)) {

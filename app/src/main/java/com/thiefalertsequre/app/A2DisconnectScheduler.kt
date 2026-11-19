@@ -231,16 +231,18 @@ internal object A2DisconnectScheduler {
             Build.VERSION.SDK_INT,
             Build.VERSION.SDK_INT < 31 || manager.canScheduleExactAlarms()
         )
+        var exactScheduled = false
         if (exactAllowed) {
             try {
                 manager.setExactAndAllowWhileIdle(
                     AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, exactOperation
                 )
+                exactScheduled = true
             } catch (error: Exception) {
                 runCatching { cancelPendingIntent(manager, exactOperation) }
                 LocalTamperHistory.record(
                     context, "a2_exact_alarm_schedule_failed",
-                    error.javaClass.simpleName + ": " + error.message + "; inexact fallback remains scheduled"
+                    error.javaClass.simpleName + ": " + error.message + "; trying the inexact fallback"
                 )
             }
         } else {
@@ -251,12 +253,24 @@ internal object A2DisconnectScheduler {
             )
         }
 
-        // Keep a distinct inexact callback alive even when exact access is granted.
-        // Android cancels exact alarms and stops the app when SCHEDULE_EXACT_ALARM
-        // is revoked; this independent callback preserves a delayed recovery path.
-        manager.setAndAllowWhileIdle(
-            AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, fallbackOperation
-        )
+        // Keep the inexact callback independent of exact-alarm access. A failure
+        // in one channel must not cancel a callback accepted by the other channel.
+        var fallbackScheduled = false
+        try {
+            manager.setAndAllowWhileIdle(
+                AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, fallbackOperation
+            )
+            fallbackScheduled = true
+        } catch (error: Exception) {
+            LocalTamperHistory.record(
+                context, "a2_inexact_fallback_schedule_failed",
+                error.javaClass.simpleName + ": " + error.message
+            )
+        }
+
+        if (!A2DisconnectPolicy.hasUsableDeadlineCallback(exactScheduled, fallbackScheduled)) {
+            throw IllegalStateException("Android rejected both exact and inexact A2 deadline callbacks")
+        }
         true
     }.getOrElse { error ->
         LocalTamperHistory.record(
@@ -265,7 +279,6 @@ internal object A2DisconnectScheduler {
         )
         false
     }
-
     private fun cancelCallbacks(context: Context, address: String) {
         val manager = context.getSystemService(AlarmManager::class.java)
         cancelPendingIntent(manager, pendingIntent(context, address, fallback = false))

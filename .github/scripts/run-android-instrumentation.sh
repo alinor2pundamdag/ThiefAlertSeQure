@@ -91,16 +91,66 @@ trap capture_android_diagnostics EXIT
 # Install the target package first so the disposable emulator can grant the
 # Bluetooth runtime permission before AndroidX starts the instrumentation process.
 # This is test-harness setup only; the app never auto-grants or auto-requests it here.
+install_instrumentation_target() {
+  local attempt=1
+  while true; do
+    local log_file="$diagnostics_dir/install-attempt-$attempt.log"
+    local install_exit_code
+    set +e
+    ./gradlew :app:installRelease -PsignReleaseForTests=true -PinstrumentationTestBuild=true --no-daemon --stacktrace 2>&1 | tee "$log_file"
+    install_exit_code="${PIPESTATUS[0]}"
+    set -e
+
+    if [[ "$install_exit_code" -eq 0 ]]; then
+      return 0
+    fi
+
+    # Retry only when DDMLib cannot read a temporarily unavailable emulator.
+    # A real Gradle/configuration or ABI failure is returned without masking it.
+    if [[ "$attempt" -ge 3 ]] || ! grep -Eq \
+        'ShellCommandUnresponsiveException|Unknown API Level|device offline|Can.t find service: package|Failed to install on any devices|Skipping device .*Could not find build of variant which supports density' \
+        "$log_file"; then
+      return "$install_exit_code"
+    fi
+
+    echo "::warning::Emulator framework/identity failed during target installation; rebooting and retrying infrastructure-only failure."
+    adb reconnect offline >/dev/null 2>&1 || true
+    adb -s emulator-5554 reboot >/dev/null 2>&1 || true
+    sleep 5
+    if ! wait_for_stable_emulator; then
+      echo "::error::Emulator framework did not recover before retrying target installation."
+      return "$install_exit_code"
+    fi
+    attempt=$((attempt + 1))
+  done
+}
+
 prepare_instrumentation_permissions() {
-  ./gradlew :app:installRelease -PsignReleaseForTests=true -PinstrumentationTestBuild=true --no-daemon
-  adb shell pm grant com.thiefalertsequre.app android.permission.BLUETOOTH_CONNECT
-  local permission_state
-  permission_state="$(adb shell pm check-permission android.permission.BLUETOOTH_CONNECT com.thiefalertsequre.app | tr -d '\r')"
-  if [[ "$permission_state" != "granted" ]]; then
-    echo "::error::BLUETOOTH_CONNECT was not granted to the instrumentation target package (state: $permission_state)."
+  if ! install_instrumentation_target; then
+    echo "::error::Unable to install the release instrumentation target on the emulator."
     return 1
   fi
-  echo "Granted BLUETOOTH_CONNECT to the disposable instrumentation target package."
+
+  if ! adb shell pm grant com.thiefalertsequre.app android.permission.BLUETOOTH_CONNECT; then
+    echo "::error::BLUETOOTH_CONNECT could not be granted to the installed instrumentation target package."
+    return 1
+  fi
+
+  if ! adb shell pm list packages 2>/dev/null | tr -d '\r' | grep -Fxq 'package:com.thiefalertsequre.app'; then
+    echo "::error::The instrumentation target package is not installed after the grant step."
+    return 1
+  fi
+
+  # PackageManagerShellCommand does not expose a check-permission subcommand on
+  # the current Android images. Inspect the runtime permission state instead.
+  local permission_state
+  permission_state="$(adb shell dumpsys package com.thiefalertsequre.app 2>/dev/null | grep -F 'android.permission.BLUETOOTH_CONNECT: granted=true' | tail -n 1 || true)"
+  if [[ -z "$permission_state" ]]; then
+    echo "::error::BLUETOOTH_CONNECT is not shown as granted in the target package runtime-permission state."
+    adb shell dumpsys package com.thiefalertsequre.app 2>/dev/null | grep -F 'BLUETOOTH_CONNECT' || true
+    return 1
+  fi
+  echo "Verified BLUETOOTH_CONNECT grant: $permission_state"
 }
 
 if [[ "$api_level" =~ ^[0-9]+$ ]]; then
@@ -133,7 +183,7 @@ while true; do
   # DDMLib can temporarily lose API identity or PackageManager while cold images settle.
   attempt_log="$diagnostics_dir/instrumentation-attempt-$attempt.log"
   if [[ "$attempt" -ge 3 ]] || ! grep -Eq \
-      'No compatible devices connected|Found [0-9]+ connected device|Unknown API Level|Can.t find service: package|Failed to install split APK|Failed to commit install session|Failure calling service package|Broken pipe|ShellCommandUnresponsiveException|device offline' \
+      'No compatible devices connected|Found [0-9]+ connected device|Unknown API Level|Can.t find service: package|Failed to install split APK|Failed to commit install session|Failure calling service package|Broken pipe|ShellCommandUnresponsiveException|device offline|Skipping device .*Could not find build of variant which supports density|Failed to install on any devices' \
       "$attempt_log"; then
     exit "$test_exit_code"
   fi

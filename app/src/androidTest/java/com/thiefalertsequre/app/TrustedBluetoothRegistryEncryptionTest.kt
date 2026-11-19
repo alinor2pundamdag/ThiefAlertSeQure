@@ -120,6 +120,10 @@ class TrustedBluetoothRegistryEncryptionTest {
             .commit()
         try {
             assertFalse(TrustedBluetoothRegistry.add(prefs, "AA:BB:CC:DD:EE:12", "Second"))
+            assertTrue(
+                "An unreadable baseline is unknown, not proof that the accessory disconnected",
+                TrustedBluetoothRegistry.isBaselineConnected(prefs, "AA:BB:CC:DD:EE:11")
+            )
             assertEquals(malformed, prefs.getString(TrustedBluetoothRegistry.KEY_BASELINES, null))
         } finally {
             prefs.edit().clear().commit()
