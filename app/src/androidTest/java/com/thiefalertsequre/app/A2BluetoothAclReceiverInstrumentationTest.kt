@@ -55,8 +55,28 @@ class A2BluetoothAclReceiverInstrumentationTest {
                 .putBoolean(ProtectionMonitorService.KEY_BT_ALERT_ENABLED, true)
                 .commit())
             assertTrue(TrustedBluetoothRegistry.add(prefs, address, "Test accessory"))
+            // Enabling/resetting the manifest listener deliberately invalidates old
+            // connection baselines. A fresh ACL_CONNECTED event must establish the
+            // baseline before a later disconnect can start the grace period.
             assertFalse(TrustedBluetoothRegistry.markConnected(prefs, address, true))
-            assertTrue(A2BluetoothReceiverController.sync(context))
+            assertTrue(A2BluetoothReceiverController.sync(context, requireFreshBaseline = true))
+
+            val connectFinished = CountDownLatch(1)
+            var connectResult: A2BluetoothEventResult? = null
+            enqueueA2BluetoothAddressEvent(
+                context,
+                BluetoothDevice.ACTION_ACL_CONNECTED,
+                address,
+                A2BluetoothEventReceipt.capture(context),
+                "a2_instrumentation_manifest_path",
+                onResult = { connectResult = it },
+                onFinished = { connectFinished.countDown() }
+            )
+            assertTrue("The shared event queue should finish the fresh connection baseline",
+                connectFinished.await(30, TimeUnit.SECONDS))
+            assertTrue("A fresh ACL connect must establish the trusted-device baseline",
+                connectResult is A2BluetoothEventResult.Connected &&
+                    TrustedBluetoothRegistry.isBaselineConnected(prefs, address))
 
             val disconnectFinished = CountDownLatch(1)
             enqueueA2BluetoothAddressEvent(
