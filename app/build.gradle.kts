@@ -6,6 +6,7 @@ plugins {
 
 val appVersionCode = 7
 val appVersionName = "1.1.5_Developer_Alinor"
+val appTestVersionName = "${appVersionName.substringBefore("_Developer_Alinor")}-test"
 
 val releaseSigningReady = listOf(
     "ANDROID_KEYSTORE_PATH",
@@ -73,8 +74,8 @@ android {
 androidComponents {
     onVariants(selector().withBuildType("debug")) { variant ->
         variant.outputs.forEach { output ->
-            output.versionCode.set(7)
-            output.versionName.set("1.1.5-test")
+            output.versionCode.set(appVersionCode)
+            output.versionName.set(appTestVersionName)
         }
     }
 }
@@ -84,9 +85,9 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2026.04.01"))
     implementation("androidx.compose.ui:ui")
     // Filament real-time PBR renderer and Android surface helpers (same pinned release).
-    implementation("com.google.android.filament:filament-android:1.75.0")
-    implementation("com.google.android.filament:filament-utils-android:1.75.0")
-    implementation("com.google.android.filament:filamat-android:1.75.0")
+    implementation("com.google.android.filament:filament-android:1.81.0")
+    implementation("com.google.android.filament:filament-utils-android:1.81.0")
+    implementation("com.google.android.filament:filamat-android:1.81.0")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.material3:material3")
