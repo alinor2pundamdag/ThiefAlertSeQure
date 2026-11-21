@@ -85,6 +85,10 @@ internal object OwnerAuthenticationCoordinator {
                     it.javaClass.simpleName + ": " + it.message
                 )
                 monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_RUNNING, false).apply()
+                ProtectionMonitorRecoveryNotice.show(
+                    appContext,
+                    "Protection was re-armed after owner authentication, but Android rejected background monitoring startup. Open the app to restore monitoring."
+                )
             }
         } else {
             appContext.stopService(Intent(appContext, ProtectionMonitorService::class.java))
