@@ -462,7 +462,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             exportDiagnostics.launch("thiefalertsequre-diagnostics.json")
         }, matchWrap())
         root.addView(space(12))
-        root.addView(label("Privacy boundary: this report reads public local Android APIs and hardware feature flags. It does not read IMEI, serial number, MAC address, Wi-Fi identifiers, contacts, messages, microphone, or precise location. Optional front-camera capture is separate and occurs only after explicit owner opt-in and successful authentication while the app is visible; this diagnostics report never reads or exports photo content. Results stay on this device.", 12f, R.color.tas_muted, false), matchWrap())
+        root.addView(label("Privacy boundary: this report reads public local Android APIs and hardware feature flags. It does not read IMEI, serial number, MAC address, Wi-Fi identifiers, contacts, messages, microphone, or precise location. Optional front-camera capture is separate and occurs only after explicit owner opt-in and successful authentication while the app is visible; this diagnostics report never reads or exports photo content. The app does not upload diagnostics. If you choose Export Diagnostics, Android writes a redacted report to the destination you select, which may be cloud-backed.", 12f, R.color.tas_muted, false), matchWrap())
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
         ThemeRuntime.apply(this, scroll)
