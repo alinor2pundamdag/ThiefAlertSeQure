@@ -158,7 +158,7 @@ for required in (
         errors.append("Genesis 3D renderer missing PBR/fracture contract: " + required)
 filament_gradle = (ROOT / "app" / "build.gradle.kts").read_text(encoding="utf-8")
 if 'com.google.android.filament:filament-utils-android:1.75.0' not in filament_gradle:
-    errors.append("Genesis HDR environment requires the Filament 1.75.0 runtime utilities")
+    errors.append("Genesis HDR environment requires the Filament 1.75.1 runtime utilities")
 setup_snapshot = (APP / "SetupStatusSnapshot.kt").read_text(encoding="utf-8")
 setup_activity = (APP / "SetupStatusActivity.kt").read_text(encoding="utf-8")
 if "NotificationSetupStatusPolicy.monitorChannel(monitorChannel?.importance)" not in setup_snapshot:
