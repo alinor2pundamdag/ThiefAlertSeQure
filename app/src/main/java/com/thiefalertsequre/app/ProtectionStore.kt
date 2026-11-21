@@ -126,13 +126,23 @@ class ProtectionStore internal constructor(
             val value = SafePreferences.readLong(prefs, KEY_LAST_AUTH_DISARM_ELAPSED, 0L)
         ) {
             is PreferenceRead.Value -> value.value
-            is PreferenceRead.Corrupt -> return@synchronized false
+            is PreferenceRead.Corrupt -> {
+                record("a2_deadline_owner_auth_epoch_corrupt", "Authenticated-disarm monotonic timestamp has the wrong stored type; A2 deadlines fail closed")
+                return@synchronized false
+            }
         }
         val authenticatedBoot = when (
             val value = SafePreferences.readInt(prefs, KEY_LAST_AUTH_DISARM_BOOT, -1)
         ) {
             is PreferenceRead.Value -> value.value
-            is PreferenceRead.Corrupt -> return@synchronized false
+            is PreferenceRead.Corrupt -> {
+                record("a2_deadline_owner_auth_epoch_corrupt", "Authenticated-disarm boot identity has the wrong stored type; A2 deadlines fail closed")
+                return@synchronized false
+            }
+        }
+        if (authenticatedElapsed == 0L && authenticatedBoot != -1) {
+            record("a2_deadline_owner_auth_epoch_incomplete", "Authenticated-disarm marker is partial; A2 deadlines fail closed")
+            return@synchronized false
         }
         A2DisconnectPolicy.isAfterLastAuthenticatedDisarm(
             eventElapsedRealtimeMs, eventBootCount, authenticatedElapsed, authenticatedBoot
