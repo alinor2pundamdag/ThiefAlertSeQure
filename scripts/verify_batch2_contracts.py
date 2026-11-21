@@ -150,10 +150,10 @@ checks = {
         and "Independent repeating vibration" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
         and "AlarmHapticPattern.entries" in (APP / "AlarmHapticsPolicy.kt").read_text(encoding="utf-8"),
     "active alarm torch pulses use a dedicated background HandlerThread":
-        "HandlerThread(\"ThiefAlertSeQure-AlarmFlash\")" in alarm_service
-        and "flashHandler" in alarm_service
-        and "AlarmFlashController(this, handler)" in alarm_service
-        and "AlarmFlashController(this, volumeHandler)" not in alarm_service,
+        "HandlerThread(\"ThiefAlertSeQure-AlarmFlash\")" in alarm
+        and "flashHandler" in alarm
+        and "AlarmFlashController(this, handler)" in alarm
+        and "AlarmFlashController(this, volumeHandler)" not in alarm,
     "Settings flash preview uses its own lifecycle-bound timing worker":
         "ensureFlashPreviewHandler" in settings
         and "HandlerThread(\"ThiefAlertSeQure-FlashPreview\")" in settings
