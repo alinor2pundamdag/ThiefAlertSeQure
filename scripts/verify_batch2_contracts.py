@@ -149,6 +149,15 @@ checks = {
         "AlarmHapticsPolicy.waveform" in (APP / "AlarmService.kt").read_text(encoding="utf-8")
         and "Independent repeating vibration" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
         and "AlarmHapticPattern.entries" in (APP / "AlarmHapticsPolicy.kt").read_text(encoding="utf-8"),
+    "active alarm torch pulses use a dedicated background HandlerThread":
+        "HandlerThread(\"ThiefAlertSeQure-AlarmFlash\")" in alarm_service
+        and "flashHandler" in alarm_service
+        and "AlarmFlashController(this, handler)" in alarm_service
+        and "AlarmFlashController(this, volumeHandler)" not in alarm_service,
+    "Settings flash preview uses its own lifecycle-bound timing worker":
+        "ensureFlashPreviewHandler" in settings
+        and "HandlerThread(\"ThiefAlertSeQure-FlashPreview\")" in settings
+        and "stopFlashPreviewThread()" in settings,
     "flash pattern policy drives the torch controller":
         "AlarmFlashPatternPolicy.delayMs" in flash_controller and "AlarmFlashPatternPolicy.nextTorchState" in flash_controller,
     "torch output monitoring detects external interruptions and unavailable hardware":
