@@ -14,6 +14,13 @@ class CameraEvidencePolicyTest {
         assertFalse(CameraEvidencePolicy.shouldCapture(true, true, true, false))
     }
 
+    @Test fun postAuthenticationPhotoStorageAllowsOnlyDisarmedOrArmedState() {
+        assertTrue(CameraEvidencePolicy.canPersistPhoto(ProtectionMode.DISARMED))
+        assertTrue(CameraEvidencePolicy.canPersistPhoto(ProtectionMode.ARMED))
+        assertFalse(CameraEvidencePolicy.canPersistPhoto(ProtectionMode.COUNTDOWN))
+        assertFalse(CameraEvidencePolicy.canPersistPhoto(ProtectionMode.ALARM_TRIGGERED))
+    }
+
     @Test fun frontCameraJpegOrientationUsesFrontFacingDisplayRotation() {
         assertEquals(270, CameraEvidencePolicy.jpegOrientation(270, 0, true))
         assertEquals(0, CameraEvidencePolicy.jpegOrientation(270, 90, true))
