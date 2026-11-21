@@ -155,6 +155,10 @@ checks = {
         "CameraManager.TorchCallback" in flash_controller
         and "alarm_flash_external_interruption" in flash_controller
         and "alarm_flash_output_unavailable" in flash_controller,
+    "alarm recovery failures cannot block authenticated disarm or primary alarm startup":
+        "runCatching { AlarmRecoveryNotice.show(context, reason) }" in (APP / "AlarmRecoveryCoordinator.kt").read_text(encoding="utf-8")
+        and "runCatching { clearRecoveryState(context) }" in (APP / "AlarmRecoveryCoordinator.kt").read_text(encoding="utf-8")
+        and "AlarmRecoveryCoordinator.onAlarmDisarmed(appContext)" in (APP / "OwnerAuthenticationCoordinator.kt").read_text(encoding="utf-8"),
     "primary alarm audio starts immediately after foreground promotion before optional lock/UI work":
         alarm.index("startForeground(NOTIFICATION_ID, notification())")
         < alarm.index("if (player == null && toneController == null) startAlarmAudio()")
