@@ -18,7 +18,7 @@
     <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" alt="Android 8.0 and newer" />
     <img src="https://img.shields.io/badge/Privacy-On--device-2D6CDF" alt="On-device privacy" />
     <img src="https://img.shields.io/badge/Candidate-1.1.5%5FDeveloper%5FAlinor-1677D2" alt="Candidate 1.1.5_Developer_Alinor" />
-    <img src="https://img.shields.io/badge/Owner%20device%20tests-11%2F11%20PASS-2E8B57" alt="Owner-reported 11 of 11 physical test scenarios passed" />
+    <img src="https://img.shields.io/badge/v1.1.3%20owner%20tests-11%2F11%20PASS-2E8B57" alt="Owner-reported 11 of 11 physical test scenarios passed on v1.1.3 only" />
     <img src="https://img.shields.io/badge/Updates-Owner--initiated%20GitHub%20releases-2D6CDF" alt="Owner initiated GitHub updates" />
     <img src="https://img.shields.io/badge/License-See%20LICENSE-lightgrey" alt="License information" />
   </p>
@@ -26,9 +26,9 @@
 
 ---
 
-## ✅ Owner-reported physical-device verification
+## ✅ Historical owner-reported physical-device verification — v1.1.3 only
 
-The app owner reports that all 11 planned v1.1.3 scenarios passed on a HONOR 200 Pro:
+The app owner reports that all 11 planned v1.1.3 scenarios passed on a HONOR 200 Pro. These results apply only to that earlier v1.1.3 build and do not certify the current v1.1.5 Batch Four candidate:
 
 1. Automatic arming after charger connection
 2. Charger-removal countdown
@@ -42,7 +42,7 @@ The app owner reports that all 11 planned v1.1.3 scenarios passed on a HONOR 200
 10. Recovery after reboot
 11. Lock-screen alarm presentation
 
-These are owner-performed physical-device tests. CI separately verifies automated build, unit-test, lint, and APK checks; it does not independently reproduce every handset scenario. Results on other Android devices and OEM builds may differ.
+These are owner-performed physical-device tests on the earlier v1.1.3 build. The current v1.1.5 Batch Four candidate has not undergone physical-device acceptance: the Phase 12 record remains 0/25 PASS and 25/25 NOT TESTED. CI separately verifies automated build, unit-test, lint, and APK checks; it does not independently reproduce handset scenarios. Results on other Android devices and OEM builds may differ.
 
 ## 🛡️ A small layer of protection when your phone is charging
 
