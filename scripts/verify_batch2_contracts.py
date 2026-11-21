@@ -180,6 +180,8 @@ checks = {
         and "ls -1 /sys/class/bluetooth" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8"),
     "authenticated disarm and safe package replacement invalidate stale A2 deadlines across all execution paths":
         "markA2DeadlinesInvalidated" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
+        and "current.mode != ProtectionMode.DISARMED" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
+        and "writeUnlocked(next, authenticatedAtElapsedRealtimeMs, authenticatedAtBootCount)" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
         and "markA2DeadlinesInvalidated()" in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
         and "A2DisconnectScheduler.clearAll(context)" in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
         and (APP / "BootReceiver.kt").read_text(encoding="utf-8").index("markA2DeadlinesInvalidated()") < (APP / "BootReceiver.kt").read_text(encoding="utf-8").index('startMonitorIfNeeded(context, state, "app_update")')
