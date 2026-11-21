@@ -25,13 +25,13 @@ Every official update must:
 ## Historical v1.1.3 → v1.1.4 upgrade behavior
 
 - The v1.1.3 updater requires the owner to disarm protection and turn its background monitor off before downloading/installing. After this first update, the owner must re-enable monitoring if it was disabled for the update; v1.1.3 does not persist a separate “temporarily paused for update” intent, so v1.1.4 cannot safely infer whether `monitor_enabled=false` was temporary or an intentional opt-out.
-- Starting with v1.1.4, an update is allowed when protection is DISARMED and there is no countdown or active alarm. A running monitor may remain enabled; Android stops the old process during package replacement and the package-replaced receiver attempts to restart it. Explicit owner opt-out remains respected.
+- Starting with v1.1.4, an update is allowed when protection is DISARMED and there is no countdown or active alarm. A running monitor may remain enabled; Android stops the old process during package replacement and the package-replaced receiver invalidates stale A2 deadlines before restarting it, then attempts to restart monitoring. Explicit owner opt-out remains respected.
 - Android's package installer normally preserves the app's private data on an in-place update when package identity, signer and version rules are satisfied. The physical-device acceptance procedure must verify this using the previous official APK and `adb install -r`; no emulator upgrade test is run in CI under the current owner direction.
 
 ## Current v1.1.4 code 6 → v1.1.5 code 7 candidate behavior
 
 - The current candidate preserves the production application ID, pinned signing-certificate requirement, minSdk 26 and app-private data contract.
-- The in-app updater permits an update only while `ProtectionMode.DISARMED`; it does not require the background monitor preference to be OFF. Countdown and latched-alarm states remain blocked.
+- The in-app updater permits an update only while `ProtectionMode.DISARMED`; it does not require the background monitor preference to be OFF. Countdown and latched-alarm states remain blocked. On package replacement while DISARMED, the receiver commits a new A2 deadline invalidation epoch and clears persisted pre-update deadlines before restarting monitoring.
 - The candidate's versionCode 7 is strictly greater than the v1.1.4 candidate's code 6. The update is still subject to the installed/candidate signer match and GitHub release asset/checksum validation.
 - PR #8 is open and unmerged. No official release tag, production-signed APK publication, install-over-existing test, emulator test or physical-device acceptance is claimed for this candidate.
 
