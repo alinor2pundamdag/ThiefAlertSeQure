@@ -85,7 +85,7 @@ internal object CameraEvidenceVault {
                 // successful owner authentication. Preserve that just-captured
                 // evidence only in ARMED; never write a photo during COUNTDOWN
                 // or a newly latched ALARM_TRIGGERED state.
-                if (currentState.mode != ProtectionMode.ARMED) return@runIfProtectionActive false
+                if (!CameraEvidencePolicy.canPersistPhoto(currentState.mode)) return@runIfProtectionActive false
                 synchronized(this) {
                     val currentEntries = readIndex(app) ?: return@synchronized false
                     if (currentEntries.size >= CameraEvidencePolicy.MAX_IMAGES) return@synchronized false
