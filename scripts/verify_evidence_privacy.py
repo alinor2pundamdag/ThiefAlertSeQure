@@ -194,7 +194,8 @@ required = {
         and "CameraEvidenceVault.delete(applicationContext, entry.id)" in settings
         and "CameraEvidenceVault.deleteAll(applicationContext)" in settings
         and "CameraEvidenceMediaStore.deleteAll(applicationContext)" in settings
-        and "var allDeleted = true" in camera_media
+        and "var allDeleted = query.unverifiedLegacyCount == 0" in camera_media
+        and "var allDeleted = true" not in camera_media
         and "if (!query.success) return false" in camera_media
         and "query.images.forEach" in camera_media
         and "val cursor = context.contentResolver.query(" in camera_media
