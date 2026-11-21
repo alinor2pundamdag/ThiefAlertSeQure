@@ -44,6 +44,23 @@ object A2DisconnectPolicy {
         capturedMonitorRevision == currentMonitorRevision &&
         capturedDeviceRevision == currentDeviceRevision
 
+    /** A durable owner-auth timestamp invalidates any older A2 grace event. */
+    fun isAfterLastAuthenticatedDisarm(
+        eventElapsedRealtimeMs: Long,
+        eventBootCount: Int,
+        lastAuthenticatedElapsedRealtimeMs: Long,
+        lastAuthenticatedBootCount: Int
+    ): Boolean {
+        if (eventElapsedRealtimeMs <= 0L || lastAuthenticatedElapsedRealtimeMs < 0L) return false
+        if (lastAuthenticatedElapsedRealtimeMs == 0L && lastAuthenticatedBootCount == -1) return true
+        if (eventBootCount < 0 || lastAuthenticatedBootCount < 0) return false
+        return when {
+            eventBootCount > lastAuthenticatedBootCount -> true
+            eventBootCount < lastAuthenticatedBootCount -> false
+            else -> eventElapsedRealtimeMs > lastAuthenticatedElapsedRealtimeMs
+        }
+    }
+
     fun shouldTriggerAlarm(
         alertEnabled: Boolean,
         trusted: Boolean,
