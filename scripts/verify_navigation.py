@@ -197,15 +197,23 @@ if "startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" i
     errors.append("Battery optimization request must use guarded Android Settings/activity fallback")
 if "AndroidDeviceCompatibility.open(" not in settings_activity:
     errors.append("Settings external destinations must use the centralized guarded launcher")
+restore_recovery_block = re.search(
+    r"private fun applyRestoredConfiguration\\(\\).*?val protectionMode",
+    settings_activity,
+    re.S,
+)
+direct_monitor_stop = "stopService(Intent(this, ProtectionMonitorService::class.java))"
 if (
     "putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).apply()" in settings_activity
     or "putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).commit()" not in settings_activity
     or "batteryAlertEdit.commit()" not in settings_activity
     or ".setAction(ProtectionMonitorService.ACTION_STOP)" not in settings_activity
     or "putExtra(ProtectionMonitorService.EXTRA_STOP_PREFERENCE_COMMITTED, true)" not in settings_activity
-    or "stopService(Intent(this, ProtectionMonitorService::class.java))" in settings_activity
+    or settings_activity.count(direct_monitor_stop) != 1
+    or restore_recovery_block is None
+    or direct_monitor_stop not in restore_recovery_block.group(0)
 ):
-    errors.append("Critical monitor settings must be durably committed and shutdown must use the service-owned retry path")
+    errors.append("Critical monitor settings must be durably committed; direct shutdown is allowed only while configuration recovery is unresolved")
 main_activity = (APP / "MainActivity.kt").read_text(encoding="utf-8")
 if "protectionModeAtLaunch != ProtectionMode.ALARM_TRIGGERED" not in main_activity:
     errors.append("Privacy acknowledgement must not block the active alarm owner-authentication recovery screen")
