@@ -105,12 +105,38 @@ class ProtectionStore internal constructor(
 
         val next = ProtectionEngine.authenticated(current, nowEpochMs)
         if (next.mode != ProtectionMode.DISARMED) return@synchronized null
-        if (!writeUnlocked(next)) {
+        val authenticatedAtElapsedRealtimeMs = ProtectionClock.elapsedRealtime()
+        val authenticatedAtBootCount = ProtectionClock.bootCount(appContext)
+        if (!writeUnlocked(next, authenticatedAtElapsedRealtimeMs, authenticatedAtBootCount)) {
             record("protection_state_authenticated_disarm_persist_failed", "Authenticated disarm could not be durably committed; the alarm remains active")
             return@synchronized null
         }
         stateCorruptionDetected = false
         next
+    }
+
+    /** Rejects persisted A2 disconnect events that predate the last authenticated disarm. */
+    internal fun isA2EventAfterLastAuthenticatedDisarm(
+        eventElapsedRealtimeMs: Long,
+        eventBootCount: Int
+    ): Boolean = synchronized(LOCK) {
+        readUnlocked()
+        if (stateCorruptionDetected) return@synchronized false
+        val authenticatedElapsed = when (
+            val value = SafePreferences.readLong(prefs, KEY_LAST_AUTH_DISARM_ELAPSED, 0L)
+        ) {
+            is PreferenceRead.Value -> value.value
+            is PreferenceRead.Corrupt -> return@synchronized false
+        }
+        val authenticatedBoot = when (
+            val value = SafePreferences.readInt(prefs, KEY_LAST_AUTH_DISARM_BOOT, -1)
+        ) {
+            is PreferenceRead.Value -> value.value
+            is PreferenceRead.Corrupt -> return@synchronized false
+        }
+        A2DisconnectPolicy.isAfterLastAuthenticatedDisarm(
+            eventElapsedRealtimeMs, eventBootCount, authenticatedElapsed, authenticatedBoot
+        )
     }
 
     fun readAuthenticationThrottle(
@@ -218,7 +244,8 @@ class ProtectionStore internal constructor(
             is PreferenceRead.Corrupt -> return failClosedFromCorruption("Protection boot identity has the wrong stored type")
         }
         val hasOtherStateFields = listOf(
-            "deadline", "changed", "deadline_elapsed", "boot_count"
+            "deadline", "changed", "deadline_elapsed", "boot_count",
+            KEY_LAST_AUTH_DISARM_ELAPSED, KEY_LAST_AUTH_DISARM_BOOT
         ).any(prefs::contains)
         val decoded = ProtectionState.fromPersisted(
             modeName = modeName,
@@ -321,14 +348,23 @@ class ProtectionStore internal constructor(
         return AuthenticationThrottle.recoverCorruptState(nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
     }
 
-    private fun writeUnlocked(state: ProtectionState): Boolean {
+    private fun writeUnlocked(
+        state: ProtectionState,
+        authenticatedDisarmElapsedRealtimeMs: Long? = null,
+        authenticatedDisarmBootCount: Int? = null
+    ): Boolean {
         val saved = commitWithOneRetry {
-            prefs.edit()
-                .putString("mode", state.mode.name)
-                .putLong("deadline", state.deadlineEpochMs)
-                .putLong("changed", state.changedAtEpochMs)
-                .putLong("deadline_elapsed", state.deadlineElapsedRealtimeMs)
-                .putInt("boot_count", state.bootCount)
+            prefs.edit().apply {
+                putString("mode", state.mode.name)
+                putLong("deadline", state.deadlineEpochMs)
+                putLong("changed", state.changedAtEpochMs)
+                putLong("deadline_elapsed", state.deadlineElapsedRealtimeMs)
+                putInt("boot_count", state.bootCount)
+                if (authenticatedDisarmElapsedRealtimeMs != null && authenticatedDisarmBootCount != null) {
+                    putLong(KEY_LAST_AUTH_DISARM_ELAPSED, authenticatedDisarmElapsedRealtimeMs)
+                    putInt(KEY_LAST_AUTH_DISARM_BOOT, authenticatedDisarmBootCount)
+                }
+            }
         }
         if (saved) runCatching {
             appContext.sendBroadcast(
@@ -513,5 +549,7 @@ class ProtectionStore internal constructor(
         private const val KEY_AUTH_COOLDOWN = "auth_cooldown_until"
         private const val KEY_AUTH_COOLDOWN_ELAPSED = "auth_cooldown_until_elapsed"
         private const val KEY_AUTH_BOOT_COUNT = "auth_cooldown_boot_count"
+        private const val KEY_LAST_AUTH_DISARM_ELAPSED = "last_auth_disarm_elapsed_realtime"
+        private const val KEY_LAST_AUTH_DISARM_BOOT = "last_auth_disarm_boot_count"
     }
 }
