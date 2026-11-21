@@ -90,6 +90,17 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             LocalTamperHistory.record(context, "a2_deadline_old_boot_rejected", "A2 deadline belonged to a different or unverifiable boot")
             return
         }
+        if (!ProtectionStore(context).isA2EventAfterLastAuthenticatedDisarm(
+                pending.eventElapsedRealtimeMs, pending.bootCount
+            )
+        ) {
+            A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+            LocalTamperHistory.record(
+                context, "a2_deadline_invalidated_by_owner_auth",
+                "Pre-authentication A2 deadline was discarded before retry or alarm evaluation"
+            )
+            return
+        }
         if (nowElapsed < pending.deadlineElapsedRealtimeMs) {
             if (!A2DisconnectScheduler.schedule(context, pending)) {
                 A2DisconnectScheduler.scheduleRetry(context, pending, 1_000L)
@@ -99,9 +110,6 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
 
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
         val valid = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false) &&
-            ProtectionStore(context).isA2EventAfterLastAuthenticatedDisarm(
-                pending.eventElapsedRealtimeMs, pending.bootCount
-            ) &&
             TrustedBluetoothRegistry.isTrusted(prefs, pending.address) &&
             A2DisconnectPolicy.isPendingDisconnectCurrent(
                 pending.monitorRevision,
