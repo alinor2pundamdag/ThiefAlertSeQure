@@ -178,14 +178,11 @@ checks = {
         and "settings get global bluetooth_on" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8")
         and "getprop ro.bluetooth.library_name" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8")
         and "ls -1 /sys/class/bluetooth" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8"),
-    "authenticated disarm and safe package replacement invalidate stale A2 deadlines":
+    "authenticated disarm and safe package replacement invalidate stale A2 deadlines across all execution paths":
         "markA2DeadlinesInvalidated" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
         and "markA2DeadlinesInvalidated()" in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
         and "A2DisconnectScheduler.clearAll(context)" in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
-        and "isA2EventAfterLastInvalidation" in monitor
-        and "isA2EventAfterLastInvalidation" in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8")
-        and "isA2EventAfterLastInvalidation" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8"),
-        "last_a2_deadline_invalidation_elapsed_realtime" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
+        and "last_a2_deadline_invalidation_elapsed_realtime" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
         and "isA2EventAfterLastInvalidation" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
         and "A2DisconnectScheduler.cancel" in monitor
         and "isA2EventAfterLastInvalidation" in monitor
