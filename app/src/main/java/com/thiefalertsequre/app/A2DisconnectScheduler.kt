@@ -64,7 +64,7 @@ internal object A2DisconnectScheduler {
             )
         ) {
             LocalTamperHistory.record(
-                context, "a2_deadline_predates_owner_auth",
+                context, "a2_deadline_predates_invalidation",
                 "A2 deadline was rejected because it predates the last A2 deadline invalidation"
             )
             return@synchronized false
