@@ -59,6 +59,16 @@ internal object A2DisconnectScheduler {
             LocalTamperHistory.record(context, "a2_deadline_metadata_rejected", "Invalid trusted-device deadline metadata was rejected")
             return false
         }
+        if (!ProtectionStore(context).isA2EventAfterLastAuthenticatedDisarm(
+                pending.eventElapsedRealtimeMs, pending.bootCount
+            )
+        ) {
+            LocalTamperHistory.record(
+                context, "a2_deadline_predates_owner_auth",
+                "A2 deadline was rejected because it predates the last authenticated disarm"
+            )
+            return@synchronized false
+        }
         val addressKey = pending.address.uppercase()
         val confirmedAt = confirmedConnections[addressKey]
         if (confirmedAt != null && confirmedAt >= pending.eventElapsedRealtimeMs) {
