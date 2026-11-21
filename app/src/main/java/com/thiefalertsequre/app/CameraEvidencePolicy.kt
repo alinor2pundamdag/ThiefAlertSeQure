@@ -14,6 +14,10 @@ internal object CameraEvidencePolicy {
     ): Boolean = ownerEnabled && cameraPermissionGranted &&
         authenticationSucceeded && activityVisible
 
+    /** Post-auth evidence may commit only while disarmed or immediately re-armed. */
+    fun canPersistPhoto(mode: ProtectionMode): Boolean =
+        mode == ProtectionMode.DISARMED || mode == ProtectionMode.ARMED
+
     fun isRetained(timestampEpochMs: Long, nowEpochMs: Long): Boolean =
         timestampEpochMs > 0L && nowEpochMs >= timestampEpochMs &&
             nowEpochMs - timestampEpochMs <= RETENTION_MS
