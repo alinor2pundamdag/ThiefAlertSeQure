@@ -30,6 +30,7 @@ The app stores only the operational information needed to provide its functions:
 - The owner's local preference for enabling or disabling the alarm flashlight.
 - URI references and Android read-access grants for owner-selected alarm and secondary-alert audio. The app stores references/permissions, not a second copy of the selected audio file.
 - The installed package name, app version, and signing-certificate fingerprint are read locally for About/Info transparency and official-update verification. The fingerprint is calculated on-device and is not uploaded.
+- Device Intelligence reads manufacturer/brand/model, Android release/API/security patch, hardware feature flags, battery/thermal state, background restrictions, permission status, and protection readiness through local Android APIs. These values are displayed locally and are not sent to a server. If the owner explicitly exports diagnostics, the redacted JSON may include manufacturer/brand/model, Android/API/target SDK, protection mode and integrity status, permission/special-access readiness, monitor status, and redacted event codes. It excludes serial number, IMEI, MAC/Wi-Fi identifiers, precise location, photo content, credentials, and build fingerprint. Android writes the file to the destination the owner selects; that destination may be cloud-backed, but the app does not upload the report.
 
 This information is stored in the app's private local preferences. The app does not upload it.
 
@@ -60,7 +61,7 @@ Android settings, manufacturer power-management behavior, notification controls,
 
 ## 5. Sharing and third parties
 
-The app contains no configured analytics, advertising SDK, app backend, or cloud storage. The update check sends a request to GitHub for public release metadata and, only when an update is available, downloads the APK and checksum. It does not upload protection state, event history, selected audio, trusted Bluetooth names or MAC addresses, credentials, camera photos, location, or other personal data. GitHub receives ordinary network request metadata, such as the request IP address, under GitHub's own privacy terms. No update check runs until the owner initiates it. Android itself provides the credential, biometric, notification, alarm, and device-management services.
+The app contains no configured analytics, advertising SDK, app backend, or automatic cloud storage. Owner-initiated exports (event CSV, evidence backups, individual photos, or redacted diagnostics) use Android's document picker and are written only to the destination the owner selects; a selected destination may be cloud-backed. The app itself does not upload those files. The update check sends a request to GitHub for public release metadata and, only when an update is available, downloads the APK and checksum. It does not upload protection state, event history, selected audio, trusted Bluetooth names or MAC addresses, credentials, camera photos, location, or other personal data. GitHub receives ordinary network request metadata, such as the request IP address, under GitHub's own privacy terms. No update check runs until the owner initiates it. Android itself provides the credential, biometric, notification, alarm, and device-management services.
 
 ## 6. Retention and deletion
 
