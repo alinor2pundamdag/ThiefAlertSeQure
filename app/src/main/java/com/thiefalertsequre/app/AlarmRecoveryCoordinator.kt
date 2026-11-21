@@ -42,14 +42,29 @@ object AlarmRecoveryCoordinator {
         }
     }
 
-    /** Called only after startForeground() succeeds for the latched alarm. */
+    /** Called only after startForeground() succeeds for the latched alarm. Cleanup must never block alarm audio. */
     fun onServiceStarted(context: Context) {
-        clearRecoveryState(context)
-        LocalTamperHistory.record(context, "alarm_recovery_completed", "Foreground alarm service successfully resumed")
+        clearRecoveryStateSafely(context, "alarm_recovery_cleanup_failed")
+        recordSafely(context, "alarm_recovery_completed", "Foreground alarm service successfully resumed")
     }
 
+    /** A cleanup/storage exception must never interrupt the already-persisted owner disarm. */
     fun onAlarmDisarmed(context: Context) {
-        clearRecoveryState(context)
+        clearRecoveryStateSafely(context, "alarm_recovery_disarm_cleanup_failed")
+    }
+
+    private fun clearRecoveryStateSafely(context: Context, event: String) {
+        runCatching { clearRecoveryState(context) }.onFailure {
+            recordSafely(
+                context,
+                event,
+                "Alarm recovery cleanup failed after the protection state transition: ${it.javaClass.simpleName}: ${it.message}"
+            )
+        }
+    }
+
+    private fun recordSafely(context: Context, event: String, detail: String) {
+        runCatching { LocalTamperHistory.record(context, event, detail) }
     }
 
     private fun clearRecoveryState(context: Context) {
