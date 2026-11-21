@@ -8,7 +8,7 @@
 
 # ThiefAlertSeQure Privacy Policy
 
-**Effective date:** 18 November 2026
+**Effective date:** 21 November 2026
 
 ## 1. Overview
 
