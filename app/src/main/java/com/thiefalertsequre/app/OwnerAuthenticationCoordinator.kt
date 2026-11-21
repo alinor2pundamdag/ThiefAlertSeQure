@@ -24,6 +24,21 @@ internal object OwnerAuthenticationCoordinator {
         val authenticated = store.disarmAfterOwnerAuthentication(System.currentTimeMillis()) ?: return null
         if (authenticated.mode != ProtectionMode.DISARMED) return null
 
+        // Stop the audible alarm and restore its volume before non-critical recovery cleanup.
+        appContext.stopService(Intent(appContext, AlarmService::class.java))
+        val volumeRestored = runCatching {
+            AlarmVolumeController.restore(
+                appContext,
+                appContext.getSystemService(AudioManager::class.java)
+            )
+        }.getOrDefault(false)
+        if (!volumeRestored) {
+            LocalTamperHistory.record(
+                appContext, "alarm_volume_restore_incomplete",
+                "The saved alarm-volume value was unavailable or Android rejected restoration; review alarm volume in system settings"
+            )
+        }
+
         AlarmRecoveryCoordinator.onAlarmDisarmed(appContext)
         store.resetAuthenticationFailures()
         val monitorPrefs = appContext.getSharedPreferences(
@@ -43,19 +58,6 @@ internal object OwnerAuthenticationCoordinator {
             ProtectionMonitorRecoveryNotice.show(
                 appContext,
                 "Old trusted-device deadlines could not be removed. They are invalidated by the authenticated recovery marker; review Bluetooth monitoring status."
-            )
-        }
-        appContext.stopService(Intent(appContext, AlarmService::class.java))
-        val volumeRestored = runCatching {
-            AlarmVolumeController.restore(
-                appContext,
-                appContext.getSystemService(AudioManager::class.java)
-            )
-        }.getOrDefault(false)
-        if (!volumeRestored) {
-            LocalTamperHistory.record(
-                appContext, "alarm_volume_restore_incomplete",
-                "The saved alarm-volume value was unavailable or Android rejected restoration; review alarm volume in system settings"
             )
         }
 
