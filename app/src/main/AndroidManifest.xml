@@ -33,7 +33,7 @@
     <uses-feature android:name="android.hardware.camera.front" android:required="false" />
     <uses-feature android:name="android.hardware.fingerprint" android:required="false" />
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
-    <application android:name=".ThiefAlertSeQureApplication" android:allowBackup="false" android:icon="@mipmap/ic_launcher"
+    <application android:name=".ThiefAlertSeQureApplication" android:allowBackup="false" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round" android:label="ThiefAlertSeQure"
         android:usesCleartextTraffic="false" android:theme="@style/Theme.ThiefAlertSeQure">
         <activity android:name=".SeismicGenesisIntroActivity" android:exported="false" />
