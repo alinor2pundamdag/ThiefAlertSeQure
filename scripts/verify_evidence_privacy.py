@@ -84,6 +84,11 @@ required = {
         and "if (!activityVisible.get())" in camera_capture
         and "val displayRotationDegrees = when (activity.windowManager.defaultDisplay.rotation)" in camera_capture
         and "val displayRotation = when (activity.windowManager.defaultDisplay.rotation)" not in camera_capture,
+    "final camera evidence commit is serialized against Activity lifecycle cancellation":
+        "val captureCommitLock = Any()" in camera_capture
+        and "synchronized(captureCommitLock) { activityVisible.set(false) }" in camera_capture
+        and "val persisted = synchronized(captureCommitLock)" in camera_capture
+        and "if (finished.get() || !activityVisible.get()) null" in camera_capture,
     "camera JPEG decode bounds pixel memory before allocating the bitmap":
         "inJustDecodeBounds = true" in camera_capture
         and "inSampleSize = sampleSize" in camera_capture
