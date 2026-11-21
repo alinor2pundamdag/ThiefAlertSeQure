@@ -6,6 +6,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class A2DisconnectPolicyTest {
+    @Test fun ownerAuthenticationInvalidatesOlderA2GraceDeadlines() {
+        assertFalse(A2DisconnectPolicy.isAfterLastAuthenticatedDisarm(500L, 4, 600L, 4))
+        assertTrue(A2DisconnectPolicy.isAfterLastAuthenticatedDisarm(700L, 4, 600L, 4))
+    }
+
+    @Test fun newerBootA2EventsFollowPriorBootOwnerAuthentication() {
+        assertTrue(A2DisconnectPolicy.isAfterLastAuthenticatedDisarm(100L, 5, 900L, 4))
+        assertFalse(A2DisconnectPolicy.isAfterLastAuthenticatedDisarm(100L, 3, 900L, 4))
+    }
+
+    @Test fun unknownBootIdentityFailsClosedAfterAnAuthenticatedDisarm() {
+        assertFalse(A2DisconnectPolicy.isAfterLastAuthenticatedDisarm(700L, -1, 600L, 4))
+        assertFalse(A2DisconnectPolicy.isAfterLastAuthenticatedDisarm(700L, 4, 600L, -1))
+    }
+
     @Test fun disconnectGraceDeadlineStartsAtBroadcastReceipt() {
         assertEquals(9_000L, A2DisconnectPolicy.graceDeadlineUptimeMs(1_000L, 8_000L))
     }
