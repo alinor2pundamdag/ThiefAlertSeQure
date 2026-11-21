@@ -115,37 +115,62 @@ class ProtectionStore internal constructor(
         next
     }
 
-    /** Rejects persisted A2 disconnect events that predate the last authenticated disarm. */
-    internal fun isA2EventAfterLastAuthenticatedDisarm(
+    /**
+     * Establishes a new A2 deadline epoch after a safe package replacement.
+     * Package updates are permitted only while DISARMED; stale callbacks from
+     * the previous installation must not become valid after auto-rearming.
+     */
+    internal fun markA2DeadlinesInvalidated(): Boolean = synchronized(LOCK) {
+        val current = readUnlocked()
+        if (current.mode != ProtectionMode.DISARMED || stateCorruptionDetected) return@synchronized false
+        val invalidatedAtElapsedRealtimeMs = ProtectionClock.elapsedRealtime()
+        if (invalidatedAtElapsedRealtimeMs <= 0L) return@synchronized false
+        val invalidatedAtBootCount = ProtectionClock.bootCount(appContext)
+        val saved = commitWithOneRetry {
+            prefs.edit()
+                .putLong(KEY_LAST_A2_DEADLINE_INVALIDATION_ELAPSED, invalidatedAtElapsedRealtimeMs)
+                .putInt(KEY_LAST_A2_DEADLINE_INVALIDATION_BOOT, invalidatedAtBootCount)
+        }
+        if (!saved) {
+            record(
+                "a2_deadline_update_epoch_persist_failed",
+                "Package replacement could not persist a new A2 deadline epoch; pending schedule cleanup remains required"
+            )
+        }
+        saved
+    }
+
+    /** Rejects persisted A2 disconnect events that predate the last A2 deadline invalidation. */
+    internal fun isA2EventAfterLastInvalidation(
         eventElapsedRealtimeMs: Long,
         eventBootCount: Int
     ): Boolean = synchronized(LOCK) {
         readUnlocked()
         if (stateCorruptionDetected) return@synchronized false
-        val authenticatedElapsed = when (
-            val value = SafePreferences.readLong(prefs, KEY_LAST_AUTH_DISARM_ELAPSED, 0L)
+        val invalidatedElapsed = when (
+            val value = SafePreferences.readLong(prefs, KEY_LAST_A2_DEADLINE_INVALIDATION_ELAPSED, 0L)
         ) {
             is PreferenceRead.Value -> value.value
             is PreferenceRead.Corrupt -> {
-                record("a2_deadline_owner_auth_epoch_corrupt", "Authenticated-disarm monotonic timestamp has the wrong stored type; A2 deadlines fail closed")
+                record("a2_deadline_invalidation_epoch_corrupt", "A2 deadline invalidation monotonic timestamp has the wrong stored type; A2 deadlines fail closed")
                 return@synchronized false
             }
         }
-        val authenticatedBoot = when (
-            val value = SafePreferences.readInt(prefs, KEY_LAST_AUTH_DISARM_BOOT, -1)
+        val invalidatedBoot = when (
+            val value = SafePreferences.readInt(prefs, KEY_LAST_A2_DEADLINE_INVALIDATION_BOOT, -1)
         ) {
             is PreferenceRead.Value -> value.value
             is PreferenceRead.Corrupt -> {
-                record("a2_deadline_owner_auth_epoch_corrupt", "Authenticated-disarm boot identity has the wrong stored type; A2 deadlines fail closed")
+                record("a2_deadline_invalidation_epoch_corrupt", "A2 deadline invalidation boot identity has the wrong stored type; A2 deadlines fail closed")
                 return@synchronized false
             }
         }
-        if (authenticatedElapsed == 0L && authenticatedBoot != -1) {
-            record("a2_deadline_owner_auth_epoch_incomplete", "Authenticated-disarm marker is partial; A2 deadlines fail closed")
+        if (invalidatedElapsed == 0L && invalidatedBoot != -1) {
+            record("a2_deadline_invalidation_epoch_incomplete", "A2 deadline invalidation marker is partial; A2 deadlines fail closed")
             return@synchronized false
         }
-        A2DisconnectPolicy.isAfterLastAuthenticatedDisarm(
-            eventElapsedRealtimeMs, eventBootCount, authenticatedElapsed, authenticatedBoot
+        A2DisconnectPolicy.isAfterLastInvalidation(
+            eventElapsedRealtimeMs, eventBootCount, invalidatedElapsed, invalidatedBoot
         )
     }
 
@@ -255,7 +280,7 @@ class ProtectionStore internal constructor(
         }
         val hasOtherStateFields = listOf(
             "deadline", "changed", "deadline_elapsed", "boot_count",
-            KEY_LAST_AUTH_DISARM_ELAPSED, KEY_LAST_AUTH_DISARM_BOOT
+            KEY_LAST_A2_DEADLINE_INVALIDATION_ELAPSED, KEY_LAST_A2_DEADLINE_INVALIDATION_BOOT
         ).any(prefs::contains)
         val decoded = ProtectionState.fromPersisted(
             modeName = modeName,
@@ -360,8 +385,8 @@ class ProtectionStore internal constructor(
 
     private fun writeUnlocked(
         state: ProtectionState,
-        authenticatedDisarmElapsedRealtimeMs: Long? = null,
-        authenticatedDisarmBootCount: Int? = null
+        a2InvalidationElapsedRealtimeMs: Long? = null,
+        a2InvalidationBootCount: Int? = null
     ): Boolean {
         val saved = commitWithOneRetry {
             prefs.edit().apply {
@@ -370,9 +395,9 @@ class ProtectionStore internal constructor(
                 putLong("changed", state.changedAtEpochMs)
                 putLong("deadline_elapsed", state.deadlineElapsedRealtimeMs)
                 putInt("boot_count", state.bootCount)
-                if (authenticatedDisarmElapsedRealtimeMs != null && authenticatedDisarmBootCount != null) {
-                    putLong(KEY_LAST_AUTH_DISARM_ELAPSED, authenticatedDisarmElapsedRealtimeMs)
-                    putInt(KEY_LAST_AUTH_DISARM_BOOT, authenticatedDisarmBootCount)
+                if (a2InvalidationElapsedRealtimeMs != null && a2InvalidationBootCount != null) {
+                    putLong(KEY_LAST_A2_DEADLINE_INVALIDATION_ELAPSED, a2InvalidationElapsedRealtimeMs)
+                    putInt(KEY_LAST_A2_DEADLINE_INVALIDATION_BOOT, a2InvalidationBootCount)
                 }
             }
         }
@@ -559,7 +584,7 @@ class ProtectionStore internal constructor(
         private const val KEY_AUTH_COOLDOWN = "auth_cooldown_until"
         private const val KEY_AUTH_COOLDOWN_ELAPSED = "auth_cooldown_until_elapsed"
         private const val KEY_AUTH_BOOT_COUNT = "auth_cooldown_boot_count"
-        private const val KEY_LAST_AUTH_DISARM_ELAPSED = "last_auth_disarm_elapsed_realtime"
-        private const val KEY_LAST_AUTH_DISARM_BOOT = "last_auth_disarm_boot_count"
+        private const val KEY_LAST_A2_DEADLINE_INVALIDATION_ELAPSED = "last_a2_deadline_invalidation_elapsed_realtime"
+        private const val KEY_LAST_A2_DEADLINE_INVALIDATION_BOOT = "last_a2_deadline_invalidation_boot_count"
     }
 }
