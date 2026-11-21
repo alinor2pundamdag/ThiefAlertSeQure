@@ -370,7 +370,8 @@ internal object CameraEvidenceVault {
     }
 
     private fun pruneExpired(context: Context) {
-        // Lock order is always ProtectionStore -> vault monitor.
+        // This is called from the synchronized entries() path; lock order is
+        // consistently vault monitor -> ProtectionStore state lock across vault mutations.
         ProtectionStore(context).runIfDisarmed {
             synchronized(this) {
                 val entries = readIndex(context) ?: return@synchronized
