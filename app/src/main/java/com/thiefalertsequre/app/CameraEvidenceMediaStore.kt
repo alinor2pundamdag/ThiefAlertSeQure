@@ -285,7 +285,7 @@ internal object CameraEvidenceMediaStore {
             when (deleteResult) {
                 true -> {
                     removed += 1
-                    if (Build.VERSION.SDK_INT < 29) uri.lastPathSegment?.let(removedLegacyIds::add)
+                    if (Build.VERSION.SDK_INT < 29) pending.uri.lastPathSegment?.let(removedLegacyIds::add)
                 }
                 false -> removalFailures += 1
                 null -> {
