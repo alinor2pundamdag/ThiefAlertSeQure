@@ -170,6 +170,11 @@ checks = {
         "ThermalFlashPolicy.shouldSuppress" in thermal
         and "!listenerRegistered || thermalStatus == null || thermalStatus >= severeThreshold" in thermal
         and "ThermalFlashPolicyTest" in (ROOT / "app/src/test/java/com/thiefalertsequre/app/ThermalFlashPolicyTest.kt").read_text(encoding="utf-8"),
+    "Settings flash preview shares the alarm thermal guard and releases it on every stop path":
+        "ThermalFlashController(this)" in settings
+        and "flashPreviewThermalController?.stop()" in settings
+        and "Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q" in settings
+        and "stopFlashPreview()" in settings,
     "built-in alarm tone preview is owner-initiated and time-bounded":
         "previewBuiltInAlarmTone" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8") and "postDelayed(stop, 5_000L)" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8"),
     "encrypted evidence vault uses Android Keystore AES-GCM and bounded retention":
