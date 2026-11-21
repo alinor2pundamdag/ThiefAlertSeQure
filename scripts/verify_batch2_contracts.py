@@ -190,7 +190,8 @@ checks = {
         and "A2DisconnectScheduler.cancel" in monitor
         and "isA2EventAfterLastInvalidation" in monitor
         and "isA2EventAfterLastInvalidation" in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8")
-        and "isA2EventAfterLastInvalidation" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8"),
+        and "isA2EventAfterLastInvalidation" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8")
+        and (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8").index("if (protectionState.mode != ProtectionMode.ARMED)") < (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8").index("val nowElapsed = ProtectionClock.elapsedRealtime()"),
     "alarm recovery failures cannot block authenticated disarm or primary alarm startup":
         "runCatching { AlarmRecoveryNotice.show(context, reason) }" in (APP / "AlarmRecoveryCoordinator.kt").read_text(encoding="utf-8")
         and "runCatching { clearRecoveryState(context) }" in (APP / "AlarmRecoveryCoordinator.kt").read_text(encoding="utf-8")
