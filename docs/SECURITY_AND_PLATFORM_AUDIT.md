@@ -1,4 +1,4 @@
-> Current Batch Four candidate: `work/batch-4-implementation`, v1.1.5 code 7, PR #8 open/unmerged. Historical audit runs and device reports below do not verify this exact candidate.\n\n<div align="right">
+> Current Batch Four candidate: `work/batch-4-implementation`, v1.1.5 code 7, PR #8 open/unmerged. Historical audit runs and device reports below do not verify this exact candidate.\n> **21 November follow-up:** Current Phase 12 physical acceptance remains 0/25 PASS / 25/25 NOT TESTED. The follow-up branch now includes authenticated-disarm invalidation for stale A2 deadlines, emergency protection-state snapshots, non-blocking alarm recovery, dedicated background flash timing workers, and allowlisted Bluetooth root diagnostics. Exact-head Android CI and CodeQL are queued/not yet verified. The 11/11 owner-reported handset scenarios elsewhere in this document apply to v1.1.3 only.\n\n<div align="right">
   <a href="../README.md"><img src="../ThiefAlertSeQureIcon.jpg" alt="ThiefAlertSeQure icon" width="64" /></a>
 </div>
 
