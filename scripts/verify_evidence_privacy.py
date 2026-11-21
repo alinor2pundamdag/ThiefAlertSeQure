@@ -186,8 +186,11 @@ required = {
         and "synchronized(this) {\n            synchronized(MIGRATION_LOCK)" in camera_media
         and "CameraEvidenceVault.read(app, entry.id)" in camera_media
         and "MessageDigest.isEqual(original, verified)" in camera_media
-        and "pendingDeletions += uri to sourceDigest" in camera_media
-        and "MessageDigest.isEqual(originalDigest, sha256(currentSource))" in camera_media
+        and "pendingDeletions += PendingGalleryDeletion(uri, sourceDigest, entry.id)" in camera_media
+        and "synchronized(CameraEvidenceVault)" in camera_media
+        and "CameraEvidenceVault.read(app, pending.vaultEntryId)" in camera_media
+        and "MessageDigest.isEqual(pending.sourceDigest, sha256(currentSource))" in camera_media
+        and "app.contentResolver.delete(pending.uri, null, null)" in camera_media
         and "ProtectionStore(app).runIfDisarmed" in camera_media
         and "CameraEvidenceCapture.isEncryptionEnabled(app)" in camera_media
         and "if (ProtectionStore(app).read().mode != ProtectionMode.DISARMED)" in camera_media
