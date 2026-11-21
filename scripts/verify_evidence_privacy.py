@@ -149,9 +149,12 @@ required = {
         and "if (!copiedVaultHealthy)" in camera_media
         and camera_media.index("if (!copiedVaultHealthy)") < camera_media.index("for ((uri, originalDigest) in pendingDeletions)")
         and "ProtectionStore(app).runIfDisarmed" in camera_media,
-    "post-auth photo writes during re-arm are allowed only in ARMED, never COUNTDOWN or ALARM_TRIGGERED":
+    "both photo stores state-lock post-auth writes to DISARMED or ARMED only":
         "runIfProtectionActive { currentState ->" in camera_vault
-        and "if (currentState.mode != ProtectionMode.ARMED) return@runIfProtectionActive false" in camera_vault,
+        and "CameraEvidencePolicy.canPersistPhoto(currentState.mode)" in camera_vault
+        and "ProtectionStore(app).runIfDisarmed" in camera_media
+        and "ProtectionStore(app).runIfProtectionActive" in camera_media
+        and "CameraEvidencePolicy.canPersistPhoto(currentState.mode)" in camera_media,
     "camera evidence retention is non-destructive while protection is active":
         "ProtectionStore(context).runIfDisarmed" in camera_vault
         and "@Synchronized\n    fun save(" in camera_vault
