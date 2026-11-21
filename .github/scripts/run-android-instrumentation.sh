@@ -16,10 +16,10 @@ wait_for_stable_emulator() {
     if [[ "$adb_state" == "device" ]]; then
       boot_completed="$(timeout 10s adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
       actual_api="$(timeout 10s adb shell getprop ro.build.version.sdk 2>/dev/null | tr -d '\r' || true)"
-      package_service="$(timeout 10s adb shell service check package 2>&1 || true)"
+      package_service="$(timeout 10s adb shell service check package 2>&1 | tr -d '\r' || true)"
       package_path="$(timeout 10s adb shell pm path android 2>/dev/null | head -n 1 | tr -d '\r' || true)"
       if [[ "$boot_completed" == "1" && "$actual_api" == "$api_level" \
-            && "$package_service" == *"found"* && "$package_path" == package:* ]]; then
+            && "$package_service" == "Service package: found" && "$package_path" == package:* ]]; then
         stable_checks=$((stable_checks + 1))
         if [[ "$stable_checks" -ge 3 ]]; then
           echo "Verified stable ADB transport, PackageManager, and API $api_level."

@@ -56,44 +56,34 @@ retry_adb() {
     return 1
 }
 
-retry_boot_probe() {
-    local attempt output
-    for attempt in {1..180}; do
-        if output="$("$REAL_ADB" "$@" 2>&1)"; then
-            printf '%s\n' "$output"
-            return 0
-        fi
-        if [[ "$output" != *offline* && "$output" != *"not found"* &&
-              "$output" != *"cannot connect"* && "$output" != *closed* ]]; then
-            printf '%s\n' "$output" >&2
-            return 1
-        fi
-        echo "ADB transport is not ready for the emulator boot probe (attempt $attempt/180): $output" >&2
-        "$REAL_ADB" reconnect offline >/dev/null 2>&1 || true
-        sleep 2
-    done
-    echo "ADB transport did not recover for sys.boot_completed after 360 seconds" >&2
-    return 1
-}
-
+# Leave sys.boot_completed polling to android-emulator-runner. Its configured
+# emulator-boot-timeout is the authoritative boot deadline; a long retry loop here
+# would block the runner's own polling and can turn a missing emulator into a timeout.
 case "$*" in
-    *"shell getprop sys.boot_completed"*)
-        # android-emulator-runner polls this before invoking our test script.
-        # Retry only transient offline/transport failures so cold API images can boot.
-        retry_boot_probe "$@" || exit 1
-        exit 0
-        ;;
     *"shell input keyevent 82"*)
-        # sys.boot_completed can precede InputManager readiness on cold API 30+ images.
-        for attempt in {1..90}; do
-            if "$REAL_ADB" -s "$serial" shell service check input 2>&1 | grep -q "found"; then
+        input_wait_attempts="${ADB_READINESS_INPUT_ATTEMPTS:-90}"
+        input_wait_interval="${ADB_READINESS_INPUT_INTERVAL_SECONDS:-2}"
+        if ! [[ "$input_wait_attempts" =~ ^[1-9][0-9]*$ &&
+                "$input_wait_interval" =~ ^(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid ADB input-service readiness retry configuration." >&2
+            exit 2
+        fi
+
+        # Require the positive service-check response exactly. A substring search
+        # for "found" also matches "not found" and can release setup too early.
+        for ((attempt = 1; attempt <= input_wait_attempts; attempt++)); do
+            service_output="$("$REAL_ADB" -s "$serial" shell service check input 2>&1 || true)"
+            service_output="${service_output//$'\r'/}"
+            if [[ "$service_output" == "Service input: found" ]]; then
                 retry_adb "$@"
                 exit $?
             fi
             "$REAL_ADB" reconnect offline >/dev/null 2>&1 || true
-            sleep 2
+            if [[ "$attempt" -lt "$input_wait_attempts" ]]; then
+                sleep "$input_wait_interval"
+            fi
         done
-        echo "Android input service did not become ready within 180 seconds" >&2
+        echo "Android input service did not become ready within $input_wait_attempts checks" >&2
         exit 1
         ;;
     *"shell settings put"*)

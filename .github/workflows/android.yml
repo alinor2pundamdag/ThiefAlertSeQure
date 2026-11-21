@@ -69,6 +69,9 @@ jobs:
       - name: Verify internal navigation and themed dialogs
         run: python3 scripts/verify_navigation.py
 
+      - name: Verify Android emulator readiness harness
+        run: bash scripts/test_adb_readiness_wrapper.sh
+
       - name: Android lint
         run: |
           if ! ./gradlew :app:lintDebug --no-daemon --stacktrace; then
@@ -423,8 +426,8 @@ jobs:
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         env:
           ANDROID_API_LEVEL: ${{ matrix.api-level }}
-          # Android 17's emulator requires explicit TCG opt-in when this hosted Linux runner has no KVM.
-          ANDROID_I_WANT_MY_TCG: ${{ matrix.api-level == 37 && 'yes' || 'no' }}
+          # Hosted Linux runners may lack KVM. Explicitly opt into TCG for both API images.
+          ANDROID_I_WANT_MY_TCG: yes
         with:
           api-level: ${{ matrix.api-level }}
           system-image-api-level: ${{ matrix.api-level == 37 && '37.0' || matrix.api-level }}
