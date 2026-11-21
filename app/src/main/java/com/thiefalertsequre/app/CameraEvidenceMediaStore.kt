@@ -188,7 +188,7 @@ internal object CameraEvidenceMediaStore {
         val removedLegacyIds = mutableListOf<String>()
         var capacityLimitedDuringMigration = 0
         var blocked = false
-        val pendingDeletions = mutableListOf<Pair<Uri, ByteArray>>() // URI plus SHA-256 digest, not the full photo bytes
+        val pendingDeletions = mutableListOf<PendingGalleryDeletion>() // URI + digest + verified encrypted-entry identity; never retain full photo bytes
 
         // Copy and verify every selected item first. Do not remove any Gallery
         // source until the complete encrypted vault passes its integrity scan.
@@ -241,7 +241,7 @@ internal object CameraEvidenceMediaStore {
                 continue
             }
             copied += 1
-            pendingDeletions += uri to sourceDigest
+            pendingDeletions += PendingGalleryDeletion(uri, sourceDigest, entry.id)
         }
 
         val copiedVaultHealthy = CameraEvidenceVault.verifyIntegrity(app)
@@ -259,14 +259,28 @@ internal object CameraEvidenceMediaStore {
 
         // Remove a source only after a fresh byte-for-byte source check and a
         // state-locked DISARMED check. If protection activates, stop immediately.
-        for ((uri, originalDigest) in pendingDeletions) {
-            val currentSource = readBoundedImage(app, uri)
-            if (currentSource == null || !MessageDigest.isEqual(originalDigest, sha256(currentSource))) {
+        for (pending in pendingDeletions) {
+            val currentSource = readBoundedImage(app, pending.uri)
+            if (currentSource == null || !MessageDigest.isEqual(pending.sourceDigest, sha256(currentSource))) {
                 removalFailures += 1
                 continue
             }
-            val deleteResult = ProtectionStore(app).runIfDisarmed {
-                runCatching { app.contentResolver.delete(uri, null, null) == 1 }.getOrDefault(false)
+            // Serialize vault mutation against source deletion. If an owner
+            // deletes the encrypted copy after the global integrity scan, the
+            // only remaining Gallery original must be retained.
+            val deleteResult = synchronized(CameraEvidenceVault) {
+                val verifiedVaultCopy = CameraEvidenceVault.read(app, pending.vaultEntryId)
+                if (verifiedVaultCopy == null ||
+                    !MessageDigest.isEqual(pending.sourceDigest, sha256(verifiedVaultCopy))
+                ) {
+                    false
+                } else {
+                    ProtectionStore(app).runIfDisarmed {
+                        runCatching {
+                            app.contentResolver.delete(pending.uri, null, null) == 1
+                        }.getOrDefault(false)
+                    }
+                }
             }
             when (deleteResult) {
                 true -> {
@@ -387,6 +401,12 @@ internal object CameraEvidenceMediaStore {
         } else {
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         }
+
+    private data class PendingGalleryDeletion(
+        val uri: Uri,
+        val sourceDigest: ByteArray,
+        val vaultEntryId: String
+    )
 
     private data class QueryResult(
         val success: Boolean,
