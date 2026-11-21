@@ -2,6 +2,7 @@ package com.thiefalertsequre.app
 
 import android.content.Context
 import android.content.SharedPreferences
+import java.util.UUID
 
 data class ProtectionStoreUpdateResult(
     val state: ProtectionState,
@@ -363,37 +364,27 @@ class ProtectionStore internal constructor(
         val backup = corruptionPrefs()
         val active = when (val value = SafePreferences.readBoolean(backup, activeKey, false)) {
             is PreferenceRead.Value -> value.value
-            is PreferenceRead.Corrupt -> return false
+            // A damaged recovery marker is itself corruption. Preserve both
+            // preference files in a separate snapshot before repairing it.
+            is PreferenceRead.Corrupt -> return preserveEmergencyCorruptSnapshot(reason, activeKey, backup)
         }
         if (active) return true
 
         val count = when (val value = SafePreferences.readLong(backup, KEY_SNAPSHOT_COUNT, 0L)) {
             is PreferenceRead.Value -> value.value
-            is PreferenceRead.Corrupt -> return false
+            is PreferenceRead.Corrupt -> return preserveEmergencyCorruptSnapshot(reason, activeKey, backup)
         }
-        if (count == Long.MAX_VALUE) return false
+        if (count < 0L || count == Long.MAX_VALUE) {
+            return preserveEmergencyCorruptSnapshot(reason, activeKey, backup)
+        }
         val snapshot = count + 1L
         val rawValues = runCatching { prefs.all }.getOrNull() ?: return false
-        for ((_, value) in rawValues) {
-            when (value) {
-                is String, is Int, is Long, is Float, is Boolean -> Unit
-                is Set<*> -> if (value.filterIsInstance<String>().size != value.size) return false
-                else -> return false
-            }
+        if (!rawValues.values.all(::isSupportedPreferenceValue)) {
+            return preserveEmergencyCorruptSnapshot(reason, activeKey, backup)
         }
         val saved = commitWithOneRetry {
             backup.edit().also { retryEditor ->
-                for ((key, value) in rawValues) {
-                    val snapshotKey = "snapshot_${snapshot}_$key"
-                    when (value) {
-                        is String -> retryEditor.putString(snapshotKey, value)
-                        is Int -> retryEditor.putInt(snapshotKey, value)
-                        is Long -> retryEditor.putLong(snapshotKey, value)
-                        is Float -> retryEditor.putFloat(snapshotKey, value)
-                        is Boolean -> retryEditor.putBoolean(snapshotKey, value)
-                        is Set<*> -> retryEditor.putStringSet(snapshotKey, value.filterIsInstance<String>().toSet())
-                    }
-                }
+                putTypedPreferences(retryEditor, "snapshot_${snapshot}_", rawValues)
                 retryEditor
                     .putString("snapshot_${snapshot}_reason", reason.take(256))
                     .putLong("snapshot_${snapshot}_captured_at_epoch_ms", System.currentTimeMillis())
@@ -401,7 +392,94 @@ class ProtectionStore internal constructor(
                     .putBoolean(activeKey, true)
             }
         }
-        return saved
+        if (!saved) return preserveEmergencyCorruptSnapshot(reason, activeKey, backup)
+
+        val savedValues = runCatching { backup.all }.getOrNull() ?: return false
+        val snapshotMatches = rawValues.all { (key, value) ->
+            savedValues["snapshot_${snapshot}_$key"] == value
+        } && savedValues["snapshot_${snapshot}_reason"] == reason.take(256) &&
+            savedValues["snapshot_${snapshot}_captured_at_epoch_ms"] is Long &&
+            savedValues[KEY_SNAPSHOT_COUNT] == snapshot &&
+            savedValues[activeKey] == true
+        return if (snapshotMatches) true else preserveEmergencyCorruptSnapshot(reason, activeKey, backup)
+    }
+
+    /**
+     * Last-resort recovery when the normal corruption marker/snapshot metadata
+     * is itself damaged or cannot be committed. This preserves both the primary
+     * protection preferences and the recovery preferences in a separate file,
+     * verifies every typed value by read-back, and only then repairs the active
+     * marker to TRUE. Authenticated disarm remains the only path that clears it.
+     */
+    private fun preserveEmergencyCorruptSnapshot(
+        reason: String,
+        activeKey: String,
+        backup: SharedPreferences
+    ): Boolean {
+        val primaryValues = runCatching { prefs.all }.getOrNull() ?: return false
+        val backupValues = runCatching { backup.all }.getOrNull() ?: return false
+        if (!primaryValues.values.all(::isSupportedPreferenceValue) ||
+            !backupValues.values.all(::isSupportedPreferenceValue)
+        ) return false
+
+        val emergency = appContext.getSharedPreferences(EMERGENCY_CORRUPT_BACKUP_PREFS, Context.MODE_PRIVATE)
+        val snapshotId = UUID.randomUUID().toString().replace("-", "")
+        val primaryPrefix = "snapshot_${snapshotId}_protection_"
+        val backupPrefix = "snapshot_${snapshotId}_recovery_"
+        val reasonKey = "snapshot_${snapshotId}_reason"
+        val capturedAtKey = "snapshot_${snapshotId}_captured_at_epoch_ms"
+        val saved = commitWithOneRetry {
+            emergency.edit().also { editor ->
+                putTypedPreferences(editor, primaryPrefix, primaryValues)
+                putTypedPreferences(editor, backupPrefix, backupValues)
+                editor
+                    .putString(reasonKey, reason.take(256))
+                    .putLong(capturedAtKey, System.currentTimeMillis())
+                    .putString(KEY_EMERGENCY_LATEST_SNAPSHOT_ID, snapshotId)
+            }
+        }
+        if (!saved) return false
+
+        val verified = runCatching { emergency.all }.getOrNull() ?: return false
+        val snapshotMatches = primaryValues.all { (key, value) -> verified[primaryPrefix + key] == value } &&
+            backupValues.all { (key, value) -> verified[backupPrefix + key] == value } &&
+            verified[reasonKey] == reason.take(256) &&
+            verified[capturedAtKey] is Long &&
+            verified[KEY_EMERGENCY_LATEST_SNAPSHOT_ID] == snapshotId
+        if (!snapshotMatches) return false
+
+        val markerSaved = commitWithOneRetry { backup.edit().putBoolean(activeKey, true) }
+        if (!markerSaved) return false
+        record(
+            "protection_state_emergency_snapshot_preserved",
+            "$reason; both primary and recovery preferences were copied and verified in a separate private snapshot"
+        )
+        return true
+    }
+
+    private fun isSupportedPreferenceValue(value: Any?): Boolean = when (value) {
+        is String, is Int, is Long, is Float, is Boolean -> true
+        is Set<*> -> value.all { it is String }
+        else -> false
+    }
+
+    private fun putTypedPreferences(
+        editor: SharedPreferences.Editor,
+        prefix: String,
+        values: Map<String, *>
+    ) {
+        for ((key, value) in values) {
+            val snapshotKey = prefix + key
+            when (value) {
+                is String -> editor.putString(snapshotKey, value)
+                is Int -> editor.putInt(snapshotKey, value)
+                is Long -> editor.putLong(snapshotKey, value)
+                is Float -> editor.putFloat(snapshotKey, value)
+                is Boolean -> editor.putBoolean(snapshotKey, value)
+                is Set<*> -> editor.putStringSet(snapshotKey, value.filterIsInstance<String>().toSet())
+                else -> throw IllegalArgumentException("Unsupported SharedPreferences value type for $key")
+            }
+        }
     }
 
     private fun clearCorruptionFlag(key: String): Boolean {
@@ -426,6 +504,8 @@ class ProtectionStore internal constructor(
         const val ACTION_STATE_CHANGED = "com.thiefalertsequre.PROTECTION_STATE_CHANGED"
         private val LOCK = Any()
         private const val CORRUPT_BACKUP_PREFS = "protection_state_corrupt_backup_v1"
+        private const val EMERGENCY_CORRUPT_BACKUP_PREFS = "protection_state_emergency_backup_v1"
+        private const val KEY_EMERGENCY_LATEST_SNAPSHOT_ID = "latest_emergency_snapshot_id"
         private const val KEY_SNAPSHOT_COUNT = "snapshot_count"
         private const val KEY_STATE_CORRUPTION_ACTIVE = "state_corruption_active"
         private const val KEY_AUTH_CORRUPTION_ACTIVE = "auth_corruption_active"
