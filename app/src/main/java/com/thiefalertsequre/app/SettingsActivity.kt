@@ -1938,7 +1938,9 @@ class SettingsActivity : FragmentActivity() {
         flashPreviewStopRunnable = null
         flashPreviewController?.stop()
         flashPreviewController = null
-        flashPreviewThermalController?.stop()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            flashPreviewThermalController?.stop()
+        }
         flashPreviewThermalController = null
     }
 
