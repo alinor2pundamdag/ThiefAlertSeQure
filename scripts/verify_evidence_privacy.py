@@ -57,7 +57,7 @@ required = {
     "privacy policy discloses one-shot location":
         "one cached location fix or request one current GPS/network fix" in privacy and "No background location permission" in privacy,
     "updated first-launch notice discloses Gallery default and encrypted option":
-        "privacy_notice_v8" in main and "Pictures/ThiefAlertSeQure" in main and "Gallery" in main and "AES-GCM" in main,
+        "privacy_notice_v9" in main and "Pictures/ThiefAlertSeQure" in main and "Gallery" in main and "AES-GCM" in main,
     "evidence metadata backup uses password-derived authenticated encryption":
         "PBKDF2WithHmacSHA256" in (APP / "EvidenceVaultBackup.kt").read_text(encoding="utf-8")
         and "AES/GCM/NoPadding" in (APP / "EvidenceVaultBackup.kt").read_text(encoding="utf-8")
