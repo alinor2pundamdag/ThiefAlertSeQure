@@ -149,7 +149,7 @@ required = {
     "photo migration validates the complete vault before deleting Gallery sources":
         "val copiedVaultHealthy = CameraEvidenceVault.verifyIntegrity(app)" in camera_media
         and "if (!copiedVaultHealthy)" in camera_media
-        and camera_media.index("if (!copiedVaultHealthy)") < camera_media.index("for ((uri, originalDigest) in pendingDeletions)")
+        and camera_media.index("if (!copiedVaultHealthy)") < camera_media.index("for (pending in pendingDeletions)")
         and "ProtectionStore(app).runIfDisarmed" in camera_media,
     "both photo stores state-lock post-auth writes to DISARMED or ARMED only":
         "runIfProtectionActive { currentState ->" in camera_vault
