@@ -25,6 +25,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /** One still front-camera capture, initiated only after successful owner authentication in a visible Activity. */
 internal object CameraEvidenceCapture {
@@ -152,8 +153,8 @@ internal object CameraEvidenceCapture {
 
         val finished = AtomicBoolean(false)
         val activityVisible = AtomicBoolean(visible)
-        // Serialize lifecycle cancellation against the final storage commit.
-        val captureCommitLock = Any()
+        // 0=visible/eligible, 1=commit authorized, 2=lifecycle cancellation won.
+        val commitState = AtomicInteger(0)
         val lifecycle = (activity as LifecycleOwner).lifecycle
         var lifecycleObserver: LifecycleEventObserver? = null
         var camera: CameraDevice? = null
@@ -177,7 +178,8 @@ internal object CameraEvidenceCapture {
 
         lifecycleObserver = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP || event == Lifecycle.Event.ON_DESTROY) {
-                synchronized(captureCommitLock) { activityVisible.set(false) }
+                activityVisible.set(false)
+                commitState.compareAndSet(0, 2)
                 handler.post {
                     finish(
                         "camera_evidence_activity_not_visible",
@@ -219,30 +221,21 @@ internal object CameraEvidenceCapture {
                 finish("camera_evidence_image_rejected", "JPEG could not be compressed below the 2 MiB evidence size limit")
                 return@setOnImageAvailableListener
             }
-            // The final owner-visible check and durable photo write share a small
-            // gate with ON_STOP/ON_DESTROY. If lifecycle cancellation wins, no photo
-            // is persisted after the authentication Activity has left the foreground.
-            val persisted = synchronized(captureCommitLock) {
-                if (finished.get() || !activityVisible.get()) null
-                else {
-                    val encryptedEntry = if (encryptEvidence) {
-                        runCatching { CameraEvidenceVault.save(app, boundedJpeg) }.getOrNull()
-                    } else null
-                    val galleryUri = if (!encryptEvidence) {
-                        runCatching { CameraEvidenceMediaStore.save(app, boundedJpeg) }.getOrNull()
-                    } else null
-                    encryptedEntry to galleryUri
-                }
-            }
-            if (persisted == null) {
+            // Atomically authorize the storage commit only if lifecycle cancellation
+            // has not already won. This avoids blocking the UI thread on disk I/O.
+            if (finished.get() || !activityVisible.get() || !commitState.compareAndSet(0, 1)) {
                 finish(
                     "camera_evidence_activity_not_visible",
                     "App left the visible state before the front-camera evidence photo could be committed"
                 )
                 return@setOnImageAvailableListener
             }
-            val encryptedEntry = persisted.first
-            val galleryUri = persisted.second
+            val encryptedEntry = if (encryptEvidence) {
+                runCatching { CameraEvidenceVault.save(app, boundedJpeg) }.getOrNull()
+            } else null
+            val galleryUri = if (!encryptEvidence) {
+                runCatching { CameraEvidenceMediaStore.save(app, boundedJpeg) }.getOrNull()
+            } else null
             val saved = if (encryptEvidence) encryptedEntry != null else galleryUri != null
             if (!saved) {
                 finish("camera_evidence_storage_failed", if (encryptEvidence)
