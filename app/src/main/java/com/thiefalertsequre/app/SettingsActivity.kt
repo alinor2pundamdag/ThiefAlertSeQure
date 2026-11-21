@@ -39,6 +39,8 @@ class SettingsActivity : FragmentActivity() {
     private var previewToneController: AlarmToneController? = null
     private var previewToneStopRunnable: Runnable? = null
     private var flashPreviewController: AlarmFlashController? = null
+    private var flashPreviewThread: HandlerThread? = null
+    private var flashPreviewHandler: Handler? = null
     private var flashPreviewThermalController: ThermalFlashController? = null
     private var flashPreviewStopRunnable: Runnable? = null
     private var pendingUpdateInstall: AppUpdateResult.Ready? = null
@@ -1827,7 +1829,16 @@ class SettingsActivity : FragmentActivity() {
             return
         }
         stopFlashPreview()
-        val controller = AlarmFlashController(this, previewToneHandler) { _, _ -> }
+        val flashHandler = ensureFlashPreviewHandler()
+        if (flashHandler == null) {
+            android.widget.Toast.makeText(
+                this,
+                "Flash preview is unavailable because its timing worker could not start.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        val controller = AlarmFlashController(this, flashHandler) { _, _ -> }
         if (!controller.hasFlashHardware()) {
             android.widget.Toast.makeText(this, "No compatible flashlight hardware is available on this device.", android.widget.Toast.LENGTH_LONG).show()
             return
@@ -1888,6 +1899,28 @@ class SettingsActivity : FragmentActivity() {
             else "No compatible camera LED / torch was detected.",
             android.widget.Toast.LENGTH_LONG
         ).show()
+    }
+
+    private fun ensureFlashPreviewHandler(): Handler? {
+        flashPreviewHandler?.let { return it }
+        val thread = runCatching {
+            HandlerThread("ThiefAlertSeQure-FlashPreview").apply { start() }
+        }.getOrNull() ?: return null
+        val handler = runCatching { Handler(thread.looper) }.getOrNull()
+        if (handler == null) {
+            thread.quitSafely()
+            return null
+        }
+        flashPreviewThread = thread
+        flashPreviewHandler = handler
+        return handler
+    }
+
+    private fun stopFlashPreviewThread() {
+        flashPreviewHandler?.removeCallbacksAndMessages(null)
+        flashPreviewThread?.quitSafely()
+        flashPreviewHandler = null
+        flashPreviewThread = null
     }
 
     private fun stopFlashPreview() {
@@ -1986,12 +2019,14 @@ class SettingsActivity : FragmentActivity() {
     override fun onPause() {
         stopPreview()
         stopFlashPreview()
+        stopFlashPreviewThread()
         super.onPause()
     }
 
     override fun onDestroy() {
         stopPreview()
         stopFlashPreview()
+        stopFlashPreviewThread()
         ioExecutor.shutdown()
         super.onDestroy()
     }
