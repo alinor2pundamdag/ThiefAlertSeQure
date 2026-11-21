@@ -6,6 +6,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class A2DisconnectPolicyTest {
+    @Test fun lastInvalidationRejectsOlderA2GraceDeadlines() {
+        assertFalse(A2DisconnectPolicy.isAfterLastInvalidation(500L, 4, 600L, 4))
+        assertTrue(A2DisconnectPolicy.isAfterLastInvalidation(700L, 4, 600L, 4))
+    }
+
+    @Test fun missingInvalidationMarkerAllowsNewEventsOnFreshInstall() {
+        assertTrue(A2DisconnectPolicy.isAfterLastInvalidation(500L, 4, 0L, -1))
+    }
+
+    @Test fun partialInvalidationMarkerFailsClosed() {
+        assertFalse(A2DisconnectPolicy.isAfterLastInvalidation(700L, 4, 0L, 4))
+    }
+
+    @Test fun newerBootA2EventsFollowPriorBootInvalidation() {
+        assertTrue(A2DisconnectPolicy.isAfterLastInvalidation(100L, 5, 900L, 4))
+        assertFalse(A2DisconnectPolicy.isAfterLastInvalidation(100L, 3, 900L, 4))
+    }
+
+    @Test fun unknownBootIdentityFailsClosedAcrossMismatchedSourcesButAllowsLiveProcessOrdering() {
+        assertFalse(A2DisconnectPolicy.isAfterLastInvalidation(700L, -1, 600L, 4))
+        assertFalse(A2DisconnectPolicy.isAfterLastInvalidation(700L, 4, 600L, -1))
+        assertTrue(A2DisconnectPolicy.isAfterLastInvalidation(700L, -1, 600L, -1))
+    }
+
     @Test fun disconnectGraceDeadlineStartsAtBroadcastReceipt() {
         assertEquals(9_000L, A2DisconnectPolicy.graceDeadlineUptimeMs(1_000L, 8_000L))
     }
@@ -21,10 +45,12 @@ class A2DisconnectPolicyTest {
             A2DisconnectPolicy.isSameBoot(4, 4, 13_000L, 12_000L))
     }
 
-    @Test fun elapsedRealtimeDetectsRebootWhenBootCountUnavailable() {
-        assertTrue(A2DisconnectPolicy.isSameBoot(-1, -1, 12_000L, 13_000L))
+    @Test fun unknownBootCountsCannotProveSameBootFromElapsedTimeAlone() {
+        // A reboot may already have accumulated more uptime than the old event.
+        assertFalse(A2DisconnectPolicy.isSameBoot(-1, -1, 12_000L, 13_000L))
         assertFalse(A2DisconnectPolicy.isSameBoot(-1, -1, 12_000L, 500L))
         assertFalse(A2DisconnectPolicy.isSameBoot(4, -1, 12_000L, 13_000L))
+        assertFalse(A2DisconnectPolicy.isSameBoot(-1, 4, 12_000L, 13_000L))
     }
 
     @Test fun gracePeriodRequiresEnabledTrustedDeviceWithConfirmedBaselineWhileArmed() {

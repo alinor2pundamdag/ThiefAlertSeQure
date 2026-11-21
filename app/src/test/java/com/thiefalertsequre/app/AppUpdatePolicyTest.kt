@@ -30,6 +30,15 @@ class AppUpdatePolicyTest {
         )))
     }
 
+    @Test fun releaseTagsAcceptPermanentDeveloperSuffixAndHistoricalTags() {
+        assertTrue(AppUpdatePolicy.isValidReleaseTag("v1.1.3"))
+        assertTrue(AppUpdatePolicy.isValidReleaseTag("v1.1.4_Developer_Alinor"))
+        assertTrue(AppUpdatePolicy.isValidReleaseTag("v1.1.5_Developer_Alinor"))
+        assertFalse(AppUpdatePolicy.isValidReleaseTag("1.1.5_Developer_Alinor"))
+        assertFalse(AppUpdatePolicy.isValidReleaseTag("v1.1.5-developer-alinor"))
+        assertFalse(AppUpdatePolicy.isValidReleaseTag("v1.1.5_Developer_Alinor-extra"))
+    }
+
     @Test fun versionCodeIsAuthoritativeEvenWhenDisplayVersionIsUnchanged() {
         assertTrue(AppUpdatePolicy.isNewerVersionCode(5L, 6L))
         assertTrue(AppUpdatePolicy.isNewerVersionCode(6L, 7L))

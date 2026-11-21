@@ -2,6 +2,7 @@ package com.thiefalertsequre.app
 
 import android.content.Context
 import android.content.SharedPreferences
+import java.util.UUID
 
 data class ProtectionStoreUpdateResult(
     val state: ProtectionState,
@@ -48,6 +49,28 @@ class ProtectionStore internal constructor(
     fun update(transform: (ProtectionState) -> ProtectionState): ProtectionState =
         updatePersisted(transform).state
 
+    /**
+     * Runs a short owner-settings transaction while the authoritative state is
+     * DISARMED. Charger/alarm transitions share LOCK and therefore cannot race
+     * a restore that is explicitly restricted to the disarmed state.
+     */
+    internal fun <T> runIfDisarmed(block: () -> T): T? = synchronized(LOCK) {
+        val current = readUnlocked()
+        if (stateCorruptionDetected || current.mode != ProtectionMode.DISARMED) {
+            return@synchronized null
+        }
+        block()
+    }
+
+    /** Runs a small preference repair only while ARMED/COUNTDOWN remains authoritative. */
+    internal fun <T> runIfProtectionActive(block: (ProtectionState) -> T): T? = synchronized(LOCK) {
+        val current = readUnlocked()
+        if (stateCorruptionDetected ||
+            (current.mode != ProtectionMode.ARMED && current.mode != ProtectionMode.COUNTDOWN)
+        ) return@synchronized null
+        block(current)
+    }
+
     /** Returns the actual commit result so callers do not cancel alarms on an unpersisted transition. */
     fun updatePersisted(transform: (ProtectionState) -> ProtectionState): ProtectionStoreUpdateResult =
         synchronized(LOCK) {
@@ -82,12 +105,73 @@ class ProtectionStore internal constructor(
 
         val next = ProtectionEngine.authenticated(current, nowEpochMs)
         if (next.mode != ProtectionMode.DISARMED) return@synchronized null
-        if (!writeUnlocked(next)) {
+        val authenticatedAtElapsedRealtimeMs = ProtectionClock.elapsedRealtime()
+        val authenticatedAtBootCount = ProtectionClock.bootCount(appContext)
+        if (!writeUnlocked(next, authenticatedAtElapsedRealtimeMs, authenticatedAtBootCount)) {
             record("protection_state_authenticated_disarm_persist_failed", "Authenticated disarm could not be durably committed; the alarm remains active")
             return@synchronized null
         }
         stateCorruptionDetected = false
         next
+    }
+
+    /**
+     * Establishes a new A2 deadline epoch after a safe package replacement.
+     * Package updates are permitted only while DISARMED; stale callbacks from
+     * the previous installation must not become valid after auto-rearming.
+     */
+    internal fun markA2DeadlinesInvalidated(): Boolean = synchronized(LOCK) {
+        val current = readUnlocked()
+        if (current.mode != ProtectionMode.DISARMED || stateCorruptionDetected) return@synchronized false
+        val invalidatedAtElapsedRealtimeMs = ProtectionClock.elapsedRealtime()
+        if (invalidatedAtElapsedRealtimeMs <= 0L) return@synchronized false
+        val invalidatedAtBootCount = ProtectionClock.bootCount(appContext)
+        val saved = commitWithOneRetry {
+            prefs.edit()
+                .putLong(KEY_LAST_A2_DEADLINE_INVALIDATION_ELAPSED, invalidatedAtElapsedRealtimeMs)
+                .putInt(KEY_LAST_A2_DEADLINE_INVALIDATION_BOOT, invalidatedAtBootCount)
+        }
+        if (!saved) {
+            record(
+                "a2_deadline_update_epoch_persist_failed",
+                "Package replacement could not persist a new A2 deadline epoch; pending schedule cleanup remains required"
+            )
+        }
+        saved
+    }
+
+    /** Rejects persisted A2 disconnect events that predate the last A2 deadline invalidation. */
+    internal fun isA2EventAfterLastInvalidation(
+        eventElapsedRealtimeMs: Long,
+        eventBootCount: Int
+    ): Boolean = synchronized(LOCK) {
+        readUnlocked()
+        if (stateCorruptionDetected) return@synchronized false
+        val invalidatedElapsed = when (
+            val value = SafePreferences.readLong(prefs, KEY_LAST_A2_DEADLINE_INVALIDATION_ELAPSED, 0L)
+        ) {
+            is PreferenceRead.Value -> value.value
+            is PreferenceRead.Corrupt -> {
+                record("a2_deadline_invalidation_epoch_corrupt", "A2 deadline invalidation monotonic timestamp has the wrong stored type; A2 deadlines fail closed")
+                return@synchronized false
+            }
+        }
+        val invalidatedBoot = when (
+            val value = SafePreferences.readInt(prefs, KEY_LAST_A2_DEADLINE_INVALIDATION_BOOT, -1)
+        ) {
+            is PreferenceRead.Value -> value.value
+            is PreferenceRead.Corrupt -> {
+                record("a2_deadline_invalidation_epoch_corrupt", "A2 deadline invalidation boot identity has the wrong stored type; A2 deadlines fail closed")
+                return@synchronized false
+            }
+        }
+        if (invalidatedElapsed == 0L && invalidatedBoot != -1) {
+            record("a2_deadline_invalidation_epoch_incomplete", "A2 deadline invalidation marker is partial; A2 deadlines fail closed")
+            return@synchronized false
+        }
+        A2DisconnectPolicy.isAfterLastInvalidation(
+            eventElapsedRealtimeMs, eventBootCount, invalidatedElapsed, invalidatedBoot
+        )
     }
 
     fun readAuthenticationThrottle(
@@ -195,7 +279,8 @@ class ProtectionStore internal constructor(
             is PreferenceRead.Corrupt -> return failClosedFromCorruption("Protection boot identity has the wrong stored type")
         }
         val hasOtherStateFields = listOf(
-            "deadline", "changed", "deadline_elapsed", "boot_count"
+            "deadline", "changed", "deadline_elapsed", "boot_count",
+            KEY_LAST_A2_DEADLINE_INVALIDATION_ELAPSED, KEY_LAST_A2_DEADLINE_INVALIDATION_BOOT
         ).any(prefs::contains)
         val decoded = ProtectionState.fromPersisted(
             modeName = modeName,
@@ -298,20 +383,46 @@ class ProtectionStore internal constructor(
         return AuthenticationThrottle.recoverCorruptState(nowEpochMs, nowElapsedRealtimeMs, currentBootCount)
     }
 
-    private fun writeUnlocked(state: ProtectionState): Boolean = prefs.edit()
-        .putString("mode", state.mode.name)
-        .putLong("deadline", state.deadlineEpochMs)
-        .putLong("changed", state.changedAtEpochMs)
-        .putLong("deadline_elapsed", state.deadlineElapsedRealtimeMs)
-        .putInt("boot_count", state.bootCount)
-        .let(commitEditor)
+    private fun writeUnlocked(
+        state: ProtectionState,
+        a2InvalidationElapsedRealtimeMs: Long? = null,
+        a2InvalidationBootCount: Int? = null
+    ): Boolean {
+        val saved = commitWithOneRetry {
+            prefs.edit().apply {
+                putString("mode", state.mode.name)
+                putLong("deadline", state.deadlineEpochMs)
+                putLong("changed", state.changedAtEpochMs)
+                putLong("deadline_elapsed", state.deadlineElapsedRealtimeMs)
+                putInt("boot_count", state.bootCount)
+                if (a2InvalidationElapsedRealtimeMs != null && a2InvalidationBootCount != null) {
+                    putLong(KEY_LAST_A2_DEADLINE_INVALIDATION_ELAPSED, a2InvalidationElapsedRealtimeMs)
+                    putInt(KEY_LAST_A2_DEADLINE_INVALIDATION_BOOT, a2InvalidationBootCount)
+                }
+            }
+        }
+        if (saved) runCatching {
+            appContext.sendBroadcast(
+                android.content.Intent(ACTION_STATE_CHANGED).setPackage(appContext.packageName)
+            )
+        }
+        return saved
+    }
 
-    private fun writeThrottleUnlocked(state: AuthThrottleState): Boolean = prefs.edit()
-        .putInt(KEY_AUTH_FAILURES, state.failedAttempts)
-        .putLong(KEY_AUTH_COOLDOWN, state.cooldownUntilEpochMs)
-        .putLong(KEY_AUTH_COOLDOWN_ELAPSED, state.cooldownUntilElapsedRealtimeMs)
-        .putInt(KEY_AUTH_BOOT_COUNT, state.bootCount)
-        .let(commitEditor)
+    private fun writeThrottleUnlocked(state: AuthThrottleState): Boolean = commitWithOneRetry {
+        prefs.edit()
+            .putInt(KEY_AUTH_FAILURES, state.failedAttempts)
+            .putLong(KEY_AUTH_COOLDOWN, state.cooldownUntilEpochMs)
+            .putLong(KEY_AUTH_COOLDOWN_ELAPSED, state.cooldownUntilElapsedRealtimeMs)
+            .putInt(KEY_AUTH_BOOT_COUNT, state.bootCount)
+    }
+
+    private fun commitWithOneRetry(editorFactory: () -> SharedPreferences.Editor): Boolean {
+        val first = runCatching { commitEditor(editorFactory()) }.getOrDefault(false)
+        if (first) return true
+        android.util.Log.w(TAG, "SharedPreferences commit failed; retrying once")
+        return runCatching { commitEditor(editorFactory()) }.getOrDefault(false)
+    }
 
     private fun corruptionFlag(key: String): Boolean? = when (
         val value = SafePreferences.readBoolean(corruptionPrefs(), key, false)
@@ -324,41 +435,122 @@ class ProtectionStore internal constructor(
         val backup = corruptionPrefs()
         val active = when (val value = SafePreferences.readBoolean(backup, activeKey, false)) {
             is PreferenceRead.Value -> value.value
-            is PreferenceRead.Corrupt -> return false
+            // A damaged recovery marker is itself corruption. Preserve both
+            // preference files in a separate snapshot before repairing it.
+            is PreferenceRead.Corrupt -> return preserveEmergencyCorruptSnapshot(reason, activeKey, backup)
         }
         if (active) return true
 
         val count = when (val value = SafePreferences.readLong(backup, KEY_SNAPSHOT_COUNT, 0L)) {
             is PreferenceRead.Value -> value.value
-            is PreferenceRead.Corrupt -> return false
+            is PreferenceRead.Corrupt -> return preserveEmergencyCorruptSnapshot(reason, activeKey, backup)
         }
-        if (count == Long.MAX_VALUE) return false
+        if (count < 0L || count == Long.MAX_VALUE) {
+            return preserveEmergencyCorruptSnapshot(reason, activeKey, backup)
+        }
         val snapshot = count + 1L
         val rawValues = runCatching { prefs.all }.getOrNull() ?: return false
-        val editor = backup.edit()
-        for ((key, value) in rawValues) {
-            val snapshotKey = "snapshot_${snapshot}_$key"
+        if (!rawValues.values.all(::isSupportedPreferenceValue)) {
+            return preserveEmergencyCorruptSnapshot(reason, activeKey, backup)
+        }
+        val saved = commitWithOneRetry {
+            backup.edit().also { retryEditor ->
+                putTypedPreferences(retryEditor, "snapshot_${snapshot}_", rawValues)
+                retryEditor
+                    .putString("snapshot_${snapshot}_reason", reason.take(256))
+                    .putLong("snapshot_${snapshot}_captured_at_epoch_ms", System.currentTimeMillis())
+                    .putLong(KEY_SNAPSHOT_COUNT, snapshot)
+                    .putBoolean(activeKey, true)
+            }
+        }
+        if (!saved) return preserveEmergencyCorruptSnapshot(reason, activeKey, backup)
+
+        val savedValues = runCatching { backup.all }.getOrNull() ?: return false
+        val snapshotMatches = rawValues.all { (key, value) ->
+            savedValues["snapshot_${snapshot}_$key"] == value
+        } && savedValues["snapshot_${snapshot}_reason"] == reason.take(256) &&
+            savedValues["snapshot_${snapshot}_captured_at_epoch_ms"] is Long &&
+            savedValues[KEY_SNAPSHOT_COUNT] == snapshot &&
+            savedValues[activeKey] == true
+        return if (snapshotMatches) true else preserveEmergencyCorruptSnapshot(reason, activeKey, backup)
+    }
+
+    /**
+     * Last-resort recovery when the normal corruption marker/snapshot metadata
+     * is itself damaged or cannot be committed. This preserves both the primary
+     * protection preferences and the recovery preferences in a separate file,
+     * verifies every typed value by read-back, and only then repairs the active
+     * marker to TRUE. Authenticated disarm remains the only path that clears it.
+     */
+    private fun preserveEmergencyCorruptSnapshot(
+        reason: String,
+        activeKey: String,
+        backup: SharedPreferences
+    ): Boolean {
+        val primaryValues = runCatching { prefs.all }.getOrNull() ?: return false
+        val backupValues = runCatching { backup.all }.getOrNull() ?: return false
+        if (!primaryValues.values.all(::isSupportedPreferenceValue) ||
+            !backupValues.values.all(::isSupportedPreferenceValue)
+        ) return false
+
+        val emergency = appContext.getSharedPreferences(EMERGENCY_CORRUPT_BACKUP_PREFS, Context.MODE_PRIVATE)
+        val snapshotId = UUID.randomUUID().toString().replace("-", "")
+        val primaryPrefix = "snapshot_${snapshotId}_protection_"
+        val backupPrefix = "snapshot_${snapshotId}_recovery_"
+        val reasonKey = "snapshot_${snapshotId}_reason"
+        val capturedAtKey = "snapshot_${snapshotId}_captured_at_epoch_ms"
+        val saved = commitWithOneRetry {
+            emergency.edit().also { editor ->
+                putTypedPreferences(editor, primaryPrefix, primaryValues)
+                putTypedPreferences(editor, backupPrefix, backupValues)
+                editor
+                    .putString(reasonKey, reason.take(256))
+                    .putLong(capturedAtKey, System.currentTimeMillis())
+                    .putString(KEY_EMERGENCY_LATEST_SNAPSHOT_ID, snapshotId)
+            }
+        }
+        if (!saved) return false
+
+        val verified = runCatching { emergency.all }.getOrNull() ?: return false
+        val snapshotMatches = primaryValues.all { (key, value) -> verified[primaryPrefix + key] == value } &&
+            backupValues.all { (key, value) -> verified[backupPrefix + key] == value } &&
+            verified[reasonKey] == reason.take(256) &&
+            verified[capturedAtKey] is Long &&
+            verified[KEY_EMERGENCY_LATEST_SNAPSHOT_ID] == snapshotId
+        if (!snapshotMatches) return false
+
+        val markerSaved = commitWithOneRetry { backup.edit().putBoolean(activeKey, true) }
+        if (!markerSaved) return false
+        record(
+            "protection_state_emergency_snapshot_preserved",
+            "$reason; both primary and recovery preferences were copied and verified in a separate private snapshot"
+        )
+        return true
+    }
+
+    private fun isSupportedPreferenceValue(value: Any?): Boolean = when (value) {
+        is String, is Int, is Long, is Float, is Boolean -> true
+        is Set<*> -> value.all { it is String }
+        else -> false
+    }
+
+    private fun putTypedPreferences(
+        editor: SharedPreferences.Editor,
+        prefix: String,
+        values: Map<String, *>
+    ) {
+        for ((key, value) in values) {
+            val snapshotKey = prefix + key
             when (value) {
                 is String -> editor.putString(snapshotKey, value)
                 is Int -> editor.putInt(snapshotKey, value)
                 is Long -> editor.putLong(snapshotKey, value)
                 is Float -> editor.putFloat(snapshotKey, value)
                 is Boolean -> editor.putBoolean(snapshotKey, value)
-                is Set<*> -> {
-                    val strings = value.filterIsInstance<String>()
-                    if (strings.size != value.size) return false
-                    editor.putStringSet(snapshotKey, strings.toSet())
-                }
-                else -> return false
+                is Set<*> -> editor.putStringSet(snapshotKey, value.filterIsInstance<String>().toSet())
+                else -> throw IllegalArgumentException("Unsupported SharedPreferences value type for $key")
             }
         }
-        val saved = editor
-            .putString("snapshot_${snapshot}_reason", reason.take(256))
-            .putLong("snapshot_${snapshot}_captured_at_epoch_ms", System.currentTimeMillis())
-            .putLong(KEY_SNAPSHOT_COUNT, snapshot)
-            .putBoolean(activeKey, true)
-            .let(commitEditor)
-        return saved
     }
 
     private fun clearCorruptionFlag(key: String): Boolean {
@@ -367,7 +559,7 @@ class ProtectionStore internal constructor(
             is PreferenceRead.Value -> value.value
             is PreferenceRead.Corrupt -> return false
         }
-        return !active || commitEditor(backup.edit().putBoolean(key, false))
+        return !active || commitWithOneRetry { backup.edit().putBoolean(key, false) }
     }
 
     private fun corruptionPrefs(): SharedPreferences = appContext.getSharedPreferences(
@@ -379,8 +571,12 @@ class ProtectionStore internal constructor(
     }
 
     companion object {
+        private const val TAG = "ProtectionStore"
+        const val ACTION_STATE_CHANGED = "com.thiefalertsequre.PROTECTION_STATE_CHANGED"
         private val LOCK = Any()
         private const val CORRUPT_BACKUP_PREFS = "protection_state_corrupt_backup_v1"
+        private const val EMERGENCY_CORRUPT_BACKUP_PREFS = "protection_state_emergency_backup_v1"
+        private const val KEY_EMERGENCY_LATEST_SNAPSHOT_ID = "latest_emergency_snapshot_id"
         private const val KEY_SNAPSHOT_COUNT = "snapshot_count"
         private const val KEY_STATE_CORRUPTION_ACTIVE = "state_corruption_active"
         private const val KEY_AUTH_CORRUPTION_ACTIVE = "auth_corruption_active"
@@ -388,5 +584,7 @@ class ProtectionStore internal constructor(
         private const val KEY_AUTH_COOLDOWN = "auth_cooldown_until"
         private const val KEY_AUTH_COOLDOWN_ELAPSED = "auth_cooldown_until_elapsed"
         private const val KEY_AUTH_BOOT_COUNT = "auth_cooldown_boot_count"
+        private const val KEY_LAST_A2_DEADLINE_INVALIDATION_ELAPSED = "last_a2_deadline_invalidation_elapsed_realtime"
+        private const val KEY_LAST_A2_DEADLINE_INVALIDATION_BOOT = "last_a2_deadline_invalidation_boot_count"
     }
 }

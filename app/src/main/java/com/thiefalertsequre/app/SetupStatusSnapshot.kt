@@ -31,6 +31,8 @@ object SetupStatusSnapshot {
   x+=NotificationSetupStatusPolicy.appNotifications(notifs)
   val alarmChannel=runCatching{c.getSystemService(NotificationManager::class.java).getNotificationChannel(AlarmService.CHANNEL_ID)}.getOrNull()
   x+=NotificationSetupStatusPolicy.alarmChannel(alarmChannel?.importance)
+  val monitorChannel=runCatching{c.getSystemService(NotificationManager::class.java).getNotificationChannel(ProtectionMonitorService.CHANNEL_ID)}.getOrNull()
+  x+=NotificationSetupStatusPolicy.monitorChannel(monitorChannel?.importance)
   val dashboardEnabled=SafePreferences.boolean(c.getSharedPreferences(MainActivity.ALARM_DISPLAY_PREFS,0),MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN,false)
   val fullScreenAccess=Build.VERSION.SDK_INT<34||runCatching{c.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()}.getOrDefault(false)
   x+=FullScreenSetupStatusPolicy.evaluate(dashboardEnabled,Build.VERSION.SDK_INT,fullScreenAccess)
@@ -44,13 +46,25 @@ object SetupStatusSnapshot {
   val adapter=runCatching{if(perm)c.getSystemService(BluetoothManager::class.java)?.adapter?.isEnabled else null}.getOrNull()
   x+=BluetoothSetupStatusPolicy.adapter(a2Enabled,adapter)
   val enabled=SafePreferences.boolean(prefs,ProtectionMonitorService.KEY_ENABLED,ProtectionMonitorPolicy.DEFAULT_ENABLED)
+  val protectionMode=ProtectionStore(c).read().mode
+  val monitorRequired=enabled||protectionMode==ProtectionMode.ARMED||protectionMode==ProtectionMode.COUNTDOWN
   val running=runCatching{c.getSystemService(ActivityManager::class.java).getRunningServices(100).any{it.service.className==ProtectionMonitorService::class.java.name}}.getOrDefault(false)
-  x+=when{!enabled->SetupItem("monitor","Protection monitor",SetupState.NEUTRAL,"Monitor is disabled by owner.");running->SetupItem("monitor","Protection monitor",SetupState.VERIFIED,"Android process list confirms the service is running.");else->SetupItem("monitor","Protection monitor",SetupState.UNKNOWN,"Enabled preference exists, but running service is not confirmed.")}
+  x+=when{
+   protectionMode==ProtectionMode.ALARM_TRIGGERED->SetupItem("monitor","Protection monitor",SetupState.NEUTRAL,"The latched alarm is handled by AlarmService.")
+   !enabled&&protectionMode==ProtectionMode.DISARMED->SetupItem("monitor","Protection monitor",SetupState.NEUTRAL,"Monitor is disabled by owner while protection is disarmed.")
+   running->SetupItem("monitor","Protection monitor",SetupState.VERIFIED,if(enabled)"Android process list confirms the service is running." else "Active protection requires the monitor; it remains running until protection is disarmed.")
+   protectionMode==ProtectionMode.ARMED||protectionMode==ProtectionMode.COUNTDOWN->SetupItem("monitor","Protection monitor",SetupState.ACTION_REQUIRED,"Active protection requires a running monitor, but Android does not confirm that the service is running.")
+   else->SetupItem("monitor","Protection monitor",SetupState.UNKNOWN,"Enabled preference exists, but running service is not confirmed.")
+  }
   when (val registry=TrustedBluetoothRegistry.readResult(prefs)) {
    is PreferenceRead.Value -> {
     val trustedDevices=registry.value
     val baselineCount=trustedDevices.count{TrustedBluetoothRegistry.isBaselineConnected(prefs,it.address)}
-    x+=A2SetupStatusPolicy.evaluate(a2Enabled,trustedDevices.size,perm,adapter,enabled,running,baselineCount)
+    x+=A2SetupStatusPolicy.evaluate(
+     a2Enabled,trustedDevices.size,perm,adapter,monitorRequired,running,baselineCount,
+     ProtectionClock.bootCount(c)>=0,
+     SafePreferences.boolean(prefs,ProtectionMonitorService.KEY_A2_BOOT_BASELINE_READY,false)
+    )
    }
    is PreferenceRead.Corrupt -> x+=SetupItem(
     "a2_registry","Trusted Bluetooth registry",SetupState.UNKNOWN,
@@ -63,6 +77,7 @@ object SetupStatusSnapshot {
  "exact"->if(Build.VERSION.SDK_INT>=31)Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:${c.packageName}"))else null
  "notifications"->Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,c.packageName)
  "alarm_channel"->Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,c.packageName).putExtra(Settings.EXTRA_CHANNEL_ID,AlarmService.CHANNEL_ID)
+ "monitor_channel"->Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,c.packageName).putExtra(Settings.EXTRA_CHANNEL_ID,ProtectionMonitorService.CHANNEL_ID)
  "fullscreen"->if(Build.VERSION.SDK_INT>=34)Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,Uri.parse("package:${c.packageName}"))else null
  "battery"->if(Build.VERSION.SDK_INT>=23)Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:${c.packageName}"))else null
  "oem_background"->Intent(Settings.ACTION_SETTINGS)

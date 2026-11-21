@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.os.Build
 import android.os.UserManager
+import androidx.annotation.RequiresApi
 
 /**
  * Optional, explicitly enabled Android Enterprise / fully-managed-device mode.
@@ -89,7 +90,21 @@ object ManagedProtectionController {
     }.getOrDefault(false)
 
     fun enable(activity: Activity): Boolean {
+        check(!ConfigurationBackup.isRestoreOrRecoveryInProgress() &&
+            ConfigurationBackup.recoverPendingRestore(activity)
+        ) { "Managed lockdown is unavailable until interrupted settings recovery completes." }
         if (Build.VERSION.SDK_INT < 28) return false
+        val result = ProtectionStore(activity).runIfDisarmed {
+            enableWhileDisarmed(activity)
+        }
+        check(result != null) {
+            "Managed lockdown can be enabled only while protection is DISARMED."
+        }
+        return result
+    }
+
+    @RequiresApi(Build.VERSION_CODES.P)
+    private fun enableWhileDisarmed(activity: Activity): Boolean {
         check(isDeviceOwner(activity)) {
             "Device Owner provisioning is required. Standard device-admin activation is not sufficient."
         }
@@ -181,6 +196,19 @@ object ManagedProtectionController {
     }
 
     fun disable(activity: Activity) {
+        // Keep the Device Owner emergency exit available even when an unrelated
+        // configuration journal is damaged; this action restores managed policies,
+        // not imported preferences.
+        val completed = ProtectionStore(activity).runIfDisarmed {
+            disableWhileDisarmed(activity)
+            true
+        }
+        check(completed == true) {
+            "Managed lockdown can be disabled only while protection is DISARMED."
+        }
+    }
+
+    private fun disableWhileDisarmed(activity: Activity) {
         check(isDeviceOwner(activity)) {
             "Only the enrolled Device Owner can remove managed policies."
         }
@@ -206,9 +234,61 @@ object ManagedProtectionController {
         restorePersistedSnapshot(activity, dpm, admin)
     }
 
+    /**
+     * Recover an interrupted enable/disable transaction only while protection is
+     * DISARMED. A valid original snapshot is required; damaged/legacy snapshots
+     * remain visible for the explicit emergency recovery action instead.
+     */
+    fun recoverPendingRollback(activity: Activity): Boolean {
+        if (!hasPendingRollback(activity)) return true
+        if (!isDeviceOwner(activity)) return false
+        val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (runCatching { prefs.getInt(KEY_VERSION, -1) }.getOrDefault(-1) != SNAPSHOT_VERSION) {
+            LocalTamperHistory.record(
+                activity, "managed_policy_recovery_requires_owner_action",
+                "Managed-policy rollback metadata is legacy or invalid; automatic policy changes were withheld for owner review"
+            )
+            return false
+        }
+        if (runCatching { validateSnapshot(prefs) }.isFailure) {
+            LocalTamperHistory.record(
+                activity, "managed_policy_recovery_snapshot_invalid",
+                "Managed-policy rollback snapshot failed validation; no automatic Device Owner policy changes were attempted"
+            )
+            return false
+        }
+        val restored = runCatching {
+            ProtectionStore(activity).runIfDisarmed {
+                runCatching { activity.stopLockTask() }
+                restorePersistedSnapshot(
+                    activity,
+                    activity.getSystemService(DevicePolicyManager::class.java),
+                    admin(activity)
+                )
+                true
+            } == true
+        }.onFailure {
+            LocalTamperHistory.record(
+                activity, "managed_policy_automatic_recovery_failed",
+                it.javaClass.simpleName + ": " + it.message
+            )
+        }.getOrDefault(false)
+        if (restored) {
+            LocalTamperHistory.record(
+                activity, "managed_policy_automatic_recovery_completed",
+                "Interrupted Device Owner policy transaction was rolled back to its verified original snapshot"
+            )
+        }
+        return restored
+    }
+
     fun startIfConfigured(activity: Activity) {
-        // Never re-enter kiosk automatically while an explicit rollback is pending.
-        if (hasPendingRollback(activity)) return
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress() ||
+            !ConfigurationBackup.recoverPendingRestore(activity) ||
+            ProtectionStore(activity).read().mode != ProtectionMode.DISARMED
+        ) return
+        // A process death during enable/disable must not leave a partial policy set.
+        if (!recoverPendingRollback(activity)) return
         if (isPolicyConfigured(activity) &&
             activity.getSystemService(DevicePolicyManager::class.java).isLockTaskPermitted(activity.packageName)
         ) {

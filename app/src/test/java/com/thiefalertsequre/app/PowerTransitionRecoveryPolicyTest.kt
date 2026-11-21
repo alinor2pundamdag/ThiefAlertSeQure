@@ -5,6 +5,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PowerTransitionRecoveryPolicyTest {
+    @Test fun baselineResetIsAllowedOnlyWhenProtectionIsDisarmed() {
+        assertTrue(PowerTransitionRecoveryPolicy.canResetBaseline(ProtectionMode.DISARMED))
+        assertFalse(PowerTransitionRecoveryPolicy.canResetBaseline(ProtectionMode.ARMED))
+        assertFalse(PowerTransitionRecoveryPolicy.canResetBaseline(ProtectionMode.COUNTDOWN))
+        assertFalse(PowerTransitionRecoveryPolicy.canResetBaseline(ProtectionMode.ALARM_TRIGGERED))
+    }
+
     @Test fun pendingCandidateRequiresItsOwnCurrentGenerationAndDisconnectedBaseline() {
         assertTrue(PowerTransitionRecoveryPolicy.isCurrentCandidate(true, 8L, 8L, false))
         assertFalse(PowerTransitionRecoveryPolicy.isCurrentCandidate(false, 8L, 8L, false))

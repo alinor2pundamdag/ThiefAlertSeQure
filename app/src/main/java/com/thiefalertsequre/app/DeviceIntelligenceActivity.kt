@@ -22,6 +22,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.FragmentActivity
@@ -34,9 +35,24 @@ import java.util.concurrent.Executors
 
 /** Read-only, on-device capability and readiness report. No hardware identifiers are collected. */
 class DeviceIntelligenceActivity : FragmentActivity() {
+    private data class IntegritySnapshot(
+        val protectionStateHealthy: Boolean,
+        val authenticationThrottleHealthy: Boolean,
+        val evidenceVaultHealthy: Boolean,
+        val cameraVaultHealthy: Boolean,
+        val cameraPhotoCount: Int,
+        val asynchronousEvidenceWriteFailures: Long,
+        val recentOutputEvents: List<String>,
+        val error: String? = null
+    )
+
     private lateinit var root: LinearLayout
     private lateinit var rootStatusView: TextView
     private val rootCheckExecutor = Executors.newSingleThreadExecutor()
+    private val integrityExecutor = Executors.newSingleThreadExecutor()
+    @Volatile private var integritySnapshot: IntegritySnapshot? = null
+    @Volatile private var integrityCheckInFlight = false
+    private var hasResumedOnce = false
     private var rangingStatus: String? = null
     private var stopRangingQuery: (() -> Unit)? = null
     private val exportDiagnostics = registerForActivityResult(
@@ -47,11 +63,58 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         PermissionChangeMonitor.check(this)
-        // Re-read permissions, platform capabilities and service status after Android Settings.
-        if (::root.isInitialized) render()
+        // Refresh expensive integrity checks after returning from Android Settings.
+        if (::root.isInitialized) {
+            if (hasResumedOnce) integritySnapshot = null
+            hasResumedOnce = true
+            render()
+        }
+    }
+
+    private fun scheduleIntegritySnapshot() {
+        if (integrityCheckInFlight) return
+        integrityCheckInFlight = true
+        integrityExecutor.execute {
+            val snapshot = runCatching {
+                val integrity = ProtectionStore(applicationContext).integritySnapshot()
+                val evidenceHealthy = LocalEvidenceVault.verifyIntegrity(applicationContext)
+                val cameraHealthy = runCatching {
+                    CameraEvidenceVault.verifyIntegrity(applicationContext)
+                }.getOrDefault(false)
+                val photoCount = runCatching {
+                    CameraEvidenceVault.entries(applicationContext).size
+                }.getOrDefault(-1)
+                val asynchronousEvidenceWriteFailures = LocalEvidenceVault.asyncWriteFailureCount(applicationContext)
+                val recent = LocalTamperHistory.read(applicationContext, 100)
+                    .filter { line ->
+                        listOf("alarm_audio_", "alarm_audio_focus_", "secondary_alarm_", "alarm_haptics_", "alarm_flash_")
+                            .any(line::contains)
+                    }.takeLast(8).map { it.take(180) }
+                IntegritySnapshot(
+                    integrity.protectionStateHealthy,
+                    integrity.authenticationThrottleHealthy,
+                    evidenceHealthy,
+                    cameraHealthy,
+                    photoCount,
+                    asynchronousEvidenceWriteFailures,
+                    recent
+                )
+            }.getOrElse {
+                IntegritySnapshot(false, false, false, false, -1, 0L, emptyList(), it.message ?: it.javaClass.simpleName)
+            }
+            integritySnapshot = snapshot
+            integrityCheckInFlight = false
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed &&
+                    lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                ) render()
+            }
+        }
     }
 
     private fun render() {
+        val integrity = integritySnapshot
+        if (integrity == null) scheduleIntegritySnapshot()
         val scroll = ScrollView(this).apply { isFillViewport = true; setBackgroundColor(getColor(R.color.tas_background)) }
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(22), dp(20), dp(30)) }
         scroll.addView(root)
@@ -205,6 +268,8 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         }.getOrDefault(false)
         val protectionStore = ProtectionStore(this)
         val protectionMode = protectionStore.read().mode
+        val activeProtectionRequiresMonitor = protectionMode == ProtectionMode.ARMED || protectionMode == ProtectionMode.COUNTDOWN
+        val monitorRequiredNow = monitorEnabled || activeProtectionRequiresMonitor
         val btConnect = Build.VERSION.SDK_INT < 31 || checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
         val a2Enabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
         val dashboardEnabled = SafePreferences.boolean(getSharedPreferences(MainActivity.ALARM_DISPLAY_PREFS, MODE_PRIVATE), MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
@@ -215,7 +280,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             else -> "Not allowed — normal alarm notification and sound remain available"
         }
         val exactAlarmSummary = when {
-            !monitorEnabled -> "Not needed while the protection monitor is disabled"
+            !monitorRequiredNow -> "Not needed while protection is disarmed and the monitor is disabled"
             Build.VERSION.SDK_INT < 31 -> "Available — no separate access gate on this Android version"
             exactAlarm -> "Available / permitted"
             else -> "Access not granted — precise protection scheduling may be delayed"
@@ -237,16 +302,16 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             "Secure screen lock: ${if (secureLock) "Configured" else "Not configured"}",
             "Bluetooth Connect permission: $btConnectSummary",
             "Android ranging capability check: $rangingSummary",
-            "Protection monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled"} • Runtime status: ${if (monitorRunning) "Running (last recorded state)" else "Not running (last recorded state)"}",
+            "Protection monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled"} • Current protection requires monitor: ${if (activeProtectionRequiresMonitor) "Yes" else "No"} • Runtime: ${if (monitorProcessRunning) "Process confirmed running" else if (monitorRunning) "Last recorded running; current process not confirmed" else "Not running"}",
             "Protection state: $protectionMode",
             "Background guidance family: $family"
         )
         addCard("THIEFALERTSEQuRE READINESS", appReadiness)
         val readinessSignals = buildList {
-            add(ReadinessSignal("Protection monitor enabled and last recorded running", monitorEnabled && monitorRunning, 25))
+            add(ReadinessSignal("Required protection monitor running", monitorRequiredNow && monitorProcessRunning, 25))
             add(ReadinessSignal("Alarm notifications enabled", notifications, 15))
             add(ReadinessSignal("Secure Android screen lock configured", secureLock, 15))
-            if (monitorEnabled) add(ReadinessSignal("Exact alarm scheduling available", exactAlarm, 15))
+            if (monitorRequiredNow) add(ReadinessSignal("Exact alarm scheduling available", exactAlarm, 15))
             if (dashboardEnabled) add(ReadinessSignal("Optional full-screen alarm access available", fullScreenIntent, 10))
             if (a2Enabled) add(ReadinessSignal("Optional Bluetooth Connect permission available", btConnect, 10))
             add(ReadinessSignal("Battery optimization exemption", power.isIgnoringBatteryOptimizations(packageName), 10))
@@ -258,53 +323,61 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             else "Needs attention: ${readinessScore.missing.joinToString("; ")}",
             "This is a transparent setup-readiness indicator, not a theft-prevention, security-integrity, or hardware reliability guarantee."
         ))
-        val storeIntegrity = protectionStore.integritySnapshot()
-        val evidenceIntegrity = LocalEvidenceVault.verifyIntegrity(this)
-        val cameraEvidenceIntegrity = runCatching { CameraEvidenceVault.verifyIntegrity(this) }.getOrDefault(false)
         val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
         val cameraPermissionGranted = checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(this).size }.getOrDefault(0)
-        val integritySignals = listOf(
-            IntegritySignal("Protection state storage", if (storeIntegrity.protectionStateHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 3),
-            IntegritySignal("Owner-authentication throttle storage", if (storeIntegrity.authenticationThrottleHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
-            IntegritySignal("Encrypted evidence vault", if (evidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
-            IntegritySignal("Encrypted front-camera photo vault", if (cameraEvidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 1),
-            IntegritySignal(
-                "Protection monitor runtime",
-                when {
-                    !monitorEnabled -> IntegrityStatus.UNSUPPORTED
-                    monitorProcessRunning -> IntegrityStatus.VERIFIED
-                    else -> IntegrityStatus.FAILED
-                }, 2
-            ),
-            IntegritySignal(
-                "Exact alarm access",
-                when {
-                    !monitorEnabled || Build.VERSION.SDK_INT < 31 -> IntegrityStatus.UNSUPPORTED
-                    exactAlarm -> IntegrityStatus.VERIFIED
-                    else -> IntegrityStatus.FAILED
-                }, 1
-            ),
-            IntegritySignal("Alarm notifications", if (notifications) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 1)
-        )
-        val integrityScore = ProtectionIntegrityPolicy.calculate(integritySignals)
-        addCard("PROTECTION INTEGRITY SCORE — ${integrityScore.percent}%", listOf(
-            "${integrityScore.earnedPoints} / ${integrityScore.possiblePoints} verified-component points",
-            "${integrityScore.verifiedCount} verified • ${integrityScore.failed.size} failed • ${integrityScore.unconfirmed.size} unconfirmed • ${integrityScore.unsupported.size} unsupported",
-            if (integrityScore.failed.isEmpty()) "No failed supported integrity checks were detected."
-            else "Failed: ${integrityScore.failed.joinToString("; ")}",
-            if (integrityScore.unconfirmed.isEmpty()) "No supported checks remain unconfirmed."
-            else "Unconfirmed: ${integrityScore.unconfirmed.joinToString("; ")}",
-            "Unsupported checks: ${integrityScore.unsupported.joinToString("; ").ifBlank { "None" }}",
-            "This score only reflects the listed checks the app can verify; it is not proof against tampering, root access, OEM restrictions, or hardware attacks."
-        ))
+        val cameraEvidenceCount = integrity?.cameraPhotoCount ?: -1
+        if (integrity == null) {
+            addCard("PROTECTION INTEGRITY", listOf("Checking encrypted evidence, photo-vault, and protection-state integrity in the background…"))
+        } else if (integrity.error != null) {
+            addCard("PROTECTION INTEGRITY", listOf(
+                "Integrity inspection could not complete: ${integrity.error}",
+                "No integrity result is being represented as verified. Reopen this page to retry."
+            ))
+        } else {
+            val integritySignals = listOf(
+                IntegritySignal("Protection state storage", if (integrity.protectionStateHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 3),
+                IntegritySignal("Owner-authentication throttle storage", if (integrity.authenticationThrottleHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
+                IntegritySignal("Encrypted evidence vault", if (integrity.evidenceVaultHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
+                IntegritySignal("Encrypted front-camera photo vault", if (integrity.cameraVaultHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 1),
+                IntegritySignal(
+                    "Protection monitor runtime",
+                    when {
+                        !monitorRequiredNow -> IntegrityStatus.UNSUPPORTED
+                        monitorProcessRunning -> IntegrityStatus.VERIFIED
+                        else -> IntegrityStatus.FAILED
+                    }, 2
+                ),
+                IntegritySignal(
+                    "Exact alarm access",
+                    when {
+                        !monitorRequiredNow || Build.VERSION.SDK_INT < 31 -> IntegrityStatus.UNSUPPORTED
+                        exactAlarm -> IntegrityStatus.VERIFIED
+                        else -> IntegrityStatus.FAILED
+                    }, 1
+                ),
+                IntegritySignal("Alarm notifications", if (notifications) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 1)
+            )
+            val integrityScore = ProtectionIntegrityPolicy.calculate(integritySignals)
+            addCard("PROTECTION INTEGRITY SCORE — ${integrityScore.percent}%", listOf(
+                "${integrityScore.earnedPoints} / ${integrityScore.possiblePoints} verified-component points",
+                "${integrityScore.verifiedCount} verified • ${integrityScore.failed.size} failed • ${integrityScore.unconfirmed.size} unconfirmed • ${integrityScore.unsupported.size} unsupported",
+                if (integrityScore.failed.isEmpty()) "No failed supported integrity checks were detected."
+                else "Failed: ${integrityScore.failed.joinToString("; ")}",
+                if (integrityScore.unconfirmed.isEmpty()) "No supported checks remain unconfirmed."
+                else "Unconfirmed: ${integrityScore.unconfirmed.joinToString("; ")}",
+                "Unsupported checks: ${integrityScore.unsupported.joinToString("; ").ifBlank { "None" }}",
+                "This score only reflects the listed checks the app can verify; it is not proof against tampering, root access, OEM restrictions, or hardware attacks."
+            ))
+        }
         val a2Dependency = when {
             !a2Enabled -> "OPTIONAL OFF"
             !btConnect -> "ACTION REQUIRED — Bluetooth Connect permission"
             else -> "OWNER ENABLED — trusted device and fresh baseline must remain verified"
         }
         val monitorDependency = when {
-            !monitorEnabled -> "OWNER DISABLED"
+            activeProtectionRequiresMonitor && monitorProcessRunning -> "ACTIVE PROTECTION — monitor process confirmed, even if the owner preference is OFF"
+            activeProtectionRequiresMonitor -> "ACTION REQUIRED — active protection requires a running monitor"
+            !monitorEnabled -> "OWNER DISABLED WHILE DISARMED"
             monitorProcessRunning -> "OPERATIONAL — process currently confirmed"
             else -> "FAILED / NOT CONFIRMED — monitor process not found"
         }
@@ -320,29 +393,38 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             !frontCameraFeatureAvailable -> "UNSUPPORTED — Android does not report front-facing camera hardware"
             !cameraEvidenceEnabled -> "OPTIONAL OFF — no camera permission is requested until owner opt-in"
             !cameraPermissionGranted -> "OWNER ENABLED — CAMERA permission missing; photo capture is skipped"
-            cameraEvidenceIntegrity -> "OWNER ENABLED — one front-camera still after successful visible owner authentication; $cameraEvidenceCount encrypted photos retained"
+            integrity == null -> "CHECKING — encrypted photo-vault integrity and retained-photo count are being inspected in the background"
+            integrity.error != null -> "UNKNOWN — photo-vault integrity inspection could not complete"
+            integrity.cameraVaultHealthy -> "OWNER ENABLED — one front-camera still after successful visible owner authentication; ${if (cameraEvidenceCount >= 0) "$cameraEvidenceCount encrypted photos retained" else "photo count unavailable"}"
             else -> "FAILED — encrypted camera evidence vault integrity check failed"
+        }
+        val evidenceVaultStatus = when {
+            integrity == null -> "CHECKING"
+            integrity.error != null -> "UNKNOWN — inspection incomplete"
+            integrity.evidenceVaultHealthy -> "OPERATIONAL"
+            else -> "FAILED"
         }
         val dependencyMap = listOf(
             "Charger protection → foreground monitor + power broadcasts + exact scheduling + notifications: $monitorDependency",
             "Bluetooth separation (A2) → owner opt-in + paired trusted device + Bluetooth Connect + fresh baseline: $a2Dependency",
             "Primary alarm → latched protection state + Android alarm audio; optional secondary audio and haptics have independent controls",
             "Flash alert → camera torch hardware + Android torch service + thermal availability: $flashDependency",
-            "Evidence vault → Android Keystore AES-GCM + local storage + integrity-checked records: ${if (evidenceIntegrity) "OPERATIONAL" else "FAILED"}",
+            "Evidence vault → Android Keystore AES-GCM + local storage + integrity-checked records: $evidenceVaultStatus",
             "GPS evidence → explicit owner action + coarse/fine location permission + one-shot provider fix: $gpsDependency",
             "Managed hardening → Device Owner enrollment + Lock Task policy: ${if (ManagedProtectionController.isDeviceOwner(this)) "DEVICE OWNER PRESENT" else "OPTIONAL / NOT ENROLLED"}",
             "Front-camera photo evidence → explicit opt-in + CAMERA permission + successful owner authentication + visible Activity + encrypted local vault: $cameraDependency"
         )
         addCard("FEATURE DEPENDENCY MAP", dependencyMap)
-        val recentOutputEvents = LocalTamperHistory.read(this, 100)
-            .filter { line ->
-                listOf("alarm_audio_", "alarm_audio_focus_", "secondary_alarm_", "alarm_haptics_", "alarm_flash_")
-                    .any(line::contains)
-            }.takeLast(8).map { it.take(180) }
+        val recentOutputEvents = integrity?.recentOutputEvents.orEmpty()
         addCard("ALARM OUTPUT MONITOR", listOf(
             "Primary audio, audio-focus changes, secondary alarm, haptics, torch interruptions, and thermal suppression are recorded locally.",
             "A secondary-output failure does not stop the primary alarm. A successful start event is not proof of audible sound at the speaker.",
-            if (recentOutputEvents.isEmpty()) "No recent alarm-output events have been recorded."
+            if (integrity == null) "Checking recent output events in the background…"
+            else if (integrity.error != null) "Recent output events could not be read."
+            else "Asynchronous evidence write failures: ${integrity.asynchronousEvidenceWriteFailures}",
+            if (integrity == null) "Checking recent output events in the background…"
+            else if (integrity.error != null) "Recent output events could not be read."
+            else if (recentOutputEvents.isEmpty()) "No recent alarm-output events have been recorded."
             else "Recent output events:\n${recentOutputEvents.joinToString("\n")}"
         ))
         if (Build.VERSION.SDK_INT >= 36) {
@@ -380,7 +462,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             exportDiagnostics.launch("thiefalertsequre-diagnostics.json")
         }, matchWrap())
         root.addView(space(12))
-        root.addView(label("Privacy boundary: this report reads public local Android APIs and hardware feature flags. It does not read IMEI, serial number, MAC address, Wi-Fi identifiers, contacts, messages, microphone, or precise location. Optional front-camera capture is separate and occurs only after explicit owner opt-in and successful authentication while the app is visible; this diagnostics report never reads or exports photo content. Results stay on this device.", 12f, R.color.tas_muted, false), matchWrap())
+        root.addView(label("Privacy boundary: this report reads public local Android APIs and hardware feature flags. It does not read IMEI, serial number, MAC address, Wi-Fi identifiers, contacts, messages, microphone, or precise location. Optional front-camera capture is separate and occurs only after explicit owner opt-in and successful authentication while the app is visible; this diagnostics report never reads or exports photo content. The app does not upload diagnostics. If you choose Export Diagnostics, Android writes a redacted report to the destination you select, which may be cloud-backed.", 12f, R.color.tas_muted, false), matchWrap())
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
         ThemeRuntime.apply(this, scroll)
@@ -413,93 +495,130 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     }
 
     private fun writeDiagnosticsReport(uri: android.net.Uri) {
-        val report = runCatching {
-            val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-            val alarmManager = getSystemService(AlarmManager::class.java)
-            val notifications = NotificationManagerCompat.from(this).areNotificationsEnabled()
-            val exactAlarm = Build.VERSION.SDK_INT < 31 || runCatching { alarmManager.canScheduleExactAlarms() }.getOrDefault(false)
-            val secureLock = getSystemService(KeyguardManager::class.java).isDeviceSecure
-            val protectionStore = ProtectionStore(this)
-            val state = protectionStore.read()
-            val storeIntegrity = protectionStore.integritySnapshot()
-            val evidenceIntegrity = LocalEvidenceVault.verifyIntegrity(this)
-            val cameraEvidenceIntegrity = runCatching { CameraEvidenceVault.verifyIntegrity(this) }.getOrDefault(false)
-            val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
-            val cameraPermissionGranted = checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-            val frontCameraFeatureAvailable = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
-            val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(this).size }.getOrDefault(0)
-            val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
-            val monitorProcessRunning = runCatching {
-                getSystemService(ActivityManager::class.java).getRunningServices(100)
-                    .any { it.service.className == ProtectionMonitorService::class.java.name }
-            }.getOrDefault(false)
-            val integritySignals = listOf(
-                IntegritySignal("Protection state storage", if (storeIntegrity.protectionStateHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 3),
-                IntegritySignal("Authentication throttle storage", if (storeIntegrity.authenticationThrottleHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
-                IntegritySignal("Encrypted evidence vault", if (evidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
-                IntegritySignal("Encrypted front-camera photo vault", if (cameraEvidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 1),
-                IntegritySignal("Protection monitor runtime", when {
-                    !monitorEnabled -> IntegrityStatus.UNSUPPORTED
-                    monitorProcessRunning -> IntegrityStatus.VERIFIED
-                    else -> IntegrityStatus.FAILED
-                }, 2)
-            )
-            val integrityScore = ProtectionIntegrityPolicy.calculate(integritySignals)
-            JSONObject().apply {
-                put("schemaVersion", 1)
-                put("generatedAtEpochMs", System.currentTimeMillis())
-                put("appVersion", appVersion())
-                put("manufacturer", Build.MANUFACTURER)
-                put("brand", Build.BRAND)
-                put("model", Build.MODEL)
-                put("androidRelease", Build.VERSION.RELEASE)
-                put("apiLevel", Build.VERSION.SDK_INT)
-                put("targetSdk", applicationInfo.targetSdkVersion)
-                put("protectionMode", state.mode.name)
-                put("protectionStateStoreHealthy", storeIntegrity.protectionStateHealthy)
-                put("authenticationThrottleHealthy", storeIntegrity.authenticationThrottleHealthy)
-                put("evidenceVaultIntegrityHealthy", evidenceIntegrity)
-                put("cameraEvidenceVaultIntegrityHealthy", cameraEvidenceIntegrity)
-                put("cameraEvidenceEnabledByOwner", cameraEvidenceEnabled)
-                put("cameraPermissionGranted", cameraPermissionGranted)
-                put("frontCameraFeatureAvailable", frontCameraFeatureAvailable)
-                put("encryptedCameraPhotoCount", cameraEvidenceCount)
-                put("monitorProcessCurrentlyConfirmed", monitorProcessRunning)
-                put("protectionIntegrityScorePercent", integrityScore.percent)
-                put("protectionIntegrityScorePoints", "${integrityScore.earnedPoints}/${integrityScore.possiblePoints}")
-                put("permissionChangeMonitoring", "Android permission and special-access snapshots are compared when the app resumes")
-                put("recentAlarmOutputEvents", org.json.JSONArray(
-                    LocalTamperHistory.read(this@DeviceIntelligenceActivity, 100)
-                        .filter { line -> listOf("alarm_audio_", "alarm_audio_focus_", "secondary_alarm_", "alarm_haptics_", "alarm_flash_").any(line::contains) }
-                        .takeLast(20).map { LocalTamperHistoryPolicy.eventCodeFromLine(it) }
-                ))
-                put("monitorEnabled", monitorEnabled)
-                put("monitorLastRecordedRunning", SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_RUNNING, false))
-                put("notificationsEnabled", notifications)
-                put("exactAlarmAvailable", exactAlarm)
-                put("secureLockConfigured", secureLock)
-                put("backgroundRestricted", if (Build.VERSION.SDK_INT >= 28) {
-                    runCatching { getSystemService(ActivityManager::class.java).isBackgroundRestricted }.getOrNull()
-                } else JSONObject.NULL)
-                put("deviceIdleMode", runCatching { getSystemService(PowerManager::class.java).isDeviceIdleMode }.getOrDefault(false))
-                put("appStandbyBucket", if (Build.VERSION.SDK_INT >= 28) {
-                    runCatching { standbyBucketLabel(getSystemService(UsageStatsManager::class.java).appStandbyBucket) }.getOrDefault("Unavailable")
-                } else "Not exposed before API 28")
-                put("recentEventCodes", org.json.JSONArray(LocalTamperHistory.read(this@DeviceIntelligenceActivity, 20).map { LocalTamperHistoryPolicy.eventCodeFromLine(it) }))
-                put("privacyNote", "Redacted local diagnostics only. No photo content, location, microphone, credentials, serial, IMEI, MAC, or build fingerprint is exported.")
-            }
-        }.getOrElse {
-            android.widget.Toast.makeText(this, "Could not build diagnostics: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+        if (ProtectionStore(this).read().mode != ProtectionMode.DISARMED) {
+            Toast.makeText(this, "Diagnostics export is available only while protection is DISARMED.", Toast.LENGTH_LONG).show()
             return
         }
-        runCatching {
-            contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(report.toString(2)) }
-                ?: error("Android could not open the selected export destination.")
-        }.onSuccess {
-            LocalTamperHistory.record(this, "diagnostics_exported", "Owner exported a redacted local diagnostics JSON report")
-            android.widget.Toast.makeText(this, "Redacted diagnostics report exported.", android.widget.Toast.LENGTH_LONG).show()
-        }.onFailure {
-            android.widget.Toast.makeText(this, "Diagnostics export failed: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+        integrityExecutor.execute {
+            val app = applicationContext
+            if (ProtectionStore(app).read().mode != ProtectionMode.DISARMED) {
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) {
+                        Toast.makeText(this, "Protection became active. Diagnostics were not exported.", Toast.LENGTH_LONG).show()
+                    }
+                }
+                return@execute
+            }
+            val reportResult = runCatching {
+                val monitorPrefs = app.getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+                val alarmManager = app.getSystemService(AlarmManager::class.java)
+                val notifications = NotificationManagerCompat.from(app).areNotificationsEnabled()
+                val exactAlarm = Build.VERSION.SDK_INT < 31 || runCatching { alarmManager.canScheduleExactAlarms() }.getOrDefault(false)
+                val secureLock = app.getSystemService(KeyguardManager::class.java).isDeviceSecure
+                val protectionStore = ProtectionStore(app)
+                val state = protectionStore.read()
+                val storeIntegrity = protectionStore.integritySnapshot()
+                val evidenceIntegrity = LocalEvidenceVault.verifyIntegrity(app)
+                val cameraEvidenceIntegrity = runCatching { CameraEvidenceVault.verifyIntegrity(app) }.getOrDefault(false)
+                val cameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(app)
+                val cameraPermissionGranted = app.checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                val frontCameraFeatureAvailable = app.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
+                val cameraEvidenceCount = runCatching { CameraEvidenceVault.entries(app).size }.getOrDefault(-1)
+                val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+                val activeProtectionRequiresMonitor = state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN
+                val monitorRequiredNow = monitorEnabled || activeProtectionRequiresMonitor
+                val monitorProcessRunning = runCatching {
+                    app.getSystemService(ActivityManager::class.java).getRunningServices(100)
+                        .any { it.service.className == ProtectionMonitorService::class.java.name }
+                }.getOrDefault(false)
+                val integritySignals = listOf(
+                    IntegritySignal("Protection state storage", if (storeIntegrity.protectionStateHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 3),
+                    IntegritySignal("Authentication throttle storage", if (storeIntegrity.authenticationThrottleHealthy) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
+                    IntegritySignal("Encrypted evidence vault", if (evidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 2),
+                    IntegritySignal("Encrypted front-camera photo vault", if (cameraEvidenceIntegrity) IntegrityStatus.VERIFIED else IntegrityStatus.FAILED, 1),
+                    IntegritySignal("Protection monitor runtime", when {
+                        !monitorEnabled -> IntegrityStatus.UNSUPPORTED
+                        monitorProcessRunning -> IntegrityStatus.VERIFIED
+                        else -> IntegrityStatus.FAILED
+                    }, 2)
+                )
+                val integrityScore = ProtectionIntegrityPolicy.calculate(integritySignals)
+                JSONObject().apply {
+                    put("schemaVersion", 1)
+                    put("generatedAtEpochMs", System.currentTimeMillis())
+                    put("appVersion", appVersion())
+                    put("manufacturer", Build.MANUFACTURER)
+                    put("brand", Build.BRAND)
+                    put("model", Build.MODEL)
+                    put("androidRelease", Build.VERSION.RELEASE)
+                    put("apiLevel", Build.VERSION.SDK_INT)
+                    put("targetSdk", app.applicationInfo.targetSdkVersion)
+                    put("protectionMode", state.mode.name)
+                    put("protectionStateStoreHealthy", storeIntegrity.protectionStateHealthy)
+                    put("authenticationThrottleHealthy", storeIntegrity.authenticationThrottleHealthy)
+                    put("evidenceVaultIntegrityHealthy", evidenceIntegrity)
+                    put("asynchronousEvidenceWriteFailures", LocalEvidenceVault.asyncWriteFailureCount(app))
+                    put("cameraEvidenceVaultIntegrityHealthy", cameraEvidenceIntegrity)
+                    put("cameraEvidenceEnabledByOwner", cameraEvidenceEnabled)
+                    put("cameraPermissionGranted", cameraPermissionGranted)
+                    put("frontCameraFeatureAvailable", frontCameraFeatureAvailable)
+                    put("encryptedCameraPhotoCount", cameraEvidenceCount)
+                    put("monitorProcessCurrentlyConfirmed", monitorProcessRunning)
+                    put("activeProtectionRequiresMonitor", activeProtectionRequiresMonitor)
+                    put("monitorRequiredByCurrentState", monitorRequiredNow)
+                    put("protectionIntegrityScorePercent", integrityScore.percent)
+                    put("protectionIntegrityScorePoints", "${integrityScore.earnedPoints}/${integrityScore.possiblePoints}")
+                    put("permissionChangeMonitoring", "Android permission and special-access snapshots are compared when the app resumes")
+                    put("recentAlarmOutputEvents", org.json.JSONArray(
+                        LocalTamperHistory.read(app, 100)
+                            .filter { line -> listOf("alarm_audio_", "alarm_audio_focus_", "secondary_alarm_", "alarm_haptics_", "alarm_flash_").any(line::contains) }
+                            .takeLast(20).map { LocalTamperHistoryPolicy.eventCodeFromLine(it) }
+                    ))
+                    put("monitorEnabled", monitorEnabled)
+                    put("monitorLastRecordedRunning", SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_RUNNING, false))
+                    put("notificationsEnabled", notifications)
+                    put("exactAlarmAvailable", exactAlarm)
+                    put("secureLockConfigured", secureLock)
+                    put("backgroundRestricted", if (Build.VERSION.SDK_INT >= 28) {
+                        runCatching { app.getSystemService(ActivityManager::class.java).isBackgroundRestricted }.getOrNull()
+                    } else JSONObject.NULL)
+                    put("deviceIdleMode", runCatching { app.getSystemService(PowerManager::class.java).isDeviceIdleMode }.getOrDefault(false))
+                    put("appStandbyBucket", if (Build.VERSION.SDK_INT >= 28) {
+                        runCatching { standbyBucketLabel(app.getSystemService(UsageStatsManager::class.java).appStandbyBucket) }.getOrDefault("Unavailable")
+                    } else "Not exposed before API 28")
+                    put("recentEventCodes", org.json.JSONArray(LocalTamperHistory.read(app, 20).map { LocalTamperHistoryPolicy.eventCodeFromLine(it) }))
+                    put("privacyNote", "Redacted local diagnostics only. No photo content, location, microphone, credentials, serial, IMEI, MAC, or build fingerprint is exported.")
+                }
+            }
+            if (reportResult.isFailure) {
+                val message = reportResult.exceptionOrNull()?.message ?: "Unknown diagnostics error"
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) {
+                        android.widget.Toast.makeText(this@DeviceIntelligenceActivity, "Could not build diagnostics: $message", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+                return@execute
+            }
+            val writeResult = runCatching {
+                app.contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use {
+                    it.write(reportResult.getOrThrow().toString(2))
+                } ?: error("Android could not open the selected export destination.")
+            }
+            if (writeResult.isSuccess) {
+                LocalTamperHistory.record(app, "diagnostics_exported", "Owner exported a redacted local diagnostics JSON report")
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (writeResult.isSuccess) {
+                    android.widget.Toast.makeText(this@DeviceIntelligenceActivity, "Redacted diagnostics report exported.", android.widget.Toast.LENGTH_LONG).show()
+                } else {
+                    android.widget.Toast.makeText(
+                        this@DeviceIntelligenceActivity,
+                        "Diagnostics export failed: ${writeResult.exceptionOrNull()?.message}",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         }
     }
 
@@ -538,11 +657,19 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     }
 
     private fun confirmRootCheck() {
+        if (ProtectionStore(this).read().mode != ProtectionMode.DISARMED) {
+            Toast.makeText(this, "Root authorization diagnostics are available only while protection is DISARMED.", Toast.LENGTH_LONG).show()
+            return
+        }
         MaterialAlertDialogBuilder(this)
             .setTitle("Check root access?")
             .setMessage("This runs the read-only command su -c id. Your Magisk or other superuser manager may display an authorization prompt. The check does not modify files, settings, firmware, or protection behavior. Continue?")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Run check") { _, _ ->
+                if (ProtectionStore(this).read().mode != ProtectionMode.DISARMED) {
+                    Toast.makeText(this, "Protection became active. Root diagnostics were not started.", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
                 rootStatusView.text = "ROOT ACCESS: CHECKING…"
                 rootCheckExecutor.execute {
                     val report = RootCapabilityInspector.verifyRootAuthorization()
@@ -642,6 +769,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
     override fun onDestroy() {
         clearRangingCallback()
         rootCheckExecutor.shutdownNow()
+        integrityExecutor.shutdownNow()
         super.onDestroy()
     }
 }

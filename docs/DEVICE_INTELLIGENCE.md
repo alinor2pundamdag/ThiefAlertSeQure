@@ -26,6 +26,7 @@ The Device Intelligence page reads Android public APIs and package-manager featu
 ## Privacy and safety boundaries
 
 - Inspection is local and on demand; no telemetry or cloud upload is performed.
+- The optional redacted JSON diagnostics export is created only after an explicit owner action while protection is DISARMED. Android writes it to the destination selected by the owner; that destination may be cloud-backed, but the app itself does not upload the report. It excludes photo content, precise location, serial/IMEI, MAC/Wi-Fi identifiers, credentials, and build fingerprint.
 - Do not read IMEI, SIM identifiers, serial number, MAC/BSSID, Wi-Fi identifiers, contacts, messages, files, precise location, microphone content, or camera content.
 - Build fingerprint is deliberately withheld from the displayed report.
 - No runtime permission is requested automatically by opening the page. The local API 36+ ranging capability callback does not require a RANGING session permission; this app does not declare or request that dangerous permission because it never creates a ranging session.

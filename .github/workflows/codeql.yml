@@ -12,6 +12,7 @@ on:
   pull_request:
     branches:
       - main
+      - "work/**"
   schedule:
     - cron: "23 2 * * 1"
   workflow_dispatch:
@@ -52,6 +53,7 @@ jobs:
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
         with:
           cache-provider: basic
+
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3

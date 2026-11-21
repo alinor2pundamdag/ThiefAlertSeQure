@@ -17,6 +17,10 @@ class ProtectionShieldView @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val shieldPath = Path()
+    private val checkPath = Path()
+    private val hoodPath = Path()
+    private val maskPath = Path()
     private var protectionMode: ProtectionMode = ProtectionMode.DISARMED
     private var monitorReady: Boolean = false
 
@@ -58,22 +62,21 @@ class ProtectionShieldView @JvmOverloads constructor(
         canvas.drawCircle(0.5f, 0.49f, 0.48f, paint)
         paint.alpha = 255
 
-        val shield = Path().apply {
-            moveTo(0.5f, 0.055f)
-            lineTo(0.87f, 0.19f)
-            lineTo(0.84f, 0.57f)
-            cubicTo(0.82f, 0.74f, 0.67f, 0.88f, 0.5f, 0.955f)
-            cubicTo(0.33f, 0.88f, 0.18f, 0.74f, 0.16f, 0.57f)
-            lineTo(0.13f, 0.19f)
-            close()
-        }
+        shieldPath.reset()
+        shieldPath.moveTo(0.5f, 0.055f)
+        shieldPath.lineTo(0.87f, 0.19f)
+        shieldPath.lineTo(0.84f, 0.57f)
+        shieldPath.cubicTo(0.82f, 0.74f, 0.67f, 0.88f, 0.5f, 0.955f)
+        shieldPath.cubicTo(0.33f, 0.88f, 0.18f, 0.74f, 0.16f, 0.57f)
+        shieldPath.lineTo(0.13f, 0.19f)
+        shieldPath.close()
         paint.color = fill
-        canvas.drawPath(shield, paint)
+        canvas.drawPath(shieldPath, paint)
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 0.035f
         paint.strokeJoin = Paint.Join.ROUND
         paint.color = shieldColor
-        canvas.drawPath(shield, paint)
+        canvas.drawPath(shieldPath, paint)
         paint.style = Paint.Style.FILL
 
         when (protectionMode) {
@@ -91,12 +94,11 @@ class ProtectionShieldView @JvmOverloads constructor(
         paint.strokeWidth = 0.075f
         paint.strokeCap = Paint.Cap.ROUND
         paint.strokeJoin = Paint.Join.ROUND
-        val check = Path().apply {
-            moveTo(0.32f, 0.51f)
-            lineTo(0.45f, 0.64f)
-            lineTo(0.70f, 0.37f)
-        }
-        canvas.drawPath(check, paint)
+        checkPath.reset()
+        checkPath.moveTo(0.32f, 0.51f)
+        checkPath.lineTo(0.45f, 0.64f)
+        checkPath.lineTo(0.70f, 0.37f)
+        canvas.drawPath(checkPath, paint)
         paint.style = Paint.Style.FILL
     }
 
@@ -115,27 +117,25 @@ class ProtectionShieldView @JvmOverloads constructor(
     private fun drawThief(canvas: Canvas, color: Int) {
         // Hooded face and eye-mask silhouette: alarm-only visual.
         paint.color = color
-        val hood = Path().apply {
-            moveTo(0.27f, 0.65f)
-            cubicTo(0.23f, 0.34f, 0.37f, 0.22f, 0.5f, 0.22f)
-            cubicTo(0.67f, 0.22f, 0.79f, 0.36f, 0.73f, 0.65f)
-            lineTo(0.66f, 0.77f)
-            lineTo(0.34f, 0.77f)
-            close()
-        }
-        canvas.drawPath(hood, paint)
+        hoodPath.reset()
+        hoodPath.moveTo(0.27f, 0.65f)
+        hoodPath.cubicTo(0.23f, 0.34f, 0.37f, 0.22f, 0.5f, 0.22f)
+        hoodPath.cubicTo(0.67f, 0.22f, 0.79f, 0.36f, 0.73f, 0.65f)
+        hoodPath.lineTo(0.66f, 0.77f)
+        hoodPath.lineTo(0.34f, 0.77f)
+        hoodPath.close()
+        canvas.drawPath(hoodPath, paint)
         paint.color = Color.rgb(255, 225, 218)
         canvas.drawOval(0.37f, 0.36f, 0.63f, 0.68f, paint)
         paint.color = Color.rgb(42, 18, 23)
-        val mask = Path().apply {
-            moveTo(0.36f, 0.47f)
-            lineTo(0.64f, 0.47f)
-            lineTo(0.61f, 0.56f)
-            lineTo(0.50f, 0.59f)
-            lineTo(0.39f, 0.56f)
-            close()
-        }
-        canvas.drawPath(mask, paint)
+        maskPath.reset()
+        maskPath.moveTo(0.36f, 0.47f)
+        maskPath.lineTo(0.64f, 0.47f)
+        maskPath.lineTo(0.61f, 0.56f)
+        maskPath.lineTo(0.50f, 0.59f)
+        maskPath.lineTo(0.39f, 0.56f)
+        maskPath.close()
+        canvas.drawPath(maskPath, paint)
         paint.color = color
         canvas.drawCircle(0.44f, 0.51f, 0.018f, paint)
         canvas.drawCircle(0.56f, 0.51f, 0.018f, paint)

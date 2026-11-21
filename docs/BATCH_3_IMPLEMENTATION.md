@@ -32,12 +32,21 @@ This document records the implementation scope and integration boundaries for Ba
 
 ## Phase 13 — Seismic Genesis Intro
 
-- Four-stage, approximately nine-second Canvas animation with a 20-color spectrum progression.
-- Optional intro audio and haptics; reduced-motion setting and skip path.
-- First-launch completion is committed before navigating to the existing privacy-acceptance flow.
-- Replay is available from Appearance Studio and is persisted safely.
-- The intro is deferred while protection is armed, counting down, or alarm-triggered. It must never delay an active protection countdown or owner authentication.
-- A failed completion write keeps the user on the intro instead of falsely marking it complete.
+- First-launch-only cinematic sequence runs before the existing Privacy Notice & Terms Acceptance screen. Replay remains available from Appearance Studio.
+- **Duration:** approximately 9 seconds, with four choreographed stages:
+  1. **Core Emergence:** pitch-black `#000000`; the original ThiefAlertSeQure icon emerges from a microscopic center point and scales from 0 to 1 with spring/overshoot motion.
+  2. **Seismic Impact:** `Developed By:` drops from the top in light red `#FF5252`; the impact triggers a 300 ms left-right seismic shake, concrete fractures/cracks, and particle-dust disintegration of the icon.
+  3. **Architect Reveal:** `Alinor Pundamdag` drops next with a concrete/cement-block texture. The strongest quake shatters the `Developed By:` title; fractures reveal dark gray `#121212` behind the original black. The developer name remains intact and receives an infinite per-letter transition through 20 light colors, advancing at one-second intervals.
+  4. **Final Collapse:** a final shake sends the intact name toward the bottom while dark-gray cracks and digital-wind particles exit into the existing Privacy Notice & Terms Acceptance flow.
+- Implemented with Jetpack Compose UI, Canvas drawing, Path-based fracture geometry, matrix-backed translation/rotation for particle transforms, and responsive device sizing.
+- The intro now includes a Filament 3D scene alongside the existing Compose/Canvas sequence: a sloped-bevel extruded titanium shield, a compact generated Radiance HDR studio probe, equirectangular-to-cubemap conversion, prefiltered specular reflections, an environment skybox, indirect PBR lighting, and cool/warm rim lights.
+- Shield destruction now uses deterministic Voronoi-clipped polygon cells, each extruded as an independent 3D fragment, plus a second micro-fragment scale. The custom fragment integrator now uses area/thickness-derived mass, mass-weighted collision impulses, friction, angular response, and floor restitution. This is a deterministic lightweight rigid-body approximation, not a general-purpose physics engine or fracture solver.
+- The Filament view also enables IBL-tinted atmospheric fog/in-scattering, HDR bloom, depth-of-field, ambient occlusion, and adaptive render resolution (0.82–1.0 scale range). These are real renderer post-processing features; fog is atmospheric scattering, not a full participating-media volume simulation.
+- The existing 2D dust, scan, shockwave, and wind overlays remain in place; the new 3D fragments add depth but do not claim a fully volumetric particle simulation.
+- **There is no Skip Intro button or skip path.** Back navigation is consumed while the first-launch cinematic is active; it cannot silently bypass the intro or privacy acknowledgement.
+- Existing reduced-motion preference receives a short, static fallback. Existing optional audio/haptic preferences remain opt-in and do not gate the visual sequence.
+- First-launch completion is committed before navigating to the existing privacy-acceptance flow. A failed completion write is retried and never falsely marks the intro complete.
+- The intro is deferred while protection is armed, counting down, or alarm-triggered. It must never delay an active protection countdown or owner authentication. If an alarm is already latched before privacy acknowledgement, or becomes latched while the notice is open, the owner-authentication dashboard takes priority; the privacy notice remains mandatory for normal use but cannot cover alarm recovery.
 
 ## Cross-phase integration and invariants
 

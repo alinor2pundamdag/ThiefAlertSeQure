@@ -75,7 +75,7 @@ object AppUpdateManager {
         }
 
         val tag = release.optString("tag_name")
-        require(tag.matches(Regex("^v[0-9]+(\\.[0-9]+){1,3}$"))) {
+        require(AppUpdatePolicy.isValidReleaseTag(tag)) {
             "The latest release tag has an invalid version format."
         }
         val remoteVersionName = tag.removePrefix("v")
@@ -198,7 +198,9 @@ object AppUpdateManager {
         repeat(6) {
             require(
                 currentUrl.protocol.equals("https", ignoreCase = true) &&
-                    currentUrl.host in allowedHosts
+                    currentUrl.host in allowedHosts &&
+                    (currentUrl.port == -1 || currentUrl.port == 443) &&
+                    currentUrl.userInfo == null
             ) { "The update server or redirect is not an approved HTTPS GitHub host." }
 
             val connection = (currentUrl.openConnection() as HttpURLConnection).apply {

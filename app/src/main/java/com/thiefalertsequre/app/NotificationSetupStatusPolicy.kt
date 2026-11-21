@@ -16,6 +16,34 @@ object NotificationSetupStatusPolicy {
             }
         )
 
+    fun monitorChannel(importance: Int?): SetupItem =
+        when {
+            importance == null -> SetupItem(
+                "monitor_channel",
+                "Protection notification channel",
+                SetupState.UNKNOWN,
+                "Android has not created the protection-monitor channel yet; it is created when the monitor service starts."
+            )
+            importance == NotificationManager.IMPORTANCE_NONE -> SetupItem(
+                "monitor_channel",
+                "Protection notification channel",
+                SetupState.ACTION_REQUIRED,
+                "Android reports that the persistent protection notification channel is blocked. The status-bar shield cannot appear until it is enabled."
+            )
+            importance == NotificationManager.IMPORTANCE_MIN -> SetupItem(
+                "monitor_channel",
+                "Protection notification channel",
+                SetupState.ACTION_REQUIRED,
+                "Android set this foreground channel to minimum importance; its notification is not shown in the status bar. Raise it to Low or Default in Android settings."
+            )
+            else -> SetupItem(
+                "monitor_channel",
+                "Protection notification channel",
+                SetupState.VERIFIED,
+                "The channel is available. Android may still hide silent Low-importance icons according to the device's status-bar notification preference."
+            )
+        }
+
     fun alarmChannel(importance: Int?): SetupItem =
         when {
             importance == null -> SetupItem(
@@ -30,11 +58,17 @@ object NotificationSetupStatusPolicy {
                 SetupState.ACTION_REQUIRED,
                 "Android reports that the alarm notification channel is blocked."
             )
+            importance < NotificationManager.IMPORTANCE_HIGH -> SetupItem(
+                "alarm_channel",
+                "Alarm notification channel",
+                SetupState.ACTION_REQUIRED,
+                "Full-screen alarm presentation requires HIGH channel importance. Raise this channel to High in Android notification settings."
+            )
             else -> SetupItem(
                 "alarm_channel",
                 "Alarm notification channel",
                 SetupState.VERIFIED,
-                "Android reports that the alarm notification channel is available."
+                "Android reports HIGH alarm-channel importance, which permits full-screen alarm notifications when the platform also grants full-screen intent access."
             )
         }
 }

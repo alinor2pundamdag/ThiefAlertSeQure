@@ -25,11 +25,13 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /** One still front-camera capture, initiated only after successful owner authentication in a visible Activity. */
 internal object CameraEvidenceCapture {
     private const val SETTINGS = "camera_evidence_settings"
     private const val KEY_ENABLED = "capture_after_owner_authentication"
+    private const val KEY_ENCRYPT_NEW_PHOTOS = "encrypt_new_photos"
     private const val CAPTURE_TIMEOUT_MS = 15_000L
     private const val PREFERRED_WIDTH = 1280
     private const val PREFERRED_HEIGHT = 720
@@ -43,10 +45,32 @@ internal object CameraEvidenceCapture {
         )
     }.getOrDefault(false)
 
-    fun setEnabled(context: Context, enabled: Boolean): Boolean = runCatching {
-        context.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE)
-            .edit().putBoolean(KEY_ENABLED, enabled).commit()
-    }.getOrDefault(false)
+    fun isEncryptionEnabled(context: Context): Boolean = runCatching {
+        when (val read = SafePreferences.readBoolean(
+            context.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE),
+            KEY_ENCRYPT_NEW_PHOTOS,
+            false
+        )) {
+            is PreferenceRead.Value -> read.value
+            is PreferenceRead.Corrupt -> true
+        }
+    }.getOrDefault(true)
+
+    fun setEncryptionEnabled(context: Context, enabled: Boolean): Boolean =
+        ProtectionStore(context).runIfDisarmed {
+            runCatching {
+                context.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE)
+                    .edit().putBoolean(KEY_ENCRYPT_NEW_PHOTOS, enabled).commit()
+            }.getOrDefault(false)
+        } == true
+
+    fun setEnabled(context: Context, enabled: Boolean): Boolean =
+        ProtectionStore(context).runIfDisarmed {
+            runCatching {
+                context.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE)
+                    .edit().putBoolean(KEY_ENABLED, enabled).commit()
+            }.getOrDefault(false)
+        } == true
 
     fun captureAfterSuccessfulAuthentication(activity: Activity) {
         val app = activity.applicationContext
@@ -55,10 +79,26 @@ internal object CameraEvidenceCapture {
             activity, Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
         val visible = isActivityVisible(activity)
+        // Read window/display state on the Activity thread before camera callbacks
+        // move to the dedicated camera HandlerThread.
+        val displayRotationDegrees = when (activity.windowManager.defaultDisplay.rotation) {
+            Surface.ROTATION_90 -> 90
+            Surface.ROTATION_180 -> 180
+            Surface.ROTATION_270 -> 270
+            else -> 0
+        }
+        val encryptEvidence = isEncryptionEnabled(app)
         if (!CameraEvidencePolicy.shouldCapture(true, permissionGranted, true, visible)) {
             recordFailure(app, if (!permissionGranted) "camera_evidence_permission_missing"
                 else "camera_evidence_activity_not_visible",
                 "Front-camera evidence was skipped; owner authentication remains successful")
+            return
+        }
+        val galleryPermissionGranted = encryptEvidence || android.os.Build.VERSION.SDK_INT >= 29 ||
+            (ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED)
+        if (!galleryPermissionGranted) {
+            recordFailure(app, "camera_evidence_gallery_permission_missing", "Read/write Gallery permissions are required on Android 8–9 when unencrypted Gallery storage is selected")
             return
         }
         if (!inFlight.compareAndSet(false, true)) {
@@ -113,6 +153,8 @@ internal object CameraEvidenceCapture {
 
         val finished = AtomicBoolean(false)
         val activityVisible = AtomicBoolean(visible)
+        // 0=visible/eligible, 1=commit authorized, 2=lifecycle cancellation won.
+        val commitState = AtomicInteger(0)
         val lifecycle = (activity as LifecycleOwner).lifecycle
         var lifecycleObserver: LifecycleEventObserver? = null
         var camera: CameraDevice? = null
@@ -137,6 +179,7 @@ internal object CameraEvidenceCapture {
         lifecycleObserver = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP || event == Lifecycle.Event.ON_DESTROY) {
                 activityVisible.set(false)
+                commitState.compareAndSet(0, 2)
                 handler.post {
                     finish(
                         "camera_evidence_activity_not_visible",
@@ -152,6 +195,16 @@ internal object CameraEvidenceCapture {
         }, CAPTURE_TIMEOUT_MS)
 
         reader.setOnImageAvailableListener({ source ->
+            if (finished.get() || !activityVisible.get()) {
+                runCatching { source.acquireLatestImage()?.close() }
+                if (!finished.get()) {
+                    finish(
+                        "camera_evidence_activity_not_visible",
+                        "App left the visible state before the front-camera evidence photo could be saved"
+                    )
+                }
+                return@setOnImageAvailableListener
+            }
             val image = runCatching { source.acquireLatestImage() }.getOrNull() ?: return@setOnImageAvailableListener
             val jpeg = try {
                 val buffer = image.planes.firstOrNull()?.buffer
@@ -168,25 +221,36 @@ internal object CameraEvidenceCapture {
                 finish("camera_evidence_image_rejected", "JPEG could not be compressed below the 2 MiB evidence size limit")
                 return@setOnImageAvailableListener
             }
-            val entry = runCatching { CameraEvidenceVault.save(app, boundedJpeg) }.getOrNull()
-            if (entry == null) {
-                finish("camera_evidence_storage_failed", "Encrypted front-camera evidence could not be committed to local storage")
+            // Atomically authorize the storage commit only if lifecycle cancellation
+            // has not already won. This avoids blocking the UI thread on disk I/O.
+            if (finished.get() || !activityVisible.get() || !commitState.compareAndSet(0, 1)) {
+                finish(
+                    "camera_evidence_activity_not_visible",
+                    "App left the visible state before the front-camera evidence photo could be committed"
+                )
+                return@setOnImageAvailableListener
+            }
+            val encryptedEntry = if (encryptEvidence) {
+                runCatching { CameraEvidenceVault.save(app, boundedJpeg) }.getOrNull()
+            } else null
+            val galleryUri = if (!encryptEvidence) {
+                runCatching { CameraEvidenceMediaStore.save(app, boundedJpeg) }.getOrNull()
+            } else null
+            val saved = if (encryptEvidence) encryptedEntry != null else galleryUri != null
+            if (!saved) {
+                finish("camera_evidence_storage_failed", if (encryptEvidence)
+                    "Encrypted photo could not be committed to the private vault"
+                else "Photo could not be published to the Gallery MediaStore")
             } else {
-                runCatching {
-                    LocalEvidenceVault.recordAsync(
-                        app,
-                        "front_camera_evidence_saved",
-                        "id=${entry.id}; sha256=${entry.sha256}; bytes=${entry.sizeBytes}; trigger=successful_owner_authentication"
-                    )
+                val storageDetail = if (encryptEvidence) {
+                    val entry = requireNotNull(encryptedEntry)
+                    "storage=encrypted_private_vault; id=${entry.id}; sha256=${entry.sha256}; bytes=${entry.sizeBytes}"
+                } else {
+                    "storage=gallery_unencrypted; uri=$galleryUri; bytes=${boundedJpeg.size}"
                 }
-                runCatching {
-                    LocalTamperHistory.record(
-                        app,
-                        "front_camera_evidence_saved",
-                        "Encrypted front-camera photo saved after successful owner authentication; id=${entry.id}; sha256=${entry.sha256}"
-                    )
-                }
-                notifyOwner(app, "Front-camera evidence saved securely.")
+                runCatching { LocalEvidenceVault.recordAsync(app, "front_camera_evidence_saved", "$storageDetail; trigger=successful_owner_authentication") }
+                runCatching { LocalTamperHistory.record(app, "front_camera_evidence_saved", "Front-camera photo saved after successful owner authentication; $storageDetail") }
+                notifyOwner(app, if (encryptEvidence) "Front-camera evidence saved in the encrypted private vault." else "Front-camera evidence saved to Gallery.")
                 finish()
             }
         }, handler)
@@ -213,7 +277,7 @@ internal object CameraEvidenceCapture {
                                         configured.close()
                                         return
                                     }
-                                    if (!isActivityVisible(activity)) {
+                                    if (!activityVisible.get()) {
                                         finish("camera_evidence_activity_not_visible", "App left the visible state before the front-camera photo was captured")
                                         return
                                     }
@@ -231,13 +295,14 @@ internal object CameraEvidenceCapture {
                                             }
                                             set(CaptureRequest.JPEG_QUALITY, 85.toByte())
                                             val sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
-                                            val rotation = when (activity.windowManager.defaultDisplay.rotation) {
-                                                Surface.ROTATION_90 -> 90
-                                                Surface.ROTATION_180 -> 180
-                                                Surface.ROTATION_270 -> 270
-                                                else -> 0
-                                            }
-                                            set(CaptureRequest.JPEG_ORIENTATION, (sensorOrientation - rotation + 360) % 360)
+                                            val frontFacing = characteristics.get(CameraCharacteristics.LENS_FACING) ==
+                                                CameraCharacteristics.LENS_FACING_FRONT
+                                            set(
+                                                CaptureRequest.JPEG_ORIENTATION,
+                                                CameraEvidencePolicy.jpegOrientation(
+                                                    sensorOrientation, displayRotationDegrees, frontFacing
+                                                )
+                                            )
                                         }.build()
                                         configured.capture(request, object : CameraCaptureSession.CaptureCallback() {
                                             override fun onCaptureFailed(
@@ -284,13 +349,35 @@ internal object CameraEvidenceCapture {
     }
 
     private fun boundJpeg(source: ByteArray): ByteArray? {
-        if (CameraEvidencePolicy.isValidImageSize(source.size)) return source
-        val bitmap = runCatching { BitmapFactory.decodeByteArray(source, 0, source.size) }.getOrNull() ?: return null
+        // Inspect dimensions without allocating a full-resolution bitmap. A small
+        // compressed 8K JPEG can still require hundreds of MiB when decoded.
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(source, 0, source.size, bounds)
+        val sourceWidth = bounds.outWidth
+        val sourceHeight = bounds.outHeight
+        if (sourceWidth <= 0 || sourceHeight <= 0) return null
+        if (CameraEvidencePolicy.isValidImageSize(source.size) &&
+            sourceWidth <= PREFERRED_WIDTH && sourceHeight <= PREFERRED_HEIGHT
+        ) return source
+
+        val requiredSampleRatio = maxOf(
+            sourceWidth.toFloat() / PREFERRED_WIDTH,
+            sourceHeight.toFloat() / PREFERRED_HEIGHT
+        )
+        var sampleSize = 1
+        while (sampleSize.toFloat() * 2f <= requiredSampleRatio) sampleSize *= 2
+        val decodeOptions = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        val bitmap = runCatching {
+            BitmapFactory.decodeByteArray(source, 0, source.size, decodeOptions)
+        }.getOrNull() ?: return null
         return try {
             val scale = minOf(
                 1f,
-                1280f / bitmap.width.coerceAtLeast(1),
-                720f / bitmap.height.coerceAtLeast(1)
+                PREFERRED_WIDTH.toFloat() / bitmap.width.coerceAtLeast(1),
+                PREFERRED_HEIGHT.toFloat() / bitmap.height.coerceAtLeast(1)
             )
             val resized = if (scale < 1f) {
                 Bitmap.createScaledBitmap(

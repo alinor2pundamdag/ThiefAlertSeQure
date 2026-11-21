@@ -1,7 +1,26 @@
+# Current Batch Four follow-up audit snapshot — 21 November 2026
+
+- Working branch: `work/batch-4-implementation`; PR #8 remains draft/open/unmerged; `main` is untouched.
+- Candidate identity: `com.thiefalertsequre.app`, versionName `1.1.5_Developer_Alinor`, versionCode `7`, minSdk 26, compileSdk/targetSdk 36.
+- Latest verified code-bearing commit: `c64490788185fe2f9390cf21a87de003f4a1b430`; the current branch head is a documentation-only audit refresh after that code-bearing commit. PR #8's live head remains authoritative.
+- Existing full-source audit inventory: 89 production Kotlin files, 46 JVM unit-test source files, 10 Python contract scripts, Android manifest/resources, Gradle/version catalog, GitHub Actions workflows, and project/privacy/release documentation. The current follow-up audit rechecked high-risk cross-feature seams and their regressions.
+- Follow-up fixes committed on this branch: authenticated disarm and safe package replacement invalidate old A2 Bluetooth deadlines atomically; alarm recovery cleanup cannot block owner disarm or bounded retry scheduling; monitor restart failures are owner-visible; corrupted protection/recovery metadata receives a separate typed emergency snapshot; Gallery retention pruning does not hold the global protection-state lock across bulk MediaStore work; notification channel importance is verified; active alarm and Settings flash patterns use dedicated timing workers; root Bluetooth diagnostics use allowlisted queries; diagnostics disclosures match the redacted JSON and owner-selected destination. Additional corrections replace legacy Gallery-index direct preference reads with typed SafePreferences, add explicit OS backup/device-transfer exclusions, guard API-28/29-only calls on minSdk 26, reuse drawing Paths to avoid per-frame allocations, add adaptive monochrome launcher layers, and centralize debug version derivation.
+- Previously audited safeguards remain in scope: active-state mutation boundaries; owner-only evidence review/export; Device Owner/A2 state locking; Bluetooth/alarm deadline persistence retries; bounded ACL receiver concurrency; primary-alarm audio priority; evidence queue loss reporting; crash-safe configuration restore journal; fail-closed MediaStore enumeration; complete-vault verification before Gallery-source deletion; bounded photo preview decoding; GPS validation; root diagnostic timeout cleanup; and Filament resource cleanup/reduced-motion behavior.
+- Photo storage contract: new photos remain unencrypted and Gallery-visible by default. Settings can encrypt future captures and can explicitly migrate existing app-owned Gallery photos. Migration verifies the complete encrypted vault before removing any Gallery original. The Android Keystore key is non-exportable; clearing app data/uninstalling may make encrypted photos unrecoverable. The separate event-metadata backup does not contain photo bytes.
+- Privacy contract: trusted Bluetooth identities remain app-private; root diagnostics use allowlisted non-identifier queries; optional diagnostics JSON exports contain only redacted device/protection status and event codes, and are written only to the owner-selected Android destination (which may be cloud-backed). The app does not upload these reports. Privacy notice namespace advanced to v9 to require acknowledgement of the expanded disclosure.
+- Source/test inventory at this head: 89 production Kotlin files, 46 JVM unit-test files, 10 Python contract scripts, and 15 dormant instrumentation-test source files. The owner-directed policy prohibits compiling or executing instrumentation tests and emulator matrices; no such run was performed.
+- Exact code-bearing head `c64490788185fe2f9390cf21a87de003f4a1b430` passed Android workflow [#44860111389](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44860111389) and CodeQL [#44860111390](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44860111390). Android CI passed JVM unit tests, all source/manifest/release contracts, Android lint, debug APK assembly, minified release metadata, package/version/signer checks, and artifact upload. Both CodeQL jobs passed.
+- Physical-device acceptance for the current v1.1.5 candidate remains **NOT TESTED**: Phase 12 records 0/25 PASS and 25/25 NOT TESTED. README's 11/11 owner-reported physical scenarios are explicitly historical v1.1.3 results and do not certify this candidate.
+- No Codespace was opened or used. No emulator, instrumentation build, or instrumented test was run. Physical-device testing is reserved for the owner.
+- Platform limits remain explicit: exact-alarm delivery can be deferred when access is unavailable; Android/OEM background restrictions can affect service recovery; ranging remains a local capability query only and does not start a ranging session or request the RANGING permission. Filament 1.80.1/1.81.0 AAR metadata requires compileSdk 37, so the approved compileSdk 36 / AGP 8.10.1 baseline retains Filament 1.75.1 and Kotlin 2.2.21; the newer upstream swap-chain leak fix is deferred until an approved API-37 toolchain migration.
+- Verified development APK: `com.thiefalertsequre.app.v114test`, versionCode `7`, versionName `1.1.5-test`, minSdk `26`, compileSdk/targetSdk `36`; APK SHA-256 `fd2f501b6caa3e85bfb6a94570d43690a413ad4b540c7ef4df6c6ad5f05b929b`. CI debug signer SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`. Artifact ID `14689861413`, size `42,643,550` bytes, archive SHA-256 `9633629918d771270a36c0b61f38166be4224d06ed0bef57e3515d6358cac767`; expires 2026-12-05. The minified release APK's package/version/metadata passed, but it is unsigned because permanent production signing secrets are not configured.
+
+---
+
 # ThiefAlertSeQure — Project State
 
-## Active FIXALL branch
-- Working branch: `work/phase-0-12-coding` (current coding branch; exact head recorded in the verification snapshot below)
+## Historical FIXALL branch snapshot (superseded by the current Batch Four candidate)
+- Historical FIXALL working branch: `work/phase-0-12-coding` (the current Batch Four branch is listed in the snapshot above)
 - Production branch: `main` (untouched)
 - Production package identity and signing configuration must remain unchanged.
 - Approved minimum SDK: 26. Do not lower without explicit approval.
@@ -12,7 +31,7 @@
 
 The [docs/PHASE_0_12_EXECUTION_CHECKLIST.md](docs/PHASE_0_12_EXECUTION_CHECKLIST.md) is a historical FIXALL checklist for predecessor v1.1.4 work; its Phase 0–12 numbering is not the active product roadmap. The active approved scope is the four-batch, 17-phase product roadmap recorded below and summarized in [docs/FEATURE_COMPLETION_MATRIX.md](docs/FEATURE_COMPLETION_MATRIX.md). Current Batch 2 is Phases 5–9. Instrumentation compilation/execution and emulator matrices remain prohibited; physical-device acceptance is separate and must never be inferred from CI.
 
-The bullets below are predecessor FIXALL history; they are not current Batch 1–4 phase acceptance claims.
+The bullets below are predecessor FIXALL history; they are not current Batch 1–4 phase acceptance claims. Current branch/version status is recorded in the Batch Four snapshot above.
 - Created a dedicated safety/work branch from the reviewed development candidate.
 - Restored the approved minSdk 26 invariant in the build candidate and aligned compatibility documentation.
 - Hardened charger-state handling so missing battery extras remain unknown rather than being treated as unplugged.
@@ -46,7 +65,7 @@ The bullets below are predecessor FIXALL history; they are not current Batch 1�
 
 ## Latest code-bearing candidate status (2026-11-17)
 
-- Current coding branch: `work/phase-0-12-coding`.
+- Historical FIXALL coding branch: `work/phase-0-12-coding`.
 - Latest code-bearing source commit: `475c1fa00b8c30c1280f77053d83eb91c0db7f64`. Subsequent commits in this status-documentation pass change documentation only; no Kotlin, Gradle, manifest, or workflow source was changed after the verified code commit.
 - Android non-instrumentation CI [run 43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535): **PASS** on the code-bearing commit. The final documentation snapshot `ffe5fdae9150cb8ca791478d48cfc68263776ff8` also passed [Android run 43951488247](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43951488247); JVM unit tests, source-contract checks, lint, assets, APK packaging, minified release metadata, package/version/signer checks, and artifact upload all succeeded.
 - CodeQL [run 43950015623](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623): **PASS** for Java/Kotlin and GitHub Actions on the code-bearing commit. The final documentation snapshot also passed [CodeQL run 43951488080](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43951488080).
@@ -216,7 +235,7 @@ The active roadmap is **17 phases numbered Phase 0 through Phase 16**, organized
 
 **Batch 2 completion gate:** all Phase 5–9 implementation, privacy boundaries, UI/UX, error handling, static contract checks, JVM unit tests, Android lint/build and CodeQL must pass on the exact current branch HEAD. Hardware/OEM behavior remains explicitly unverified until physical-device validation; no claim of universal shutdown/torch/camera control is permitted.
 
-**Phase 7 camera evidence boundary:** optional and OFF by default. CAMERA permission is requested only after an explicit Settings opt-in. One front-camera still is attempted only after successful owner PIN/password or supported strong-biometric authentication disarms a latched alarm while the authentication Activity is visible. Images are Android Keystore AES-GCM encrypted, locally retained with bounded limits, and owner-viewable/exportable/deletable. No background camera service, video, microphone capture, or cloud upload is allowed. Camera failure must never reverse successful authentication or alarm disarm.
+**Historical Phase 7 camera evidence boundary (superseded):** the predecessor branch stored all photos in the encrypted vault. The current Batch Four candidate saves new captures unencrypted to Gallery by default and offers a Settings toggle for future-capture AES-GCM storage; existing images are not silently converted. Capture remains optional and OFF by default, after successful owner authentication while the authentication Activity is visible. No background camera service, video, microphone capture, or cloud upload is allowed. Camera failure must never reverse successful authentication or alarm disarm.
 
 **Phase 9 dashboard boundary:** the fixed-color 136dp main shield stays above a compact, horizontally swipeable nine-destination tab strip (Bluetooth Settings; Device Hardening & Reliability; Sounds & Flash Alert; Authentication Evidence; Device Intelligence; Appearance Studio; Local Tamper History; More; About). The tab strip uses accessible 48dp touch targets and destination-specific navigation.
 

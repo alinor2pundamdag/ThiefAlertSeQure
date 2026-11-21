@@ -104,6 +104,7 @@ class SetupStatusActivity : FragmentActivity() {
                     "battery" -> "Review battery restrictions"
                     "oem_background" -> "Open Settings and search App launch"
                     "notifications" -> "Open notification settings"
+                    "monitor_channel" -> "Open protection notification channel"
                     "lock" -> "Open Android screen-lock settings"
                     else -> "Open relevant Android settings"
                 }
@@ -144,7 +145,7 @@ class SetupStatusActivity : FragmentActivity() {
                 Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
                 AndroidDeviceCompatibility.appInfoIntent(packageName)
             )
-            "notifications" -> AndroidDeviceCompatibility.open(
+            "notifications", "monitor_channel" -> AndroidDeviceCompatibility.open(
                 this, intent, AndroidDeviceCompatibility.appInfoIntent(packageName)
             )
             "bt", "lock", "bt_permission" -> AndroidDeviceCompatibility.open(

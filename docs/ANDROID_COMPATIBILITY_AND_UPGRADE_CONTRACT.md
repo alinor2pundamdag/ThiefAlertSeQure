@@ -5,8 +5,9 @@ This document is the persistent acceptance contract for ThiefAlertSeQure Android
 ## Immutable production identity
 
 - Production application ID / namespace: `com.thiefalertsequre.app`.
-- Last official installed baseline: v1.1.3, versionCode 5.
-- Candidate v1.1.4: versionCode 6, versionName `1.1.4`.
+- Last documented official installed baseline: v1.1.3, versionCode 5.
+- Historical intermediate candidate: v1.1.4, versionCode 6, versionName `1.1.4_Developer_Alinor` (not confirmed as a published release in this snapshot).
+- Current Batch Four candidate (21 November 2026): v1.1.5, versionCode 7, versionName `1.1.5_Developer_Alinor`, branch `work/batch-4-implementation`, PR #8 open/unmerged. This is not a production release. Exact-head Android CI and CodeQL are queued/not yet verified; Phase 12 physical acceptance remains 0/25 PASS / 25/25 NOT TESTED.
 - Official release signing-certificate SHA-256:
   `9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64`.
 - The development-only debug APK uses a separate `com.thiefalertsequre.app.v114test` application ID. It must never replace the production installation or be published as an update. No instrumentation APK is built.
@@ -21,11 +22,18 @@ Every official update must:
 6. During physical-device acceptance, install the previous official release and then the candidate with `adb install -r`, never `adb uninstall`, and verify SharedPreferences, app-private files, monitor preference and monitor restart. This is a manual physical-device check, not an instrumentation test.
 7. Keep the same checks in every later release workflow; update this document only when a deliberate, reviewed migration is approved.
 
-## v1.1.3 → v1.1.4 upgrade behavior
+## Historical v1.1.3 → v1.1.4 upgrade behavior
 
 - The v1.1.3 updater requires the owner to disarm protection and turn its background monitor off before downloading/installing. After this first update, the owner must re-enable monitoring if it was disabled for the update; v1.1.3 does not persist a separate “temporarily paused for update” intent, so v1.1.4 cannot safely infer whether `monitor_enabled=false` was temporary or an intentional opt-out.
-- Starting with v1.1.4, an update is allowed when protection is DISARMED and there is no countdown or active alarm. A running monitor may remain enabled; Android stops the old process during package replacement and the package-replaced receiver attempts to restart it. Explicit owner opt-out remains respected.
+- Starting with v1.1.4, an update is allowed when protection is DISARMED and there is no countdown or active alarm. A running monitor may remain enabled; Android stops the old process during package replacement and the package-replaced receiver invalidates stale A2 deadlines before restarting it, then attempts to restart monitoring. Explicit owner opt-out remains respected.
 - Android's package installer normally preserves the app's private data on an in-place update when package identity, signer and version rules are satisfied. The physical-device acceptance procedure must verify this using the previous official APK and `adb install -r`; no emulator upgrade test is run in CI under the current owner direction.
+
+## Current v1.1.4 code 6 → v1.1.5 code 7 candidate behavior
+
+- The current candidate preserves the production application ID, pinned signing-certificate requirement, minSdk 26 and app-private data contract.
+- The in-app updater permits an update only while `ProtectionMode.DISARMED`; it does not require the background monitor preference to be OFF. Countdown and latched-alarm states remain blocked. On package replacement while DISARMED, the receiver commits a new A2 deadline invalidation epoch and clears persisted pre-update deadlines before restarting monitoring.
+- The candidate's versionCode 7 is strictly greater than the v1.1.4 candidate's code 6. The update is still subject to the installed/candidate signer match and GitHub release asset/checksum validation.
+- PR #8 is open and unmerged. No official release tag, production-signed APK publication, install-over-existing test, emulator test or physical-device acceptance is claimed for this candidate.
 
 ## HONOR 200 Pro background acceptance
 

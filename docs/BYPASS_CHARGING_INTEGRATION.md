@@ -27,7 +27,7 @@ A normal APK cannot grant itself platform-signature or privileged permissions. A
 
 | OEM | Public/system feature evidence | Third-party ON/OFF adapter in this build |
 |---|---|---|
-| HONOR | Bypass Charging exists on selected models; official guidance places it under Battery → More battery settings. Model and MagicOS version matter. | Not available; no public third-party control API verified |
+| HONOR | Menu location is model/version-specific. Some builds expose charging controls under Battery → More battery settings. An HONOR community response reports MagicOS 10.0.0.113 on Magic8 added Charge Separation under Game → Game Manager → Tools. This is native OEM UI evidence, not a third-party API contract. | Not available; no public third-party control API verified |
 | Samsung | Selected Galaxy devices offer conditional “Pause USB PD charging when gaming”; charger/game/battery conditions apply. | Not available; no public third-party control API verified |
 | ASUS ROG | Selected ROG devices expose Bypass Charging / Smart Bypass in game features. | Not available; no public third-party control API verified |
 | OnePlus | Bypass Charging has been reported on selected OxygenOS models; availability varies. | Not available; no public third-party control API verified |
@@ -35,6 +35,8 @@ A normal APK cannot grant itself platform-signature or privileged permissions. A
 | OPPO, realme, vivo, Motorola, Lenovo, others | No qualifying public third-party control API has been certified for this project. | Not established |
 
 A device may have an OEM feature while ThiefAlertSeQure cannot control or read it. The UI distinguishes system feature availability from app control certification.
+
+HONOR reference: [HONOR community response on MagicOS 10.0.0.113 Charge Separation](https://club.honor.com/cn/thread-30020378-1-1.html). Do not infer that this feature exists on every HONOR model/region or that a third-party APK can control it. The app must continue to show UNKNOWN/disabled until an exact model/firmware adapter and read-back path are officially documented and safely certified.
 
 ## Adapter certification requirements
 

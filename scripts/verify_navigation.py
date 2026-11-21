@@ -111,6 +111,78 @@ if not accessibility_helper.is_file() or "ViewCompat.setAccessibilityHeading" no
     errors.append("PageAccessibility.kt must use AndroidX ViewCompat accessibility heading semantics")
 
 settings_activity = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
+
+about_activity = (APP / "AboutActivity.kt").read_text(encoding="utf-8")
+for required in (
+    'developerCreditText = "Developed by Alinor Pundamdag"',
+    "setCardBackgroundColor(0xFF070B14.toInt())",
+    "IntArray(20)",
+    "ArgbEvaluator()",
+    "stageIndex = step % 7",
+    "activeLetters.size * 1_000L",
+    "developerCredit.text = SpannableString(developerCreditText)",
+    "repeatCount = ValueAnimator.INFINITE",
+    "AppearanceStudioStore.reduceMotion(this)",
+    "developerCredit.setShadowLayer(0f",
+    "Settings.ACTION_APPLICATION_DETAILS_SETTINGS",
+    'Uri.fromParts("package", packageName, null)',
+    "AppUpdatePolicy.hasOfficialSigner(digests)",
+    "showThirdPartyLicenses"
+):
+    if required not in about_activity:
+        errors.append("AboutActivity missing Batch Four developer/version/legal contract: " + required)
+
+intro_activity = (APP / "SeismicGenesisIntroActivity.kt").read_text(encoding="utf-8")
+for required in (
+    "ComposeView(this)", "SeismicGenesisIntroContent", "INTRO_DURATION_MS = 9_000",
+    "Alinor Pundamdag", "Developed By:", "Color(0xFFFF5252)",
+    "0xFF121212", "android.graphics.RuntimeShader", "native.rotate(", "native.restoreToCount(", "GenesisFractureCanvas",
+    "repeatOnLifecycle(Lifecycle.State.RESUMED)"
+):
+    if required not in intro_activity:
+        errors.append("SeismicGenesisIntroActivity missing original cinematic intro contract: " + required)
+if "Skip intro" in intro_activity or "Skip the introduction" in intro_activity:
+    errors.append("SeismicGenesisIntroActivity must not contain an unrequested Skip Intro path")
+if "id(\"org.jetbrains.kotlin.plugin.compose\")" not in (ROOT / "app" / "build.gradle.kts").read_text(encoding="utf-8"):
+    errors.append("Seismic Genesis must use the requested Jetpack Compose implementation")
+
+renderer_activity = (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
+for required in (
+    "buildStudioHdrEnvironment", "HDRLoader.createTexture", "IBLPrefilterContext.EquirectangularToCubemap",
+    "IBLPrefilterContext.SpecularFilter", "IndirectLight.Builder()", "Skybox.Builder().environment",
+    "bevelDepth = 0.045f", "clipToBisector", "seeds.take(18)", "mass = (area * depth * 18f)",
+    "val normalImpulse", "rimLightEntities", "FogOptions()", "fogColorFromIbl = true",
+    "BloomOptions()", "DepthOfFieldOptions()", "AmbientOcclusionOptions()", "DynamicResolutionOptions()"
+):
+    if required not in renderer_activity:
+        errors.append("Genesis 3D renderer missing PBR/fracture contract: " + required)
+filament_gradle = (ROOT / "app" / "build.gradle.kts").read_text(encoding="utf-8")
+if 'com.google.android.filament:filament-utils-android:1.75.1' not in filament_gradle:
+    errors.append("Genesis HDR environment requires the Filament 1.75.1 runtime utilities")
+setup_snapshot = (APP / "SetupStatusSnapshot.kt").read_text(encoding="utf-8")
+setup_activity = (APP / "SetupStatusActivity.kt").read_text(encoding="utf-8")
+if "NotificationSetupStatusPolicy.monitorChannel(monitorChannel?.importance)" not in setup_snapshot:
+    errors.append("Verified Android setup must inspect the persistent protection notification channel separately from the alarm channel")
+if '"monitor_channel" -> "Open protection notification channel"' not in setup_activity:
+    errors.append("Verified Android setup must provide a direct route to the protection notification channel")
+for screen in ("ProtectionMonitorService.kt", "AlarmService.kt"):
+    source = (APP / screen).read_text(encoding="utf-8")
+    if ".setSmallIcon(R.drawable.ic_notification_shield)" not in source:
+        errors.append(screen + " must retain the dedicated monochrome status-bar shield icon")
+    if ".setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)" not in source:
+        errors.append(screen + " must request immediate foreground notification visibility")
+    if ".setLargeIcon(" in source:
+        errors.append(screen + " must not misuse the app logo as the notification large icon")
+
+if (
+    "LocalEvidenceVault.verifyIntegrity(this@SettingsActivity)" not in settings_activity
+    or "CameraEvidenceVault.verifyIntegrity(this@SettingsActivity)" not in settings_activity
+    or "ioExecutor.execute {" not in settings_activity
+    or "Verify local evidence integrity now" not in settings_activity
+    or "convenience log" not in settings_activity
+):
+    errors.append("Settings must expose the existing encrypted evidence integrity checks without treating the readable event log as tamper-proof")
+
 resume_block = re.search(r"override fun onResume\(\).*?override fun onPause\(", settings_activity, re.S)
 pause_block = re.search(r"override fun onPause\(\).*?override fun onDestroy\(", settings_activity, re.S)
 if not resume_block or "render()" not in resume_block.group(0):
@@ -125,16 +197,33 @@ if "startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" i
     errors.append("Battery optimization request must use guarded Android Settings/activity fallback")
 if "AndroidDeviceCompatibility.open(" not in settings_activity:
     errors.append("Settings external destinations must use the centralized guarded launcher")
+restore_recovery_block = re.search(
+    r"private fun applyRestoredConfiguration\(\).*?val protectionMode",
+    settings_activity,
+    re.S,
+)
+direct_monitor_stop = "stopService(Intent(this, ProtectionMonitorService::class.java))"
 if (
     "putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).apply()" in settings_activity
     or "putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).commit()" not in settings_activity
     or "batteryAlertEdit.commit()" not in settings_activity
     or ".setAction(ProtectionMonitorService.ACTION_STOP)" not in settings_activity
     or "putExtra(ProtectionMonitorService.EXTRA_STOP_PREFERENCE_COMMITTED, true)" not in settings_activity
-    or "stopService(Intent(this, ProtectionMonitorService::class.java))" in settings_activity
+    or settings_activity.count(direct_monitor_stop) != 1
+    or restore_recovery_block is None
+    or direct_monitor_stop not in restore_recovery_block.group(0)
 ):
-    errors.append("Critical monitor settings must be durably committed and shutdown must use the service-owned retry path")
+    errors.append("Critical monitor settings must be durably committed; direct shutdown is allowed only while configuration recovery is unresolved")
 main_activity = (APP / "MainActivity.kt").read_text(encoding="utf-8")
+if "protectionModeAtLaunch != ProtectionMode.ALARM_TRIGGERED" not in main_activity:
+    errors.append("Privacy acknowledgement must not block the active alarm owner-authentication recovery screen")
+permission_request = re.search(r"private fun requestNotificationPermissionIfNeeded\(\).*?\n    }", main_activity, re.S)
+if not permission_request or "ProtectionMode.ALARM_TRIGGERED" not in permission_request.group(0):
+    errors.append("Notification permission must be deferred during active alarm recovery and requested afterward")
+if "requestNotificationPermissionIfNeeded()" not in main_activity:
+    errors.append("Dashboard and resume lifecycle must re-check notification permission readiness")
+if "private val privacyRecoveryPoll" not in main_activity or "ProtectionMode.ALARM_TRIGGERED" not in main_activity or "removeCallbacks(privacyRecoveryPoll)" not in main_activity:
+    errors.append("An alarm starting while the first-run privacy notice is visible must surface owner recovery and stop its foreground poll")
 if "device_credential_launch_failed" not in main_activity:
     errors.append("Device credential launch failures must be handled without terminating the active alarm")
 if "Android access not granted" not in settings_activity or "Open access settings" not in settings_activity:

@@ -40,14 +40,18 @@ object EvidenceLocationCapture {
         val manager = context.getSystemService(LocationManager::class.java) ?: return null
         val candidates = runCatching {
             manager.getProviders(true).mapNotNull { provider ->
-                runCatching { manager.getLastKnownLocation(provider) }.getOrNull()
+                runCatching { manager.getLastKnownLocation(provider) }
+                    .getOrNull()
+                    ?.takeIf(::isValidLocation)
             }
         }.getOrDefault(emptyList())
         val best = candidates.maxByOrNull { it.elapsedRealtimeNanos } ?: return null
         val ageMs = TimeUnit.NANOSECONDS.toMillis(
             (SystemClock.elapsedRealtimeNanos() - best.elapsedRealtimeNanos).coerceAtLeast(0L)
         )
-        val accuracy = if (best.hasAccuracy()) best.accuracy else null
+        val accuracy = best.accuracy.takeIf {
+            best.hasAccuracy() && it.isFinite() && it >= 0f
+        }
         return Snapshot(
             latitude = best.latitude,
             longitude = best.longitude,
@@ -96,11 +100,11 @@ object EvidenceLocationCapture {
             timeout?.let(handler::removeCallbacks)
             listeners.forEach { listener -> runCatching { manager.removeUpdates(listener) } }
             cancellations.forEach { signal -> runCatching { signal.cancel() } }
-            onResult(location?.let { snapshot(it, "CURRENT_REQUEST_RESULT") })
+            onResult(location?.takeIf(::isValidLocation)?.let { snapshot(it, "CURRENT_REQUEST_RESULT") })
         }
 
         fun providerFinished(location: Location?) {
-            if (location != null) {
+            if (location != null && isValidLocation(location)) {
                 finish(location)
             } else if (pendingProviders.decrementAndGet() == 0) {
                 finish(null)
@@ -136,6 +140,20 @@ object EvidenceLocationCapture {
         }
     }
 
+    @Suppress("DEPRECATION")
+    private fun isValidLocation(location: Location): Boolean {
+        val elapsed = location.elapsedRealtimeNanos
+        val now = SystemClock.elapsedRealtimeNanos()
+        val ageNanos = now - elapsed
+        val notFutureDated = elapsed > 0L && ageNanos >= -TimeUnit.SECONDS.toNanos(1)
+        val notMock = if (Build.VERSION.SDK_INT >= 31) !location.isMock else !location.isFromMockProvider
+        return notMock && notFutureDated &&
+            location.latitude.isFinite() &&
+            location.longitude.isFinite() &&
+            location.latitude in -90.0..90.0 &&
+            location.longitude in -180.0..180.0
+    }
+
     internal fun enabledProviders(gpsEnabled: Boolean, networkEnabled: Boolean): List<String> =
         buildList {
             if (gpsEnabled) add(LocationManager.GPS_PROVIDER)
@@ -149,7 +167,7 @@ object EvidenceLocationCapture {
         return Snapshot(
             latitude = location.latitude,
             longitude = location.longitude,
-            accuracyMeters = if (location.hasAccuracy()) location.accuracy else null,
+            accuracyMeters = if (location.hasAccuracy() && location.accuracy.isFinite() && location.accuracy >= 0f) location.accuracy else null,
             provider = location.provider ?: "unknown",
             fixAgeMs = ageMs,
             classification = if (ageMs <= RECENT_FIX_MAX_AGE_MS) "${source}_RECENT" else "${source}_STALE"

@@ -16,6 +16,35 @@ class NotificationSetupStatusPolicyTest {
     }
 
     @Test
+    fun missingProtectionChannelIsUnknownRatherThanAssumedBlocked() {
+        assertEquals(SetupState.UNKNOWN, NotificationSetupStatusPolicy.monitorChannel(null).state)
+    }
+
+    @Test
+    fun blockedProtectionChannelRequiresOwnerAction() {
+        assertEquals(
+            SetupState.ACTION_REQUIRED,
+            NotificationSetupStatusPolicy.monitorChannel(NotificationManager.IMPORTANCE_NONE).state
+        )
+    }
+
+    @Test
+    fun minimumProtectionChannelRequiresOwnerActionForStatusBarVisibility() {
+        assertEquals(
+            SetupState.ACTION_REQUIRED,
+            NotificationSetupStatusPolicy.monitorChannel(NotificationManager.IMPORTANCE_MIN).state
+        )
+    }
+
+    @Test
+    fun availableProtectionChannelIsVerified() {
+        assertEquals(
+            SetupState.VERIFIED,
+            NotificationSetupStatusPolicy.monitorChannel(NotificationManager.IMPORTANCE_LOW).state
+        )
+    }
+
+    @Test
     fun missingAlarmChannelIsUnknownRatherThanAssumedBlocked() {
         assertEquals(SetupState.UNKNOWN, NotificationSetupStatusPolicy.alarmChannel(null).state)
     }
@@ -29,10 +58,18 @@ class NotificationSetupStatusPolicyTest {
     }
 
     @Test
-    fun availableAlarmChannelIsVerified() {
+    fun defaultAlarmChannelRequiresOwnerActionForFullScreenEligibility() {
+        assertEquals(
+            SetupState.ACTION_REQUIRED,
+            NotificationSetupStatusPolicy.alarmChannel(NotificationManager.IMPORTANCE_DEFAULT).state
+        )
+    }
+
+    @Test
+    fun highImportanceAlarmChannelIsVerifiedForFullScreenEligibility() {
         assertEquals(
             SetupState.VERIFIED,
-            NotificationSetupStatusPolicy.alarmChannel(NotificationManager.IMPORTANCE_DEFAULT).state
+            NotificationSetupStatusPolicy.alarmChannel(NotificationManager.IMPORTANCE_HIGH).state
         )
     }
 }

@@ -66,6 +66,11 @@ for feature in (
     if declaration is None or declaration.get(ANDROID + "required") != "false":
         errors.append(feature + " must remain optional because its feature is not required for core protection")
 
+for permission in ("android.permission.READ_EXTERNAL_STORAGE", "android.permission.WRITE_EXTERNAL_STORAGE"):
+    element = next((item for item in manifest.findall("uses-permission") if item.get(ANDROID + "name") == permission), None)
+    if element is not None and element.get(ANDROID + "maxSdkVersion") != "28":
+        errors.append(permission + " must be capped at API 28; newer Android uses app-owned MediaStore access")
+
 for permission in (
     # RANGING is only required to create sessions; this app performs local capability
     # inspection only and deliberately does not request that dangerous permission.
@@ -78,6 +83,7 @@ for permission in (
     "android.permission.READ_CONTACTS",
     "android.permission.SEND_SMS",
     "android.permission.READ_SMS",
+    "android.permission.READ_MEDIA_IMAGES",
 ):
     if permission in permissions:
         errors.append("Unapproved sensitive permission declared: " + permission)
@@ -97,8 +103,29 @@ for name, element in legacy_bluetooth.items():
 if application is None:
     errors.append("Manifest application element is missing")
 else:
+    if application.get(ANDROID + "name") != ".ThiefAlertSeQureApplication":
+        errors.append("Application must run startup recovery for interrupted configuration restores")
     if application.get(ANDROID + "allowBackup") != "false":
         errors.append("Application backup must remain disabled")
+    if application.get(ANDROID + "fullBackupContent") != "@xml/backup_rules":
+        errors.append("Legacy Android backup must use explicit exclusion rules")
+    if application.get(ANDROID + "dataExtractionRules") != "@xml/data_extraction_rules":
+        errors.append("Android 12+ cloud and device-transfer backup must use explicit exclusion rules")
+    backup_rules = ROOT / "app/src/main/res/xml/backup_rules.xml"
+    extraction_rules = ROOT / "app/src/main/res/xml/data_extraction_rules.xml"
+    if not backup_rules.is_file() or not extraction_rules.is_file():
+        errors.append("Explicit no-backup rule resources are missing")
+    if backup_rules.is_file() and extraction_rules.is_file():
+        legacy_xml = ET.parse(backup_rules).getroot()
+        extraction_xml = ET.parse(extraction_rules).getroot()
+        if legacy_xml.tag != "full-backup-content" or not legacy_xml.findall("exclude"):
+            errors.append("Legacy backup rules must exclude all app-owned data")
+        if extraction_xml.tag != "data-extraction-rules":
+            errors.append("Android 12+ extraction rules have an invalid root")
+        for mode in ("cloud-backup", "device-transfer"):
+            section = extraction_xml.find(mode)
+            if section is None or not section.findall("exclude"):
+                errors.append(f"{mode} must explicitly exclude app-owned data")
     if application.get(ANDROID + "usesCleartextTraffic") != "false":
         errors.append("Cleartext traffic must remain disabled")
 
@@ -192,6 +219,6 @@ if errors:
 
 print(
     f"Verified {len(required_permissions)} required permissions, sensitive-permission exclusions, "
-    "explicit owner-consented camera permission and visible-Activity capture boundary, component export boundaries, "
+    "explicit owner-consented camera permission, API-28-capped legacy Gallery permissions and visible-Activity capture boundary, component export boundaries, "
     "foreground-service declarations, package identity, SDK levels, and 10s/8s protection timing invariants."
 )

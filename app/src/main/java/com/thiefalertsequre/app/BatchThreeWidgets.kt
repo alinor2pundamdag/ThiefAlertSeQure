@@ -27,7 +27,8 @@ abstract class BaseProtectionWidgetProvider : AppWidgetProvider() {
             ProtectionMonitorService.KEY_ENABLED,
             ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
-        val monitor = monitorEnabled && ProtectionMonitorService.isRunning
+        val activeProtectionRequiresMonitor = state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN
+        val monitor = ProtectionMonitorService.isRunning && (monitorEnabled || activeProtectionRequiresMonitor)
         val now = System.currentTimeMillis()
         val modeLabel = when (state.mode) {
             ProtectionMode.DISARMED -> "NOT ARMED"

@@ -29,6 +29,7 @@ import androidx.fragment.app.FragmentActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import java.util.concurrent.Executors
 
 class MainActivity : FragmentActivity() {
     private lateinit var status: TextView
@@ -43,7 +44,10 @@ class MainActivity : FragmentActivity() {
     private var fullScreenAccessButton: MaterialButton? = null
     private var biometricPrompt: BiometricPrompt? = null
     private var autoAuthenticationRequested = false
+    private var privacyScreenVisible = false
+    private var notificationPermissionAskedThisSession = false
     private var lastBatchThreeRefreshAt = 0L
+    private val maintenanceExecutor = Executors.newSingleThreadExecutor()
 
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -68,25 +72,54 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    private val privacyRecoveryPoll = object : Runnable {
+        override fun run() {
+            if (isFinishing || isDestroyed || !privacyScreenVisible) return
+            if (ProtectionStore(this@MainActivity).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                window.decorView.removeCallbacks(this)
+                buildDashboard()
+                return
+            }
+            window.decorView.postDelayed(this, 500L)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val introPrefs = getSharedPreferences("batch_three_intro_v1", MODE_PRIVATE)
-        val introCompleted = SafePreferences.boolean(introPrefs, "completed", false)
+        val configurationRecovered = !ConfigurationBackup.isRestoreOrRecoveryInProgress() &&
+            ConfigurationBackup.recoverPendingRestore(this)
+        if (!configurationRecovered) {
+            android.widget.Toast.makeText(
+                this,
+                "An interrupted settings restore could not be recovered. Background monitoring remains paused; review settings recovery before arming.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
+        val introPrefs = getSharedPreferences(AppLaunchIntroPolicy.PREFS, MODE_PRIVATE)
         val protectionModeAtLaunch = ProtectionStore(this).read().mode
-        // Never let a cosmetic first-run sequence delay an active countdown or owner authentication.
-        if (!introCompleted && protectionModeAtLaunch == ProtectionMode.DISARMED) {
+        val installedVersionCode = AppLaunchIntroPolicy.currentVersionCode(this)
+        val lastIntroVersionCode = AppLaunchIntroPolicy.lastCompletedVersionCode(introPrefs, installedVersionCode)
+        // Show the cinematic intro once per installed app version, but never delay active protection or owner authentication.
+        if (AppLaunchIntroPolicy.shouldShow(lastIntroVersionCode, installedVersionCode, protectionModeAtLaunch == ProtectionMode.DISARMED)) {
             startActivity(Intent(this, SeismicGenesisIntroActivity::class.java))
             finish()
             return
         }
-        // Enforce the optional photo-vault retention window when the owner opens the app.
-        runCatching { CameraEvidenceVault.entries(this) }
+        // Prune both app-managed photo stores off the main thread; keep startup responsive.
+        maintenanceExecutor.execute {
+            runCatching { CameraEvidenceVault.entries(applicationContext) }
+            runCatching { CameraEvidenceMediaStore.enforceRetention(applicationContext) }
+        }
         applyAlarmWindowPolicy()
 
-        val privacyDecision = SafePreferences.string(getSharedPreferences("privacy_notice_v5", MODE_PRIVATE), "decision", null)
+        val privacyDecision = SafePreferences.string(getSharedPreferences(PRIVACY_NOTICE_PREFS, MODE_PRIVATE), "decision", null)
         // Require acknowledgement of this updated notice on every existing
         // install once; it now discloses the optional alarm flashlight and its safety toggle.
-        if (privacyDecision != "acknowledged") {
+        // Privacy acknowledgement remains mandatory for normal app use, but it must
+        // never cover the active-alarm recovery UI or delay Android owner authentication.
+        if (privacyDecision != "acknowledged" &&
+            protectionModeAtLaunch != ProtectionMode.ALARM_TRIGGERED
+        ) {
             showPrivacyScreen()
             return
         }
@@ -94,6 +127,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun showPrivacyScreen() {
+        privacyScreenVisible = true
         val scroll = ScrollView(this).apply {
             isFillViewport = true
             setBackgroundColor(getColor(R.color.tas_background))
@@ -127,14 +161,14 @@ class MainActivity : FragmentActivity() {
         body.addView(label("Data and privacy", 18f, getColor(R.color.tas_text), true), matchWrap())
         body.addView(space(8))
         body.addView(label(
-            "The app does not require an account, analytics, advertising, or a cloud backend. Internet access is used only when you manually check for an official GitHub release and download its APK. The app does not upload protection state, event history, evidence, location, credentials, photos, or other personal data. GitHub receives ordinary network request metadata, such as your request IP address, when you check for updates. Protection state, biometric-failure cooldown counters, a bounded local event history, monitor preferences, and AES-GCM encrypted local evidence metadata are stored on this device. Optional front-camera photos are stored separately in an AES-GCM encrypted local vault only after explicit owner opt-in and successful Android owner authentication that disarms a latched alarm while this app is visible. A cached location fix or one bounded current GPS/network location request (20-second timeout) is saved only after you explicitly request it and grant location permission. The metadata evidence vault can be exported or restored only through a password-protected file you choose; camera photos can be exported individually. Backup passwords are not stored. Selected audio remains with its Android document provider; the app retains only the access grant and URI. Your PIN, pattern, password, and biometric templates are never collected or stored by this app; Android performs verification.",
+            "The app does not require an account, analytics, advertising, or a cloud backend. Internet access is used only when you manually check for an official GitHub release and download its APK. The app does not upload protection state, event history, evidence, location, credentials, photos, or other personal data. GitHub receives ordinary network request metadata, such as your request IP address, when you check for updates. Protection state, biometric-failure cooldown counters, a bounded local event history, monitor preferences, and AES-GCM encrypted local evidence metadata are stored on this device. Optional front-camera photos are saved as normal, unencrypted images in Pictures/ThiefAlertSeQure and appear in Gallery by default, only after explicit owner opt-in and successful Android owner authentication that disarms a latched alarm while this app is visible. Settings can enable AES-GCM encryption for future captures, moving them to the private app vault instead of Gallery. Existing app-owned Gallery photos can be moved through the explicit verified migration action in Settings; each encrypted copy is read back and checked before an unchanged original is removed. On Android 8–9, only Gallery rows recorded in the app's encrypted private ownership index can be verified or migrated; older unindexed files are left untouched. Android 10+ additionally verifies MediaStore owner attribution. Existing encrypted-vault photos remain encrypted when future-capture storage changes. A cached location fix or one bounded current GPS/network location request (20-second timeout) is saved only after you explicitly request it and grant location permission. The metadata evidence vault can be exported or restored only through a password-protected file you choose; camera photos can be exported individually. Backup passwords are not stored. Selected audio remains with its Android document provider; the app retains only the access grant and URI. Device Intelligence reads manufacturer/model, Android compatibility, battery/thermal, permission, and protection-readiness information locally. If you explicitly export diagnostics, the redacted report may include those device/protection fields and event codes; Android writes it only to the destination you choose, which may be cloud-backed. The app does not upload the report. It excludes serial, IMEI, MAC/Wi-Fi identifiers, precise location, photo content, credentials, and build fingerprint. Your PIN, pattern, password, and biometric templates are never collected or stored by this app; Android performs verification.",
             14f, getColor(R.color.tas_muted), false
         ), matchWrap())
         body.addView(space(16))
         body.addView(label("System access and limitations", 18f, getColor(R.color.tas_text), true), matchWrap())
         body.addView(space(8))
         body.addView(label(
-            "The app may use boot and charger broadcasts, alarm scheduling, notifications, alarm audio, the camera flashlight's Android torch control while the alarm is active, and foreground services. Five optional built-in alarm tones and owner-selected custom audio are stored locally. The flash feature does not request camera permission and does not capture images. Separately, you may explicitly enable optional front-camera photo evidence in Settings; CAMERA permission is requested only after that choice, and one photo is captured only after a successful owner PIN/password or supported strong-biometric verification that disarms a latched alarm while the app is visible. Android displays its camera privacy indicator. Photos are AES-GCM encrypted with an Android Keystore key, stored locally for up to 30 days (maximum 20 photos), and can be viewed, exported or deleted; they are never uploaded. If permission, camera hardware, or foreground access is unavailable, capture is skipped and alarm/authentication behavior is unaffected. The encrypted local evidence vault stores app-observed event metadata and only cached location snapshots or a one-shot current GPS/network location request that you explicitly initiate after granting location permission; the current request times out after 20 seconds. No background location, continuous tracking, microphone capture, or cloud evidence upload is used. You may export or restore the metadata evidence vault using a separate password-protected file encrypted with AES-GCM; camera photos are exported individually. The backup password is not stored by the app. Flashing light may affect photosensitive users; you can disable the flash alert in Settings. Exact alarm access and notification permission are controlled by Android. Optional Device Owner mode requires separate device enrollment and can restrict device settings. No ordinary app can guarantee protection against force-stop, uninstall, physical shutdown, recovery controls, battery removal, or every manufacturer-specific power policy. Alarm delivery may be delayed when Android restricts background execution or exact alarms.",
+            "The app may use boot and charger broadcasts, alarm scheduling, notifications, alarm audio, the camera flashlight's Android torch control while the alarm is active, and foreground services. Five optional built-in alarm tones and owner-selected custom audio are stored locally. The flash feature does not request camera permission and does not capture images. Separately, you may explicitly enable optional front-camera photo evidence in Settings; CAMERA permission is requested only after that choice, and one photo is captured only after a successful owner PIN/password or supported strong-biometric verification that disarms a latched alarm while the app is visible. Android displays its camera privacy indicator. Photos are saved unencrypted in the app-specific Gallery folder by default, or in the private AES-GCM vault when photo encryption is enabled in Settings. App-managed photos are limited to 20 images and 30 days; Gallery images are visible to anyone with Gallery access. The setting controls future captures. Existing app-owned Gallery photos can be moved through the explicit verified migration action in Settings; originals remain if encrypted read-back, source recheck, deletion, or vault capacity prevents a safe move. On Android 8–9, older Gallery rows without an encrypted ownership-index record are left untouched; Android 10+ uses MediaStore owner attribution. Photos are never uploaded. If permission, camera hardware, or foreground access is unavailable, capture is skipped and alarm/authentication behavior is unaffected. The encrypted local evidence vault stores app-observed event metadata and only cached location snapshots or a one-shot current GPS/network location request that you explicitly initiate after granting location permission; the current request times out after 20 seconds. No background location, continuous tracking, microphone capture, or cloud evidence upload is used. You may export or restore the metadata evidence vault using a separate password-protected file encrypted with AES-GCM; camera photos are exported individually. The backup password is not stored by the app. Flashing light may affect photosensitive users; you can disable the flash alert in Settings. Exact alarm access and notification permission are controlled by Android. Optional Device Owner mode requires separate device enrollment and can restrict device settings. No ordinary app can guarantee protection against force-stop, uninstall, physical shutdown, recovery controls, battery removal, or every manufacturer-specific power policy. Alarm delivery may be delayed when Android restricts background execution or exact alarms.",
             14f, getColor(R.color.tas_muted), false
         ), matchWrap())
         body.addView(space(16))
@@ -148,7 +182,7 @@ class MainActivity : FragmentActivity() {
         root.addView(notice, matchWrap())
         root.addView(space(22))
         root.addView(button("I understand & continue") {
-            getSharedPreferences("privacy_notice_v5", MODE_PRIVATE).edit()
+            getSharedPreferences(PRIVACY_NOTICE_PREFS, MODE_PRIVATE).edit()
                 .putString("decision", "acknowledged").putLong("decision_at", System.currentTimeMillis()).apply()
             buildDashboard()
         }, matchWrap())
@@ -157,9 +191,15 @@ class MainActivity : FragmentActivity() {
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
         ThemeRuntime.apply(this, scroll)
+        // If a countdown reaches ALARM_TRIGGERED while this first-run notice is open,
+        // replace the notice with owner recovery immediately; never cover authentication.
+        window.decorView.removeCallbacks(privacyRecoveryPoll)
+        window.decorView.postDelayed(privacyRecoveryPoll, 500L)
     }
 
     private fun buildDashboard() {
+        privacyScreenVisible = false
+        window.decorView.removeCallbacks(privacyRecoveryPoll)
         val scroll = ScrollView(this).apply {
             isFillViewport = true
             setBackgroundColor(getColor(R.color.tas_background))
@@ -387,11 +427,19 @@ class MainActivity : FragmentActivity() {
         status.removeCallbacks(ticker)
         status.post(ticker)
 
-        if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED && Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        requestNotificationPermissionIfNeeded()
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (
+            notificationPermissionAskedThisSession ||
+            Build.VERSION.SDK_INT < 33 ||
+            ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED ||
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        ) return
+        // Do not interrupt alarm recovery. Ask once the owner has returned to normal app use.
+        notificationPermissionAskedThisSession = true
+        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     override fun onResume() {
@@ -400,7 +448,16 @@ class MainActivity : FragmentActivity() {
         applyAlarmWindowPolicy()
         reconcileCharging()
         ManagedProtectionController.startIfConfigured(this)
-        if (!::status.isInitialized) return
+        if (!::status.isInitialized) {
+            if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                buildDashboard()
+            } else {
+                window.decorView.removeCallbacks(privacyRecoveryPoll)
+                window.decorView.postDelayed(privacyRecoveryPoll, 500L)
+            }
+            return
+        }
+        requestNotificationPermissionIfNeeded()
         ThemeRuntime.apply(this, window.decorView)
         if (::setupSummary.isInitialized) setupSummary.text = SetupStatusSnapshot.read(this).dashboardSummary()
         render()
@@ -412,12 +469,24 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        launchAutomaticOwnerAuthenticationIfNeeded()
+        if (!::status.isInitialized && ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+            buildDashboard()
+        } else {
+            launchAutomaticOwnerAuthenticationIfNeeded()
+        }
     }
 
     override fun onPause() {
+        window.decorView.removeCallbacks(privacyRecoveryPoll)
         if (::status.isInitialized) status.removeCallbacks(ticker)
         super.onPause()
+    }
+
+    override fun onDestroy() {
+        window.decorView.removeCallbacks(privacyRecoveryPoll)
+        if (::status.isInitialized) status.removeCallbacks(ticker)
+        maintenanceExecutor.shutdown()
+        super.onDestroy()
     }
 
     private fun applyAlarmWindowPolicy() {
@@ -545,6 +614,29 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun reconcileCharging() {
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress() ||
+            !ConfigurationBackup.recoverPendingRestore(this)
+        ) {
+            val deferredState = ProtectionStore(this).read()
+            if (deferredState.mode == ProtectionMode.ALARM_TRIGGERED) {
+                runCatching {
+                    ContextCompat.startForegroundService(
+                        this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START)
+                    )
+                }.onFailure {
+                    LocalTamperHistory.record(this, "activity_alarm_restore_failed", it.javaClass.simpleName + ": " + it.message)
+                    AlarmScheduler.scheduleImmediateRecovery(this)
+                }
+            } else if (deferredState.mode == ProtectionMode.ARMED ||
+                deferredState.mode == ProtectionMode.COUNTDOWN
+            ) {
+                ProtectionMonitorRecoveryNotice.show(
+                    this,
+                    "Background monitoring is deferred until the interrupted settings restore is safely recovered. Existing protection state is preserved."
+                )
+            }
+            return
+        }
         // A battery snapshot is state evidence, not proof of a physical transition.
         // Only PowerTransitionReceiver may create a charger countdown.
         PowerTransitionCoordinator.initializeBaseline(this)
@@ -554,21 +646,25 @@ class MainActivity : FragmentActivity() {
             getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE),
             ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
-        // Owner opt-out is authoritative for every non-triggered state. A
-        // connected snapshot may arm only while monitoring is enabled.
+        // A stale or legacy OFF preference must never disarm active protection.
+        // Active ARMED/COUNTDOWN state owns the monitor requirement.
         val state = when {
-            !monitorEnabled && current.mode != ProtectionMode.ALARM_TRIGGERED -> {
-                val update = store.updatePersisted { old ->
-                    ProtectionEngine.disableMonitoring(old, System.currentTimeMillis())
+            !monitorEnabled &&
+                (current.mode == ProtectionMode.ARMED || current.mode == ProtectionMode.COUNTDOWN) -> {
+                val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+                val repaired = store.runIfProtectionActive {
+                    monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
                 }
-                if (!update.persisted) {
+                if (repaired == false) {
                     LocalTamperHistory.record(
-                        this, "dashboard_monitor_opt_out_state_persist_failed",
-                        "Monitoring is disabled, but the protection state was not durably disarmed; the prior state remains authoritative"
+                        this, "active_monitor_preference_repair_failed",
+                        "Active protection remains authoritative, but the monitor-enabled preference could not be restored"
                     )
                 }
-                update.state
+                A2BluetoothReceiverController.sync(this)
+                store.read()
             }
+            !monitorEnabled && current.mode == ProtectionMode.DISARMED -> current
             monitorEnabled && current.mode != ProtectionMode.ALARM_TRIGGERED &&
                 ExternalPowerState.readConnected(this) == true ->
                 PowerTransitionCoordinator.confirmConnectedAndArm(this, "Connected power confirmed during app reconciliation")
@@ -596,6 +692,18 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun syncProtectionMonitor(state: ProtectionState) {
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress() ||
+            !ConfigurationBackup.recoverPendingRestore(this)
+        ) {
+            stopService(Intent(this, ProtectionMonitorService::class.java))
+            if (state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN) {
+                ProtectionMonitorRecoveryNotice.show(
+                    this,
+                    "Active protection is preserved, but monitoring is deferred until settings recovery completes."
+                )
+            }
+            return
+        }
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
         val enabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         if (ProtectionMonitorPolicy.shouldRun(enabled, state.mode)) {
@@ -604,6 +712,10 @@ class MainActivity : FragmentActivity() {
             }.onFailure {
                 LocalTamperHistory.record(this, "monitor_start_blocked", it.javaClass.simpleName + ": " + it.message)
                 prefs.edit().putBoolean(ProtectionMonitorService.KEY_RUNNING, false).apply()
+                ProtectionMonitorRecoveryNotice.show(
+                    this,
+                    "Protection remains active, but Android rejected background monitoring startup. Open the app to review permissions and restore monitoring."
+                )
             }
         } else if (!enabled || state.mode == ProtectionMode.DISARMED || state.mode == ProtectionMode.ALARM_TRIGGERED) {
             stopService(Intent(this, ProtectionMonitorService::class.java))
@@ -839,17 +951,25 @@ class MainActivity : FragmentActivity() {
         } else {
             "Independent motion alarm: OFF; charger-removal-only behavior is active."
         }
-        val monitorMessage = if (SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
-            "Charger protection monitor: ENABLED; keep its persistent notification visible. $motionMessage"
-        } else {
-            "Charger protection monitor: OFF by owner choice; automatic plug/unplug detection is unavailable until re-enabled."
+        val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        val monitorRunning = ProtectionMonitorService.isRunning
+        val activeProtectionRequiresMonitor = state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN
+        val monitorMessage = when {
+            state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN ->
+                if (monitorRunning) "Charger protection monitor: ACTIVE for the current armed/countdown state. The monitor remains running until protection is disarmed. $motionMessage"
+                else "Charger protection monitor: NOT CONFIRMED while protection is active. Open Setup Status and review Android background restrictions. $motionMessage"
+            state.mode == ProtectionMode.ALARM_TRIGGERED ->
+                "The latched theft alarm is handled by AlarmService. $motionMessage"
+            monitorEnabled ->
+                "Charger protection monitor: ENABLED; keep its persistent notification visible. $motionMessage"
+            else ->
+                "Charger protection monitor: OFF by owner choice while protection is disarmed; automatic plug/unplug detection is unavailable until re-enabled."
         }
         val keyguard = getSystemService(KeyguardManager::class.java)
         val secureCredentialReady = keyguard.isDeviceSecure
         val exactAlarmReady = Build.VERSION.SDK_INT < 31 || getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
-        val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
-        val monitorRunning = ProtectionMonitorService.isRunning
-        shield.update(state.mode, monitorEnabled && monitorRunning)
+        val monitorActive = monitorRunning && (monitorEnabled || activeProtectionRequiresMonitor)
+        shield.update(state.mode, monitorActive)
         val bootIdentityReady = ProtectionClock.bootCount(this) >= 0
         val bootIdentityMessage = if (bootIdentityReady) {
             "Boot identity: available for monotonic countdown recovery."
@@ -863,8 +983,10 @@ class MainActivity : FragmentActivity() {
         if (!notificationsAllowed) readinessIssues.add("Allow notifications")
         if (!exactAlarmReady) readinessIssues.add("Allow Alarms & reminders for exact deadline recovery")
         if (!alarmChannelReady) readinessIssues.add("Set Anti-theft alarm notification importance to High")
-        if (!monitorEnabled) readinessIssues.add("Enable charger monitoring")
-        if (monitorEnabled && state.mode != ProtectionMode.ALARM_TRIGGERED && !monitorRunning) {
+        if (!monitorEnabled && state.mode == ProtectionMode.DISARMED) readinessIssues.add("Enable charger monitoring")
+        if ((monitorEnabled || activeProtectionRequiresMonitor) &&
+            state.mode != ProtectionMode.ALARM_TRIGGERED && !monitorRunning
+        ) {
             readinessIssues.add("Wait for the charger-monitor foreground service to start")
         }
         val batteryPowerManager = getSystemService(PowerManager::class.java)
@@ -1080,17 +1202,41 @@ class MainActivity : FragmentActivity() {
             } else {
                 "Owner authenticated. Alarm stopped. Protection remains disarmed until the charger is reconnected."
             }
-            if (CameraEvidenceCapture.isEnabled(this) &&
-                checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-            ) {
-                details.append(" Front-camera evidence capture is starting.")
-            }
-            // Optional photo evidence runs only after a fresh successful proof and while this Activity is visible.
-            runCatching { CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this) }
-                .onFailure {
-                    LocalEvidenceVault.recordAsync(this, "camera_evidence_capture_failed", "Optional camera evidence failed safely: ${it.javaClass.simpleName}")
-                    LocalTamperHistory.record(this, "camera_evidence_capture_failed", "Optional camera evidence failed safely: ${it.javaClass.simpleName}")
+            val settingsRecovered = !ConfigurationBackup.isRestoreOrRecoveryInProgress() &&
+                ConfigurationBackup.recoverPendingRestore(this)
+            if (settingsRecovered) {
+                if (next.mode == ProtectionMode.DISARMED) {
+                    ManagedProtectionController.startIfConfigured(this)
                 }
+                val authCameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
+                val authCameraPermissionGranted = checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                when {
+                    authCameraEvidenceEnabled && authCameraPermissionGranted ->
+                        details.append(" Front-camera evidence capture is starting.")
+                    authCameraEvidenceEnabled ->
+                        details.append(" Front-camera evidence is enabled, but CAMERA permission is missing; no photo was captured.")
+                    else ->
+                        details.append(" Front-camera evidence is OFF in Settings; no photo was captured.")
+                }
+                // Optional photo evidence runs only after a fresh successful proof and while this Activity is visible.
+                runCatching { CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this) }
+                    .onFailure {
+                        LocalEvidenceVault.recordAsync(this, "camera_evidence_capture_failed", "Optional camera evidence failed safely: ${it.javaClass.simpleName}")
+                        LocalTamperHistory.record(this, "camera_evidence_capture_failed", "Optional camera evidence failed safely: ${it.javaClass.simpleName}")
+                    }
+            } else {
+                details.append(" Optional camera evidence was skipped while interrupted settings recovery is pending.")
+            }
+            // Active-alarm recovery bypasses the first-run notice so authentication is never
+            // blocked. Once the owner has disarmed the alarm, require acknowledgement before
+            // returning to normal dashboard use.
+            val privacyDecision = SafePreferences.string(
+                getSharedPreferences(PRIVACY_NOTICE_PREFS, MODE_PRIVATE), "decision", null
+            )
+            if (privacyDecision != "acknowledged") {
+                showPrivacyScreen()
+                return
+            }
         } else {
             syncProtectionMonitor(ProtectionStore(this).read())
         }
@@ -1173,6 +1319,7 @@ class MainActivity : FragmentActivity() {
     }
 
     companion object {
+        const val PRIVACY_NOTICE_PREFS = "privacy_notice_v9"
         const val ALARM_DISPLAY_PREFS = "alarm_display_settings_v1"
         const val KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN = "show_alarm_screen_over_lockscreen"
         private const val REQUEST_DEVICE_CREDENTIAL = 4102

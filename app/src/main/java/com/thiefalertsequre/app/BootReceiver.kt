@@ -9,16 +9,54 @@ import androidx.core.content.ContextCompat
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // A reboot invalidates every previous Bluetooth connection baseline even
+        // when settings recovery is pending. Do this before any early return.
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED &&
+            !A2BluetoothReceiverController.resetBaselineForBoot(context)
+        ) {
+            LocalTamperHistory.record(
+                context, "a2_boot_baseline_reset_failed",
+                "A2 manifest receiver remains disabled until stale Bluetooth baselines are safely cleared"
+            )
+        }
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress()) {
+            LocalTamperHistory.record(
+                context, "configuration_restore_recovery_pending",
+                "Boot/package/exact-alarm callback was deferred while an in-process settings restore is active"
+            )
+            return
+        }
+        if (!ConfigurationBackup.recoverPendingRestore(context)) {
+            LocalTamperHistory.record(
+                context, "configuration_restore_recovery_pending",
+                "Boot/package/exact-alarm reconciliation was deferred until the interrupted settings restore can be recovered"
+            )
+            if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+                A2BluetoothReceiverController.deferBaselineResetForBoot(context)
+            }
+            val state = ProtectionStore(context).read()
+            when (state.mode) {
+                ProtectionMode.ALARM_TRIGGERED -> {
+                    scheduleAlarmRecovery(context, "Latched alarm recovery takes priority over interrupted settings recovery")
+                }
+                ProtectionMode.COUNTDOWN -> {
+                    // Preserve/recreate the consumed countdown callback. On a new
+                    // boot AlarmScheduler detects the stale monotonic clock and
+                    // schedules a reconciliation callback instead of firing early.
+                    scheduleCountdownWithRetry(
+                        context, state, "interrupted_settings_recovery"
+                    )
+                }
+                ProtectionMode.ARMED, ProtectionMode.DISARMED -> Unit
+            }
+            ProtectionMonitorRecoveryNotice.show(
+                context, "An interrupted settings restore must be recovered before background monitoring can safely resume. Existing alarm/countdown state is preserved and deadlines retry automatically."
+            )
+            return
+        }
         // BOOT_COMPLETED is authoritative even on devices where Settings.Global.BOOT_COUNT
         // is unreadable. Invalidate the previous boot's charger baseline before processing
         // any later power event; package-update and exact-alarm callbacks preserve it.
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            A2DisconnectScheduler.clearAll(context)
-            val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
-            runCatching { TrustedBluetoothRegistry.clearBaselines(monitorPrefs) }
-                .onFailure { LocalTamperHistory.record(context, "a2_boot_baseline_reset_failed", it.javaClass.simpleName + ": " + it.message) }
-            A2BluetoothReceiverController.sync(context)
-        }
         PowerTransitionCoordinator.initializeBaseline(
             context,
             forceBootReconciliation = intent.action == Intent.ACTION_BOOT_COMPLETED
@@ -27,7 +65,7 @@ class BootReceiver : BroadcastReceiver() {
             if (Build.VERSION.SDK_INT >= 31 && context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()) {
                 val state = enforceMonitorOptOut(context)
                 when (state.mode) {
-                    ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
+                    ProtectionMode.COUNTDOWN -> scheduleCountdownWithRetry(context, state, "exact_alarm_access")
                     ProtectionMode.ALARM_TRIGGERED -> scheduleAlarmRecovery(
                         context, "Protection alarm is active after reboot or app update"
                     )
@@ -59,7 +97,7 @@ class BootReceiver : BroadcastReceiver() {
             }
         }
         when (next.mode) {
-            ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
+            ProtectionMode.COUNTDOWN -> scheduleCountdownWithRetry(context, next, "boot")
             ProtectionMode.ALARM_TRIGGERED -> scheduleAlarmRecovery(
                         context, "Protection alarm is active after reboot or app update"
                     )
@@ -71,8 +109,24 @@ class BootReceiver : BroadcastReceiver() {
     /** Package replacement preserves the current boot's monotonic countdown deadline. */
     private fun restoreAfterAppUpdate(context: Context) {
         val state = enforceMonitorOptOut(context)
+        if (state.mode == ProtectionMode.DISARMED) {
+            // The updater permits package replacement only while DISARMED. Invalidate
+            // pre-update A2 callbacks before the monitor can auto-arm this installation.
+            val epochInvalidated = ProtectionStore(context).markA2DeadlinesInvalidated()
+            val deadlinesCleared = A2DisconnectScheduler.clearAll(context)
+            if (!epochInvalidated || !deadlinesCleared) {
+                LocalTamperHistory.record(
+                    context, "app_update_a2_deadline_cleanup_incomplete",
+                    "A2 package-update invalidation/cleanup was incomplete; any callback must still pass state, trust, boot and deadline-epoch validation"
+                )
+                ProtectionMonitorRecoveryNotice.show(
+                    context,
+                    "Trusted-device deadline cleanup after the app update could not be fully confirmed. Open the app and review Bluetooth monitoring before relying on A2 alerts."
+                )
+            }
+        }
         when (state.mode) {
-            ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
+            ProtectionMode.COUNTDOWN -> scheduleCountdownWithRetry(context, state, "app_update")
             ProtectionMode.ALARM_TRIGGERED -> scheduleAlarmRecovery(
                         context, "Protection alarm is active after reboot or app update"
                     )
@@ -82,11 +136,32 @@ class BootReceiver : BroadcastReceiver() {
         LocalTamperHistory.record(context, "app_update_state_restored", "Persisted protection state re-evaluated after package replacement")
     }
 
+    private fun scheduleCountdownWithRetry(
+        context: Context,
+        state: ProtectionState,
+        source: String
+    ) {
+        if (AlarmScheduler.schedule(
+                context, state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount
+            )
+        ) return
+        AlarmScheduler.scheduleRetry(context, 1_000L)
+        LocalTamperHistory.record(
+            context, "countdown_recovery_schedule_failed",
+            "$source could not schedule the preserved countdown immediately; a one-second retry was requested"
+        )
+    }
+
     private fun scheduleAlarmRecovery(context: Context, reason: String) {
         AlarmRecoveryCoordinator.onStartFailure(context, reason)
     }
 
     private fun startMonitorIfNeeded(context: Context, state: ProtectionState, source: String) {
+        if (!ConfigurationBackup.recoverPendingRestore(context)) {
+            LocalTamperHistory.record(context, "configuration_restore_recovery_pending", "Background monitor startup blocked because an interrupted configuration restore could not be recovered")
+            ProtectionMonitorRecoveryNotice.show(context, "An interrupted settings restore needs recovery before background monitoring can safely resume.")
+            return
+        }
         val enabled = monitorEnabled(context)
         if (!ProtectionMonitorPolicy.shouldRun(enabled, state.mode)) return
         runCatching {
@@ -98,23 +173,36 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     private fun enforceMonitorOptOut(context: Context): ProtectionState {
-        if (monitorEnabled(context)) return ProtectionStore(context).read()
-        A2DisconnectScheduler.clearAll(context)
-        val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
-        runCatching { TrustedBluetoothRegistry.clearBaselines(monitorPrefs) }
-        A2BluetoothReceiverController.sync(context)
-        // Preserve the previous opt-out contract even when Android's sticky
-        // battery snapshot is temporarily unavailable.
         val store = ProtectionStore(context)
-        val update = store.updatePersisted { current ->
-            ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
+        val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        val activeRepair = store.runIfProtectionActive {
+            if (monitorEnabled(context)) true
+            else monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
         }
-        if (!update.persisted) {
+        if (activeRepair != null) {
+            if (!activeRepair) {
+                LocalTamperHistory.record(
+                    context, "active_monitor_preference_repair_failed",
+                    "Boot preserved active protection, but the monitor-enabled preference could not be restored"
+                )
+            }
+            A2BluetoothReceiverController.sync(context)
+            return store.read()
+        }
+        val current = store.read()
+        if (current.mode == ProtectionMode.ALARM_TRIGGERED) return current
+        if (monitorEnabled(context)) return current
+
+        // Owner opt-out may clear optional monitoring state only while the
+        // authoritative protection state is already DISARMED.
+        val deadlinesCleared = A2DisconnectScheduler.clearAll(context)
+        val baselinesCleared = runCatching { TrustedBluetoothRegistry.clearBaselines(monitorPrefs); true }.getOrDefault(false)
+        A2BluetoothReceiverController.sync(context)
+        if (!deadlinesCleared || !baselinesCleared) {
             LocalTamperHistory.record(
-                context, "boot_monitor_opt_out_state_persist_failed",
-                "Monitor is disabled, but the protection state was not durably disarmed; the prior deadline and state remain authoritative"
+                context, "boot_monitor_opt_out_cleanup_incomplete",
+                "Monitor is disabled while DISARMED, but trusted-device cleanup could not be fully confirmed"
             )
-            return update.state
         }
         PowerTransitionCoordinator.resetBaselineToCurrentPower(context, "Protection monitor is disabled")
         return store.read()
