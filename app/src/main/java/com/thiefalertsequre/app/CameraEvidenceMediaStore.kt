@@ -35,16 +35,50 @@ internal object CameraEvidenceMediaStore {
         val unverifiedLegacyPhotos: Int = 0
     )
 
+    private data class SaveAttempt(val uri: Uri?)
+
+    /**
+     * Gallery and encrypted-vault writes share the same state boundary:
+     * DISARMED, or ARMED if a connected charger immediately re-armed after
+     * successful owner authentication. COUNTDOWN, ALARM_TRIGGERED and corrupt
+     * state must never publish a new photo.
+     *
+     * The short bounded MediaStore transaction stays inside ProtectionStore's
+     * state lock so a concurrent charger/deadline transition cannot cross the
+     * authorization check and publish a Gallery image in a forbidden state.
+     */
     @Synchronized
     fun save(context: Context, jpeg: ByteArray): Uri? {
         if (!CameraEvidencePolicy.isValidImageSize(jpeg.size)) return null
         val app = context.applicationContext
+        val store = ProtectionStore(app)
+
+        val disarmedAttempt = store.runIfDisarmed {
+            SaveAttempt(saveWhilePermitted(app, jpeg, pruneRetention = true))
+        }
+        if (disarmedAttempt != null) return disarmedAttempt.uri
+
+        val activeAttempt = store.runIfProtectionActive { currentState ->
+            if (!CameraEvidencePolicy.canPersistPhoto(currentState.mode)) {
+                SaveAttempt(null)
+            } else {
+                SaveAttempt(saveWhilePermitted(app, jpeg, pruneRetention = false))
+            }
+        }
+        return activeAttempt?.uri
+    }
+
+    /** Caller holds the synchronized Gallery lock and an authorized protection-state transaction. */
+    private fun saveWhilePermitted(
+        app: Context,
+        jpeg: ByteArray,
+        pruneRetention: Boolean
+    ): Uri? {
         val resolver = app.contentResolver
         val collection = imageCollectionUri()
         val now = System.currentTimeMillis()
-        // Reserve one Gallery slot before capture. This keeps the hard 20-photo
-        // cap even if protection becomes active before post-insert retention runs.
-        if (ProtectionStore(app).read().mode == ProtectionMode.DISARMED) {
+        // Retention cleanup is destructive and therefore runs only in DISARMED state.
+        if (pruneRetention) {
             runCatching { prune(app, now, maxImages = CameraEvidencePolicy.MAX_IMAGES - 1) }
         }
         val currentGallery = queryOwnedImages(app)
@@ -89,7 +123,7 @@ internal object CameraEvidenceMediaStore {
             )
             return null
         }
-        runCatching { prune(context.applicationContext, now) }
+        if (pruneRetention) runCatching { prune(app, now) }
         val ownershipCheck = queryOwnedImages(app)
         if (!ownershipCheck.success || ownershipCheck.images.none { it.first == uri }) {
             val removed = runCatching { resolver.delete(uri, null, null) == 1 }.getOrDefault(false)
@@ -101,7 +135,6 @@ internal object CameraEvidenceMediaStore {
         }
         return uri
     }
-
     @Synchronized
     fun enforceRetention(context: Context) {
         prune(context.applicationContext, System.currentTimeMillis())
