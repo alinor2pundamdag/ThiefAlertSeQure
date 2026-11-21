@@ -58,10 +58,18 @@ class NotificationSetupStatusPolicyTest {
     }
 
     @Test
-    fun availableAlarmChannelIsVerified() {
+    fun defaultAlarmChannelRequiresOwnerActionForFullScreenEligibility() {
+        assertEquals(
+            SetupState.ACTION_REQUIRED,
+            NotificationSetupStatusPolicy.alarmChannel(NotificationManager.IMPORTANCE_DEFAULT).state
+        )
+    }
+
+    @Test
+    fun highImportanceAlarmChannelIsVerifiedForFullScreenEligibility() {
         assertEquals(
             SetupState.VERIFIED,
-            NotificationSetupStatusPolicy.alarmChannel(NotificationManager.IMPORTANCE_DEFAULT).state
+            NotificationSetupStatusPolicy.alarmChannel(NotificationManager.IMPORTANCE_HIGH).state
         )
     }
 }
