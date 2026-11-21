@@ -11,13 +11,29 @@ class PowerTransitionReceiver : BroadcastReceiver() {
         private val powerEventExecutor = Executors.newSingleThreadExecutor()
 
         fun enqueuePendingRecovery(context: Context) {
+            val app = context.applicationContext
             try {
                 powerEventExecutor.execute {
-                    PowerTransitionCoordinator.recoverPendingDisconnectCandidate(context.applicationContext)
+                    runCatching {
+                        PowerTransitionCoordinator.recoverPendingDisconnectCandidate(app)
+                    }.onFailure { error ->
+                        LocalTamperHistory.record(
+                            app, "pending_unplug_recovery_failed",
+                            error.javaClass.simpleName + ": " + error.message
+                        )
+                    }
+                    runCatching {
+                        PowerTransitionCoordinator.recoverMissedDisconnectAfterServiceRestart(app)
+                    }.onFailure { error ->
+                        LocalTamperHistory.record(
+                            app, "missed_unplug_restart_recovery_failed",
+                            error.javaClass.simpleName + ": " + error.message
+                        )
+                    }
                 }
             } catch (error: Exception) {
                 LocalTamperHistory.record(
-                    context, "pending_unplug_recovery_queue_failed",
+                    app, "pending_unplug_recovery_queue_failed",
                     error.javaClass.simpleName + ": " + error.message
                 )
             }

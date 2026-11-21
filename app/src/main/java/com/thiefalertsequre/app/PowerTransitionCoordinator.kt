@@ -261,6 +261,48 @@ object PowerTransitionCoordinator {
         )
     }
 
+    /**
+     * A manifest receiver cannot be relied on for ACTION_POWER_DISCONNECTED on API 26+.
+     * If Android restarts the sticky monitor service after the runtime receiver was absent,
+     * recover only from a durable same-boot connected baseline while monitoring is still
+     * enabled and protection is still ARMED. The fresh grace begins at recovery detection;
+     * the original physical disconnect time is unknowable.
+     */
+    fun recoverMissedDisconnectAfterServiceRestart(context: Context): ProtectionState {
+        val appContext = context.applicationContext
+        val shouldRecover = synchronized(lock) {
+            val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val monitorPrefs = appContext.getSharedPreferences(
+                ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
+            )
+            PowerTransitionRecoveryPolicy.shouldRecoverMissedDisconnect(
+                monitorEnabled = SafePreferences.boolean(
+                    monitorPrefs, ProtectionMonitorService.KEY_ENABLED, false
+                ),
+                baselineKnown = SafePreferences.boolean(prefs, KNOWN, false),
+                baselineConnected = SafePreferences.boolean(prefs, CONNECTED, false),
+                baselineBootCount = SafePreferences.int(prefs, BASELINE_BOOT_COUNT, -1),
+                currentBootCount = ProtectionClock.bootCount(appContext),
+                baselineGeneration = SafePreferences.long(prefs, GENERATION, -1L),
+                pendingDisconnect = SafePreferences.boolean(prefs, PENDING_DISCONNECT, true),
+                protectionMode = ProtectionStore(appContext).read().mode,
+                liveConnected = ExternalPowerState.readConnected(appContext)
+            )
+        }
+        if (!shouldRecover) return ProtectionStore(appContext).read()
+
+        val eventEpochMs = System.currentTimeMillis()
+        val eventElapsedRealtimeMs = ProtectionClock.elapsedRealtime()
+        val eventBootCount = ProtectionClock.bootCount(appContext)
+        LocalTamperHistory.record(
+            appContext, "missed_unplug_recovery_started",
+            "Same-boot connected baseline conflicted with live disconnected power after monitor service restart; a fresh grace period starts at recovery detection"
+        )
+        return onPowerDisconnected(
+            appContext, eventEpochMs, eventElapsedRealtimeMs, eventBootCount
+        )
+    }
+
     fun onPowerConnected(context: Context): ProtectionState {
         val appContext = context.applicationContext
         // Stop as soon as three consecutive live samples confirm the event.

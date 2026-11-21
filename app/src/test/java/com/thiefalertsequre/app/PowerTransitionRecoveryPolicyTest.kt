@@ -78,4 +78,61 @@ class PowerTransitionRecoveryPolicyTest {
     @Test fun missingCurrentBootIdentityCannotProveSameBoot() {
         assertFalse(PowerTransitionRecoveryPolicy.isSameBoot(12, -1, 50_000L, 51_000L))
     }
+
+    @Test fun missedDisconnectRecoveryRequiresAValidSameBootConnectedArmedBaseline() {
+        assertTrue(
+            PowerTransitionRecoveryPolicy.shouldRecoverMissedDisconnect(
+                monitorEnabled = true,
+                baselineKnown = true,
+                baselineConnected = true,
+                baselineBootCount = 12,
+                currentBootCount = 12,
+                baselineGeneration = 4L,
+                pendingDisconnect = false,
+                protectionMode = ProtectionMode.ARMED,
+                liveConnected = false
+            )
+        )
+    }
+
+    @Test fun missedDisconnectRecoveryRejectsEveryUnsafeOrAmbiguousCondition() {
+        val valid = mapOf(
+            "monitorEnabled" to true,
+            "baselineKnown" to true,
+            "baselineConnected" to true,
+            "baselineBootCount" to 12,
+            "currentBootCount" to 12,
+            "baselineGeneration" to 4L,
+            "pendingDisconnect" to false,
+            "protectionMode" to ProtectionMode.ARMED,
+            "liveConnected" to false
+        )
+        fun evaluate(overrides: Map<String, Any?>): Boolean {
+            val values = valid + overrides
+            return PowerTransitionRecoveryPolicy.shouldRecoverMissedDisconnect(
+                monitorEnabled = values.getValue("monitorEnabled") as Boolean,
+                baselineKnown = values.getValue("baselineKnown") as Boolean,
+                baselineConnected = values.getValue("baselineConnected") as Boolean,
+                baselineBootCount = values.getValue("baselineBootCount") as Int,
+                currentBootCount = values.getValue("currentBootCount") as Int,
+                baselineGeneration = values.getValue("baselineGeneration") as Long,
+                pendingDisconnect = values.getValue("pendingDisconnect") as Boolean,
+                protectionMode = values.getValue("protectionMode") as ProtectionMode,
+                liveConnected = values["liveConnected"] as Boolean?
+            )
+        }
+        assertFalse(evaluate(mapOf("monitorEnabled" to false)))
+        assertFalse(evaluate(mapOf("baselineKnown" to false)))
+        assertFalse(evaluate(mapOf("baselineConnected" to false)))
+        assertFalse(evaluate(mapOf("baselineBootCount" to -1)))
+        assertFalse(evaluate(mapOf("currentBootCount" to 13)))
+        assertFalse(evaluate(mapOf("baselineGeneration" to -1L)))
+        assertFalse(evaluate(mapOf("pendingDisconnect" to true)))
+        assertFalse(evaluate(mapOf("protectionMode" to ProtectionMode.DISARMED)))
+        assertFalse(evaluate(mapOf("protectionMode" to ProtectionMode.COUNTDOWN)))
+        assertFalse(evaluate(mapOf("protectionMode" to ProtectionMode.ALARM_TRIGGERED)))
+        assertFalse(evaluate(mapOf("liveConnected" to true)))
+        assertFalse(evaluate(mapOf("liveConnected" to null)))
+    }
+
 }

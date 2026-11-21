@@ -28,10 +28,12 @@ import androidx.core.content.ContextCompat
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * User-visible persistent monitor for motion, battery-threshold alerts and
- * trusted Bluetooth fast-path handling. Protected charger connect/disconnect
- * broadcasts are delivered by PowerTransitionReceiver even when this service
- * or process is absent; motion sensing remains ARMED-only.
+ * User-visible persistent monitor for charger transitions, motion, battery-threshold
+ * alerts and trusted Bluetooth fast-path handling. Charger broadcasts are registered
+ * dynamically while this foreground service is active. A sticky-service restart can
+ * reconcile a missed same-boot unplug from a durable connected baseline; a stopped
+ * or force-stopped process cannot rely on manifest power broadcasts. Motion sensing
+ * remains ARMED-only.
  */
 class ProtectionMonitorService : Service(), SensorEventListener {
     private val handler = Handler(Looper.getMainLooper())
@@ -43,7 +45,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     private var accelerometer: Sensor? = null
     private var sensorRegistered = false
     private var receiverRegistered = false
+    private var powerTransitionReceiverRegistered = false
     private var bluetoothReceiverRegistered = false
+    private val powerTransitionReceiver = PowerTransitionReceiver()
     private val pendingBluetoothRunnables = mutableMapOf<String, Runnable>()
     private val bluetoothSeparationReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -168,6 +172,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
 
         registerSystemReceiver()
+        registerPowerTransitionReceiver()
         registerBluetoothSeparationReceiver()
         if (bluetoothReceiverRegistered && !A2DisconnectScheduler.rescheduleAll(this)) {
             LocalTamperHistory.record(
@@ -191,6 +196,38 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
         ContextCompat.registerReceiver(this, systemReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         receiverRegistered = true
+    }
+
+    /**
+     * Power connected/disconnected broadcasts are not Android 8+ manifest implicit-broadcast
+     * exceptions. Register at runtime only while the user-visible monitor FGS is active.
+     */
+    private fun registerPowerTransitionReceiver() {
+        if (powerTransitionReceiverRegistered) return
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_POWER_CONNECTED)
+            addAction(Intent.ACTION_POWER_DISCONNECTED)
+        }
+        runCatching {
+            ContextCompat.registerReceiver(
+                this, powerTransitionReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+        }.onSuccess {
+            powerTransitionReceiverRegistered = true
+            isPowerTransitionReceiverRegistered = true
+            LocalTamperHistory.record(
+                this, "power_transition_runtime_receiver_registered",
+                "Charger connect/disconnect events are registered while the foreground monitor is active"
+            )
+        }.onFailure { error ->
+            LocalTamperHistory.record(
+                this, "power_transition_runtime_receiver_registration_failed",
+                error.javaClass.simpleName + ": " + error.message
+            )
+            ProtectionMonitorRecoveryNotice.show(
+                this, "Charger transition monitoring could not register. Reopen the app to restore charger detection."
+            )
+        }
     }
 
     private fun registerBluetoothSeparationReceiver() = A2DisconnectStateLock.withLock {
@@ -335,7 +372,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     }
 
     private fun reconcileStablePowerState() {
-        // Service startup/restart cannot synthesize a physical unplug transition.
+        // A disconnected snapshot alone never creates a transition here. The
+        // separate same-boot restart-recovery path requires a prior connected
+        // baseline, ARMED state, monitor opt-in and stable live-state confirmation.
         PowerTransitionCoordinator.initializeBaseline(this)
         if (ExternalPowerState.readConnected(this) == true) {
             prefs.edit().putBoolean(KEY_BATTERY_ALERT_FIRED, false)
@@ -696,6 +735,9 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         unregisterMotionSensor()
         if (receiverRegistered) runCatching { unregisterReceiver(systemReceiver) }
         receiverRegistered = false
+        if (powerTransitionReceiverRegistered) runCatching { unregisterReceiver(powerTransitionReceiver) }
+        powerTransitionReceiverRegistered = false
+        isPowerTransitionReceiverRegistered = false
         A2DisconnectStateLock.withLock {
             serviceDestroyed = true
             pendingBluetoothRunnables.values.forEach(handler::removeCallbacks)
@@ -717,6 +759,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         @Volatile var isRunning: Boolean = false
             private set
         @Volatile var isBluetoothReceiverRegistered: Boolean = false
+        @Volatile var isPowerTransitionReceiverRegistered: Boolean = false
         const val PREFS = "protection_monitor_v1"
         const val KEY_ENABLED = "monitor_enabled"
         const val KEY_RUNNING = "monitor_running"

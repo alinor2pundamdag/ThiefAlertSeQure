@@ -1,8 +1,8 @@
 package com.thiefalertsequre.app
 
 /**
- * A persisted unplug candidate may be replayed only while elapsedRealtime proves
- * the same boot. BOOT_COUNT strengthens this check when Android exposes it.
+ * Persisted unplug candidates may be replayed only when Android exposes matching
+ * BOOT_COUNT values. elapsedRealtime alone is not sufficient to prove the same boot.
  */
 internal object PowerTransitionRecoveryPolicy {
     fun isCurrentCandidate(
