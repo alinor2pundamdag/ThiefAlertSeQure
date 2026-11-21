@@ -67,9 +67,18 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
     private fun handleA2DisconnectDeadline(context: Context, intent: Intent) {
         val token = intent.data?.lastPathSegment ?: return
         val pending = A2DisconnectScheduler.find(context, token) ?: return
-        if (ProtectionStore(context).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+        val protectionState = ProtectionStore(context).read()
+        if (protectionState.mode == ProtectionMode.ALARM_TRIGGERED) {
             A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
             startAlarm(context, "Recovering an already-latched A2 alarm")
+            return
+        }
+        if (protectionState.mode != ProtectionMode.ARMED) {
+            A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+            LocalTamperHistory.record(
+                context, "a2_deadline_cancelled_protection_not_armed",
+                "A2 disconnect deadline was discarded because protection was not ARMED; it cannot survive disarm or countdown state"
+            )
             return
         }
         if (A2DisconnectScheduler.wasConfirmedConnectedAfter(pending)) {
