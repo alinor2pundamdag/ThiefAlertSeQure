@@ -16,9 +16,10 @@ class A2DisconnectPolicyTest {
         assertFalse(A2DisconnectPolicy.isAfterLastAuthenticatedDisarm(100L, 3, 900L, 4))
     }
 
-    @Test fun unknownBootIdentityFailsClosedAfterAnAuthenticatedDisarm() {
+    @Test fun unknownBootIdentityFailsClosedAcrossMismatchedSourcesButAllowsLiveProcessOrdering() {
         assertFalse(A2DisconnectPolicy.isAfterLastAuthenticatedDisarm(700L, -1, 600L, 4))
         assertFalse(A2DisconnectPolicy.isAfterLastAuthenticatedDisarm(700L, 4, 600L, -1))
+        assertTrue(A2DisconnectPolicy.isAfterLastAuthenticatedDisarm(700L, -1, 600L, -1))
     }
 
     @Test fun disconnectGraceDeadlineStartsAtBroadcastReceipt() {
