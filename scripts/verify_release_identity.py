@@ -40,7 +40,7 @@ assert 'appVersionName.substringBefore("_Developer_Alinor")' in gradle
 filament_versions = set(re.findall(
     r'com\.google\.android\.filament:[^"]+:(\d+\.\d+\.\d+)', gradle
 ))
-assert filament_versions == {"1.81.0"}, (
+assert filament_versions == {"1.80.1"}, (
     f"Filament runtime/helper/material compiler artifacts must use one verified release: {filament_versions}"
 )
 root_gradle = (ROOT / "build.gradle.kts").read_text(encoding="utf-8")
