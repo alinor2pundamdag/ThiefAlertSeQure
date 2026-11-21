@@ -617,7 +617,8 @@ class MainActivity : FragmentActivity() {
         if (ConfigurationBackup.isRestoreOrRecoveryInProgress() ||
             !ConfigurationBackup.recoverPendingRestore(this)
         ) {
-            if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+            val deferredState = ProtectionStore(this).read()
+            if (deferredState.mode == ProtectionMode.ALARM_TRIGGERED) {
                 runCatching {
                     ContextCompat.startForegroundService(
                         this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START)
@@ -626,6 +627,13 @@ class MainActivity : FragmentActivity() {
                     LocalTamperHistory.record(this, "activity_alarm_restore_failed", it.javaClass.simpleName + ": " + it.message)
                     AlarmScheduler.scheduleImmediateRecovery(this)
                 }
+            } else if (deferredState.mode == ProtectionMode.ARMED ||
+                deferredState.mode == ProtectionMode.COUNTDOWN
+            ) {
+                ProtectionMonitorRecoveryNotice.show(
+                    this,
+                    "Background monitoring is deferred until the interrupted settings restore is safely recovered. Existing protection state is preserved."
+                )
             }
             return
         }
@@ -688,6 +696,12 @@ class MainActivity : FragmentActivity() {
             !ConfigurationBackup.recoverPendingRestore(this)
         ) {
             stopService(Intent(this, ProtectionMonitorService::class.java))
+            if (state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN) {
+                ProtectionMonitorRecoveryNotice.show(
+                    this,
+                    "Active protection is preserved, but monitoring is deferred until settings recovery completes."
+                )
+            }
             return
         }
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
@@ -698,6 +712,10 @@ class MainActivity : FragmentActivity() {
             }.onFailure {
                 LocalTamperHistory.record(this, "monitor_start_blocked", it.javaClass.simpleName + ": " + it.message)
                 prefs.edit().putBoolean(ProtectionMonitorService.KEY_RUNNING, false).apply()
+                ProtectionMonitorRecoveryNotice.show(
+                    this,
+                    "Protection remains active, but Android rejected background monitoring startup. Open the app to review permissions and restore monitoring."
+                )
             }
         } else if (!enabled || state.mode == ProtectionMode.DISARMED || state.mode == ProtectionMode.ALARM_TRIGGERED) {
             stopService(Intent(this, ProtectionMonitorService::class.java))
