@@ -20,6 +20,7 @@ engine = (APP / "ProtectionEngine.kt").read_text(encoding="utf-8")
 camera_capture = (APP / "CameraEvidenceCapture.kt").read_text(encoding="utf-8")
 camera_vault = (APP / "CameraEvidenceVault.kt").read_text(encoding="utf-8")
 camera_policy = (APP / "CameraEvidencePolicy.kt").read_text(encoding="utf-8")
+camera_media = (APP / "CameraEvidenceMediaStore.kt").read_text(encoding="utf-8")
 settings = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
 
 trusted_registry = (APP / "TrustedBluetoothRegistry.kt").read_text(encoding="utf-8")
@@ -409,13 +410,17 @@ checks = {
         and "IS_PENDING" in (APP / "CameraEvidenceMediaStore.kt").read_text(encoding="utf-8")
         and "AES/GCM/NoPadding" in camera_vault and "AndroidKeyStore" in camera_vault
         and "sha256(plaintext) != entry.sha256" in camera_vault
-        and "MAX_IMAGES = 20" in camera_policy and "RETENTION_MS = 30L" in camera_policy,
+        and "MAX_IMAGES = 20" in camera_policy and "RETENTION_MS = 30L" in camera_policy
+        and "canPersistPhoto(mode: ProtectionMode)" in camera_policy,
     "front-camera photos can be viewed, exported, deleted and integrity-checked":
         "showCameraEvidenceArchive" in settings and "exportCameraEvidence.launch" in settings
         and "CameraEvidenceVault.delete(applicationContext, entry.id)" in settings
         and "CameraEvidenceVault.deleteAll(applicationContext)" in settings
         and "CameraEvidenceMediaStore.deleteAll(applicationContext)" in settings
-        and "var allDeleted = query.unverifiedLegacyCount == 0" in (APP / "CameraEvidenceMediaStore.kt").read_text(encoding="utf-8")
+        and "ProtectionStore(app).runIfDisarmed" in camera_media
+        and "ProtectionStore(app).runIfProtectionActive" in camera_media
+        and "CameraEvidencePolicy.canPersistPhoto(currentState.mode)" in camera_media
+        and "var allDeleted = query.unverifiedLegacyCount == 0" in camera_media
         and "var allDeleted = true" not in (APP / "CameraEvidenceMediaStore.kt").read_text(encoding="utf-8")
         and "CameraEvidenceVault.verifyIntegrity(this@SettingsActivity)" in settings,
     "emergency recovery guide explains camera evidence failure boundaries":
