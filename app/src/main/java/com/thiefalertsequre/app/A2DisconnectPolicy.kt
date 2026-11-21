@@ -52,7 +52,7 @@ object A2DisconnectPolicy {
         lastAuthenticatedBootCount: Int
     ): Boolean {
         if (eventElapsedRealtimeMs <= 0L || lastAuthenticatedElapsedRealtimeMs < 0L) return false
-        if (lastAuthenticatedElapsedRealtimeMs == 0L && lastAuthenticatedBootCount == -1) return true
+        if (lastAuthenticatedElapsedRealtimeMs == 0L) return lastAuthenticatedBootCount == -1
         if (eventBootCount < 0 || lastAuthenticatedBootCount < 0) return false
         return when {
             eventBootCount > lastAuthenticatedBootCount -> true
