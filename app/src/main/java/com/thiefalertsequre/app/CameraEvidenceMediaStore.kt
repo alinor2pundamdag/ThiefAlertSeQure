@@ -380,7 +380,14 @@ internal object CameraEvidenceMediaStore {
         val resolver = context.contentResolver
         val query = queryOwnedImages(context)
         if (!query.success) return
-        val allowedManagedImages = (maxImages - query.unverifiedLegacyCount).coerceAtLeast(0)
+        // Unverified legacy rows are never deleted. Do not evict known app-owned
+        // photos merely to compensate for rows whose ownership cannot be proven;
+        // capacity checks will fail closed until safe space is available.
+        val allowedManagedImages = if (query.unverifiedLegacyCount > 0) {
+            query.images.size
+        } else {
+            maxImages.coerceAtLeast(0)
+        }
         val removedLegacyIds = mutableListOf<String>()
         query.images.sortedByDescending { it.second }.forEachIndexed { index, (uri, timestamp) ->
             if (!CameraEvidencePolicy.isRetained(timestamp, now) || index >= allowedManagedImages) {
