@@ -159,6 +159,13 @@ checks = {
         "ProtectionMonitorRecoveryNotice.show" in (APP / "OwnerAuthenticationCoordinator.kt").read_text(encoding="utf-8")
         and "ProtectionMonitorRecoveryNotice.show" in dashboard
         and ".setOnlyAlertOnce(true)" in (APP / "ProtectionMonitorRecoveryNotice.kt").read_text(encoding="utf-8"),
+    "authenticated disarm invalidates stale A2 deadlines across every execution path":
+        "last_auth_disarm_elapsed_realtime" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
+        and "isA2EventAfterLastAuthenticatedDisarm" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
+        and "A2DisconnectScheduler.cancel" in monitor
+        and "isA2EventAfterLastAuthenticatedDisarm" in monitor
+        and "isA2EventAfterLastAuthenticatedDisarm" in (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8")
+        and "isA2EventAfterLastAuthenticatedDisarm" in (APP / "A2DisconnectScheduler.kt").read_text(encoding="utf-8"),
     "alarm recovery failures cannot block authenticated disarm or primary alarm startup":
         "runCatching { AlarmRecoveryNotice.show(context, reason) }" in (APP / "AlarmRecoveryCoordinator.kt").read_text(encoding="utf-8")
         and "runCatching { clearRecoveryState(context) }" in (APP / "AlarmRecoveryCoordinator.kt").read_text(encoding="utf-8")
