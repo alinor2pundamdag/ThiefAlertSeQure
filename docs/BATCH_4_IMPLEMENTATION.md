@@ -1,10 +1,10 @@
-# Batch Four — Phases 14–16
+# Batch Four — Phases 14–17
 
 **Working branch:** `work/batch-4-implementation`  
 **Historical Batch Three baseline:** `work/phase-0-12-coding`  
 **Production identity:** `com.thiefalertsequre.app`  
 **Current candidate:** `1.1.5_Developer_Alinor` / versionCode `7`  
-**21 November follow-up:** A2 stale-deadline invalidation after authenticated disarm and package replacement, dedicated flash timing workers, allowlisted root Bluetooth diagnostics, and updated diagnostics-export privacy disclosure are committed. Exact-head Android CI and CodeQL are queued/not yet verified; Phase 12 remains 0/25 PASS / 25/25 NOT TESTED.
+**21 November verification:** Code-bearing commit `c64490788185fe2f9390cf21a87de003f4a1b430` passed Android CI #44860111389 and CodeQL #44860111390. Unit tests, source/manifest/release contracts, lint, debug APK assembly, minified release metadata, package/version/signer verification and artifact upload passed. Phase 12 remains 0/25 PASS / 25/25 NOT TESTED; no instrumentation, emulator or physical-device test is claimed.
 
 This record distinguishes existing capabilities reused by Batch Four from the additions made in this branch. It is not a claim that CI, production signing, or device acceptance has passed.
 
@@ -21,7 +21,7 @@ This record distinguishes existing capabilities reused by Batch Four from the ad
 ### Batch Four additions
 
 - Candidate versionName is `1.1.5_Developer_Alinor`; candidate versionCode is `7`, preserving the v1.1.4 code-6 → v1.1.5 code-7 upgrade order.
-- The isolated debug build remains a separate package (`.v114test`) and uses the explicit `1.1.5-test` label.
+- The isolated debug build remains a separate package (`.v114test`) and derives the explicit `1.1.5-test` label from the single Gradle version source; CI no longer duplicates the version code/name.
 - New official release tags with the permanent suffix are accepted by the updater. Historical numeric-only tags remain accepted so an older release does not become unreadable.
 - A new About button opens Android's app-specific details page using `Settings.ACTION_APPLICATION_DETAILS_SETTINGS` and the `package:` URI. It does not change Android settings.
 - About now reads the installed package signer, calculates its SHA-256 fingerprint, and compares the production package against the existing pinned official certificate. Development packages are identified separately rather than incorrectly shown as production-verified.
@@ -77,10 +77,17 @@ The dashboard now re-checks Android 13+ notification permission after returning 
 - No new cloud backend, analytics, telemetry, account, or unrelated runtime permission.
 - No instrumentation tests, emulator tests, physical-device tests, or GitHub Codespaces are part of this non-physical implementation pass.
 
+### Phase 17 — additional cross-feature hardening
+- Legacy Gallery ownership-index reads now use typed SafePreferences; corrupt values fail closed.
+- Explicit legacy backup and Android 12+ cloud/device-transfer exclusion rules preserve the no-automatic-backup privacy contract.
+- Managed Lock Task API 28 and thermal preview API 29 calls are guarded on the minSdk 26 range.
+- ProtectionShieldView reuses Path instances to avoid per-frame drawing allocations; adaptive launcher icons now include monochrome layers.
+- New photo storage remains Gallery-visible and unencrypted by default; future-capture encryption remains an explicit owner setting. Existing Gallery originals are not removed until complete encrypted-vault verification succeeds.
+
 ## Verification status
 
 - Source changes are committed to the isolated Batch Four working branch.
-- CI and CodeQL results for the final Batch Four head: pending observation.
+- Filament artifacts are pinned together at 1.75.1 and Kotlin plugins remain aligned at 2.2.21 to preserve compileSdk 36 / AGP 8.10.1. Filament 1.80.1 and 1.81.0 require compileSdk 37 and were rejected rather than changing the approved build baseline.
 - Actual production keystore/secret availability and a production-signed APK: not verified in this task.
 - Android install-over-existing-device acceptance and HONOR 200 Pro behavior: not performed here.
 - No claim of 100% release readiness until the exact final commit's required CI/security checks are observed and remaining owner/device gates are recorded.
@@ -92,4 +99,4 @@ The dashboard now re-checks Android 13+ notification permission after returning 
 - Gallery writes use MediaStore with pending/publish semantics on Android 10+ and the dedicated app-owned Pictures folder on Android 8–9. Legacy read/write permissions are requested only on API 26–28 when Gallery mode is selected. Gallery pruning/deletion filters by both the app folder and its file-name prefix; unrelated photos are not touched.
 - Configuration backup schema 2 includes the new storage preference while accepting schema 1 backups without changing the current storage privacy choice.
 - The cinematic starting page is version-gated: it appears once after each installed versionCode change, then is suppressed for that version. It is deferred while protection is not DISARMED so it cannot cover active protection or alarm recovery. The candidate versionCode is 7.
-- This source update is not considered verified until exact-head JVM tests, lint, release/debug APK assembly/metadata checks, and CodeQL complete. No physical-device behavior is claimed from CI.
+- Software verification passed on code-bearing commit `c644907`: JVM unit tests, source contracts, lint, debug APK assembly, minified release APK metadata, package/version/signer checks, artifact upload and CodeQL. The release APK is unsigned without permanent production signing secrets. No physical-device behavior is claimed from CI.
