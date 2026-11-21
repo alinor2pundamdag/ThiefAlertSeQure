@@ -76,9 +76,6 @@ internal object OwnerAuthenticationCoordinator {
         // Rebuild the charger baseline only after verified owner authentication.
         // A connected cable returns to ARMED; a disconnected cable remains DISARMED
         // until a new, genuine connect-then-disconnect sequence is observed.
-        val monitorPrefs = appContext.getSharedPreferences(
-            ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
-        )
         val monitorEnabled = SafePreferences.boolean(
             monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
