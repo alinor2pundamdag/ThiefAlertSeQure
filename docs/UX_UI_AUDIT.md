@@ -1,6 +1,8 @@
-# v1.1.4 UX/UI and interaction audit
+# ThiefAlertSeQure UX/UI and interaction audit
 
-**Current status (2026-11-17):** Source-level UX/UI implementation and static navigation/theme/dialog checks are recorded. Exact head `475c1fa00b8c30c1280f77053d83eb91c0db7f64` passed [Android CI run 43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535) and [CodeQL run 43950015623](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623). Instrumentation is not compiled or executed and no emulator matrix runs. The uploaded debug APK is development-only. Physical-device acceptance for this v1.1.4 candidate remains NOT TESTED; subsequent commits require new exact-head CI.
+**Follow-up status (2026-11-21):** The historical v1.1.4 UX audit and its CI run remain baseline evidence only. Follow-up source changes added dedicated background flash timing workers, fail-closed thermal preview initialization, owner-visible monitor recovery, notification-channel importance verification, and updated diagnostics-export privacy disclosure. The current candidate is v1.1.5/versionCode 7; exact-head Android CI and CodeQL are queued/not yet verified. Current Phase 12 physical acceptance remains 0/25 PASS and 25/25 NOT TESTED. No instrumentation or emulator matrix is run under the owner-directed policy.
+
+**Historical v1.1.4 status (2026-11-17):** Source-level UX/UI implementation and static navigation/theme/dialog checks were recorded. Exact head `475c1fa00b8c30c1280f77053d83eb91c0db7f64` passed [Android CI run 43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535) and [CodeQL run 43950015623](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623). Instrumentation was not compiled or executed and no emulator matrix ran. The uploaded debug APK was development-only. Those results do not verify the current v1.1.5 candidate.
 
 ## Historical verification baseline (not current-head evidence)
 - Branch: `work/phase-0-12-coding`
