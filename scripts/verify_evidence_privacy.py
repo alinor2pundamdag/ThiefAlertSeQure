@@ -152,8 +152,8 @@ required = {
     "both photo stores state-lock post-auth writes to DISARMED or ARMED only":
         "runIfProtectionActive { currentState ->" in camera_vault
         and "CameraEvidencePolicy.canPersistPhoto(currentState.mode)" in camera_vault
-        and "ProtectionStore(app).runIfDisarmed" in camera_media
-        and "ProtectionStore(app).runIfProtectionActive" in camera_media
+        and "store.runIfDisarmed" in camera_media
+        and "store.runIfProtectionActive" in camera_media
         and "CameraEvidencePolicy.canPersistPhoto(currentState.mode)" in camera_media,
     "camera evidence retention is non-destructive while protection is active":
         "ProtectionStore(context).runIfDisarmed" in camera_vault
