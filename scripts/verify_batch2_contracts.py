@@ -155,6 +155,10 @@ checks = {
         "CameraManager.TorchCallback" in flash_controller
         and "alarm_flash_external_interruption" in flash_controller
         and "alarm_flash_output_unavailable" in flash_controller,
+    "active monitor startup failures remain owner-visible without repeated notification alerts":
+        "ProtectionMonitorRecoveryNotice.show" in (APP / "OwnerAuthenticationCoordinator.kt").read_text(encoding="utf-8")
+        and "ProtectionMonitorRecoveryNotice.show" in dashboard
+        and ".setOnlyAlertOnce(true)" in (APP / "ProtectionMonitorRecoveryNotice.kt").read_text(encoding="utf-8"),
     "alarm recovery failures cannot block authenticated disarm or primary alarm startup":
         "runCatching { AlarmRecoveryNotice.show(context, reason) }" in (APP / "AlarmRecoveryCoordinator.kt").read_text(encoding="utf-8")
         and "runCatching { clearRecoveryState(context) }" in (APP / "AlarmRecoveryCoordinator.kt").read_text(encoding="utf-8")
