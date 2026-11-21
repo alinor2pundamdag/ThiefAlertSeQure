@@ -415,7 +415,8 @@ checks = {
         and "CameraEvidenceVault.delete(applicationContext, entry.id)" in settings
         and "CameraEvidenceVault.deleteAll(applicationContext)" in settings
         and "CameraEvidenceMediaStore.deleteAll(applicationContext)" in settings
-        and "var allDeleted = true" in (APP / "CameraEvidenceMediaStore.kt").read_text(encoding="utf-8")
+        and "var allDeleted = query.unverifiedLegacyCount == 0" in (APP / "CameraEvidenceMediaStore.kt").read_text(encoding="utf-8")
+        and "var allDeleted = true" not in (APP / "CameraEvidenceMediaStore.kt").read_text(encoding="utf-8")
         and "CameraEvidenceVault.verifyIntegrity(this@SettingsActivity)" in settings,
     "emergency recovery guide explains camera evidence failure boundaries":
         "front-camera evidence is not saved" in diagnostics
