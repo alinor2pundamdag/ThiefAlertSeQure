@@ -90,7 +90,7 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             LocalTamperHistory.record(context, "a2_deadline_old_boot_rejected", "A2 deadline belonged to a different or unverifiable boot")
             return
         }
-        if (!ProtectionStore(context).isA2EventAfterLastAuthenticatedDisarm(
+        if (!ProtectionStore(context).isA2EventAfterLastInvalidation(
                 pending.eventElapsedRealtimeMs, pending.bootCount
             )
         ) {
