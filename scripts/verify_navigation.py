@@ -198,7 +198,7 @@ if "startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" i
 if "AndroidDeviceCompatibility.open(" not in settings_activity:
     errors.append("Settings external destinations must use the centralized guarded launcher")
 restore_recovery_block = re.search(
-    r"private fun applyRestoredConfiguration\\(\\).*?val protectionMode",
+    r"private fun applyRestoredConfiguration\(\).*?val protectionMode",
     settings_activity,
     re.S,
 )
