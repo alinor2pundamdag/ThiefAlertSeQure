@@ -16,6 +16,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -33,6 +34,10 @@ class AlarmService : Service() {
     private var hapticsActive = false
     private var activeHapticPattern: AlarmHapticPattern? = null
     private var flashController: AlarmFlashController? = null
+    // Torch pulses run on a dedicated worker so UI/audio-volume work on the main
+    // looper cannot turn the configured background/lock-screen pattern steady.
+    private var flashThread: HandlerThread? = null
+    private var flashHandler: Handler? = null
     // API 29+ must remain fail-closed if thermal controller construction or
     // initial status lookup fails. API 26–28 has no public thermal listener.
     private var thermalFlashSuppressed = Build.VERSION.SDK_INT >= 29
@@ -59,6 +64,16 @@ class AlarmService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        flashThread = runCatching {
+            HandlerThread("ThiefAlertSeQure-AlarmFlash").apply { start() }
+        }.getOrNull()
+        flashHandler = flashThread?.let { runCatching { Handler(it.looper) }.getOrNull() }
+        if (flashHandler == null) {
+            LocalTamperHistory.record(
+                this, "alarm_flash_worker_unavailable",
+                "Dedicated torch timing thread could not start; audio alarm remains independent"
+            )
+        }
         if (Build.VERSION.SDK_INT >= 29) {
             thermalFlashController = runCatching {
                 ThermalFlashController(this) { suppressFlash ->
@@ -146,8 +161,14 @@ class AlarmService : Service() {
      * Failure to access a flash unit never blocks or stops alarm audio.
      */
     private fun syncAlarmFlash() {
+        val handler = flashHandler
+        if (handler == null) {
+            flashController?.stop()
+            flashController = null
+            return
+        }
         if (!thermalFlashSuppressed && AlarmFlashSettings.isEnabled(this) && AlarmFlashSettings.shouldRun(ProtectionStore(this).read().mode)) {
-            val controller = flashController ?: AlarmFlashController(this, volumeHandler) { event, detail ->
+            val controller = flashController ?: AlarmFlashController(this, handler) { event, detail ->
                 LocalTamperHistory.record(this, event, detail)
             }.also { flashController = it }
             controller.start()
@@ -560,6 +581,10 @@ class AlarmService : Service() {
         }
         thermalFlashController = null
         stopAlarm()
+        flashHandler?.removeCallbacksAndMessages(null)
+        flashThread?.quitSafely()
+        flashHandler = null
+        flashThread = null
         BatchThreeUiBridge.refresh(this)
         super.onDestroy()
     }
