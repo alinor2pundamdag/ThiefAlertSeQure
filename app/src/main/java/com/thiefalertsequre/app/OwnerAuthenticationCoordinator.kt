@@ -26,6 +26,25 @@ internal object OwnerAuthenticationCoordinator {
 
         AlarmRecoveryCoordinator.onAlarmDisarmed(appContext)
         store.resetAuthenticationFailures()
+        val monitorPrefs = appContext.getSharedPreferences(
+            ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
+        )
+        val a2AlertsEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false
+        )
+        val a2DeadlinesCleared = runCatching {
+            A2DisconnectScheduler.clearAll(appContext)
+        }.getOrDefault(false)
+        if (!a2DeadlinesCleared && a2AlertsEnabled) {
+            LocalTamperHistory.record(
+                appContext, "a2_owner_recovery_deadline_cleanup_failed",
+                "Old trusted-device deadlines could not be removed; the durable authenticated-disarm timestamp invalidates any pre-authentication event"
+            )
+            ProtectionMonitorRecoveryNotice.show(
+                appContext,
+                "Old trusted-device deadlines could not be removed. They are invalidated by the authenticated recovery marker; review Bluetooth monitoring status."
+            )
+        }
         appContext.stopService(Intent(appContext, AlarmService::class.java))
         val volumeRestored = runCatching {
             AlarmVolumeController.restore(
