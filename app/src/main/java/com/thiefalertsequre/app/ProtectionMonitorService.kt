@@ -115,6 +115,10 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                                 address, eventElapsedRealtimeMs
                             )
                             val pendingDisconnectCurrent = !reconnectObserved &&
+                                ProtectionStore(this@ProtectionMonitorService).isA2EventAfterLastAuthenticatedDisarm(
+                                    eventElapsedRealtimeMs,
+                                    ProtectionClock.bootCount(this@ProtectionMonitorService)
+                                ) &&
                                 A2DisconnectPolicy.isPendingDisconnectCurrent(
                                     monitorRevision,
                                     TrustedBluetoothRegistry.revision(prefs),
@@ -144,6 +148,15 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                                 }
                                 val next = update.state
                                 if (transitioned && update.persisted && next.mode == ProtectionMode.ALARM_TRIGGERED) {
+                                    val deadlineCancelled = A2DisconnectScheduler.cancel(
+                                        this@ProtectionMonitorService, address, eventElapsedRealtimeMs
+                                    )
+                                    if (!deadlineCancelled) {
+                                        LocalTamperHistory.record(
+                                            this@ProtectionMonitorService, "a2_in_process_deadline_cancel_failed",
+                                            "In-process A2 alarm latched, but its durable deadline could not be removed; authenticated disarm invalidates all older A2 events"
+                                        )
+                                    }
                                     LocalTamperHistory.record(this@ProtectionMonitorService, "trusted_bluetooth_separation_alarm", "A registered trusted Bluetooth device remained disconnected beyond grace period")
                                     unregisterMotionSensor()
                                     startTheftAlarm()
