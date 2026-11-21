@@ -39,6 +39,7 @@ class SettingsActivity : FragmentActivity() {
     private var previewToneController: AlarmToneController? = null
     private var previewToneStopRunnable: Runnable? = null
     private var flashPreviewController: AlarmFlashController? = null
+    private var flashPreviewThermalController: ThermalFlashController? = null
     private var flashPreviewStopRunnable: Runnable? = null
     private var pendingUpdateInstall: AppUpdateResult.Ready? = null
     private var pendingCameraEvidenceExportId: String? = null
@@ -331,14 +332,6 @@ class SettingsActivity : FragmentActivity() {
             if (!AlarmFlashSettings.setEnabled(this, enabled)) {
                 showProtectionSettingsSaveFailure()
                 return@action
-            }
-            if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
-                runCatching {
-                    ContextCompat.startForegroundService(
-                        this,
-                        Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_REFRESH_FLASH)
-                    )
-                }
             }
             render()
         })
@@ -1839,7 +1832,34 @@ class SettingsActivity : FragmentActivity() {
             android.widget.Toast.makeText(this, "No compatible flashlight hardware is available on this device.", android.widget.Toast.LENGTH_LONG).show()
             return
         }
+
+        // Use the same fail-closed thermal boundary as the active alarm service.
+        // A preview must never bypass a severe/unknown thermal state.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val thermalGuard = ThermalFlashController(this) { suppressed ->
+                if (suppressed && flashPreviewController != null) {
+                    stopFlashPreview()
+                    android.widget.Toast.makeText(
+                        this,
+                        "Flash preview stopped because Android reported a severe thermal state.",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+            flashPreviewThermalController = thermalGuard
+            if (thermalGuard.start()) {
+                stopFlashPreview()
+                android.widget.Toast.makeText(
+                    this,
+                    "Flash preview is unavailable because thermal safety status is severe or could not be verified.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                return
+            }
+        }
+
         if (!controller.start()) {
+            stopFlashPreview()
             android.widget.Toast.makeText(this, "Android could not start the flashlight. Another camera app, thermal limit, or OEM policy may be using it.", android.widget.Toast.LENGTH_LONG).show()
             return
         }
@@ -1864,6 +1884,8 @@ class SettingsActivity : FragmentActivity() {
         flashPreviewStopRunnable = null
         flashPreviewController?.stop()
         flashPreviewController = null
+        flashPreviewThermalController?.stop()
+        flashPreviewThermalController = null
     }
 
     private fun previewSound(slot: String) {
