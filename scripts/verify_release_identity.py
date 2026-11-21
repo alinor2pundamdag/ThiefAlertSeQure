@@ -34,4 +34,26 @@ assert "AppUpdatePolicy.requireInstalledPackage(context.packageName)" in updater
 assert "AppUpdatePolicy.requireNewerVersionCode" in updater
 assert "AppUpdatePolicy.hasOfficialSigner" in updater
 assert 'applicationIdSuffix = ".v114test"' in gradle
+assert "output.versionCode.set(appVersionCode)" in gradle
+assert "output.versionName.set(appTestVersionName)" in gradle
+assert 'appVersionName.substringBefore("_Developer_Alinor")' in gradle
+filament_versions = set(re.findall(
+    r'com\\.google\\.android\\.filament:[^"]+:(\\d+\\.\\d+\\.\\d+)', gradle
+))
+assert filament_versions == {"1.81.0"}, (
+    f"Filament runtime/helper/material compiler artifacts must use one verified release: {filament_versions}"
+)
+root_gradle = (ROOT / "build.gradle.kts").read_text(encoding="utf-8")
+kotlin_plugin_versions = set(re.findall(
+    r'id\\("org\\.jetbrains\\.kotlin\\.(?:android|plugin\\.compose)"\\) version "([^"]+)"',
+    root_gradle,
+))
+assert kotlin_plugin_versions == {"2.4.21"}, (
+    f"Kotlin Android and Compose compiler plugins must stay aligned: {kotlin_plugin_versions}"
+)
+android_workflow = (ROOT / ".github/workflows/android.yml").read_text(encoding="utf-8")
+assert 'VERSION_NAME="${VERSION_NAME%_Developer_Alinor}-test"' in android_workflow
+assert not re.search(r'^\\s*VERSION_CODE=\\d+|VERSION_NAME="[^"]+-test"', android_workflow, re.MULTILINE), (
+    "CI debug version must derive from the Gradle source of truth"
+)
 print(f"Production identity consistent: {gradle_package}; signer SHA-256 {policy_cert.lower()}")
