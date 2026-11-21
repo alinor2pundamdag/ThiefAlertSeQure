@@ -11,6 +11,14 @@ class A2DisconnectPolicyTest {
         assertTrue(A2DisconnectPolicy.isAfterLastInvalidation(700L, 4, 600L, 4))
     }
 
+    @Test fun missingInvalidationMarkerAllowsNewEventsOnFreshInstall() {
+        assertTrue(A2DisconnectPolicy.isAfterLastInvalidation(500L, 4, 0L, -1))
+    }
+
+    @Test fun partialInvalidationMarkerFailsClosed() {
+        assertFalse(A2DisconnectPolicy.isAfterLastInvalidation(700L, 4, 0L, 4))
+    }
+
     @Test fun newerBootA2EventsFollowPriorBootInvalidation() {
         assertTrue(A2DisconnectPolicy.isAfterLastInvalidation(100L, 5, 900L, 4))
         assertFalse(A2DisconnectPolicy.isAfterLastInvalidation(100L, 3, 900L, 4))
