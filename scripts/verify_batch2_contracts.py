@@ -164,6 +164,11 @@ checks = {
         and "EMERGENCY_CORRUPT_BACKUP_PREFS" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
         and "verified[primaryPrefix + key] == value" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
         and "backup.edit().putBoolean(activeKey, true)" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8"),
+    "root Bluetooth diagnostics avoid broad dumpsys output that may expose paired-device identifiers":
+        "dumpsys bluetooth_manager" not in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8")
+        and "settings get global bluetooth_on" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8")
+        and "getprop ro.bluetooth.library_name" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8")
+        and "ls -1 /sys/class/bluetooth" in (APP / "RootCapabilityInspector.kt").read_text(encoding="utf-8"),
     "authenticated disarm invalidates stale A2 deadlines across every execution path":
         "last_auth_disarm_elapsed_realtime" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
         and "isA2EventAfterLastAuthenticatedDisarm" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
