@@ -417,8 +417,8 @@ checks = {
         and "CameraEvidenceVault.delete(applicationContext, entry.id)" in settings
         and "CameraEvidenceVault.deleteAll(applicationContext)" in settings
         and "CameraEvidenceMediaStore.deleteAll(applicationContext)" in settings
-        and "ProtectionStore(app).runIfDisarmed" in camera_media
-        and "ProtectionStore(app).runIfProtectionActive" in camera_media
+        and "store.runIfDisarmed" in camera_media
+        and "store.runIfProtectionActive" in camera_media
         and "CameraEvidencePolicy.canPersistPhoto(currentState.mode)" in camera_media
         and "var allDeleted = query.unverifiedLegacyCount == 0" in camera_media
         and "var allDeleted = true" not in (APP / "CameraEvidenceMediaStore.kt").read_text(encoding="utf-8")
