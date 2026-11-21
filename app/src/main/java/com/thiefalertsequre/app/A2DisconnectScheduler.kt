@@ -190,6 +190,9 @@ internal object A2DisconnectScheduler {
         records.forEach { pending ->
             val valid = enabled &&
                 state.mode == ProtectionMode.ARMED &&
+                ProtectionStore(context).isA2EventAfterLastAuthenticatedDisarm(
+                    pending.eventElapsedRealtimeMs, pending.bootCount
+                ) &&
                 A2DisconnectPolicy.isSameBoot(pending.bootCount, bootCount, pending.eventElapsedRealtimeMs, nowElapsed) &&
                 TrustedBluetoothRegistry.isTrusted(prefs, pending.address) &&
                 !TrustedBluetoothRegistry.isBaselineConnected(prefs, pending.address) &&
