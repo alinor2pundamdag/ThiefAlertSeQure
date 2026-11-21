@@ -6,7 +6,7 @@
 **Current candidate:** `1.1.5_Developer_Alinor` / versionCode `7`  
 **21 November verification:** Code-bearing commit `c64490788185fe2f9390cf21a87de003f4a1b430` passed Android CI #44860111389 and CodeQL #44860111390. Unit tests, source/manifest/release contracts, lint, debug APK assembly, minified release metadata, package/version/signer verification and artifact upload passed. Phase 12 remains 0/25 PASS / 25/25 NOT TESTED; no instrumentation, emulator or physical-device test is claimed.
 
-This record distinguishes existing capabilities reused by Batch Four from the additions made in this branch. It is not a claim that CI, production signing, or device acceptance has passed.
+This record distinguishes existing capabilities reused by Batch Four from the additions made in this branch. Software CI passed on code-bearing commit `c644907`; production signing and physical-device acceptance remain unverified.
 
 ## Phase 14 — About, Version, Legal and Privacy
 
