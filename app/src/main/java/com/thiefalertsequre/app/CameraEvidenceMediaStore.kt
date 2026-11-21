@@ -423,8 +423,10 @@ internal object CameraEvidenceMediaStore {
 
     private fun readLegacyIndex(context: Context): Set<LegacyOwnershipEntry>? {
         val prefs = context.getSharedPreferences(LEGACY_INDEX_PREFS, Context.MODE_PRIVATE)
-        if (!prefs.contains(KEY_LEGACY_OWNED_IMAGES)) return emptySet()
-        val encoded = runCatching { prefs.getString(KEY_LEGACY_OWNED_IMAGES, null) }.getOrNull() ?: return null
+        val encoded = when (val stored = SafePreferences.readString(prefs, KEY_LEGACY_OWNED_IMAGES, null)) {
+            is PreferenceRead.Value -> stored.value ?: return emptySet()
+            is PreferenceRead.Corrupt -> return null
+        }
         return runCatching {
             val array = org.json.JSONArray(
                 LocalPreferenceCipher.decrypt(LEGACY_INDEX_PURPOSE, encoded)
