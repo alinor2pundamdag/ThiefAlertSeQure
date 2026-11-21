@@ -53,6 +53,11 @@ object A2DisconnectPolicy {
     ): Boolean {
         if (eventElapsedRealtimeMs <= 0L || lastAuthenticatedElapsedRealtimeMs < 0L) return false
         if (lastAuthenticatedElapsedRealtimeMs == 0L) return lastAuthenticatedBootCount == -1
+        if (eventBootCount < 0 && lastAuthenticatedBootCount < 0) {
+            // In-process grace timers can still prove ordering on the same live process.
+            // Durable AlarmManager paths independently require a known matching boot count.
+            return eventElapsedRealtimeMs > lastAuthenticatedElapsedRealtimeMs
+        }
         if (eventBootCount < 0 || lastAuthenticatedBootCount < 0) return false
         return when {
             eventBootCount > lastAuthenticatedBootCount -> true
