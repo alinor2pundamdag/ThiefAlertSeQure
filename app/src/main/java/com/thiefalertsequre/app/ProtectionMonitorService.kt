@@ -115,7 +115,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                                 address, eventElapsedRealtimeMs
                             )
                             val pendingDisconnectCurrent = !reconnectObserved &&
-                                ProtectionStore(this@ProtectionMonitorService).isA2EventAfterLastAuthenticatedDisarm(
+                                ProtectionStore(this@ProtectionMonitorService).isA2EventAfterLastInvalidation(
                                     eventElapsedRealtimeMs,
                                     ProtectionClock.bootCount(this@ProtectionMonitorService)
                                 ) &&
