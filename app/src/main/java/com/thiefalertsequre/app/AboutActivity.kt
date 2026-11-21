@@ -341,7 +341,7 @@ class AboutActivity : FragmentActivity() {
         val message = """
             Direct runtime dependencies:
             • Jetpack Compose UI, Foundation, Animation and Material 3 (Compose BOM 2026.04.01) — Apache License 2.0
-            • Google Filament Android, Filament Utils Android and Filamat Android 1.75.0 — Apache License 2.0
+            • Google Filament Android, Filament Utils Android and Filamat Android 1.75.1 — Apache License 2.0
             • AndroidX Core KTX 1.15.0 — Apache License 2.0
             • AndroidX Activity KTX 1.10.0 — Apache License 2.0
             • AndroidX Fragment KTX 1.8.5 — Apache License 2.0
