@@ -3,7 +3,8 @@
 **Working branch:** `work/batch-4-implementation`  
 **Historical Batch Three baseline:** `work/phase-0-12-coding`  
 **Production identity:** `com.thiefalertsequre.app`  
-**Current candidate:** `1.1.5_Developer_Alinor` / versionCode `7`
+**Current candidate:** `1.1.5_Developer_Alinor` / versionCode `7`  
+**21 November follow-up:** A2 stale-deadline invalidation, dedicated flash timing workers, allowlisted root Bluetooth diagnostics, and updated diagnostics-export privacy disclosure are committed. Exact-head Android CI and CodeQL are queued/not yet verified; Phase 12 remains 0/25 PASS / 25/25 NOT TESTED.
 
 This record distinguishes existing capabilities reused by Batch Four from the additions made in this branch. It is not a claim that CI, production signing, or device acceptance has passed.
 
