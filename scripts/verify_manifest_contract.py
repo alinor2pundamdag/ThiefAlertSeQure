@@ -107,6 +107,25 @@ else:
         errors.append("Application must run startup recovery for interrupted configuration restores")
     if application.get(ANDROID + "allowBackup") != "false":
         errors.append("Application backup must remain disabled")
+    if application.get(ANDROID + "fullBackupContent") != "@xml/backup_rules":
+        errors.append("Legacy Android backup must use explicit exclusion rules")
+    if application.get(ANDROID + "dataExtractionRules") != "@xml/data_extraction_rules":
+        errors.append("Android 12+ cloud and device-transfer backup must use explicit exclusion rules")
+    backup_rules = ROOT / "app/src/main/res/xml/backup_rules.xml"
+    extraction_rules = ROOT / "app/src/main/res/xml/data_extraction_rules.xml"
+    if not backup_rules.is_file() or not extraction_rules.is_file():
+        errors.append("Explicit no-backup rule resources are missing")
+    if backup_rules.is_file() and extraction_rules.is_file():
+        legacy_xml = ET.parse(backup_rules).getroot()
+        extraction_xml = ET.parse(extraction_rules).getroot()
+        if legacy_xml.tag != "full-backup-content" or not legacy_xml.findall("exclude"):
+            errors.append("Legacy backup rules must exclude all app-owned data")
+        if extraction_xml.tag != "data-extraction-rules":
+            errors.append("Android 12+ extraction rules have an invalid root")
+        for mode in ("cloud-backup", "device-transfer"):
+            section = extraction_xml.find(mode)
+            if section is None or not section.findall("exclude"):
+                errors.append(f"{mode} must explicitly exclude app-owned data")
     if application.get(ANDROID + "usesCleartextTraffic") != "false":
         errors.append("Cleartext traffic must remain disabled")
 
