@@ -255,7 +255,7 @@ Please test the app on your own device and confirm its permissions and backgroun
 
 - In Settings, tap **Check for official updates**. The app contacts GitHub only when you request it, downloads the published stable APK and checksum, verifies the checksum, package ID, version and pinned release certificate, then opens Android's installer.
 - Android confirmation is required. If the package ID and release key match, Android updates the installed app in place and retains its private app data; uninstalling is not required.
-- Updates are blocked while protection monitoring is enabled or a countdown/alarm is active. Disable monitoring first so package replacement cannot interrupt an active protection event.
+- Updates are blocked while protection is ARMED, COUNTDOWN, or ALARM_TRIGGERED. The owner must first reach DISARMED; the background monitor preference may remain enabled. Android stops the old process during package replacement, and the package-replaced receiver attempts to restart monitoring afterward. The owner’s explicit monitor opt-out remains respected.
 - Android may require you to allow installs from ThiefAlertSeQure in its app-specific unknown-apps setting. This is system-controlled and can be revoked after the update.
 - The current development candidate is `1.1.5_Developer_Alinor` (versionCode `7`) on `work/batch-4-implementation`; PR #8 remains unmerged.
 - Production updates must always use the same permanent release keystore. CI supports the four GitHub Actions secrets documented in [APK installation and update safety](docs/APK_INSTALL_AND_UPDATE.md).
