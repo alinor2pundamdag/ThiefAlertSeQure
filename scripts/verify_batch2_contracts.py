@@ -182,6 +182,7 @@ checks = {
         "markA2DeadlinesInvalidated" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
         and "markA2DeadlinesInvalidated()" in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
         and "A2DisconnectScheduler.clearAll(context)" in (APP / "BootReceiver.kt").read_text(encoding="utf-8")
+        and (APP / "BootReceiver.kt").read_text(encoding="utf-8").index("markA2DeadlinesInvalidated()") < (APP / "BootReceiver.kt").read_text(encoding="utf-8").index('startMonitorIfNeeded(context, state, "app_update")')
         and "last_a2_deadline_invalidation_elapsed_realtime" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
         and "isA2EventAfterLastInvalidation" in (APP / "ProtectionStore.kt").read_text(encoding="utf-8")
         and "A2DisconnectScheduler.cancel" in monitor
