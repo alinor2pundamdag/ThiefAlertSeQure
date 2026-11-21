@@ -1836,18 +1836,29 @@ class SettingsActivity : FragmentActivity() {
         // Use the same fail-closed thermal boundary as the active alarm service.
         // A preview must never bypass a severe/unknown thermal state.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val thermalGuard = ThermalFlashController(this) { suppressed ->
-                if (suppressed && flashPreviewController != null) {
-                    stopFlashPreview()
-                    android.widget.Toast.makeText(
-                        this,
-                        "Flash preview stopped because Android reported a severe thermal state.",
-                        android.widget.Toast.LENGTH_LONG
-                    ).show()
+            val thermalGuard = runCatching {
+                ThermalFlashController(this) { suppressed ->
+                    if (suppressed && flashPreviewController != null) {
+                        stopFlashPreview()
+                        android.widget.Toast.makeText(
+                            this,
+                            "Flash preview stopped because Android reported a severe thermal state.",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
+            }.getOrNull()
+            if (thermalGuard == null) {
+                stopFlashPreview()
+                android.widget.Toast.makeText(
+                    this,
+                    "Flash preview is unavailable because Android thermal status could not be verified.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                return
             }
             flashPreviewThermalController = thermalGuard
-            if (thermalGuard.start()) {
+            if (runCatching { thermalGuard.start() }.getOrDefault(true)) {
                 stopFlashPreview()
                 android.widget.Toast.makeText(
                     this,
