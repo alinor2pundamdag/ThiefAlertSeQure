@@ -99,6 +99,9 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
 
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
         val valid = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false) &&
+            ProtectionStore(context).isA2EventAfterLastAuthenticatedDisarm(
+                pending.eventElapsedRealtimeMs, pending.bootCount
+            ) &&
             TrustedBluetoothRegistry.isTrusted(prefs, pending.address) &&
             A2DisconnectPolicy.isPendingDisconnectCurrent(
                 pending.monitorRevision,
