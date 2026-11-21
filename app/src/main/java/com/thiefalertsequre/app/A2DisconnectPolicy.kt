@@ -45,24 +45,24 @@ object A2DisconnectPolicy {
         capturedDeviceRevision == currentDeviceRevision
 
     /** A durable owner-auth timestamp invalidates any older A2 grace event. */
-    fun isAfterLastAuthenticatedDisarm(
+    fun isAfterLastInvalidation(
         eventElapsedRealtimeMs: Long,
         eventBootCount: Int,
-        lastAuthenticatedElapsedRealtimeMs: Long,
-        lastAuthenticatedBootCount: Int
+        lastInvalidationElapsedRealtimeMs: Long,
+        lastInvalidationBootCount: Int
     ): Boolean {
-        if (eventElapsedRealtimeMs <= 0L || lastAuthenticatedElapsedRealtimeMs < 0L) return false
-        if (lastAuthenticatedElapsedRealtimeMs == 0L) return lastAuthenticatedBootCount == -1
-        if (eventBootCount < 0 && lastAuthenticatedBootCount < 0) {
+        if (eventElapsedRealtimeMs <= 0L || lastInvalidationElapsedRealtimeMs < 0L) return false
+        if (lastInvalidationElapsedRealtimeMs == 0L) return lastInvalidationBootCount == -1
+        if (eventBootCount < 0 && lastInvalidationBootCount < 0) {
             // In-process grace timers can still prove ordering on the same live process.
             // Durable AlarmManager paths independently require a known matching boot count.
-            return eventElapsedRealtimeMs > lastAuthenticatedElapsedRealtimeMs
+            return eventElapsedRealtimeMs > lastInvalidationElapsedRealtimeMs
         }
-        if (eventBootCount < 0 || lastAuthenticatedBootCount < 0) return false
+        if (eventBootCount < 0 || lastInvalidationBootCount < 0) return false
         return when {
-            eventBootCount > lastAuthenticatedBootCount -> true
-            eventBootCount < lastAuthenticatedBootCount -> false
-            else -> eventElapsedRealtimeMs > lastAuthenticatedElapsedRealtimeMs
+            eventBootCount > lastInvalidationBootCount -> true
+            eventBootCount < lastInvalidationBootCount -> false
+            else -> eventElapsedRealtimeMs > lastInvalidationElapsedRealtimeMs
         }
     }
 
