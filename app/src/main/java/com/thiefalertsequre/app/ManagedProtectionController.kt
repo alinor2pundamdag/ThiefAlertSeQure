@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.os.Build
 import android.os.UserManager
+import androidx.annotation.RequiresApi
 
 /**
  * Optional, explicitly enabled Android Enterprise / fully-managed-device mode.
@@ -102,6 +103,7 @@ object ManagedProtectionController {
         return result
     }
 
+    @RequiresApi(Build.VERSION_CODES.P)
     private fun enableWhileDisarmed(activity: Activity): Boolean {
         check(isDeviceOwner(activity)) {
             "Device Owner provisioning is required. Standard device-admin activation is not sufficient."
