@@ -17,28 +17,44 @@ object AlarmRecoveryCoordinator {
 
     /** Keep the owner-visible notice while scheduling only a finite number of retries. */
     fun onStartFailure(context: Context, reason: String) {
-        AlarmRecoveryNotice.show(context, reason)
-        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val retries = when (val stored = SafePreferences.readInt(prefs, KEY_RETRIES, 0)) {
+        // Notification failure must not prevent the durable retry from being scheduled.
+        runCatching { AlarmRecoveryNotice.show(context, reason) }.onFailure {
+            recordSafely(context, "alarm_recovery_notice_show_failed", "${it.javaClass.simpleName}: ${it.message}")
+        }
+        val prefs = runCatching {
+            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        }.getOrElse {
+            recordSafely(context, "alarm_recovery_preferences_unavailable", "${it.javaClass.simpleName}: ${it.message}")
+            return
+        }
+        val stored = runCatching { SafePreferences.readInt(prefs, KEY_RETRIES, 0) }.getOrElse {
+            recordSafely(context, "alarm_recovery_counter_read_failed", "${it.javaClass.simpleName}: ${it.message}")
+            return
+        }
+        val retries = when (stored) {
             is PreferenceRead.Value -> stored.value.coerceIn(0, AlarmRecoveryPolicy.MAX_RETRIES)
             is PreferenceRead.Corrupt -> {
-                LocalTamperHistory.record(context, "alarm_recovery_counter_corrupt", "Retry counter type mismatch; automatic retries stopped and source retained")
+                recordSafely(context, "alarm_recovery_counter_corrupt", "Retry counter type mismatch; automatic retries stopped and source retained")
                 return
             }
         }
         val delayMs = AlarmRecoveryPolicy.nextDelayMs(retries)
         if (delayMs == null) {
-            LocalTamperHistory.record(context, "alarm_recovery_exhausted", "Bounded automatic alarm recovery attempts exhausted; owner action is required")
+            recordSafely(context, "alarm_recovery_exhausted", "Bounded automatic alarm recovery attempts exhausted; owner action is required")
             return
         }
-        if (!prefs.edit().putInt(KEY_RETRIES, retries + 1).commit()) {
-            LocalTamperHistory.record(context, "alarm_recovery_counter_persist_failed", "Retry count was not saved; no additional automatic attempt scheduled")
+        val saved = runCatching { prefs.edit().putInt(KEY_RETRIES, retries + 1).commit() }.getOrDefault(false)
+        if (!saved) {
+            recordSafely(context, "alarm_recovery_counter_persist_failed", "Retry count was not saved; no additional automatic attempt scheduled")
             return
         }
-        if (AlarmScheduler.scheduleRecoveryRetry(context, delayMs)) {
-            LocalTamperHistory.record(context, "alarm_recovery_retry_scheduled", "Bounded recovery retry ${retries + 1}/${AlarmRecoveryPolicy.MAX_RETRIES} scheduled")
+        val retryScheduled = runCatching {
+            AlarmScheduler.scheduleRecoveryRetry(context, delayMs)
+        }.getOrDefault(false)
+        if (retryScheduled) {
+            recordSafely(context, "alarm_recovery_retry_scheduled", "Bounded recovery retry ${retries + 1}/${AlarmRecoveryPolicy.MAX_RETRIES} scheduled")
         } else {
-            LocalTamperHistory.record(context, "alarm_recovery_retry_schedule_failed", "Android did not accept the bounded recovery retry; owner-visible notice remains")
+            recordSafely(context, "alarm_recovery_retry_schedule_failed", "Android did not accept the bounded recovery retry; owner-visible notice remains")
         }
     }
 
