@@ -34,6 +34,23 @@ internal object PowerTransitionRecoveryPolicy {
         }
     }
 
+    fun shouldRecoverMissedDisconnect(
+        monitorEnabled: Boolean,
+        baselineKnown: Boolean,
+        baselineConnected: Boolean,
+        baselineBootCount: Int,
+        currentBootCount: Int,
+        baselineGeneration: Long,
+        pendingDisconnect: Boolean,
+        protectionMode: ProtectionMode,
+        liveConnected: Boolean?
+    ): Boolean =
+        monitorEnabled && baselineKnown && baselineConnected &&
+            baselineBootCount >= 0 && currentBootCount >= 0 &&
+            baselineBootCount == currentBootCount && baselineGeneration >= 0L &&
+            !pendingDisconnect && protectionMode == ProtectionMode.ARMED &&
+            liveConnected == false
+
     fun isSameBoot(
         candidateBootCount: Int,
         currentBootCount: Int,
