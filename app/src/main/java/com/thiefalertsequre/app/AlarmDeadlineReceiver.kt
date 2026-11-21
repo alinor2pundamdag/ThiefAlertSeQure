@@ -96,8 +96,8 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         ) {
             A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
             LocalTamperHistory.record(
-                context, "a2_deadline_invalidated_by_owner_auth",
-                "Pre-authentication A2 deadline was discarded before retry or alarm evaluation"
+                context, "a2_deadline_invalidated_by_epoch",
+                "Pre-invalidation A2 deadline was discarded before retry or alarm evaluation"
             )
             return
         }
