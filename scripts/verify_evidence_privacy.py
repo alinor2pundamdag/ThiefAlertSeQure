@@ -179,6 +179,10 @@ required = {
         "if (!query.success) return false" in camera_media
         and "query.images.forEach" in camera_media
         and "?: return QueryResult(false, emptyList())" in camera_media,
+    "unverified legacy Gallery rows never cause verified app-owned photos to be evicted":
+        "if (query.unverifiedLegacyCount > 0)" in camera_media
+        and "query.images.size" in camera_media
+        and "maxImages.coerceAtLeast(0)" in camera_media,
     "existing Gallery photos can be migrated only after encrypted read-back verification":
         "migrateAllToEncryptedVault" in camera_media
         and "CameraEvidenceVault.saveForMigration(app, original, timestamp)" in camera_media
