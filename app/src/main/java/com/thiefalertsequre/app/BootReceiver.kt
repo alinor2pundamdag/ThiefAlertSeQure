@@ -109,6 +109,22 @@ class BootReceiver : BroadcastReceiver() {
     /** Package replacement preserves the current boot's monotonic countdown deadline. */
     private fun restoreAfterAppUpdate(context: Context) {
         val state = enforceMonitorOptOut(context)
+        if (state.mode == ProtectionMode.DISARMED) {
+            // The updater permits package replacement only while DISARMED. Invalidate
+            // pre-update A2 callbacks before the monitor can auto-arm this installation.
+            val epochInvalidated = ProtectionStore(context).markA2DeadlinesInvalidated()
+            val deadlinesCleared = A2DisconnectScheduler.clearAll(context)
+            if (!epochInvalidated || !deadlinesCleared) {
+                LocalTamperHistory.record(
+                    context, "app_update_a2_deadline_cleanup_incomplete",
+                    "A2 package-update invalidation/cleanup was incomplete; any callback must still pass state, trust, boot and deadline-epoch validation"
+                )
+                ProtectionMonitorRecoveryNotice.show(
+                    context,
+                    "Trusted-device deadline cleanup after the app update could not be fully confirmed. Open the app and review Bluetooth monitoring before relying on A2 alerts."
+                )
+            }
+        }
         when (state.mode) {
             ProtectionMode.COUNTDOWN -> scheduleCountdownWithRetry(context, state, "app_update")
             ProtectionMode.ALARM_TRIGGERED -> scheduleAlarmRecovery(
