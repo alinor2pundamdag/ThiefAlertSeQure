@@ -162,8 +162,7 @@ jobs:
           echo "RELEASE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "RELEASE_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           if [[ "$RELEASE_SIGNING_CONFIGURED" != "true" ]]; then
-            VERSION_CODE=7
-            VERSION_NAME="1.1.5-test"
+            VERSION_NAME="${VERSION_NAME%_Developer_Alinor}-test"
           fi
           echo "APP_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "APP_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
