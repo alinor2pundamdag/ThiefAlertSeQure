@@ -58,6 +58,8 @@ required = {
         "one cached location fix or request one current GPS/network fix" in privacy and "No background location permission" in privacy,
     "updated first-launch notice discloses Gallery default and encrypted option":
         "privacy_notice_v9" in main and "Pictures/ThiefAlertSeQure" in main and "Gallery" in main and "AES-GCM" in main,
+    "updated privacy notice discloses optional redacted diagnostics export destination":
+        "redacted report" in main and "cloud-backed" in main and "The app does not upload the report" in main,
     "evidence metadata backup uses password-derived authenticated encryption":
         "PBKDF2WithHmacSHA256" in (APP / "EvidenceVaultBackup.kt").read_text(encoding="utf-8")
         and "AES/GCM/NoPadding" in (APP / "EvidenceVaultBackup.kt").read_text(encoding="utf-8")
