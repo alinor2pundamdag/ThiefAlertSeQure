@@ -92,6 +92,27 @@ class A2BluetoothAclReceiverInstrumentationTest {
             assertTrue("shared A2 processor should persist an A2 deadline while the service is absent",
                 A2DisconnectScheduler.hasPendingIntent(context, address, fallback = true))
 
+            // Capture an older event before reconnect, then submit it after reconnect.
+            // The receipt watermark must reject it instead of recreating a false deadline.
+            val staleDisconnectReceipt = A2BluetoothEventReceipt.capture(context)
+            val duplicateDisconnectFinished = CountDownLatch(1)
+            var duplicateDisconnectResult: A2BluetoothEventResult? = null
+            enqueueA2BluetoothAddressEvent(
+                context,
+                BluetoothDevice.ACTION_ACL_DISCONNECTED,
+                address,
+                A2BluetoothEventReceipt.capture(context),
+                "a2_instrumentation_manifest_path",
+                onResult = { duplicateDisconnectResult = it },
+                onFinished = { duplicateDisconnectFinished.countDown() }
+            )
+            assertTrue("Duplicate disconnect delivery should finish",
+                duplicateDisconnectFinished.await(30, TimeUnit.SECONDS))
+            assertTrue("Duplicate disconnect must be idempotently ignored",
+                duplicateDisconnectResult is A2BluetoothEventResult.Ignored)
+            assertTrue("Duplicate disconnect must not remove the original pending deadline",
+                A2DisconnectScheduler.hasPendingIntent(context, address, fallback = true))
+
             val reconnectFinished = CountDownLatch(1)
             enqueueA2BluetoothAddressEvent(
                 context,
@@ -107,6 +128,26 @@ class A2BluetoothAclReceiverInstrumentationTest {
                 A2DisconnectScheduler.hasPendingIntent(context, address, fallback = true))
             assertTrue("Reconnect must restore the trusted device's connected baseline",
                 TrustedBluetoothRegistry.isBaselineConnected(prefs, address))
+
+            val staleDisconnectFinished = CountDownLatch(1)
+            var staleDisconnectResult: A2BluetoothEventResult? = null
+            enqueueA2BluetoothAddressEvent(
+                context,
+                BluetoothDevice.ACTION_ACL_DISCONNECTED,
+                address,
+                staleDisconnectReceipt,
+                "a2_instrumentation_manifest_path",
+                onResult = { staleDisconnectResult = it },
+                onFinished = { staleDisconnectFinished.countDown() }
+            )
+            assertTrue("Stale disconnect delivery should finish",
+                staleDisconnectFinished.await(30, TimeUnit.SECONDS))
+            assertTrue("A disconnect received before reconnect must be rejected when delivered afterward",
+                staleDisconnectResult is A2BluetoothEventResult.Ignored)
+            assertTrue("Stale disconnect must not erase the reconnect baseline",
+                TrustedBluetoothRegistry.isBaselineConnected(prefs, address))
+            assertFalse("Stale disconnect must not recreate a durable deadline",
+                A2DisconnectScheduler.hasPendingIntent(context, address, fallback = true))
         } finally {
             A2DisconnectScheduler.cancel(context, address)
             TrustedBluetoothRegistry.remove(prefs, address)

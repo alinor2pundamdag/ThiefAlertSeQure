@@ -59,6 +59,10 @@ internal object A2BluetoothReceiverController {
                 }
             }
 
+            if (requireFreshBaseline || !enabled) {
+                A2BluetoothEventQueue.clearEventWatermarks()
+            }
+
             runCatching {
                 val expectedState = if (enabled) PackageManager.COMPONENT_ENABLED_STATE_ENABLED
                     else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
@@ -77,14 +81,16 @@ internal data class A2BluetoothEventReceipt(
     val eventEpochMs: Long,
     val eventElapsedRealtimeMs: Long,
     val eventUptimeMs: Long,
-    val bootCount: Int
+    val bootCount: Int,
+    val eventElapsedRealtimeNanos: Long
 ) {
     companion object {
         fun capture(context: Context): A2BluetoothEventReceipt = A2BluetoothEventReceipt(
             eventEpochMs = System.currentTimeMillis(),
             eventElapsedRealtimeMs = SystemClock.elapsedRealtime(),
             eventUptimeMs = SystemClock.uptimeMillis(),
-            bootCount = runCatching { ProtectionClock.bootCount(context.applicationContext) }.getOrDefault(-1)
+            bootCount = runCatching { ProtectionClock.bootCount(context.applicationContext) }.getOrDefault(-1),
+            eventElapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
         )
     }
 }
@@ -156,6 +162,17 @@ internal object A2BluetoothAclEventProcessor {
             !TrustedBluetoothRegistry.isTrusted(prefs, address)
         ) return A2BluetoothEventResult.Ignored
 
+        if (action != BluetoothDevice.ACTION_ACL_CONNECTED &&
+            action != BluetoothDevice.ACTION_ACL_DISCONNECTED
+        ) return A2BluetoothEventResult.Ignored
+        if (!A2BluetoothEventQueue.acceptIfCurrent(address, receipt)) {
+            LocalTamperHistory.record(
+                app, "a2_stale_acl_event_rejected",
+                "An older ACL event receipt was ignored to preserve the current trusted-device connection state"
+            )
+            return A2BluetoothEventResult.Ignored
+        }
+
         return when (action) {
             BluetoothDevice.ACTION_ACL_CONNECTED -> {
                 TrustedBluetoothRegistry.markConnected(prefs, address, true)
@@ -200,8 +217,43 @@ internal object A2BluetoothAclEventProcessor {
 }
 /** All ACL sources share one serial queue so a service restart cannot reorder a reconnect. */
 internal object A2BluetoothEventQueue {
+    private data class EventWatermark(val bootCount: Int, val elapsedRealtimeNanos: Long)
+
     private val executor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "A2BluetoothAclEvents").apply { isDaemon = true }
+    }
+    private val eventWatermarks = mutableMapOf<String, EventWatermark>()
+
+    /**
+     * Receivers can be invoked through both the manifest and runtime registrations.
+     * Preserve the physical receipt order even if concurrent callbacks submit work
+     * to the serial executor in a different order.
+     */
+    fun acceptIfCurrent(address: String, receipt: A2BluetoothEventReceipt): Boolean =
+        synchronized(A2DisconnectStateLock.monitor) {
+            val normalized = address.trim().uppercase()
+            if (!TrustedBluetoothRegistry.isValidAddress(normalized) ||
+                receipt.eventElapsedRealtimeNanos <= 0L || receipt.bootCount < -1
+            ) return@synchronized false
+
+            val previous = eventWatermarks[normalized]
+            val knownBootChanged = previous != null &&
+                previous.bootCount >= 0 && receipt.bootCount >= 0 &&
+                previous.bootCount != receipt.bootCount
+            if (previous != null && !knownBootChanged &&
+                receipt.eventElapsedRealtimeNanos < previous.elapsedRealtimeNanos
+            ) return@synchronized false
+
+            val retainedBootCount = if (receipt.bootCount >= 0) receipt.bootCount
+                else previous?.bootCount ?: -1
+            eventWatermarks[normalized] = EventWatermark(
+                retainedBootCount, receipt.eventElapsedRealtimeNanos
+            )
+            true
+        }
+
+    fun clearEventWatermarks() = synchronized(A2DisconnectStateLock.monitor) {
+        eventWatermarks.clear()
     }
 
     fun execute(task: () -> Unit) {
