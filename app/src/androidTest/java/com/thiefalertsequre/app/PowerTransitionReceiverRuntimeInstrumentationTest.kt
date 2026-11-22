@@ -109,10 +109,10 @@ class PowerTransitionReceiverRuntimeInstrumentationTest {
                 state = ProtectionStore(context).read()
             }
             assertEquals(
-                if (missedWhileServiceStopped) {
-                    "Sticky-service restart must recover a missed same-boot unplug"
+                if (monitorServiceStopped) {
+                    "The manifest receiver must process a disconnect while the service is stopped"
                 } else {
-                    "The active foreground monitor must receive the runtime power broadcast"
+                    "The manifest receiver must process a disconnect while the service is active"
                 },
                 ProtectionMode.COUNTDOWN,
                 state.mode
