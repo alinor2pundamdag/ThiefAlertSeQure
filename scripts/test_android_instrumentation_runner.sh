@@ -49,6 +49,12 @@ esac
 FAKE_ADB
 chmod +x "$bin_dir/adb"
 
+cat > "$bin_dir/sleep" <<'FAKE_SLEEP'
+#!/usr/bin/env bash
+exit 0
+FAKE_SLEEP
+chmod +x "$bin_dir/sleep"
+
 cat > "$project/gradlew" <<'FAKE_GRADLE'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -57,9 +63,14 @@ if [[ "$*" == *":app:installRelease"* ]]; then
   [[ -f "${FAKE_ADB_STATE_DIR:?}/install-attempts" ]] && attempt="$(cat "$FAKE_ADB_STATE_DIR/install-attempts")"
   attempt=$((attempt + 1))
   printf '%s' "$attempt" > "$FAKE_ADB_STATE_DIR/install-attempts"
-  # Simulate a successful Gradle task followed by a transient PackageManager
-  # loss: the first install is not visible to pm list packages.
-  if [[ "$attempt" -ge 2 ]]; then
+  if [[ "${FAKE_GRADLE_FAIL_INSTALL:-0}" == "1" ]]; then
+    echo "Kotlin compilation failed"
+    exit 1
+  fi
+  # Simulate a successful Gradle task followed by transient PackageManager
+  # loss: the first install is not visible to pm list packages. A separate
+  # mode keeps the package invisible to verify the retry limit is enforced.
+  if [[ "${FAKE_PACKAGE_NEVER_VISIBLE:-0}" != "1" && "$attempt" -ge 2 ]]; then
     : > "$FAKE_ADB_STATE_DIR/installed"
   fi
   echo "Fake install attempt $attempt"
@@ -88,4 +99,49 @@ chmod +x "$project/gradlew"
 [[ "$(cat "$state_dir/install-attempts")" == 2 ]]
 [[ "$(cat "$state_dir/instrumentation-runs")" == 1 ]]
 grep -Fq 'reboot' "$state_dir/adb.log"
-echo 'Android instrumentation runner recovered a transient post-install PackageManager failure.'
+# Persistent PackageManager loss must exhaust exactly three attempts and stop.
+persistent_state="$tmp_dir/state-persistent"
+mkdir -p "$persistent_state"
+if (
+  cd "$project"
+  PATH="$bin_dir:$PATH" \
+  ANDROID_API_LEVEL=37 \
+  RUNNER_TEMP="$tmp_dir/runner-persistent" \
+  GITHUB_SHA=runner-harness-persistent \
+  FAKE_ADB_LOG="$persistent_state/adb.log" \
+  FAKE_ADB_STATE_DIR="$persistent_state" \
+  FAKE_PACKAGE_NEVER_VISIBLE=1 \
+    bash .github/scripts/run-android-instrumentation.sh
+) > "$persistent_state/output.log" 2>&1; then
+  echo "Instrumentation runner incorrectly passed with a permanently missing target package." >&2
+  exit 1
+fi
+[[ "$(cat "$persistent_state/install-attempts")" == 3 ]]
+[[ "$(grep -c '^reboot
+ "$persistent_state/adb.log")" == 2 ]]
+[[ ! -f "$persistent_state/instrumentation-runs" ]]
+
+# Real Gradle/compiler failures must not be retried as emulator infrastructure.
+compile_state="$tmp_dir/state-compile-failure"
+mkdir -p "$compile_state"
+if (
+  cd "$project"
+  PATH="$bin_dir:$PATH" \
+  ANDROID_API_LEVEL=37 \
+  RUNNER_TEMP="$tmp_dir/runner-compile-failure" \
+  GITHUB_SHA=runner-harness-compile-failure \
+  FAKE_ADB_LOG="$compile_state/adb.log" \
+  FAKE_ADB_STATE_DIR="$compile_state" \
+  FAKE_GRADLE_FAIL_INSTALL=1 \
+    bash .github/scripts/run-android-instrumentation.sh
+) > "$compile_state/output.log" 2>&1; then
+  echo "Instrumentation runner incorrectly passed a simulated Gradle failure." >&2
+  exit 1
+fi
+[[ "$(cat "$compile_state/install-attempts")" == 1 ]]
+if grep -Fxq 'reboot' "$compile_state/adb.log"; then
+  echo "Instrumentation runner incorrectly rebooted/retried a real Gradle failure." >&2
+  exit 1
+fi
+
+echo 'Android instrumentation runner verified transient recovery, bounded exhaustion, and non-infrastructure failure handling.'
