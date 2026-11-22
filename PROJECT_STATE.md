@@ -37,10 +37,13 @@
 - Trusted Bluetooth detection: foreground ACL receiver plus an exported manifest receiver limited to platform-protected ACL actions. Export is required for the privileged Bluetooth UID; the controller enables the component only while monitoring, A2, and BLUETOOTH_CONNECT are active. Per-device encrypted deadlines use immutable PendingIntents and reconnect/revision/boot/state guards.
 - Exact-alarm access denied or revoked: an inexact idle-aware fallback remains, but Android may delay it in Doze. If it fires while the app process is absent, Android may block starting the continuous audio foreground service. The state remains latched; an owner-visible recovery notice and up to three retries are attempted. Notification denial or continued FGS restriction may require the owner to reopen the app. Eight-second delivery is a target, not a guarantee.
 - Boot behavior: old-boot A2 deadlines and connection baselines are invalidated; a fresh current-boot ACL connection event is required after reboot. Force-stop and OEM battery controls remain outside app control.
-- Verification: the newest branch workflow must pass build, unit, lint, API 36/37 instrumentation, and CodeQL before non-device Phase Two is declared complete. Physical-device testing is explicitly excluded from this work and remains a separate acceptance task.
+- Last inspectable target-branch Android workflow [#44655654144](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44655654144) checked out `752e3e972ed3706beb2278609e03522ab996888a`: the build job passed unit, navigation, lint, assets/configuration, APK assembly, package/version/signer checks, and artifact upload; API 36 failed before app tests because hosted acceleration was unavailable and TCG was not enabled; API 37 failed after PackageManager disappeared during install and the target package was absent during post-grant verification. CodeQL [#44655654167](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44655654167) passed both Java/Kotlin and Actions analysis on that older source.
+- Subsequent branch CI hardening explicitly enables TCG, leaves emulator boot polling to android-emulator-runner, requires a positive InputManager readiness response, and retries the complete instrumentation install/grant/package-verification transaction at most three times for transient PackageManager loss. Real Gradle/configuration/ABI and undeclared-permission failures are not retried as infrastructure.
+- `scripts/test_android_instrumentation_runner.sh` simulates a successful Gradle install followed by transient PackageManager/package visibility loss and verifies bounded reboot/reinstall/grant recovery. It is invoked by `scripts/test_adb_readiness_wrapper.sh`; the fake-ADB/fake-Gradle harness passed locally. This is not emulator CI.
+- Exact-head Phase Two CI remains pending. Do not declare non-device Phase Two complete until the newest branch head passes build, unit, lint, API 36 and API 37 instrumentation, and CodeQL. No target-branch PR has been created; physical-device testing remains excluded and outstanding.
 - Do not claim production release readiness from emulator CI alone.
 
-## Verification status
+## Phase One verification status
 - Source-head run #1270: PASS for the build job and all seven Android instrumentation jobs.
 - Instrumentation reports: 175 total test executions across the matrix; 168 passed and 7 intentionally skipped (one per API); zero test failures/errors.
 - Diagnostic review: complete; the single skipped test is explicitly guarded by the test's enrolled-strong-biometric precondition. Emulator system-service crashes are not app-process crashes.
@@ -48,7 +51,7 @@
 - Physical HONOR 200 Pro acceptance remains excluded from Phase 1 and is reserved for Phase 12. Emulator results are not represented as physical-device evidence.
 - Production-signed APK/update continuity, merge, tag, APK publication, and production release remain separate gates and are not authorized by this Phase 1 work.
 
-## Remaining FIXALL work
+## Remaining broader FIXALL work
 1. Review and test alarm retry scheduling, cancellation, and process-death behavior.
 2. Review all critical SharedPreferences readers and fail-closed behavior.
 3. Verify Bluetooth revision migration and user-facing recovery/registration failures.
