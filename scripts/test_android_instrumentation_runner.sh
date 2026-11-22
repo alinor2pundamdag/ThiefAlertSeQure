@@ -117,34 +117,7 @@ if (
   exit 1
 fi
 [[ "$(cat "$persistent_state/install-attempts")" == 3 ]]
-[[ "$(grep -c '^reboot
-[[ ! -f "$persistent_state/instrumentation-runs" ]]
-
-# Real Gradle/compiler failures must not be retried as emulator infrastructure.
-compile_state="$tmp_dir/state-compile-failure"
-mkdir -p "$compile_state"
-if (
-  cd "$project"
-  PATH="$bin_dir:$PATH" \
-  ANDROID_API_LEVEL=37 \
-  RUNNER_TEMP="$tmp_dir/runner-compile-failure" \
-  GITHUB_SHA=runner-harness-compile-failure \
-  FAKE_ADB_LOG="$compile_state/adb.log" \
-  FAKE_ADB_STATE_DIR="$compile_state" \
-  FAKE_GRADLE_FAIL_INSTALL=1 \
-    bash .github/scripts/run-android-instrumentation.sh
-) > "$compile_state/output.log" 2>&1; then
-  echo "Instrumentation runner incorrectly passed a simulated Gradle failure." >&2
-  exit 1
-fi
-[[ "$(cat "$compile_state/install-attempts")" == 1 ]]
-if grep -Fxq 'reboot' "$compile_state/adb.log"; then
-  echo "Instrumentation runner incorrectly rebooted/retried a real Gradle failure." >&2
-  exit 1
-fi
-
-echo 'Android instrumentation runner verified transient recovery, bounded exhaustion, and non-infrastructure failure handling.'
- "$persistent_state/adb.log")" == 2 ]]
+[[ "$(grep -c '^reboot$' "$persistent_state/adb.log")" == 2 ]]
 [[ ! -f "$persistent_state/instrumentation-runs" ]]
 
 # Real Gradle/compiler failures must not be retried as emulator infrastructure.
