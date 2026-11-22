@@ -25,6 +25,7 @@ class BootReceiver : BroadcastReceiver() {
             context,
             forceBootReconciliation = intent.action == Intent.ACTION_BOOT_COMPLETED
         )
+        PowerTransitionReceiverController.sync(context)
         if (intent.action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED) {
             if (Build.VERSION.SDK_INT >= 31 && context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()) {
                 val state = enforceMonitorOptOut(context)
@@ -62,6 +63,7 @@ class BootReceiver : BroadcastReceiver() {
                 else -> ProtectionEngine.restoreAfterBoot(old, charging, now, elapsed, boot)
             }
         }
+        PowerTransitionReceiverController.sync(context)
         when (next.mode) {
             ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount)
             ProtectionMode.ALARM_TRIGGERED -> scheduleAlarmRecovery(
@@ -82,6 +84,7 @@ class BootReceiver : BroadcastReceiver() {
                     )
             else -> AlarmScheduler.cancel(context)
         }
+        PowerTransitionReceiverController.sync(context)
         startMonitorIfNeeded(context, state, "app_update")
         LocalTamperHistory.record(context, "app_update_state_restored", "Persisted protection state re-evaluated after package replacement")
     }
@@ -102,7 +105,11 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     private fun enforceMonitorOptOut(context: Context): ProtectionState {
-        if (monitorEnabled(context)) return ProtectionStore(context).read()
+        if (monitorEnabled(context)) {
+            val state = ProtectionStore(context).read()
+            PowerTransitionReceiverController.sync(context)
+            return state
+        }
         A2DisconnectScheduler.clearAll(context)
         val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
         runCatching { TrustedBluetoothRegistry.clearBaselines(monitorPrefs) }
@@ -114,6 +121,7 @@ class BootReceiver : BroadcastReceiver() {
             else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
         }
         PowerTransitionCoordinator.resetBaselineToCurrentPower(context, "Protection monitor is disabled")
+        PowerTransitionReceiverController.sync(context)
         return ProtectionStore(context).read()
     }
 
