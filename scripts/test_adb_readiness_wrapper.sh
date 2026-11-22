@@ -99,3 +99,5 @@ print("Verified hosted-emulator TCG opt-in and strict PackageManager readiness c
 PY
 
 echo "ADB readiness wrapper behavior tests passed."
+
+bash "$repo_root/scripts/test_android_instrumentation_runner.sh"
