@@ -9,7 +9,7 @@ mkdir -p "$diagnostics_dir"
 # property alone is insufficient: PackageManager can still be unavailable, causing
 # DDMLib to fail APK installation with "Can't find service: package".
 wait_for_stable_emulator() {
-  local stable_checks=0
+  local stable_checks=0 attempt
   local adb_state boot_completed actual_api package_service package_path
   for attempt in {1..180}; do
     adb_state="$(adb get-state 2>/dev/null || true)"
@@ -91,66 +91,139 @@ trap capture_android_diagnostics EXIT
 # Install the target package first so the disposable emulator can grant the
 # Bluetooth runtime permission before AndroidX starts the instrumentation process.
 # This is test-harness setup only; the app never auto-grants or auto-requests it here.
+is_transient_package_manager_failure() {
+  local output="$1"
+  grep -Eiq \
+    'Can.t find service: package|Failure calling service package|PackageManager.*(not ready|unavailable)|device offline|device .+ not found|Broken pipe|ShellCommandUnresponsiveException' \
+    <<< "$output"
+}
+
+recover_emulator_for_setup_retry() {
+  adb reconnect offline >/dev/null 2>&1 || true
+  adb -s emulator-5554 reboot >/dev/null 2>&1 || true
+  sleep 5
+  wait_for_stable_emulator
+}
+
+# One install attempt. The caller owns the bounded retry so installation,
+# permission grant, and PackageManager verification are retried as one unit.
 install_instrumentation_target() {
-  local attempt=1
-  while true; do
-    local log_file="$diagnostics_dir/install-attempt-$attempt.log"
-    local install_exit_code
-    set +e
-    ./gradlew :app:installRelease -PsignReleaseForTests=true -PinstrumentationTestBuild=true --no-daemon --stacktrace 2>&1 | tee "$log_file"
-    install_exit_code="${PIPESTATUS[0]}"
-    set -e
+  local install_attempt="$1"
+  local log_file="$diagnostics_dir/install-attempt-$install_attempt.log"
+  local install_exit_code
+  set +e
+  ./gradlew :app:installRelease -PsignReleaseForTests=true -PinstrumentationTestBuild=true --no-daemon --stacktrace 2>&1 | tee "$log_file"
+  install_exit_code="${PIPESTATUS[0]}"
+  set -e
 
-    if [[ "$install_exit_code" -eq 0 ]]; then
-      return 0
-    fi
+  if [[ "$install_exit_code" -eq 0 ]]; then
+    return 0
+  fi
 
-    # Retry only when DDMLib cannot read a temporarily unavailable emulator.
-    # A real Gradle/configuration or ABI failure is returned without masking it.
-    if [[ "$attempt" -ge 3 ]] || ! grep -Eq \
-        'ShellCommandUnresponsiveException|Unknown API Level|device offline|Can.t find service: package|Failed to install on any devices|Skipping device .*Could not find build of variant which supports density' \
-        "$log_file"; then
-      return "$install_exit_code"
-    fi
-
-    echo "::warning::Emulator framework/identity failed during target installation; rebooting and retrying infrastructure-only failure."
-    adb reconnect offline >/dev/null 2>&1 || true
-    adb -s emulator-5554 reboot >/dev/null 2>&1 || true
-    sleep 5
-    if ! wait_for_stable_emulator; then
-      echo "::error::Emulator framework did not recover before retrying target installation."
-      return "$install_exit_code"
-    fi
-    attempt=$((attempt + 1))
-  done
+  # A real Gradle/configuration/ABI failure is never retried as an emulator issue.
+  if grep -Eq \
+      'ShellCommandUnresponsiveException|Unknown API Level|device offline|Can.t find service: package|Failed to install on any devices|Skipping device .*Could not find build of variant which supports density' \
+      "$log_file"; then
+    echo "::warning::Emulator/PackageManager infrastructure failed during target installation."
+    return 2
+  fi
+  return 1
 }
 
 prepare_instrumentation_permissions() {
-  if ! install_instrumentation_target; then
-    echo "::error::Unable to install the release instrumentation target on the emulator."
-    return 1
-  fi
+  local setup_attempt=1
+  local install_status grant_status package_status permission_dump_status
+  local grant_output package_output permission_dump permission_state package_present
+  local transient_failure
 
-  if ! adb shell pm grant com.thiefalertsequre.app android.permission.BLUETOOTH_CONNECT; then
-    echo "::error::BLUETOOTH_CONNECT could not be granted to the installed instrumentation target package."
-    return 1
-  fi
+  while [[ "$setup_attempt" -le 3 ]]; do
+    if install_instrumentation_target "$setup_attempt"; then
+      install_status=0
+    else
+      install_status=$?
+    fi
 
-  if ! adb shell pm list packages 2>/dev/null | tr -d '\r' | grep -Fxq 'package:com.thiefalertsequre.app'; then
-    echo "::error::The instrumentation target package is not installed after the grant step."
-    return 1
-  fi
+    if [[ "$install_status" -ne 0 ]]; then
+      if [[ "$install_status" -ne 2 || "$setup_attempt" -ge 3 ]]; then
+        echo "::error::Unable to install the release instrumentation target after $setup_attempt attempt(s)."
+        return 1
+      fi
+      echo "::warning::Rebooting the emulator after a PackageManager-only installation failure (attempt $setup_attempt/3)."
+      if ! recover_emulator_for_setup_retry; then
+        echo "::error::Emulator framework did not recover before retrying target installation."
+        return 1
+      fi
+      setup_attempt=$((setup_attempt + 1))
+      continue
+    fi
 
-  # PackageManagerShellCommand does not expose a check-permission subcommand on
-  # the current Android images. Inspect the runtime permission state instead.
-  local permission_state
-  permission_state="$(adb shell dumpsys package com.thiefalertsequre.app 2>/dev/null | grep -F 'android.permission.BLUETOOTH_CONNECT: granted=true' | tail -n 1 || true)"
-  if [[ -z "$permission_state" ]]; then
-    echo "::error::BLUETOOTH_CONNECT is not shown as granted in the target package runtime-permission state."
-    adb shell dumpsys package com.thiefalertsequre.app 2>/dev/null | grep -F 'BLUETOOTH_CONNECT' || true
+    if grant_output="$(adb shell pm grant com.thiefalertsequre.app android.permission.BLUETOOTH_CONNECT 2>&1)"; then
+      grant_status=0
+    else
+      grant_status=$?
+    fi
+    if package_output="$(adb shell pm list packages 2>&1)"; then
+      package_status=0
+    else
+      package_status=$?
+    fi
+    package_output="${package_output//$'\r'/}"
+    if printf '%s\n' "$package_output" | grep -Fxq 'package:com.thiefalertsequre.app'; then
+      package_present=true
+    else
+      package_present=false
+    fi
+
+    permission_dump=""
+    permission_state=""
+    permission_dump_status=0
+    if [[ "$package_present" == true ]]; then
+      if permission_dump="$(adb shell dumpsys package com.thiefalertsequre.app 2>&1)"; then
+        permission_dump_status=0
+      else
+        permission_dump_status=$?
+      fi
+      permission_dump="${permission_dump//$'\r'/}"
+      permission_state="$(printf '%s\n' "$permission_dump" | grep -F 'android.permission.BLUETOOTH_CONNECT: granted=true' | tail -n 1 || true)"
+    fi
+
+    if [[ "$grant_status" -eq 0 && "$package_status" -eq 0 &&
+          "$package_present" == true && "$permission_dump_status" -eq 0 &&
+          -n "$permission_state" ]]; then
+      echo "Verified BLUETOOTH_CONNECT grant: $permission_state"
+      return 0
+    fi
+
+    transient_failure=false
+    if [[ "$package_status" -ne 0 || "$package_present" == false ]]; then
+      transient_failure=true
+    fi
+    if is_transient_package_manager_failure "$grant_output" ||
+        is_transient_package_manager_failure "$package_output" ||
+        is_transient_package_manager_failure "$permission_dump"; then
+      transient_failure=true
+    fi
+
+    if [[ "$transient_failure" == true && "$setup_attempt" -lt 3 ]]; then
+      echo "::warning::PackageManager lost the installed target or permission state after installation; rebooting and retrying the complete setup (attempt $setup_attempt/3)."
+      if ! recover_emulator_for_setup_retry; then
+        echo "::error::Emulator framework did not recover before retrying instrumentation setup."
+        return 1
+      fi
+      setup_attempt=$((setup_attempt + 1))
+      continue
+    fi
+
+    echo "::error::Instrumentation target package/permission verification failed after $setup_attempt attempt(s)."
+    echo "Package present: $package_present; pm grant exit: $grant_status; package-list exit: $package_status; permission-dump exit: $permission_dump_status"
+    printf 'pm grant output: %s\n' "$grant_output"
+    printf 'pm list packages output: %s\n' "$package_output"
+    printf 'permission dump: %s\n' "$permission_dump"
     return 1
-  fi
-  echo "Verified BLUETOOTH_CONNECT grant: $permission_state"
+  done
+
+  echo "::error::Instrumentation target setup exhausted its bounded retry budget."
+  return 1
 }
 
 if [[ "$api_level" =~ ^[0-9]+$ ]]; then
