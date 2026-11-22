@@ -126,7 +126,6 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                 val deadlinesCleared = A2DisconnectScheduler.clearAll(this)
                 val baselinesCleared = runCatching { TrustedBluetoothRegistry.clearBaselines(prefs); true }.getOrDefault(false)
                 A2BluetoothReceiverController.sync(this)
-                PowerTransitionReceiverController.sync(this)
                 if (!deadlinesCleared || !baselinesCleared) {
                     LocalTamperHistory.record(
                         this, "monitor_disable_cleanup_incomplete",
@@ -140,7 +139,6 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
         val state = ProtectionStore(this).read()
         if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
-            PowerTransitionReceiverController.sync(this)
             runCatching {
                 ContextCompat.startForegroundService(
                     this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START)
@@ -156,7 +154,6 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         }
         val enabled = SafePreferences.boolean(prefs, KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         if (!ProtectionMonitorPolicy.shouldRun(enabled, state.mode)) {
-            PowerTransitionReceiverController.sync(this)
             stopSelf()
             return START_NOT_STICKY
         }
@@ -202,22 +199,11 @@ class ProtectionMonitorService : Service(), SensorEventListener {
     }
 
     /**
-     * Protected power broadcasts have a manifest path that can wake the app when
-     * its process/service is absent. Runtime registration is only a foreground
-     * fallback if PackageManager cannot confirm the manifest component.
+     * Power connected/disconnected broadcasts are not Android 8+ manifest implicit-broadcast
+     * exceptions. Register at runtime only while the user-visible monitor FGS is active.
      */
     private fun registerPowerTransitionReceiver() {
-        val synchronized = PowerTransitionReceiverController.sync(this)
-        if (PowerTransitionReceiverController.isEnabled(this)) {
-            isPowerTransitionReceiverRegistered = true
-            LocalTamperHistory.record(
-                this, "power_transition_manifest_receiver_enabled",
-                "Protected charger events can wake the app while the monitor service is absent"
-            )
-            return
-        }
-        if (synchronized || powerTransitionReceiverRegistered) return
-
+        if (powerTransitionReceiverRegistered) return
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_POWER_CONNECTED)
             addAction(Intent.ACTION_POWER_DISCONNECTED)
@@ -230,12 +216,12 @@ class ProtectionMonitorService : Service(), SensorEventListener {
             powerTransitionReceiverRegistered = true
             isPowerTransitionReceiverRegistered = true
             LocalTamperHistory.record(
-                this, "power_transition_runtime_fallback_registered",
-                "Manifest component state could not be confirmed; foreground runtime fallback is active"
+                this, "power_transition_runtime_receiver_registered",
+                "Charger connect/disconnect events are registered while the foreground monitor is active"
             )
         }.onFailure { error ->
             LocalTamperHistory.record(
-                this, "power_transition_runtime_fallback_failed",
+                this, "power_transition_runtime_receiver_registration_failed",
                 error.javaClass.simpleName + ": " + error.message
             )
             ProtectionMonitorRecoveryNotice.show(
@@ -751,7 +737,7 @@ class ProtectionMonitorService : Service(), SensorEventListener {
         receiverRegistered = false
         if (powerTransitionReceiverRegistered) runCatching { unregisterReceiver(powerTransitionReceiver) }
         powerTransitionReceiverRegistered = false
-        PowerTransitionReceiverController.sync(this)
+        isPowerTransitionReceiverRegistered = false
         A2DisconnectStateLock.withLock {
             serviceDestroyed = true
             pendingBluetoothRunnables.values.forEach(handler::removeCallbacks)

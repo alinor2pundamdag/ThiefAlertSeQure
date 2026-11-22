@@ -262,11 +262,11 @@ object PowerTransitionCoordinator {
     }
 
     /**
-     * The protected manifest power receiver is the primary process-absent path. This
-     * reconciliation remains a conservative fallback for OEM suppression, force-stop,
-     * or a receiver-registration failure. Recover only from a durable same-boot connected
-     * baseline while monitoring is enabled and protection is ARMED. The fresh grace begins
-     * at recovery detection because the original event time is unknowable.
+     * A manifest receiver cannot be relied on for ACTION_POWER_DISCONNECTED on API 26+.
+     * If Android restarts the sticky monitor service after the runtime receiver was absent,
+     * recover only from a durable same-boot connected baseline while monitoring is still
+     * enabled and protection is still ARMED. The fresh grace begins at recovery detection;
+     * the original physical disconnect time is unknowable.
      */
     fun recoverMissedDisconnectAfterServiceRestart(context: Context): ProtectionState {
         val appContext = context.applicationContext

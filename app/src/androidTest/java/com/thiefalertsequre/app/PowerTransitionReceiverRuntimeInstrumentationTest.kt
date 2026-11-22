@@ -1,6 +1,8 @@
 package com.thiefalertsequre.app
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.ParcelFileDescriptor
@@ -9,6 +11,7 @@ import androidx.core.content.ContextCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -16,15 +19,29 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class PowerTransitionReceiverRuntimeInstrumentationTest {
-    @Test fun manifestReceiverHandlesPowerDisconnectWhileMonitorIsRunning() {
-        exercisePowerDisconnect(monitorServiceStopped = false)
+    @Test fun powerReceiverIsRuntimeOnlyAndNotManifestDeclared() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val component = ComponentName(context, PowerTransitionReceiver::class.java)
+        val manifestDeclared = runCatching {
+            context.packageManager.getReceiverInfo(
+                component, PackageManager.MATCH_DISABLED_COMPONENTS
+            )
+        }.isSuccess
+        assertFalse(
+            "ACTION_POWER_CONNECTED and ACTION_POWER_DISCONNECTED are not manifest implicit-broadcast exceptions",
+            manifestDeclared
+        )
     }
 
-    @Test fun manifestReceiverHandlesPowerDisconnectWhileMonitorServiceIsStopped() {
-        exercisePowerDisconnect(monitorServiceStopped = true)
+    @Test fun activeForegroundMonitorReceivesPowerDisconnectAtRuntime() {
+        exercisePowerDisconnect(missedWhileServiceStopped = false)
     }
 
-    private fun exercisePowerDisconnect(monitorServiceStopped: Boolean) {
+    @Test fun stickyServiceRestartRecoversMissedDisconnectFromSameBootBaseline() {
+        exercisePowerDisconnect(missedWhileServiceStopped = true)
+    }
+
+    private fun exercisePowerDisconnect(missedWhileServiceStopped: Boolean) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
@@ -58,17 +75,8 @@ class PowerTransitionReceiverRuntimeInstrumentationTest {
             )
 
             assertTrue(
-                monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, false).commit()
-            )
-            assertTrue(PowerTransitionReceiverController.sync(context))
-            assertTrue("The manifest receiver must be disabled when monitoring is opted out",
-                !PowerTransitionReceiverController.isEnabled(context))
-            assertTrue(
                 monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
             )
-            assertTrue(PowerTransitionReceiverController.sync(context))
-            assertTrue("The manifest receiver must be enabled while monitoring is opted in",
-                PowerTransitionReceiverController.isEnabled(context))
             assertTrue(transitionPrefs.edit().clear().commit())
             assertTrue(statePrefs.edit().clear().commit())
             assertTrue(corruptionPrefs.edit().clear().commit())
@@ -78,21 +86,24 @@ class PowerTransitionReceiverRuntimeInstrumentationTest {
             startMonitorService(context)
             waitForService(true)
 
-            var disconnectRequestedAt = 0L
-            if (monitorServiceStopped) {
+            var restartRequestedAt = 0L
+            if (missedWhileServiceStopped) {
                 context.stopService(Intent(context, ProtectionMonitorService::class.java))
                 waitForService(false)
-                assertTrue("The manifest receiver remains enabled while monitoring is opted in",
-                    PowerTransitionReceiverController.isEnabled(context))
-                assertEquals(ProtectionMode.ARMED, ProtectionStore(context).read().mode)
-                disconnectRequestedAt = System.currentTimeMillis()
                 runShell(instrumentation, "dumpsys battery unplug")
                 assumeTrue(
                     "Emulator did not expose a confirmed disconnected battery snapshot",
                     waitForPowerState(context, expectedConnected = false)
                 )
+                assertEquals(
+                    "No runtime receiver is active while the monitor service is stopped",
+                    ProtectionMode.ARMED,
+                    ProtectionStore(context).read().mode
+                )
+                restartRequestedAt = System.currentTimeMillis()
+                startMonitorService(context)
+                waitForService(true)
             } else {
-                disconnectRequestedAt = System.currentTimeMillis()
                 runShell(instrumentation, "dumpsys battery unplug")
                 assumeTrue(
                     "Emulator did not expose a confirmed disconnected battery snapshot",
@@ -109,21 +120,19 @@ class PowerTransitionReceiverRuntimeInstrumentationTest {
                 state = ProtectionStore(context).read()
             }
             assertEquals(
-                if (monitorServiceStopped) {
-                    "The manifest receiver must process a disconnect while the service is stopped"
+                if (missedWhileServiceStopped) {
+                    "Sticky-service restart must recover a missed same-boot unplug"
                 } else {
-                    "The manifest receiver must process a disconnect while the service is active"
+                    "The active foreground monitor must receive the runtime power broadcast"
                 },
                 ProtectionMode.COUNTDOWN,
                 state.mode
             )
-            assertTrue("The protected manifest receiver remains enabled after processing",
-                PowerTransitionReceiverController.isEnabled(context))
-            assertEquals(monitorServiceStopped, !ProtectionMonitorService.isRunning)
-            if (monitorServiceStopped) {
+            assertTrue(ProtectionMonitorService.isPowerTransitionReceiverRegistered)
+            if (missedWhileServiceStopped) {
                 assertTrue(
-                    "A manifest-delivered disconnect uses event-receipt time while the service is absent",
-                    state.changedAtEpochMs >= disconnectRequestedAt
+                    "A missed event uses recovery-detection time, not an unknown original event time",
+                    state.changedAtEpochMs >= restartRequestedAt
                 )
             }
         } finally {
@@ -134,7 +143,6 @@ class PowerTransitionReceiverRuntimeInstrumentationTest {
             restorePreferences(statePrefs, stateSnapshot)
             restorePreferences(corruptionPrefs, corruptionSnapshot)
             restorePreferences(monitorPrefs, monitorSnapshot)
-            PowerTransitionReceiverController.sync(context)
             runCatching { runShell(instrumentation, "dumpsys battery reset") }
             if (wasRunning && previousMonitorEnabled) {
                 runCatching {
@@ -154,10 +162,13 @@ class PowerTransitionReceiverRuntimeInstrumentationTest {
     private fun waitForService(expectedRunning: Boolean) {
         val deadline = SystemClock.elapsedRealtime() + 10_000L
         while (SystemClock.elapsedRealtime() < deadline) {
-            if (ProtectionMonitorService.isRunning == expectedRunning) return
+            if (ProtectionMonitorService.isRunning == expectedRunning &&
+                ProtectionMonitorService.isPowerTransitionReceiverRegistered == expectedRunning
+            ) return
             SystemClock.sleep(50L)
         }
         assertEquals(expectedRunning, ProtectionMonitorService.isRunning)
+        assertEquals(expectedRunning, ProtectionMonitorService.isPowerTransitionReceiverRegistered)
     }
 
     private fun waitForPowerState(context: Context, expectedConnected: Boolean): Boolean {

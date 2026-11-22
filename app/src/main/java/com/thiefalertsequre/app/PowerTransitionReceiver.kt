@@ -1,70 +1,9 @@
 package com.thiefalertsequre.app
 
 import android.content.BroadcastReceiver
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import java.util.concurrent.Executors
-
-internal object PowerTransitionReceiverController {
-    fun sync(context: Context): Boolean {
-        val app = context.applicationContext
-        val monitorPrefs = app.getSharedPreferences(
-            ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
-        )
-        val monitorEnabled = SafePreferences.boolean(
-            monitorPrefs, ProtectionMonitorService.KEY_ENABLED,
-            ProtectionMonitorPolicy.DEFAULT_ENABLED
-        )
-        val mode = ProtectionStore(app).read().mode
-        val shouldEnable = ProtectionMonitorPolicy.shouldRun(monitorEnabled, mode)
-        val expectedState = if (shouldEnable) PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-            else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-        val component = ComponentName(app, PowerTransitionReceiver::class.java)
-        val manager = app.packageManager
-
-        val current = runCatching { manager.getComponentEnabledSetting(component) }
-            .getOrElse { error ->
-                LocalTamperHistory.record(
-                    app, "power_manifest_receiver_state_read_failed",
-                    error.javaClass.simpleName + ": " + error.message
-                )
-                return false
-            }
-        if (current != expectedState) {
-            runCatching {
-                manager.setComponentEnabledSetting(
-                    component, expectedState, PackageManager.DONT_KILL_APP
-                )
-            }.onFailure { error ->
-                LocalTamperHistory.record(
-                    app, "power_manifest_receiver_sync_failed",
-                    error.javaClass.simpleName + ": " + error.message
-                )
-            }
-        }
-
-        val actual = runCatching { manager.getComponentEnabledSetting(component) }.getOrNull()
-        val enabled = actual == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-        ProtectionMonitorService.isPowerTransitionReceiverRegistered = enabled
-        val synchronized = actual == expectedState
-        if (!synchronized) {
-            LocalTamperHistory.record(
-                app, "power_manifest_receiver_state_unconfirmed",
-                "Manifest power receiver state does not match the current monitor policy"
-            )
-        }
-        return synchronized
-    }
-
-    fun isEnabled(context: Context): Boolean = runCatching {
-        val app = context.applicationContext
-        app.packageManager.getComponentEnabledSetting(
-            ComponentName(app, PowerTransitionReceiver::class.java)
-        ) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-    }.getOrDefault(false)
-}
 
 class PowerTransitionReceiver : BroadcastReceiver() {
     companion object {
@@ -108,10 +47,7 @@ class PowerTransitionReceiver : BroadcastReceiver() {
             ProtectionMonitorService.KEY_ENABLED,
             ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
-        if (!ProtectionMonitorPolicy.shouldRun(
-                monitorEnabled, ProtectionStore(context.applicationContext).read().mode
-            )
-        ) return
+        if (!monitorEnabled) return
 
         // Capture the physical event time before serialized debounce work. Three
         // stable samples finish in about 200 ms; the five-sample cap is about 400 ms.
