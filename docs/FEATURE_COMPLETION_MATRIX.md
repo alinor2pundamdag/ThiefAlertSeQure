@@ -67,6 +67,11 @@ The production baseline remains v1.1.3. The current feature branch contains the 
 | Managed rollback | In-app recovery restores the saved pre-enable policy; damaged/legacy snapshots trigger emergency navigation defaults and retain a retry path if any DPM call fails |
 | Unit tests | Protection state machine, authentication throttle, and recognized OEM-family guidance including safe generic fallbacks |
 
+
+## Phase Two verification status
+
+Phase Two charger and trusted-Bluetooth source changes, unit tests, and instrumentation tests are present, but current-head CI is not yet verified. The last inspectable target-branch Android run [#44655654144](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44655654144) checked out the earlier commit `752e3e972ed3706beb2278609e03522ab996888a`: its build/unit/lint/APK checks passed, while API 36 and API 37 instrumentation failed on hosted-emulator infrastructure before app assertions. CodeQL [#44655654167](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44655654167) passed on that older source. The branch now opts into TCG for hosted emulators and retries transient PackageManager loss across install, permission grant, and package verification; the fake-ADB/fake-Gradle regression harness passes locally and is included in the build job. These changes still require a green exact-head API 36/API 37 instrumentation run and CodeQL before Phase Two non-device work can be declared complete. Physical-device acceptance remains separate and outstanding.
+
 ## Authentication boundary
 The five-failure / 30-second app cooldown applies to biometric failures reported through AndroidX BiometricPrompt. Device PIN/pattern/password remains available during that app cooldown; Android Keyguard independently enforces credential lockout. Android does not disclose incorrect device PIN/pattern/password attempts to ordinary apps. Android Keyguard enforces its own credential lockout. The app never collects, stores, logs or transmits device credentials. `ACTION_USER_PRESENT`, `isDeviceSecure`, and keyguard dismissal are not accepted as proof of a fresh credential; the owner must complete the explicit app-launched credential or strong-biometric prompt.
 
