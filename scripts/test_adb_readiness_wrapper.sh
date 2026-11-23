@@ -44,9 +44,9 @@ case "$command" in
         printf 'input-keyevent\n' >> "${FAKE_ADB_KEYEVENT_LOG:?}"
         exit 0
         ;;
-    "shell settings put global window_animation_scale 0.0"|
-    "shell settings put global transition_animation_scale 0.0"|
-    "shell settings put global animator_duration_scale 0.0"|
+    "shell settings put global window_animation_scale 0.0"|\
+    "shell settings put global transition_animation_scale 0.0"|\
+    "shell settings put global animator_duration_scale 0.0"|\
     "shell settings put secure spell_checker_enabled 0")
         if [[ "${FAKE_ADB_SETTINGS_PUT_FAIL:-0}" == "1" ]]; then
             echo "Simulated settings write failure" >&2
