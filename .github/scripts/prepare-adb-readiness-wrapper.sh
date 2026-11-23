@@ -86,18 +86,43 @@ case "$*" in
         echo "Android input service did not become ready within $input_wait_attempts checks" >&2
         exit 1
         ;;
-    *"shell settings put"*)
-        # SettingsProvider may restart briefly after a slow emulator boot.
-        for attempt in {1..90}; do
-            if "$REAL_ADB" -s "$serial" shell settings get global window_animation_scale >/dev/null 2>&1; then
+    *"shell settings put global window_animation_scale 0"*|\
+    *"shell settings put global transition_animation_scale 0"*|\
+    *"shell settings put global animator_duration_scale 0"*|\
+    *"shell settings put secure spell_checker_enabled 0"*)
+        # These whitelisted writes are android-emulator-runner UI optimizations,
+        # not test prerequisites. A missing SettingsProvider must not turn a
+        # booted, otherwise usable emulator into a false-negative CI failure.
+        settings_unavailable_marker="${REAL_ADB}.thiefalert-settings-unavailable"
+        if [[ -e "$settings_unavailable_marker" ]]; then
+            echo "Skipping optional emulator UI-tuning command; SettingsProvider was previously unavailable." >&2
+            exit 0
+        fi
+
+        settings_wait_attempts="${ADB_READINESS_SETTINGS_ATTEMPTS:-30}"
+        settings_wait_interval="${ADB_READINESS_SETTINGS_INTERVAL_SECONDS:-2}"
+        if ! [[ "$settings_wait_attempts" =~ ^[1-9][0-9]*$ &&
+                "$settings_wait_interval" =~ ^(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid ADB SettingsProvider readiness retry configuration." >&2
+            exit 2
+        fi
+
+        for ((attempt = 1; attempt <= settings_wait_attempts; attempt++)); do
+            service_output="$("$REAL_ADB" -s "$serial" shell service check settings 2>&1 || true)"
+            service_output="${service_output//$'\r'/}"
+            if [[ "$service_output" == "Service settings: found" ]]; then
                 retry_adb "$@"
                 exit $?
             fi
             "$REAL_ADB" reconnect offline >/dev/null 2>&1 || true
-            sleep 2
+            if [[ "$attempt" -lt "$settings_wait_attempts" ]]; then
+                sleep "$settings_wait_interval"
+            fi
         done
-        echo "Android settings provider did not become ready within 180 seconds" >&2
-        exit 1
+
+        : > "$settings_unavailable_marker"
+        echo "::warning::Skipping optional emulator UI-tuning command; SettingsProvider did not become ready within $settings_wait_attempts checks. Instrumentation continues with default animation/spellchecker settings." >&2
+        exit 0
         ;;
 esac
 
