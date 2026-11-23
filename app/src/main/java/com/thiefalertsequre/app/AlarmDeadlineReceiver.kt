@@ -11,13 +11,32 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         val callbackIntent = intent ?: return
         val pending = goAsync()
+        if (A2DisconnectScheduler.isDeadlineAction(callbackIntent.action)) {
+            // Serialize A2 deadline validation with ACL events. A reconnect that
+            // has already reached either receiver must be applied before an
+            // expired deadline can latch the alarm, even if the event queue is busy.
+            try {
+                A2BluetoothEventQueue.execute {
+                    try {
+                        handleA2DisconnectDeadline(context.applicationContext, callbackIntent)
+                    } catch (error: Exception) {
+                        handleProcessingFailure(context, callbackIntent, error)
+                    } finally {
+                        pending.finish()
+                    }
+                }
+            } catch (error: Exception) {
+                try {
+                    handleProcessingFailure(context, callbackIntent, error)
+                } finally {
+                    pending.finish()
+                }
+            }
+            return
+        }
         Thread {
             try {
-                if (A2DisconnectScheduler.isDeadlineAction(callbackIntent.action)) {
-                    handleA2DisconnectDeadline(context.applicationContext, callbackIntent)
-                } else {
-                    handleDeadline(context.applicationContext, callbackIntent)
-                }
+                handleDeadline(context.applicationContext, callbackIntent)
             } catch (error: Exception) {
                 handleProcessingFailure(context, callbackIntent, error)
             } finally {

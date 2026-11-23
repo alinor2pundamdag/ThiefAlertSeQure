@@ -267,7 +267,26 @@ class ProtectionMonitorService : Service(), SensorEventListener {
                     val candidate = result.candidate
                     val address = candidate.pending.address
                     pendingBluetoothRunnables.remove(address)?.let(handler::removeCallbacks)
-                    val runnable = Runnable { handleBluetoothDisconnectDeadline(candidate) }
+                    val runnable = Runnable {
+                        // Keep the fast in-process deadline behind ACL callbacks
+                        // already submitted to the shared serial queue. This prevents
+                        // queue backlog from letting a received reconnect lose the
+                        // race against the eight-second Handler deadline.
+                        try {
+                            A2BluetoothEventQueue.execute {
+                                handleBluetoothDisconnectDeadline(candidate)
+                            }
+                        } catch (error: Exception) {
+                            LocalTamperHistory.record(
+                                this, "a2_deadline_queue_failed",
+                                error.javaClass.simpleName + ": " + error.message
+                            )
+                            // Preserve the in-process fallback if the serial executor
+                            // itself rejects work; the durable AlarmManager path remains
+                            // independently scheduled whenever boot identity is available.
+                            handleBluetoothDisconnectDeadline(candidate)
+                        }
+                    }
                     pendingBluetoothRunnables[address] = runnable
                     val deadline = A2DisconnectPolicy.graceDeadlineUptimeMs(
                         candidate.eventUptimeMs, BLUETOOTH_DISCONNECT_GRACE_MS

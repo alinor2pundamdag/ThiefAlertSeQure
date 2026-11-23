@@ -53,6 +53,42 @@ class A2BluetoothEventQueueTest {
         }
     }
 
+
+    @Test fun deadlineValidationCannotOvertakeAReconnectAlreadyQueuedBehindBacklog() {
+        val order = Collections.synchronizedList(mutableListOf<String>())
+        val blockerEntered = CountDownLatch(1)
+        val releaseBlocker = CountDownLatch(1)
+        val completed = CountDownLatch(2)
+
+        A2BluetoothEventQueue.execute {
+            blockerEntered.countDown()
+            check(releaseBlocker.await(5, TimeUnit.SECONDS))
+        }
+        assertTrue("A prior ACL operation should occupy the serial queue",
+            blockerEntered.await(5, TimeUnit.SECONDS))
+
+        try {
+            A2BluetoothEventQueue.execute {
+                order.add("reconnect")
+                completed.countDown()
+            }
+            A2BluetoothEventQueue.execute {
+                order.add("deadline-validation")
+                completed.countDown()
+            }
+        } finally {
+            releaseBlocker.countDown()
+        }
+
+        assertTrue("Reconnect and deadline validation should drain after the backlog",
+            completed.await(5, TimeUnit.SECONDS))
+        assertEquals(
+            "A deadline must not overtake a reconnect that was already submitted",
+            listOf("reconnect", "deadline-validation"),
+            order.toList()
+        )
+    }
+
     @Test fun manifestAndRuntimeAclEventsShareBroadcastSubmissionOrder() {
         val order = Collections.synchronizedList(mutableListOf<String>())
         val firstStarted = CountDownLatch(1)
