@@ -175,13 +175,28 @@ internal object A2BluetoothAclEventProcessor {
 
         return when (action) {
             BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                TrustedBluetoothRegistry.markConnected(prefs, address, true)
+                val baselineUpdate = TrustedBluetoothRegistry.updateConnectionBaseline(prefs, address, true)
+                if (!baselineUpdate.committed) {
+                    LocalTamperHistory.record(
+                        app, "a2_connect_baseline_persist_failed",
+                        "Trusted-device reconnect was not accepted because its encrypted connected baseline could not be committed; the existing deadline was retained"
+                    )
+                    return A2BluetoothEventResult.Ignored
+                }
                 A2DisconnectScheduler.cancel(app, address)
                 LocalTamperHistory.record(app, "trusted_bluetooth_connected", "A registered trusted Bluetooth device connected")
                 A2BluetoothEventResult.Connected(address)
             }
             BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
-                val hadBaseline = TrustedBluetoothRegistry.markConnected(prefs, address, false)
+                val baselineUpdate = TrustedBluetoothRegistry.updateConnectionBaseline(prefs, address, false)
+                if (!baselineUpdate.committed) {
+                    LocalTamperHistory.record(
+                        app, "a2_disconnect_baseline_persist_failed",
+                        "Trusted-device disconnect was not accepted because its encrypted disconnected baseline could not be committed"
+                    )
+                    return A2BluetoothEventResult.Ignored
+                }
+                val hadBaseline = baselineUpdate.hadBaseline
                 if (!A2DisconnectPolicy.shouldStartGracePeriod(
                         alertEnabled = alertEnabled,
                         trusted = TrustedBluetoothRegistry.isTrusted(prefs, address),

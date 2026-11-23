@@ -230,20 +230,40 @@ object TrustedBluetoothRegistry {
             }
         }
 
-    fun markConnected(prefs: SharedPreferences, address: String, connected: Boolean): Boolean = A2DisconnectStateLock.withLock {
-        if (!isValidAddress(address)) return@withLock false
+    internal data class ConnectionBaselineUpdate(
+        val committed: Boolean,
+        val hadBaseline: Boolean
+    )
+
+    /**
+     * Persist the new connection baseline and report commit success separately from
+     * whether a previously connected baseline existed. A first connect is a successful
+     * write even when no older baseline existed. The commit hook keeps failure handling
+     * deterministic in instrumentation tests.
+     */
+    internal fun updateConnectionBaseline(
+        prefs: SharedPreferences,
+        address: String,
+        connected: Boolean,
+        commit: (SharedPreferences.Editor) -> Boolean = { it.commit() }
+    ): ConnectionBaselineUpdate = A2DisconnectStateLock.withLock {
+        if (!isValidAddress(address)) return@withLock ConnectionBaselineUpdate(false, false)
         val normalizedAddress = address.trim().uppercase()
         val old = when (val stored = readBaselineAddresses(prefs)) {
             is PreferenceRead.Value -> stored.value
-            is PreferenceRead.Corrupt -> return@withLock false
+            is PreferenceRead.Corrupt -> return@withLock ConnectionBaselineUpdate(false, false)
         }
         val hadBaseline = old.any { it.equals(normalizedAddress, ignoreCase = true) }
         val updated = old.filterNot { it.equals(normalizedAddress, ignoreCase = true) }.toMutableSet()
         if (connected && isTrusted(prefs, normalizedAddress)) updated.add(normalizedAddress)
-        val committed = prefs.edit()
+        val editor = prefs.edit()
             .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, updated.joinToString("\n")))
-            .commit()
-        committed && hadBaseline
+        ConnectionBaselineUpdate(commit(editor), hadBaseline)
+    }
+
+    fun markConnected(prefs: SharedPreferences, address: String, connected: Boolean): Boolean {
+        val update = updateConnectionBaseline(prefs, address, connected)
+        return update.committed && update.hadBaseline
     }
 
     fun clearBaselines(prefs: SharedPreferences) = A2DisconnectStateLock.withLock {

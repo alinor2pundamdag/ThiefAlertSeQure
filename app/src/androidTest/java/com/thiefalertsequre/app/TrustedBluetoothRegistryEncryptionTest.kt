@@ -65,6 +65,43 @@ class TrustedBluetoothRegistryEncryptionTest {
     }
 
     @Test
+    fun connectionBaselineCommitFailureIsDistinctFromMissingPriorBaseline() {
+        prefs.edit().clear().commit()
+        val address = "AA:BB:CC:DD:EE:21"
+        try {
+            assertTrue(TrustedBluetoothRegistry.add(prefs, address, "Commit test accessory"))
+
+            val firstConnect = TrustedBluetoothRegistry.updateConnectionBaseline(prefs, address, true)
+            assertTrue("A first connect is a committed write even without an older baseline", firstConnect.committed)
+            assertFalse("A first connect has no previous connected baseline", firstConnect.hadBaseline)
+            assertTrue(TrustedBluetoothRegistry.isBaselineConnected(prefs, address))
+
+            val failedDisconnect = TrustedBluetoothRegistry.updateConnectionBaseline(
+                prefs, address, false
+            ) { false }
+            assertFalse("A failed baseline commit must be reported", failedDisconnect.committed)
+            assertTrue("The previously connected baseline must still be reported", failedDisconnect.hadBaseline)
+            assertTrue("A failed write must leave the connected baseline intact",
+                TrustedBluetoothRegistry.isBaselineConnected(prefs, address))
+
+            val disconnect = TrustedBluetoothRegistry.updateConnectionBaseline(prefs, address, false)
+            assertTrue(disconnect.committed)
+            assertTrue(disconnect.hadBaseline)
+            assertFalse(TrustedBluetoothRegistry.isBaselineConnected(prefs, address))
+
+            val failedReconnect = TrustedBluetoothRegistry.updateConnectionBaseline(
+                prefs, address, true
+            ) { false }
+            assertFalse("A reconnect write failure must not be mistaken for a successful reconnect", failedReconnect.committed)
+            assertFalse(failedReconnect.hadBaseline)
+            assertFalse("A failed reconnect write must leave the disconnected baseline intact",
+                TrustedBluetoothRegistry.isBaselineConnected(prefs, address))
+        } finally {
+            prefs.edit().clear().commit()
+        }
+    }
+
+    @Test
     fun duplicateDisconnectDoesNotCreateASecondConnectionBaselineTransition() {
         prefs.edit().clear().commit()
         val address = "AA:BB:CC:DD:EE:20"
