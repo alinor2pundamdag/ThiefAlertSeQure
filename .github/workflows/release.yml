@@ -125,6 +125,33 @@ jobs:
       - name: Verify optional ranging permission boundary
         run: python3 scripts/verify_ranging_privacy.py
 
+      - name: Verify encrypted evidence and optional location privacy
+        run: python3 scripts/verify_evidence_privacy.py
+
+      - name: Verify encrypted local history migration and plaintext cleanup
+        run: python3 scripts/verify_local_history_storage.py
+
+      - name: Verify Bypass Charging privilege and state boundary
+        run: python3 scripts/verify_bypass_charging_contract.py
+
+      - name: Verify Batch 2 cross-file integration contracts
+        run: python3 scripts/verify_batch2_contracts.py
+
+      - name: Verify internal navigation and themed dialogs
+        run: python3 scripts/verify_navigation.py
+
+      - name: Verify safe preference read boundaries
+        run: python3 scripts/verify_preferences.py
+
+      - name: Verify Android manifest and protection invariants
+        run: python3 scripts/verify_manifest_contract.py
+
+      - name: Verify authoritative protection state ownership
+        run: python3 scripts/verify_state_ownership.py
+
+      - name: Verify permanent production identity stays synchronized
+        run: python3 scripts/verify_release_identity.py
+
       - name: Verify local history biometric authentication and lifecycle
         run: python3 scripts/verify_local_history_auth.py
 
