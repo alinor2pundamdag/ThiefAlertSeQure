@@ -2,6 +2,13 @@ package com.thiefalertsequre.app
 
 /** Pure A2 gating rules; timing and alarm state transitions remain owned by the service. */
 object A2DisconnectPolicy {
+    private val retryDelaysMs = longArrayOf(1_000L, 3_000L, 10_000L)
+    const val MAX_RETRIES = 3
+
+    /** Bounded retry backoff for a deadline callback whose durable transition failed. */
+    fun nextRetryDelayMs(completedRetries: Int): Long? =
+        if (completedRetries < 0) null else retryDelaysMs.getOrNull(completedRetries)
+
     /** Uses the broadcast-receipt uptime so local processing never extends the grace period. */
     fun graceDeadlineUptimeMs(eventUptimeMs: Long, gracePeriodMs: Long): Long {
         require(eventUptimeMs >= 0L && gracePeriodMs >= 0L)

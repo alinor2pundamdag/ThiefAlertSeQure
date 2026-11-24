@@ -25,7 +25,8 @@ internal object A2DisconnectScheduler {
         val eventElapsedRealtimeMs: Long,
         val bootCount: Int,
         val monitorRevision: Long,
-        val deviceRevision: Long
+        val deviceRevision: Long,
+        val retryCount: Int = 0
     ) {
         val deadlineElapsedRealtimeMs: Long
             get() = A2DisconnectPolicy.graceDeadlineUptimeMs(
@@ -35,6 +36,83 @@ internal object A2DisconnectScheduler {
 
     fun schedule(context: Context, pending: Pending): Boolean =
         scheduleInternal(context, pending, ProtectionMonitorService.PREFS, null)
+
+    /**
+     * Re-arm a consumed A2 callback after a transient receiver/state-write failure.
+     * The original grace deadline is preserved; retries use a separate bounded delay.
+     */
+    fun scheduleRetry(context: Context, pending: Pending): Boolean =
+        scheduleRetryInternal(context, pending, ProtectionMonitorService.PREFS, null)
+
+    internal fun scheduleRetryIsolated(
+        context: Context,
+        pending: Pending,
+        preferencesName: String,
+        namespace: String
+    ): Boolean = scheduleRetryInternal(context, pending, preferencesName, namespace)
+
+    private fun scheduleRetryInternal(
+        context: Context,
+        pending: Pending,
+        preferencesName: String,
+        namespace: String?
+    ): Boolean = synchronized(lock) {
+        val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
+        val records = read(prefs) ?: run {
+            LocalTamperHistory.record(context, "a2_deadline_retry_store_unreadable", "A2 deadline retry could not read the encrypted schedule; source retained")
+            ProtectionMonitorRecoveryNotice.show(context, "Trusted-device deadline retry storage is unreadable. Open the app to review protection monitoring.")
+            return false
+        }
+        val current = records.firstOrNull {
+            it.address.equals(pending.address, ignoreCase = true) &&
+                it.eventEpochMs == pending.eventEpochMs &&
+                it.eventElapsedRealtimeMs == pending.eventElapsedRealtimeMs &&
+                it.bootCount == pending.bootCount &&
+                it.monitorRevision == pending.monitorRevision &&
+                it.deviceRevision == pending.deviceRevision
+        } ?: return false
+        if (current.retryCount != pending.retryCount) return false
+
+        val delayMs = A2DisconnectPolicy.nextRetryDelayMs(current.retryCount)
+        if (delayMs == null) {
+            cancelInternal(context, current.address, current.eventElapsedRealtimeMs, preferencesName, namespace)
+            LocalTamperHistory.record(context, "a2_deadline_retry_exhausted", "A2 deadline validation could not be durably completed after ${A2DisconnectPolicy.MAX_RETRIES} bounded retries")
+            ProtectionMonitorRecoveryNotice.show(context, "A trusted-device separation deadline could not be verified. Open the app to review protection monitoring.")
+            return false
+        }
+
+        val updated = current.copy(retryCount = current.retryCount + 1)
+        if (!write(prefs, mergePending(records, updated))) {
+            LocalTamperHistory.record(context, "a2_deadline_retry_persist_failed", "A2 deadline retry count could not be committed")
+            ProtectionMonitorRecoveryNotice.show(context, "A trusted-device deadline retry could not be saved. Open the app to review protection monitoring.")
+            return false
+        }
+
+        runCatching {
+            val manager = context.getSystemService(AlarmManager::class.java)
+            val operation = pendingIntent(context, current.address, namespace)
+            val retryAt = android.os.SystemClock.elapsedRealtime() + delayMs
+            val exactAllowed = Build.VERSION.SDK_INT < 31 || manager.canScheduleExactAlarms()
+            if (!exactAllowed) {
+                LocalTamperHistory.record(context, "a2_retry_exact_alarm_access_missing", "Using the inexact idle-aware A2 retry; Android may delay delivery")
+            }
+            if (exactAllowed) {
+                try {
+                    manager.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, retryAt, operation)
+                } catch (_: SecurityException) {
+                    manager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, retryAt, operation)
+                }
+            } else {
+                manager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, retryAt, operation)
+            }
+            LocalTamperHistory.record(context, "a2_deadline_retry_scheduled", "A2 deadline retry ${updated.retryCount}/${A2DisconnectPolicy.MAX_RETRIES} scheduled after ${delayMs} ms")
+            true
+        }.getOrElse {
+            LocalTamperHistory.record(context, "a2_deadline_retry_schedule_failed", it.javaClass.simpleName + ": " + it.message)
+            ProtectionMonitorRecoveryNotice.show(context, "Android could not schedule a trusted-device deadline retry. Open the app to review protection monitoring.")
+            false
+        }
+    }
 
     /** Isolated preference and PendingIntent namespace for non-destructive instrumentation. */
     internal fun scheduleIsolated(
@@ -53,7 +131,8 @@ internal object A2DisconnectScheduler {
         if (!TrustedBluetoothRegistry.isValidAddress(pending.address) ||
             pending.eventEpochMs <= 0L || pending.eventElapsedRealtimeMs <= 0L ||
             pending.eventElapsedRealtimeMs > android.os.SystemClock.elapsedRealtime() ||
-            pending.bootCount < -1 || pending.monitorRevision < 0L || pending.deviceRevision < 0L
+            pending.bootCount < -1 || pending.monitorRevision < 0L || pending.deviceRevision < 0L ||
+            pending.retryCount !in 0..A2DisconnectPolicy.MAX_RETRIES
         ) {
             LocalTamperHistory.record(context, "a2_deadline_metadata_rejected", "Invalid trusted-device deadline metadata was rejected")
             return false
@@ -190,14 +269,16 @@ internal object A2DisconnectScheduler {
             }
             val records = decoded.lineSequence().filter { it.isNotBlank() }.map { line ->
                 val fields = line.split('|')
-                require(fields.size == 6 && TrustedBluetoothRegistry.isValidAddress(fields[0]))
+                require(fields.size in 6..7 && TrustedBluetoothRegistry.isValidAddress(fields[0]))
                 val record = Pending(
                     fields[0], fields[1].toLong(), fields[2].toLong(),
-                    fields[3].toInt(), fields[4].toLong(), fields[5].toLong()
+                    fields[3].toInt(), fields[4].toLong(), fields[5].toLong(),
+                    if (fields.size == 7) fields[6].toInt() else 0
                 )
                 require(
                     record.eventEpochMs > 0L && record.eventElapsedRealtimeMs > 0L &&
-                        record.bootCount >= -1 && record.monitorRevision >= 0L && record.deviceRevision >= 0L
+                        record.bootCount >= -1 && record.monitorRevision >= 0L && record.deviceRevision >= 0L &&
+                        record.retryCount in 0..A2DisconnectPolicy.MAX_RETRIES
                 ) { "A2 deadline record contains invalid time or revision metadata." }
                 record
             }.toList()
@@ -213,7 +294,7 @@ internal object A2DisconnectScheduler {
     private fun write(prefs: android.content.SharedPreferences, records: List<Pending>): Boolean {
         if (records.isEmpty()) return prefs.edit().remove(KEY_PENDING).commit()
         val raw = records.distinctBy { it.address.uppercase() }.joinToString("\n") {
-            "${it.address.uppercase()}|${it.eventEpochMs}|${it.eventElapsedRealtimeMs}|${it.bootCount}|${it.monitorRevision}|${it.deviceRevision}"
+            "${it.address.uppercase()}|${it.eventEpochMs}|${it.eventElapsedRealtimeMs}|${it.bootCount}|${it.monitorRevision}|${it.deviceRevision}|${it.retryCount}"
         }
         return runCatching {
             prefs.edit().putString(KEY_PENDING, LocalPreferenceCipher.encrypt(KEY_PENDING, raw)).commit()

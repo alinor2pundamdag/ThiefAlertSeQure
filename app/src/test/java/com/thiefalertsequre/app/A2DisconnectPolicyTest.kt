@@ -6,6 +6,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class A2DisconnectPolicyTest {
+    @Test fun a2DeadlineRetryBackoffIsBounded() {
+        assertEquals(1_000L, A2DisconnectPolicy.nextRetryDelayMs(0))
+        assertEquals(3_000L, A2DisconnectPolicy.nextRetryDelayMs(1))
+        assertEquals(10_000L, A2DisconnectPolicy.nextRetryDelayMs(2))
+        assertEquals(null, A2DisconnectPolicy.nextRetryDelayMs(3))
+        assertEquals(null, A2DisconnectPolicy.nextRetryDelayMs(-1))
+    }
+
     @Test fun disconnectGraceDeadlineStartsAtBroadcastReceipt() {
         assertEquals(9_000L, A2DisconnectPolicy.graceDeadlineUptimeMs(1_000L, 8_000L))
     }
