@@ -18,6 +18,7 @@ privacy = (ROOT / "docs/PRIVACY_POLICY.md").read_text(encoding="utf-8")
 main = (ROOT / "app/src/main/java/com/thiefalertsequre/app/MainActivity.kt").read_text(encoding="utf-8")
 history = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistory.kt").read_text(encoding="utf-8")
 history_policy = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistoryPolicy.kt").read_text(encoding="utf-8")
+preference_cipher = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalPreferenceCipher.kt").read_text(encoding="utf-8")
 
 required = {
     "coarse and fine location are optional manifest declarations":
@@ -76,6 +77,11 @@ required = {
         all(token in history_policy for token in ("exceptionMessage", "credentialAssignment", "bearerCredential", "knownToken", "jwt", "uri", "filesystemPath", "email")),
     "legacy local event details are sanitized on read and append":
         history.count("sanitizeStoredHistory") >= 2,
+    "encrypted preference decryption never creates a replacement key":
+        "Cipher.DECRYPT_MODE, getExistingKey()" in preference_cipher
+        and "keyStore.getKey(KEY_ALIAS, null) as? SecretKey" in preference_cipher
+        and "requireExistingKey" in preference_cipher
+        and "Cipher.DECRYPT_MODE, getOrCreateKey()" not in preference_cipher,
 }
 for description, passed in required.items():
     if not passed:
