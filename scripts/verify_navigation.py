@@ -149,6 +149,18 @@ if "Skip intro" in intro_activity or "Skip the introduction" in intro_activity:
 if not re.search(r"if\s*\(!use3d\)\s*\{\s*GenesisFractureCanvas\(", intro_activity, re.S):
     errors.append("The 2D fracture canvas must be fallback-only; Filament-capable devices must use the 3D scene without a 2D effects overlay")
 for required in (
+    "targetValue = 20f",
+    "tween(durationMillis = 20_000, easing = LinearEasing)",
+    "val drop = ((p - 0.18f) / 0.10f).coerceIn(0f, 1f)",
+    "val nameDrop = ((p - 0.39f) / 0.20f).coerceIn(0f, 1f)",
+    "val finalFall = ((p - 0.82f) / 0.18f).coerceIn(0f, 1f)",
+    "containerHeight * (1.25f * finalFall * finalFall)",
+    "finalFall - 0.55f",
+    "p in 0.245f..0.278333f"
+):
+    if required not in intro_activity:
+        errors.append("Seismic Genesis stage/name-animation contract missing: " + required)
+for required in (
     "Lifecycle.Event.ON_RESUME -> filamentView?.startRendering()",
     "Lifecycle.Event.ON_PAUSE -> filamentView?.pauseRendering()",
     "Lifecycle.Event.ON_DESTROY -> filamentView?.release()",
@@ -171,7 +183,6 @@ if body_transform and "FloatArray(16)" in body_transform.group(0):
 if "id(\"org.jetbrains.kotlin.plugin.compose\")" not in (ROOT / "app" / "build.gradle.kts").read_text(encoding="utf-8"):
     errors.append("Seismic Genesis must use the requested Jetpack Compose implementation")
 
-renderer_activity = (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
 for required in (
     "buildStudioHdrEnvironment", "HDRLoader.createTexture", "IBLPrefilterContext.EquirectangularToCubemap",
     "IBLPrefilterContext.SpecularFilter", "IndirectLight.Builder()", "Skybox.Builder().environment",
