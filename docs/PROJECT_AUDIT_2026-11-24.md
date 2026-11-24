@@ -81,12 +81,13 @@ Do not implement or assign these features to a release without a separate explic
 
 | Gate | Status |
 |---|---|
-| Follow-up exact-head Android CI and CodeQL | Pending |
+| Follow-up exact-head CodeQL | Passed (run #45309437222) |
+| Follow-up exact-head Android CI | Final minified APK verification/artifact upload running at audit time |
 | CodeQL alert #8 formal reassessment/closure | Unresolved / not verified |
 | Independent review of clean release PR | Pending |
 | Permanent production signing secrets and signed preflight | Not verified |
-| Phase 12 physical acceptance | 0/25 PASS; 25/25 NOT TESTED |
-| Emulator/instrumentation testing | Excluded by project policy |
+| Phase 12 physical acceptance | Owner-operated after delivery; excluded from coding/merge gates |
+| Emulator/instrumentation testing | Excluded by project policy; owner physical tests are separate |
 | Seismic Genesis visual quality/frame-rate on target handset | Not tested |
 | Install-over-existing, reboot, Doze, notification, exact-alarm and OEM behavior on physical device | Not tested |
 | Bypass Charging automatic OEM adapter | Blocked: no verified public API |
@@ -98,4 +99,4 @@ The selected target is the existing GitHub Releases direct APK path. The current
 
 The current targetSdk 36 meets the published Play target-API requirement for new apps and updates as of 31 August 2026, but that alone does not establish Play policy approval.
 
-**Completion statement:** The approved software candidate is under clean release integration. It is not a production-signed release and is not 100% release-accepted while the gates above remain open. No merge, tag, publication or production release has been performed.
+**Completion statement:** The software candidate is under clean release integration. Physical acceptance is reserved for the owner and is not a coding/merge blocker. Production signing, final CI, security reassessment and publication remain separate release operations. No merge, tag, publication or production release has been performed.
