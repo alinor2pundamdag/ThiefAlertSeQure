@@ -866,24 +866,15 @@ class SettingsActivity : FragmentActivity() {
             // This handoff is restricted to the app-private cache and revalidated immediately
             // above for SHA-256, production package ID, higher versionCode and the pinned signer.
 
+            // Use only Android's explicit package-installer action. The APK URI is
+            // app-private and FileProvider grants read access only for this verified file.
+            // Do not fall back to a generic ACTION_VIEW handler for APK installation.
             val installIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-                // codeql[java/android/arbitrary-apk-installation]
-
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 putExtra(Intent.EXTRA_RETURN_RESULT, true)
             }
-            // OEM fallback uses the same app-private, checksum/package/version/signer-verified APK.
-
-            val installerFallback = Intent(Intent.ACTION_VIEW).apply {
-                // codeql[java/android/arbitrary-apk-installation]
-
-                setDataAndType(apkUri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            if (!AndroidDeviceCompatibility.open(this, installIntent, installerFallback)) {
-                android.widget.Toast.makeText(this, "No Android package installer is available.", android.widget.Toast.LENGTH_LONG).show()
-            }
+            startActivity(installIntent)
         }.onFailure {
             android.widget.Toast.makeText(
                 this, "Android could not open the package installer: \${it.message}", android.widget.Toast.LENGTH_LONG
