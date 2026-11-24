@@ -36,6 +36,7 @@ class LocalTamperHistoryActivity : FragmentActivity() {
     private var authenticatedUntilElapsedMs = 0L
     private var biometricPrompt: BiometricPrompt? = null
     private var biometricChallenge: ByteArray? = null
+    private var sessionExpiryRunnable: Runnable? = null
     private var authenticationRequested = false
     private var waitingForSecureLockSetup = false
     private val filterButtons = linkedMapOf<String, MaterialButton>()
@@ -63,6 +64,10 @@ class LocalTamperHistoryActivity : FragmentActivity() {
         biometricPrompt?.cancelAuthentication()
         biometricPrompt = null
         clearBiometricChallenge()
+        sessionExpiryRunnable?.let { expiry ->
+            if (::root.isInitialized) root.removeCallbacks(expiry)
+        }
+        sessionExpiryRunnable = null
         super.onDestroy()
     }
 
@@ -173,14 +178,18 @@ class LocalTamperHistoryActivity : FragmentActivity() {
         authenticationRequested = false
         authenticatedUntilElapsedMs = SystemClock.elapsedRealtime() + SESSION_MS
         renderUnlocked()
-        root.postDelayed({
+        sessionExpiryRunnable?.let(root::removeCallbacks)
+        val expiry = Runnable {
+            sessionExpiryRunnable = null
             if (!isFinishing && !isDestroyed && authenticatedUntilElapsedMs > 0L &&
                 SystemClock.elapsedRealtime() >= authenticatedUntilElapsedMs
             ) {
                 authenticatedUntilElapsedMs = 0L
                 renderLocked("The two-minute history access session expired. Authenticate again to continue.")
             }
-        }, SESSION_MS)
+        }
+        sessionExpiryRunnable = expiry
+        root.postDelayed(expiry, SESSION_MS)
     }
 
     private fun renderLocked(message: String = "Local event history and encrypted evidence are protected by Android owner authentication.") {
