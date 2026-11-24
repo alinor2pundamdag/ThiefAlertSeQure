@@ -26,6 +26,16 @@ for path in sorted(JAVA.rglob("*.kt")):
                 "route the transition through ProtectionEngine"
             )
 
+receiver = (JAVA / "com/thiefalertsequre/app/PowerTransitionReceiver.kt").read_text(encoding="utf-8")
+for required in (
+    "PowerTransitionQueuePolicy.createExecutor()",
+    "MAX_PENDING_EVENTS = 4",
+    "ArrayBlockingQueue<Runnable>(queueCapacity)",
+    "executor.queue.offer(task, backpressureTimeoutMs, TimeUnit.MILLISECONDS)",
+):
+    if required not in receiver:
+        errors.append("PowerTransitionReceiver missing bounded FIFO queue contract: " + required)
+
 if errors:
     print("\n".join("ERROR: " + item for item in errors))
     sys.exit(1)
