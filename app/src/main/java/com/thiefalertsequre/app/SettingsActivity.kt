@@ -27,11 +27,33 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.io.File
-import java.util.concurrent.Executors
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 class SettingsActivity : FragmentActivity() {
     private lateinit var root: LinearLayout
-    private val ioExecutor = Executors.newSingleThreadExecutor()
+    // Keep background work serial and memory-bounded. A rejected submission is
+    // surfaced to the owner instead of silently growing an unbounded task queue.
+    private val ioExecutor = ThreadPoolExecutor(
+        1,
+        1,
+        0L,
+        TimeUnit.MILLISECONDS,
+        ArrayBlockingQueue(8),
+        { task -> Thread(task, "tas-settings-io").apply { isDaemon = true } },
+        { _, _ ->
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) {
+                    android.widget.Toast.makeText(
+                        this,
+                        "Background task queue is full. Wait for a current operation and try again.",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    )
     private var soundSlot = AlarmSoundStore.ALARM
     private var previewPlayer: MediaPlayer? = null
     private val previewToneHandler = android.os.Handler(android.os.Looper.getMainLooper())
