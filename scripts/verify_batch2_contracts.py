@@ -161,8 +161,8 @@ checks = {
         ))
         and "Intent(this, AboutActivity::class.java)" in dashboard
         and 'android:name=".AboutActivity"' in (ROOT / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8"),
-    "dashboard tabs deep-link to sounds, tamper history, and more settings":
-        "SECTION_SOUNDS_FLASH" in dashboard and "SECTION_TAMPER_HISTORY" in dashboard
+    "dashboard tabs deep-link to sounds, protected tamper history, and more settings":
+        "SECTION_SOUNDS_FLASH" in dashboard and "LocalTamperHistoryActivity::class.java" in dashboard
         and "SECTION_MORE" in dashboard and "sectionAnchors[section]" in settings
         and "scroll.smoothScrollTo(0, target.top)" in settings,
     "dashboard tab selection persists and restores a visible selected state":

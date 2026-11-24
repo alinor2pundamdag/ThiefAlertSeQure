@@ -342,15 +342,15 @@ class LocalTamperHistoryActivity : FragmentActivity() {
         runCatching {
             val writer = contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)
                 ?: error("Android could not open the selected export destination.")
-            writer.use {
-                appendLine("record_type,timestamp,event,detail,timezone_offset_minutes,sha256")
+            writer.use { output ->
+                output.appendLine("record_type,timestamp,event,detail,timezone_offset_minutes,sha256")
                 LocalTamperHistory.read(this, 100).asReversed().forEach { line ->
                     val parts = line.split(" | ", limit = 3)
-                    appendLine(listOf("event_history", parts.getOrElse(0) { "" }, parts.getOrElse(1) { "" },
+                    output.appendLine(listOf("event_history", parts.getOrElse(0) { "" }, parts.getOrElse(1) { "" },
                         parts.getOrElse(2) { "" }, "", "").joinToString(",") { csv(it) })
                 }
                 LocalEvidenceVault.read(this, 100).forEach { entry ->
-                    appendLine(listOf("encrypted_evidence", entry.timestampEpochMs.toString(), entry.event,
+                    output.appendLine(listOf("encrypted_evidence", entry.timestampEpochMs.toString(), entry.event,
                         entry.detail, entry.timezoneOffsetMinutes.toString(), entry.integritySha256)
                         .joinToString(",") { csv(it) })
                 }
