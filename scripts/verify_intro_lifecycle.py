@@ -10,6 +10,7 @@ source = SOURCE.read_text(encoding="utf-8")
 checks = {
     "animation pauses when the Activity stops": "override fun onStop()" in source and "animator?.pause()" in source,
     "animation resumes when the Activity becomes visible again": "override fun onStart()" in source and "animator?.resume()" in source,
+    "replay close action has an accurate accessibility description": "if (replay) \"Close the introduction and return to ThiefAlertSeQure\"" in source,
     "intro audio is released on stop": "override fun onStop()" in source and "releaseIntroAudio()" in source,
     "pending tone-release callback is cancelled before manual release": "toneReleaseRunnable?.let(mainHandler::removeCallbacks)" in source,
     "ToneGenerator reference is cleared before release": "toneGenerator = null" in source and "runCatching { generator.release() }" in source,
