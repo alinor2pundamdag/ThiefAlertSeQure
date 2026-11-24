@@ -54,6 +54,25 @@ for required in (
 if re.search(r"\bThread\s*\{", a2_receiver) or ".start()" in a2_receiver:
     errors.append("A2BluetoothAclReceiver must not create a raw thread per broadcast")
 
+alarm_receiver = (JAVA / "com/thiefalertsequre/app/AlarmDeadlineReceiver.kt").read_text(encoding="utf-8")
+for required in (
+    "AlarmDeadlineReceiverQueuePolicy.createExecutor()",
+    "MAX_PENDING_EVENTS = 8",
+    "AlarmDeadlineReceiverQueue.executor.execute",
+    "pending.finish()",
+):
+    if required not in alarm_receiver:
+        errors.append("AlarmDeadlineReceiver missing bounded deadline queue contract: " + required)
+if re.search(r"\bThread\s*\{", alarm_receiver) or ".start()" in alarm_receiver:
+    errors.append("AlarmDeadlineReceiver must not create a raw thread per deadline")
+
+for activity_name in ("BluetoothCenterActivity.kt", "DeviceIntelligenceActivity.kt"):
+    activity_source = (JAVA / f"com/thiefalertsequre/app/{activity_name}").read_text(encoding="utf-8")
+    if "BoundedSerialExecutor.create(" not in activity_source or "AtomicBoolean" not in activity_source:
+        errors.append(activity_name + " root diagnostics must use a bounded, duplicate-guarded executor")
+    if "Executors.newSingleThreadExecutor()" in activity_source:
+        errors.append(activity_name + " must not use an unbounded root-diagnostics executor")
+
 if errors:
     print("\n".join("ERROR: " + item for item in errors))
     sys.exit(1)
