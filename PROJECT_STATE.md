@@ -220,7 +220,7 @@ The active roadmap is **17 phases numbered Phase 0 through Phase 16**, organized
 
 **Phase 9 dashboard boundary:** the fixed-color 136dp main shield stays above a compact, horizontally swipeable nine-destination tab strip (Bluetooth Settings; Device Hardening & Reliability; Sounds & Flash Alert; Authentication Evidence; Device Intelligence; Appearance Studio; Local Tamper History; More; About). The tab strip uses accessible 48dp touch targets and destination-specific navigation.
 
-**Workflow constraints remain:** no GitHub Codespaces; no instrumentation/emulator tests during the agreed non-physical implementation pass; do not merge PR #7 or modify `main` without explicit owner approval. Batch 3 must not begin until Batch 2's exact-head completion gate is green.
+**Workflow constraints remain:** no GitHub Codespaces; no instrumentation/emulator tests during the agreed non-physical implementation pass; do not merge or modify `main` without explicit owner approval. Batch 3 (Phases 10–13) was owner-approved on 2026-11-17 and is implemented in the v1.1.4 candidate; its completion evidence is recorded below and in `docs/BATCH_3_IMPLEMENTATION.md`.
 
 
 ## Batch 2 verification continuation — 2026-11-17
@@ -237,4 +237,19 @@ The active roadmap is **17 phases numbered Phase 0 through Phase 16**, organized
 - **Batch 2 non-physical software gate: PASS** on the exact code-bearing commit. Phases 5–9 source integration, privacy/failure boundaries, JVM tests, static contracts, lint/build/APK validation and CodeQL passed. This is not a claim of physical/OEM validation.
 - **Not tested by design:** enrolled Device Owner runtime and actual power-menu behavior; real GPS/network fixes; camera and torch hardware output; OEM thermal behavior; handset-specific UI/background behavior. No instrumentation, emulator, or physical-device test was run.
 - PR #7 remains draft/open/unmerged; `main` remains untouched. No merge, tag, production signing, APK publication or release was performed. Permanent production signing-secret availability and active CodeQL alert #8 closure remain independently unverified.
-- Batch 3 has not started; wait for explicit owner direction.
+- **Superseded status correction (2026-11-24):** Batch 3 (Phases 10–13) was explicitly owner-approved on 2026-11-17 and is present in `release/v1.1.4-candidate`. The scope is recorded in `docs/BATCH_3_IMPLEMENTATION.md`, `docs/V1.1.4_RELEASE_BASELINE.md`, and PR #7's implementation description. Exact-head Android CI and CodeQL both passed on candidate commit `ed8230ff6e2f8bd6830af7c8ac2fe3ee7734365c`. The earlier statement that Batch 3 had not started is stale and must not be used.
+
+
+## v1.1.4 Phase 2 — release integration and security closure (2026-11-24)
+
+- Candidate branch: `release/v1.1.4-candidate`; exact reviewed HEAD before this documentation update: `ed8230ff6e2f8bd6830af7c8ac2fe3ee7734365c`.
+- Exact-head Android CI [#45319388438](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45319388438) and CodeQL [#45319388404](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45319388404) both completed with conclusion `success`.
+- Candidate identity is v1.1.4: production package `com.thiefalertsequre.app`, versionName `1.1.4_Developer_Alinor`, versionCode `6`, minSdk 26, compileSdk/targetSdk 36. Release R8 minification and resource shrinking are enabled. Debug APK identity remains isolated as `.v114test` / `1.1.4-test`.
+- Candidate-to-`main` comparison: 798 commits ahead, 0 behind; 182 changed paths, 15,218 additions, 789 line deletions, and no deleted files. Candidate-to-`work/phase-0-12-coding` comparison: 8 commits ahead, 0 behind, 8 changed files. Those 8 changes are limited to Android/CodeQL workflow configuration, README/version metadata, Gradle/updater/version-policy tests, and this release baseline; no Batch Four implementation was imported.
+- The candidate's CI artifact is a debug/test APK, not a production update. The minified production release variant passed metadata checks but was unsigned because permanent production signing was not configured for the branch CI run.
+- The official release workflow was inspected. It requires a tag matching the Gradle version, a tag commit already merged into `main`, all four permanent signing secrets, the pinned production certificate, a strictly increasing versionCode, and package/version/signer/checksum verification. Manual signed preflight is restricted to `main` and does not publish. No release action was triggered.
+- The separate `security/v1.1.4-hardening` branch is divergent (18 commits ahead / 799 behind the candidate) and still carries v1.1.3 / versionCode 5 identity. Its R8 changes were not copied; the v1.1.4 candidate already has minification and resource shrinking enabled.
+- **Still blocked / not verified:** CodeQL alert #8's active/closed state; presence of the four private production signing secrets; existence of a production-signed v1.1.4 APK; classic branch-protection configuration (the integration lacks permission to read it); and a complete human review of the 182-path diff.
+- Repository rulesets endpoint returned an empty list. The classic branch-protection endpoint returned 403, so this is not evidence that branch protection is absent.
+- PR #7 remains draft/open and targets `work/phase-0-12-coding`; PR #8 is the separate Batch Four branch; PR #9 is v1.1.5 and out of scope. No v1.1.4 candidate PR was created in this pass.
+- `main` remains untouched. No merge, rebase, tag, production signing preflight, APK publication, or GitHub Release was performed. Physical-device acceptance remains owner-operated and is not claimed.
