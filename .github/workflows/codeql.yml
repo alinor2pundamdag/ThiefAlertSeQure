@@ -7,6 +7,7 @@ on:
       - "feat/**"
       - "feature/**"
       - "fix/**"
+      - "release/**"
       - "security/**"
       - "work/**"
   pull_request:
