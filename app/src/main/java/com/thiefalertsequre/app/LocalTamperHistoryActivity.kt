@@ -64,7 +64,9 @@ class LocalTamperHistoryActivity : FragmentActivity() {
             waitingForSecureLockSetup = false
             authenticationRequested = false
             renderLocked("Secure Android screen lock detected. Verify your identity to open the history.")
-        } else if (authenticatedUntilElapsedMs > 0L && SystemClock.elapsedRealtime() >= authenticatedUntilElapsedMs) {
+        } else if (authenticatedUntilElapsedMs > 0L &&
+            !LocalHistorySessionPolicy.isActive(SystemClock.elapsedRealtime(), authenticatedUntilElapsedMs)
+        ) {
             authenticatedUntilElapsedMs = 0L
             renderLocked("The two-minute history access session expired. Authenticate again to continue.")
         } else if (::root.isInitialized) {
@@ -261,16 +263,19 @@ class LocalTamperHistoryActivity : FragmentActivity() {
         renderRows(history, evidence, historyHealthy, evidenceHealthy)
         root.addView(space(12))
         root.addView(button("Export event history and evidence metadata (CSV)") {
+            if (!requireAuthenticatedSession()) return@button
             if (historyHealthy && evidenceHealthy) exportDocument.launch("thiefalertsequre-events.csv")
             else summaryOrToast("Export disabled because integrity verification failed.")
         })
         root.addView(space(8))
         root.addView(outlinedButton("Clear local event timeline") {
+            if (!requireAuthenticatedSession()) return@outlinedButton
             MaterialAlertDialogBuilder(this)
                 .setTitle("Clear local event timeline?")
                 .setMessage("This deletes only the encrypted event timeline. The separate encrypted evidence archive and front-camera photo vault are retained.")
                 .setNegativeButton("Keep history", null)
                 .setPositiveButton("Clear timeline") { _, _ ->
+                    if (!requireAuthenticatedSession()) return@setPositiveButton
                     val cleared = LocalTamperHistory.clear(this)
                     if (cleared) LocalTamperHistory.record(this, "history_cleared", "Owner cleared the local event timeline", false)
                     summaryOrToast(if (cleared) "Local event timeline cleared." else "History could not be cleared.")
@@ -279,11 +284,13 @@ class LocalTamperHistoryActivity : FragmentActivity() {
         })
         root.addView(space(8))
         root.addView(outlinedButton("Delete encrypted evidence metadata archive") {
+            if (!requireAuthenticatedSession()) return@outlinedButton
             MaterialAlertDialogBuilder(this)
                 .setTitle("Delete encrypted evidence archive?")
                 .setMessage("This deletes encrypted event metadata and owner-saved location snapshots. It does not delete front-camera photos or the separate event timeline.")
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Delete archive") { _, _ ->
+                    if (!requireAuthenticatedSession()) return@setPositiveButton
                     val deleted = LocalEvidenceVault.deleteAll(this)
                     if (deleted) LocalTamperHistory.record(this, "evidence_archive_deleted", "Owner deleted the encrypted evidence metadata archive", false)
                     summaryOrToast(if (deleted) "Encrypted evidence archive deleted." else "Evidence archive could not be deleted.")
@@ -360,6 +367,9 @@ class LocalTamperHistoryActivity : FragmentActivity() {
     }
 
     private fun exportCsv(uri: android.net.Uri) {
+        // The document picker can remain open beyond the two-minute owner-authentication window.
+        // Re-check here because its result callback can run after the Activity resumes.
+        if (!requireAuthenticatedSession()) return
         if (!LocalTamperHistory.verifyIntegrity(this) || !LocalEvidenceVault.verifyIntegrity(this)) {
             summaryOrToast("Export disabled because integrity verification failed.")
             return
@@ -382,6 +392,15 @@ class LocalTamperHistoryActivity : FragmentActivity() {
             }
         }.onSuccess { summaryOrToast("Event history and encrypted evidence metadata exported.") }
             .onFailure { summaryOrToast("Export failed: ${it.message}") }
+    }
+
+    private fun requireAuthenticatedSession(): Boolean {
+        if (LocalHistorySessionPolicy.isActive(SystemClock.elapsedRealtime(), authenticatedUntilElapsedMs)) {
+            return true
+        }
+        authenticatedUntilElapsedMs = 0L
+        renderLocked("The two-minute history access session expired. Authenticate again to continue.")
+        return false
     }
 
     private fun csv(value: String): String = "\"${value.replace("\"", "\"\"")}\""

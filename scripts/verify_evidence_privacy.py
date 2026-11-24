@@ -19,6 +19,7 @@ main = (ROOT / "app/src/main/java/com/thiefalertsequre/app/MainActivity.kt").rea
 history = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistory.kt").read_text(encoding="utf-8")
 history_policy = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistoryPolicy.kt").read_text(encoding="utf-8")
 history_activity = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistoryActivity.kt").read_text(encoding="utf-8")
+history_session_policy = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalHistorySessionPolicy.kt").read_text(encoding="utf-8")
 policy_acknowledgements = (ROOT / "app/src/main/java/com/thiefalertsequre/app/PolicyAcknowledgementPolicy.kt").read_text(encoding="utf-8")
 about = (ROOT / "app/src/main/java/com/thiefalertsequre/app/AboutActivity.kt").read_text(encoding="utf-8")
 preference_cipher = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalPreferenceCipher.kt").read_text(encoding="utf-8")
@@ -103,6 +104,12 @@ required = {
         "addTextChangedListener" in history_activity
         and "matchesCategory" in history_activity
         and all(category in history_activity for category in ('"power"', '"bluetooth"', '"alarm"', '"authentication"', '"evidence"', '"system"')),
+    "history export and destructive actions re-check the two-minute authentication session":
+        "requireAuthenticatedSession()" in history_activity
+        and "if (!requireAuthenticatedSession()) return" in history_activity
+        and "exportCsv(uri)" in history_activity,
+    "history session expiry uses a strict monotonic deadline":
+        "nowElapsedMs < expiresAtElapsedMs" in history_session_policy,
     "local event history redacts exception messages and common sensitive values":
         all(token in history_policy for token in ("exceptionMessage", "credentialAssignment", "bearerCredential", "knownToken", "jwt", "uri", "filesystemPath", "email")),
     "legacy local event details are sanitized on read and append":
