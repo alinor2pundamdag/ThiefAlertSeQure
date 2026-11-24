@@ -128,8 +128,9 @@ class BluetoothCenterActivity : FragmentActivity() {
 
     private fun addTrustedDeviceSection() {
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        val registryRead = TrustedBluetoothRegistry.readStrict(prefs)
-        val baselineRead = TrustedBluetoothRegistry.readBaselineAddresses(prefs)
+        val integritySnapshot = TrustedBluetoothRegistry.readIntegritySnapshot(prefs)
+        val registryRead = integritySnapshot.registry
+        val baselineRead = integritySnapshot.baselines
         val registryCorrupt = registryRead is PreferenceRead.Corrupt
         val baselineCorrupt = baselineRead is PreferenceRead.Corrupt
         val integrityVerified = !registryCorrupt && !baselineCorrupt
@@ -207,9 +208,11 @@ class BluetoothCenterActivity : FragmentActivity() {
         root.addView(space(14))
     }
 
-    private fun isA2RegistryReadable(prefs: android.content.SharedPreferences): Boolean =
-        TrustedBluetoothRegistry.readStrict(prefs) is PreferenceRead.Value &&
-            TrustedBluetoothRegistry.readBaselineAddresses(prefs) is PreferenceRead.Value
+    private fun isA2RegistryReadable(prefs: android.content.SharedPreferences): Boolean {
+        val snapshot = TrustedBluetoothRegistry.readIntegritySnapshot(prefs)
+        return snapshot.registry is PreferenceRead.Value &&
+            snapshot.baselines is PreferenceRead.Value
+    }
 
     private fun confirmUnregister(device: TrustedBluetoothDevice) {
         MaterialAlertDialogBuilder(this)

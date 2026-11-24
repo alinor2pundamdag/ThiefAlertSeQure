@@ -27,6 +27,23 @@ object TrustedBluetoothRegistry {
             }
         }
 
+    /**
+     * Reads both stores as one consistent UI snapshot under the A2 state lock.
+     * Keeping the strict parsers private prevents callers from bypassing this lock.
+     */
+    internal data class IntegritySnapshot(
+        val registry: PreferenceRead<List<TrustedBluetoothDevice>>,
+        val baselines: PreferenceRead<Set<String>>
+    )
+
+    internal fun readIntegritySnapshot(prefs: SharedPreferences): IntegritySnapshot =
+        A2DisconnectStateLock.withLock {
+            IntegritySnapshot(
+                registry = readStrict(prefs),
+                baselines = readBaselineAddresses(prefs)
+            )
+        }
+
     private fun readStrict(prefs: SharedPreferences): PreferenceRead<List<TrustedBluetoothDevice>> {
         val raw = when (val stored = SafePreferences.readString(prefs, KEY_DEVICES, null)) {
             is PreferenceRead.Value -> stored.value

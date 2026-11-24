@@ -24,6 +24,16 @@ class TrustedBluetoothRegistryEncryptionTest {
         try {
             assertTrue(TrustedBluetoothRegistry.add(prefs, address, name))
             TrustedBluetoothRegistry.markConnected(prefs, address, true)
+            val integritySnapshot = TrustedBluetoothRegistry.readIntegritySnapshot(prefs)
+            when (val registry = integritySnapshot.registry) {
+                is PreferenceRead.Value -> assertEquals(listOf(TrustedBluetoothDevice(address, name)), registry.value)
+                is PreferenceRead.Corrupt -> throw AssertionError("A valid trusted-device registry must be readable")
+            }
+            when (val baselines = integritySnapshot.baselines) {
+                is PreferenceRead.Value -> assertTrue("The UI snapshot must include the confirmed connection baseline",
+                    baselines.value.contains(address))
+                is PreferenceRead.Corrupt -> throw AssertionError("A valid connection-baseline store must be readable")
+            }
             val storedDevices = prefs.getString(TrustedBluetoothRegistry.KEY_DEVICES, null)!!
             val storedBaselines = prefs.getString(TrustedBluetoothRegistry.KEY_BASELINES, null)!!
             assertTrue(LocalPreferenceCipher.isEncrypted(storedDevices))
