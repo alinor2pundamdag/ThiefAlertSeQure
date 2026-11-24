@@ -18,7 +18,7 @@ Keep future work small and independently testable. Add only features that solve 
 - Do not run sensors continuously while disarmed. Do not claim it can distinguish an owner from a thief.
 
 ### A2 — Trusted Bluetooth Device Separation Alert
-Implementation status: in progress on the development branch; release version unassigned.
+Implementation status: implemented in the current development candidate; physical acceptance and release assignment remain pending.
 - Optionally pair a trusted watch, earbuds, or other Bluetooth device.
 - Warn when the trusted device disconnects while anti-theft protection is armed.
 - Treat Bluetooth range and disconnect events as approximate; avoid claiming precise distance or guaranteed background detection.
@@ -57,14 +57,10 @@ Implementation status: in progress on the development branch; release version un
 ### D1 — Manual Diagnostic Snapshot
 
 **Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
-
-**Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 - User-triggered local health screen showing app/device version, protection state, relevant permission status, and component health.
 - No continuous polling, analytics, or network upload.
 
 ### D2 — Exportable Debug Report
-
-**Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 
 **Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 - Owner previews and explicitly exports a redacted report containing timestamps, versions, component status, and non-sensitive error codes.
@@ -73,22 +69,16 @@ Implementation status: in progress on the development branch; release version un
 ### D3 — Permission and Battery-Restriction Guidance
 
 **Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
-
-**Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 - Explain only the permission or system restriction relevant to a feature.
 - Link to the appropriate Android settings screen when supported; never silently change settings.
 
 ### D4 — Safe Recovery for Verified Failures
 
 **Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
-
-**Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 - Add a bounded recovery action only after a documented, reproducible failure is found.
 - Never clear protection state, interrupt a countdown/alarm, or create restart loops.
 
 ### D5 — Update Integrity Status
-
-**Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 
 **Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 - Show installed version and the result of package, version, digest, and signer checks.

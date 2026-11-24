@@ -3,6 +3,7 @@
 - Scope: ThiefAlertSeQure Android app only. Separate OCVIP AutoPilot, Wi-Fi security and local AI/OpenCode discussions are excluded.
 - `main` remains unchanged. No merge, rebase, force-push, release tag, production release or publication was performed.
 - PR #7 remains draft/open. PR #8 remains draft/open/unmerged on `work/batch-4-implementation`, stacked on PR #7.
+- PR #8 contains 99 changed files and 713 commits; the working branch is 1,503 commits ahead of `main` (0 behind) across 196 changed paths.
 - Latest code-bearing commit: `5e850fc4a444a1e36541890ca022a745f3be021a`. Android CI [#45304517153](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45304517153) and CodeQL [#45304517314](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45304517314) passed on this exact commit.
 - Repository inventory reviewed: 89 production Kotlin files, 46 JVM unit-test files, 15 dormant instrumentation-test files, 10 verification scripts and 29 documentation files.
 - Latest development artifact: ID `14881036567`, archive SHA-256 `33127b9cf05c92bd9a5820bf983906cdc16244390d61200dd3ef1649c707f7ce`. Debug package `com.thiefalertsequre.app.v114test`, versionCode `7`, versionName `1.1.5-test`, minSdk `26`; debug signer SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`.
