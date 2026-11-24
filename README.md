@@ -222,6 +222,8 @@ A successful CI build confirms that the configured automated checks and APK asse
 | Document | What it covers |
 |---|---|
 | [Privacy Policy](docs/PRIVACY_POLICY.md) | Local data, credentials, permissions, retention, and user choice. |
+| [Terms of Use](docs/TERMS_OF_USE.md) | Authorized use, platform limitations, evidence handling, and update confirmation. |
+| [Batch Four — Phases 14–16](docs/BATCH_4_IMPLEMENTATION.md) | About/legal integration, release-quality gates, and authenticated local tamper history. |
 | [Protection Rules](docs/PROTECTION_RULES.md) | State machine, countdown integrity, authentication, and alarm behavior. |
 | [Security & Platform Audit](docs/SECURITY_AND_PLATFORM_AUDIT.md) | Threat model, Android limits, privacy controls, and remaining verification. |
 | [Feature Completion Matrix](docs/FEATURE_COMPLETION_MATRIX.md) | Implemented features, boundaries, and release gates. |
