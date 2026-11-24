@@ -104,4 +104,16 @@ class LocalTamperHistoryPolicyTest {
             LocalTamperHistoryPolicy.newestFirst("first\nsecond\nthird", 0)
         )
     }
+
+    @Test
+    fun historyCategoriesMatchExpectedEventFamilies() {
+        assertEquals(true, LocalTamperHistoryPolicy.matchesCategory("charger_countdown_started", "power"))
+        assertEquals(true, LocalTamperHistoryPolicy.matchesCategory("a2_bluetooth_disconnected", "bluetooth"))
+        assertEquals(true, LocalTamperHistoryPolicy.matchesCategory("alarm_audio_open_failed", "alarm"))
+        assertEquals(true, LocalTamperHistoryPolicy.matchesCategory("owner_biometric_failed", "authentication"))
+        assertEquals(true, LocalTamperHistoryPolicy.matchesCategory("camera_evidence_deleted", "evidence"))
+        assertEquals(true, LocalTamperHistoryPolicy.matchesCategory("permission_changed", "system"))
+        assertEquals(false, LocalTamperHistoryPolicy.matchesCategory("owner_authenticated", "bluetooth"))
+        assertEquals(true, LocalTamperHistoryPolicy.matchesCategory("owner_authenticated", "all"))
+    }
 }

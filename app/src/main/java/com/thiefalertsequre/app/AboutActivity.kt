@@ -89,7 +89,7 @@ class AboutActivity : FragmentActivity() {
         )
         addFeatureGroup(
             "04 • Evidence and local history",
-            "Bounded local event history; encrypted evidence metadata; integrity-checked backup and restore; optional owner-requested cached or one-shot location evidence; and optional front-camera still evidence after successful owner authentication disarms a latched alarm while the app is visible.",
+            "Authentication-protected, searchable and filterable local event history; encrypted evidence metadata; integrity-checked backup and restore; optional owner-requested cached or one-shot location evidence; and optional front-camera still evidence after successful owner authentication disarms a latched alarm while the app is visible.",
             "Permissions / prerequisites: location is requested only after an owner action. CAMERA is requested only after separate photo-evidence opt-in. Photos are encrypted locally, retained for up to 30 days (maximum 20), and can be viewed, exported or deleted. No background camera, microphone, continuous location tracking or cloud upload is used."
         )
         addFeatureGroup(

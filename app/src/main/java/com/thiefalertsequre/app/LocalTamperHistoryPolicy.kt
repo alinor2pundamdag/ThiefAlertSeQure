@@ -1,5 +1,7 @@
 package com.thiefalertsequre.app
 
+import java.util.Locale
+
 /**
  * Pure formatting and retention rules for the bounded local protection history.
  * Kept separate from Android storage so the safety rules have JVM unit coverage.
@@ -59,6 +61,21 @@ internal object LocalTamperHistoryPolicy {
     fun eventCodeFromLine(line: String): String {
         val candidate = line.substringAfter("|", "").trim().substringBefore("|").trim()
         return candidate.takeIf { it.matches(Regex("[A-Za-z0-9_-]{1,48}")) } ?: "unknown_event"
+    }
+
+    fun matchesCategory(eventCode: String, category: String): Boolean {
+        val code = eventCode.lowercase(Locale.ROOT)
+        val terms = when (category) {
+            "power" -> listOf("charger", "power", "shutdown", "boot", "monitor", "motion")
+            "bluetooth" -> listOf("bluetooth", "a2")
+            "alarm" -> listOf("alarm", "flash", "haptic", "sound", "audio")
+            "authentication" -> listOf("auth", "credential", "biometric", "unlock")
+            "evidence" -> listOf("evidence", "camera", "location", "history", "backup", "export", "vault")
+            "system" -> listOf("permission", "notification", "update", "device", "bypass", "diagnostic", "root", "settings")
+            "all" -> return true
+            else -> return false
+        }
+        return terms.any(code::contains)
     }
 
     fun newestFirst(existing: String, limit: Int = MAX_EVENTS): List<String> {

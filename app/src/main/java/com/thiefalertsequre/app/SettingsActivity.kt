@@ -540,24 +540,14 @@ class SettingsActivity : FragmentActivity() {
         sectionAnchors[SECTION_TAMPER_HISTORY] = tamperHeading
         root.addView(tamperHeading)
         root.addView(space(8))
-        val historyText = LocalTamperHistory.read(this, 20).ifEmpty {
-            listOf("No recorded protection events yet.")
-        }.joinToString("\n")
-        root.addView(text(historyText, 12f, R.color.tas_text))
-        root.addView(space(8))
-        root.addView(action("Export local event history (CSV)") {
-            exportEvents.launch("thiefalertsequre-events.csv")
-        })
-        root.addView(action("Clear local event history") {
-            MaterialAlertDialogBuilder(this)
-                .setTitle("Clear local history?")
-                .setMessage("This permanently clears the on-device protection event log. It does not change protection state.")
-                .setNegativeButton("Keep history", null)
-                .setPositiveButton("Clear") { _, _ ->
-                    LocalTamperHistory.clear(this)
-                    LocalTamperHistory.record(this, "history_cleared", "Owner cleared local event history")
-                    render()
-                }.showThemed(this)
+        val localHistoryCount = if (LocalTamperHistory.verifyIntegrity(this)) LocalTamperHistory.read(this, 100).size else -1
+        root.addView(text(
+            if (localHistoryCount >= 0) "$localHistoryCount encrypted local events • authentication required to view details"
+            else "Encrypted local history integrity check failed • data preserved",
+            12f, R.color.tas_muted
+        ))
+        root.addView(action("Open protected local tamper history") {
+            startActivity(Intent(this, LocalTamperHistoryActivity::class.java))
         })
         root.addView(space(10))
         root.addView(text("ENCRYPTED EVIDENCE VAULT", 11f, R.color.tas_primary, true))
@@ -632,18 +622,8 @@ class SettingsActivity : FragmentActivity() {
             12f, R.color.tas_muted
         ))
         root.addView(space(6))
-        root.addView(action("Review encrypted evidence records") {
-            val entries = LocalEvidenceVault.read(this, 100)
-            val summary = entries.take(20).joinToString("\n\n") { entry ->
-                val date = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
-                    .format(java.util.Date(entry.timestampEpochMs))
-                "$date (UTC offset ${entry.timezoneOffsetMinutes}m)\n${entry.event}\n${entry.detail}\nSHA-256: ${entry.integritySha256.take(16)}…"
-            }.ifBlank { "No encrypted evidence records are available." }
-            MaterialAlertDialogBuilder(this)
-                .setTitle("Encrypted evidence archive")
-                .setMessage(summary)
-                .setPositiveButton("Close", null)
-                .showThemed(this)
+        root.addView(action("Open protected history and integrity details") {
+            startActivity(Intent(this, LocalTamperHistoryActivity::class.java))
         })
         root.addView(action("Export encrypted evidence backup") {
             exportEvidenceBackup.launch("ThiefAlertSeQure-evidence-backup.tasbackup")

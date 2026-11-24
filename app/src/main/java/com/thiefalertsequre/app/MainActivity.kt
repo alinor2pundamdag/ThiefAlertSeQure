@@ -255,8 +255,7 @@ class MainActivity : FragmentActivity() {
             startActivity(Intent(this, ThemeActivity::class.java))
         }
         addTab("Tamper History", "Local Tamper History", "tamper_history") {
-            startActivity(Intent(this, SettingsActivity::class.java)
-                .putExtra(SettingsActivity.EXTRA_SECTION, SettingsActivity.SECTION_TAMPER_HISTORY))
+            startActivity(Intent(this, LocalTamperHistoryActivity::class.java))
         }
         addTab("More", "More Settings", "more") {
             startActivity(Intent(this, SettingsActivity::class.java)
@@ -309,7 +308,7 @@ class MainActivity : FragmentActivity() {
         root.addView(cancelButton, matchWrap())
         root.addView(space(8))
         root.addView(outlinedButton("Review authentication & tamper evidence") {
-            startActivity(Intent(this, SettingsActivity::class.java))
+            startActivity(Intent(this, LocalTamperHistoryActivity::class.java))
         }, matchWrap())
         root.addView(space(24))
 

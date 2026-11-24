@@ -18,6 +18,7 @@ privacy = (ROOT / "docs/PRIVACY_POLICY.md").read_text(encoding="utf-8")
 main = (ROOT / "app/src/main/java/com/thiefalertsequre/app/MainActivity.kt").read_text(encoding="utf-8")
 history = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistory.kt").read_text(encoding="utf-8")
 history_policy = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistoryPolicy.kt").read_text(encoding="utf-8")
+history_activity = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistoryActivity.kt").read_text(encoding="utf-8")
 preference_cipher = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalPreferenceCipher.kt").read_text(encoding="utf-8")
 
 required = {
@@ -73,10 +74,24 @@ required = {
         "front-camera photo evidence" in main and "CAMERA permission is requested only after that choice" in main
         and "explicitly enables front-camera photo evidence" in privacy
         and "camera_permission" in (ROOT / "app/src/main/java/com/thiefalertsequre/app/PermissionChangeMonitor.kt").read_text(encoding="utf-8"),
+    "local event history is encrypted with purpose-bound Android Keystore AES-GCM":
+        "LocalPreferenceCipher.encrypt(PURPOSE" in history
+        and "LocalPreferenceCipher.decrypt(PURPOSE" in history
+        and "local_tamper_history_v2" in history,
+    "history viewer requires biometric or device credential authentication":
+        "BiometricPrompt" in history_activity
+        and "createConfirmDeviceCredentialIntent" in history_activity
+        and "FLAG_SECURE" in history_activity,
+    "history viewer supports text search and event-category filters":
+        "addTextChangedListener" in history_activity
+        and "matchesCategory" in history_activity
+        and all(category in history_activity for category in ('"power"', '"bluetooth"', '"alarm"', '"authentication"', '"evidence"', '"system"')),
     "local event history redacts exception messages and common sensitive values":
         all(token in history_policy for token in ("exceptionMessage", "credentialAssignment", "bearerCredential", "knownToken", "jwt", "uri", "filesystemPath", "email")),
     "legacy local event details are sanitized on read and append":
         history.count("sanitizeStoredHistory") >= 2,
+    "clearing event history does not silently delete the separate evidence archive":
+        "LocalEvidenceVault.deleteAll" not in history[history.index("fun clear"):history.index("private fun readStored")],
     "encrypted preference decryption never creates a replacement key":
         "Cipher.DECRYPT_MODE, getExistingKey()" in preference_cipher
         and "keyStore.getKey(KEY_ALIAS, null) as? SecretKey" in preference_cipher

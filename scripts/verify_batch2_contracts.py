@@ -173,8 +173,20 @@ checks = {
         "class AboutActivity" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
         and "Privacy & Data" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
         and "SECTION_PRIVACY" in (APP / "AboutActivity.kt").read_text(encoding="utf-8"),
+    "About screen exposes developer identity, version history, terms and feature catalog":
+        "DEVELOPER SIGNATURE" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
+        and "VERSION HISTORY" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
+        and "Terms of Use & Platform Limitations" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
+        and "FEATURE CATALOG" in (APP / "AboutActivity.kt").read_text(encoding="utf-8"),
+    "dashboard tab selection persists and restores a visible selected state":
+        "dashboard_navigation_v1" in dashboard and "selected_tab" in dashboard
+        and "refreshNavigationSelection()" in dashboard and "tab.isSelected = active" in dashboard
+        and 'tab.text = (if (active) "● " else "")' in dashboard,
     "authentication and tamper evidence remain reachable from the owner-authentication section":
-        "Review authentication & tamper evidence" in dashboard and "Intent(this, SettingsActivity::class.java)" in dashboard,
+        "Review authentication & tamper evidence" in dashboard and "Intent(this, LocalTamperHistoryActivity::class.java)" in dashboard,
+    "local tamper history is routed to its protected viewer":
+        "Intent(this, LocalTamperHistoryActivity::class.java)" in dashboard
+        and "Open protected local tamper history" in (APP / "SettingsActivity.kt").read_text(encoding="utf-8"),
     "charger countdown remains exactly ten seconds":
         "const val COUNTDOWN_MS = 10_000L" in engine,
 }
