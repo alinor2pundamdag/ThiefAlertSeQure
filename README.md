@@ -134,9 +134,9 @@ When you disarm a triggered alarm, Android handles device PIN, pattern, or passw
 
 ### Privacy notice and user choice
 
-On first launch, the app presents a local privacy and platform notice with one **I understand & continue** acknowledgement action. The acknowledgement is stored locally, and the notice can be reviewed again in Settings.
+On first launch, the app presents a local privacy and platform notice with links to read the complete bundled Privacy Policy (version 5) and Terms of Use (version 1) before continuing. The **I understand & continue** action records both acknowledgements in separate versioned app-private preferences with a local timestamp. Reviewing the privacy notice from Settings resets its acknowledgement; the full Terms of Use can be reviewed and acknowledged again from About.
 
-Read the complete [Privacy Policy](docs/PRIVACY_POLICY.md).
+Read the complete [Privacy Policy](docs/PRIVACY_POLICY.md) and [Terms of Use](docs/TERMS_OF_USE.md).
 
 ## 🚨 Alarm, authentication, and reliability
 
