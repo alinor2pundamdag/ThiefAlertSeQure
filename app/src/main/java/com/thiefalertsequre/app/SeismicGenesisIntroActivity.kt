@@ -83,7 +83,7 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
         }.markAsPageHeading(), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
         overlay.addView(Button(this).apply {
             text = if (replay) "Close intro" else "Skip intro"
-            contentDescription = "Skip the introduction and continue to the privacy notice"
+            contentDescription = if (replay) "Close the introduction and return to ThiefAlertSeQure" else "Skip the introduction and continue to the privacy notice"
             setOnClickListener { complete() }
             minHeight = dp(48)
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(28) })
