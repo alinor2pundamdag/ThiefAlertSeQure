@@ -58,7 +58,8 @@ required = {
         and "TERMS_VERSION = 1" in policy_acknowledgements
         and "storedVersion == requiredVersion" in policy_acknowledgements,
     "Terms dialog stores its own versioned acknowledgement durably":
-        'setPositiveButton("I acknowledge")' in about
+        'acknowledgeLabel = "I acknowledge"' in about
+        and "setPositiveButton(acknowledgeLabel)" in (ROOT / "app/src/main/java/com/thiefalertsequre/app/LegalDocumentViewer.kt").read_text(encoding="utf-8")
         and "PolicyAcknowledgementPolicy.TERMS_PREFS" in about
         and "PolicyAcknowledgementPolicy.TERMS_VERSION" in about
         and "decision_at" in about and ".commit()" in about,
