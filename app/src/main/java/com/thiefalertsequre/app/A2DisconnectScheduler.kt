@@ -159,6 +159,7 @@ internal object A2DisconnectScheduler {
         val current = records.firstOrNull {
             it.address.equals(pending.address, true) &&
                 it.eventElapsedRealtimeMs == pending.eventElapsedRealtimeMs &&
+                it.bootCount == pending.bootCount &&
                 it.monitorRevision == pending.monitorRevision &&
                 it.deviceRevision == pending.deviceRevision
         } ?: return@withLock false

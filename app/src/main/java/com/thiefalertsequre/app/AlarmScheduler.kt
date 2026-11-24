@@ -166,9 +166,7 @@ object AlarmScheduler {
         } else {
             runCatching { alarmManager.canScheduleExactAlarms() }.getOrNull()
         }
-        val exactAllowed = AlarmCallbackPolicy.shouldScheduleExactAlarm(
-            Build.VERSION.SDK_INT, exactPermissionState == true
-        )
+        val exactAllowed = Build.VERSION.SDK_INT < 31 || exactPermissionState == true
 
         var exactScheduled = false
         var exactRetained = false
