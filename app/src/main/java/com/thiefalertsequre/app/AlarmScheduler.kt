@@ -169,7 +169,6 @@ object AlarmScheduler {
         val exactAllowed = Build.VERSION.SDK_INT < 31 || exactPermissionState == true
 
         var exactScheduled = false
-        var exactRetained = false
         if (exactAllowed) {
             try {
                 alarmManager.setExactAndAllowWhileIdle(clockType, triggerAt, exactOperation)
@@ -186,7 +185,6 @@ object AlarmScheduler {
                 ) {
                     runCatching { cancelPendingIntent(alarmManager, exactOperation) }
                 } else {
-                    exactRetained = true
                 }
                 LocalTamperHistory.record(
                     context, "deadline_exact_schedule_failed",
@@ -200,7 +198,6 @@ object AlarmScheduler {
             ) {
                 runCatching { cancelPendingIntent(alarmManager, exactOperation) }
             } else {
-                exactRetained = true
             }
             LocalTamperHistory.record(
                 context, "deadline_exact_access_missing",
@@ -209,13 +206,11 @@ object AlarmScheduler {
         }
 
         var fallbackScheduled = false
-        var fallbackRetained = false
         try {
             alarmManager.setAndAllowWhileIdle(clockType, triggerAt, fallbackOperation)
             fallbackScheduled = true
         } catch (error: Exception) {
             if (hadFallbackOperation) {
-                fallbackRetained = true
             } else {
                 runCatching { cancelPendingIntent(alarmManager, fallbackOperation) }
             }
@@ -227,7 +222,7 @@ object AlarmScheduler {
 
         // A failed replacement must not discard a callback that was already accepted.
         if (!AlarmCallbackPolicy.hasUsableDeadlineCallback(
-                exactScheduled || exactRetained, fallbackScheduled || fallbackRetained
+                exactScheduled, fallbackScheduled
             )
         ) {
             throw IllegalStateException("Android rejected both exact and inexact alarm callbacks")

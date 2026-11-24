@@ -303,7 +303,6 @@ internal object A2DisconnectScheduler {
         )
 
         var exactScheduled = false
-        var exactRetained = false
         if (exactAllowed) {
             try {
                 manager.setExactAndAllowWhileIdle(
@@ -322,7 +321,6 @@ internal object A2DisconnectScheduler {
                 ) {
                     runCatching { cancelPendingIntent(manager, exactOperation) }
                 } else {
-                    exactRetained = true
                 }
                 LocalTamperHistory.record(
                     context, "a2_exact_alarm_schedule_failed",
@@ -336,7 +334,6 @@ internal object A2DisconnectScheduler {
             ) {
                 runCatching { cancelPendingIntent(manager, exactOperation) }
             } else {
-                exactRetained = true
             }
             LocalTamperHistory.record(
                 context, "a2_exact_alarm_access_missing",
@@ -345,7 +342,6 @@ internal object A2DisconnectScheduler {
         }
 
         var fallbackScheduled = false
-        var fallbackRetained = false
         try {
             manager.setAndAllowWhileIdle(
                 AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, fallbackOperation
@@ -353,7 +349,6 @@ internal object A2DisconnectScheduler {
             fallbackScheduled = true
         } catch (error: Exception) {
             if (hadFallbackOperation) {
-                fallbackRetained = true
             } else {
                 runCatching { cancelPendingIntent(manager, fallbackOperation) }
             }
@@ -365,7 +360,7 @@ internal object A2DisconnectScheduler {
 
         // Keep a previously accepted callback when a replacement attempt fails.
         if (!AlarmCallbackPolicy.hasUsableDeadlineCallback(
-                exactScheduled || exactRetained, fallbackScheduled || fallbackRetained
+                exactScheduled, fallbackScheduled
             )
         ) {
             throw IllegalStateException("Android rejected both exact and inexact A2 deadline callbacks")
