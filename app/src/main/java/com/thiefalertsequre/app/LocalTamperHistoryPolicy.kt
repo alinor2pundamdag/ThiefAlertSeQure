@@ -75,7 +75,7 @@ internal object LocalTamperHistoryPolicy {
             "all" -> return true
             else -> return false
         }
-        return terms.any(code::contains)
+        return terms.any { code.contains(it) }
     }
 
     fun newestFirst(existing: String, limit: Int = MAX_EVENTS): List<String> {
