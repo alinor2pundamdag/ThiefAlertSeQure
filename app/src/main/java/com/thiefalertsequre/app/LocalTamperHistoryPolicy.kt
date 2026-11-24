@@ -10,25 +10,25 @@ internal object LocalTamperHistoryPolicy {
     fun sanitizeEvent(event: String): String =
         event.filter { it.isLetterOrDigit() || it in "_- ." }.take(48)
 
-    private val exceptionMessage = Regex("""\\b([A-Za-z][A-Za-z0-9_$]*(?:Exception|Error)):\\s*.*$""")
+    private val exceptionMessage = Regex("""\b([A-Za-z][A-Za-z0-9_$]*(?:Exception|Error)):\s*.*$""")
     private val credentialAssignment = Regex(
-        """(?i)\\b(api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|authorization|bearer|token|private[_-]?key)\\b\\s*[:=]\\s*(?:Bearer\\s+)?(?:"[^"]*"|'[^']*'|[^\\s,;]+)"""
+        """(?i)\b(api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret|authorization|bearer|token|private[_-]?key)\b\s*[:=]\s*(?:Bearer\s+)?(?:"[^"]*"|'[^']*'|[^\s,;]+)"""
     )
-    private val bearerCredential = Regex("""(?i)\\bBearer\\s+[A-Za-z0-9._~+/-]+=*""")
-    private val knownToken = Regex("""\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,})\\b""")
-    private val jwt = Regex("""\\beyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\b""")
-    private val uri = Regex("""(?i)\\b(?:https?|content|file)://[^\\s,;]+""")
-    private val filesystemPath = Regex("""(?<![A-Za-z0-9])(?:/data/(?:user|user_de|data|app)/|/storage/|/sdcard/|/mnt/)[^\\s,;]+""")
-    private val email = Regex("""(?i)\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b""")
+    private val bearerCredential = Regex("""(?i)\bBearer\s+[A-Za-z0-9._~+/-]+=*""")
+    private val knownToken = Regex("""\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,})\b""")
+    private val jwt = Regex("""\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b""")
+    private val uri = Regex("""(?i)\b(?:https?|content|file)://[^\s,;]+""")
+    private val filesystemPath = Regex("""(?<![A-Za-z0-9])(?:/data/(?:user|user_de|data|app)/|/storage/|/sdcard/|/mnt/)[^\s,;]+""")
+    private val email = Regex("""(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b""")
 
     fun sanitizeDetail(detail: String): String {
         var safe = detail
-            .replace(Regex("[\\\\p{Cc}\\\\p{Zl}\\\\p{Zp}]"), " ")
+            .replace(Regex("[\\p{Cc}\\p{Zl}\\p{Zp}]"), " ")
             .replace(Regex(" +"), " ")
             .trim()
-        safe = exceptionMessage.replace(safe) { "${it.groupValues[1]}: [redacted]" }
+        safe = exceptionMessage.replace(safe) { "\${it.groupValues[1]}: [redacted]" }
         safe = bearerCredential.replace(safe, "Bearer [redacted]")
-        safe = credentialAssignment.replace(safe) { "${it.groupValues[1]}=[redacted]" }
+        safe = credentialAssignment.replace(safe) { "\${it.groupValues[1]}=[redacted]" }
         safe = knownToken.replace(safe, "[redacted]")
         safe = jwt.replace(safe, "[redacted]")
         safe = uri.replace(safe, "[redacted-uri]")
