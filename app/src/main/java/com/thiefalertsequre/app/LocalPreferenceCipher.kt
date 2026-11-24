@@ -10,6 +10,14 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
+/** Encryption-key lookup rules shared by the Android Keystore adapter and JVM tests. */
+internal object LocalPreferenceCipherKeyPolicy {
+    fun requireExistingKey(key: SecretKey?): SecretKey =
+        key ?: throw IllegalStateException(
+            "Private preference encryption key is missing; encrypted data was preserved and cannot be decrypted."
+        )
+}
+
 /** Encrypts local Bluetooth identifiers before they enter SharedPreferences. */
 internal object LocalPreferenceCipher {
     private const val KEY_ALIAS = "com.thiefalertsequre.private_preferences_v1"
@@ -45,7 +53,9 @@ internal object LocalPreferenceCipher {
         val iv = payload.copyOfRange(1, 1 + ivSize)
         val ciphertext = payload.copyOfRange(1 + ivSize, payload.size)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(TAG_BITS, iv))
+        // Decryption must never create a replacement key: doing so would hide
+        // a missing original key and make every existing ciphertext unreadable.
+        cipher.init(Cipher.DECRYPT_MODE, getExistingKey(), GCMParameterSpec(TAG_BITS, iv))
         cipher.updateAAD(purpose.toByteArray(StandardCharsets.UTF_8))
         return String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8)
     }
@@ -66,5 +76,12 @@ internal object LocalPreferenceCipher {
             generator.init(spec)
             generator.generateKey()
         }
+    }
+
+    private fun getExistingKey(): SecretKey = synchronized(lock) {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        LocalPreferenceCipherKeyPolicy.requireExistingKey(
+            keyStore.getKey(KEY_ALIAS, null) as? SecretKey
+        )
     }
 }
