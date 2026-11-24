@@ -253,3 +253,15 @@ The active roadmap is **17 phases numbered Phase 0 through Phase 16**, organized
 - Repository rulesets endpoint returned an empty list. The classic branch-protection endpoint returned 403, so this is not evidence that branch protection is absent.
 - PR #7 remains draft/open and targets `work/phase-0-12-coding`; PR #8 is the separate Batch Four branch; PR #9 is v1.1.5 and out of scope. No v1.1.4 candidate PR was created in this pass.
 - `main` remains untouched. No merge, rebase, tag, production signing preflight, APK publication, or GitHub Release was performed. Physical-device acceptance remains owner-operated and is not claimed.
+
+## ThiefAlertSeQure v1.1.4 — Phase 2 continuation (2026-11-24)
+
+- Work continues on `release/v1.1.4-integration` through draft PR #10. It remains unmerged into `main`.
+- Integration diff: 183 changed paths, zero deletions. No v1.1.4 tag or release exists; latest published release is v1.1.3.
+- Removed the generic `ACTION_VIEW` APK fallback that caused the critical CodeQL finding. The updater now hands the already verified app-private APK only to Android's explicit `ACTION_INSTALL_PACKAGE` flow through FileProvider. Added CI source guards against reintroducing the generic fallback.
+- GitHub's PR CodeQL gate passed on intermediate commit `e162c62e9631c2b3755fd5277220694901f246de` with “No new alerts in code changed by this pull request.” The outdated review thread was resolved after removal of the flagged code. Historical repository alert #8's own record state remains unverified.
+- Local tamper-history details now redact exception messages and common credential/token/JWT/URI/path/email patterns. Legacy stored detail fields are sanitized on read and append; JVM tests and a CI privacy contract were added.
+- Resource review: camera/ImageReader, media, thermal, ranging, receiver and Activity-owned executor cleanup paths were inspected. Residual backlog risk remains in the process-lifetime serial PowerTransitionReceiver executor's unbounded queue; evidence-writer saturation remains best-effort by design.
+- Exact-head Android CI and CodeQL are pending for the latest changes. Do not report Phase 2 as complete until those checks pass.
+- Owner-only gates remain: verify historical alert #8 in GitHub Security; verify production signing secrets and signed-artifact preflight; verify branch/tag protection; decide distribution channel and license; perform physical acceptance.
+- No merge, tag creation, signing preflight, APK publication, or release was performed. No Phase 3 transition is authorized.
