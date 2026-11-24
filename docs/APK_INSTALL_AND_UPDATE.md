@@ -1,6 +1,6 @@
 # APK installation and update safety
 
-> **Current Batch Four candidate (18 November 2026):** branch `work/batch-4-implementation`, PR #8 open/unmerged, versionName `1.1.5_Developer_Alinor`, versionCode `7`. The current CI package is a side-by-side debug APK (`com.thiefalertsequre.app.v114test`, versionName `1.1.5-test`). This candidate is not a production release; do not treat historical signing/device records below as verification of this exact head.
+> **Current release candidate (24 November 2026):** branch `release/v1.1.5-candidate`, PR #9, code-bearing head `9ae3d15d9de909ab1a75e88f120ca7c9ff72b3c4`; documentation head `e2965418536aaacf71295ae8a1cc22623a8e8bdf`. Exact code-head Android CI and CodeQL push/PR runs passed. The downloadable CI artifact is a debug-only side-by-side APK (`com.thiefalertsequre.app.v114test`, versionName `1.1.5-test`), not a production installer. The minified production-variant APK passed metadata checks but is unsigned in PR CI. Production signing secrets and signed preflight are not currently verified; the candidate is not a production release.
 
 > **Historical development baseline: v1.1.3 (versionCode 5).** This paragraph records the predecessor release and is superseded by the current Batch Four candidate snapshot above.
 
@@ -23,7 +23,7 @@ Do not change `applicationId`, add an `applicationIdSuffix`, or reuse a lower ve
 
 Android accepts an in-place APK update only when the new APK is signed by the same signing certificate as the installed app (or by a valid, platform-supported signing-key rotation lineage).
 
-The project now has an explicit release signing configuration. The four required GitHub Actions repository secrets were verified present on 11 November 2026. Their values remain encrypted and are never printed in logs or committed to Git. Do not distribute a production APK until the signed release workflow has successfully built, signed, verified, and published it:
+The project has an explicit release signing configuration. A historical check recorded the four required GitHub Actions repository secrets as present on 11 November 2026; that historical observation does not prove they remain present or usable on 24 November 2026. Their values are never accessed through chat, printed in logs, or committed to Git. Current presence and key usability remain unverified until the signed preflight succeeds. Do not distribute a production APK until the signed release workflow has successfully built, signed, verified, and published it:
 
 1. `ANDROID_KEYSTORE_BASE64` — base64-encoded contents of the permanent release keystore.
 2. `ANDROID_KEYSTORE_PASSWORD` — keystore password.
