@@ -24,7 +24,8 @@ object LocalTamperHistory {
             is PreferenceRead.Value -> stored.value.orEmpty()
             is PreferenceRead.Corrupt -> return
         }
-        val next = LocalTamperHistoryPolicy.append(existing, line)
+        val safeExisting = LocalTamperHistoryPolicy.sanitizeStoredHistory(existing)
+        val next = LocalTamperHistoryPolicy.append(safeExisting, line)
         if (prefs.edit().putString(KEY_EVENTS, next).commit()) {
             // The encrypted archive is secondary evidence; failure never changes
             // the authoritative protection state or blocks alarm delivery.
@@ -40,7 +41,9 @@ object LocalTamperHistory {
                 is PreferenceRead.Value -> stored.value.orEmpty()
                 is PreferenceRead.Corrupt -> ""
             }
-            LocalTamperHistoryPolicy.newestFirst(value, limit)
+            val safeValue = LocalTamperHistoryPolicy.sanitizeStoredHistory(value)
+            if (safeValue != value) prefs.edit().putString(KEY_EVENTS, safeValue).apply()
+            LocalTamperHistoryPolicy.newestFirst(safeValue, limit)
         }
 
     fun clear(context: Context): Boolean {
