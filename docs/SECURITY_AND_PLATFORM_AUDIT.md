@@ -208,9 +208,9 @@ No failure details were supplied. These results clear the reported HONOR 200 Pro
 - PR #8's current docs-only head passed CodeQL run #45306480377. This verifies that analysis ran and uploaded SARIF; it does not close alert #8.
 - The clean release branch requires fresh exact-head Android CI and CodeQL before merge.
 - Production signing secrets are never read or printed by the audit. The signed preflight on `main` is the approved way to verify that the four required Actions secrets are present and that the keystore matches the pinned production certificate.
-- Physical acceptance remains a release acceptance requirement; no CI or historical v1.1.3 result is substituted for current-candidate testing.
+- Physical acceptance is owner-operated after delivery and is not a coding/merge gate. No CI or historical v1.1.3 result is represented as physical-device evidence.
 
 
 ## Deferred security-sensitive features — no GO
 
-The owner explicitly deferred the following until a separate GO signal. They are not part of v1.1.5: active shutdown/power-menu/reboot prevention, guaranteed execution while powered off, automatic front-camera capture on successful owner credential entry, new camera/flashlight concurrency-prevention behavior, and premium/max expansion. Current camera evidence is owner-initiated and opt-in. No claims of hardware shutdown prevention or powered-off persistence are made.
+The owner explicitly deferred the following until a separate GO signal. They are not part of v1.1.5: active shutdown/power-menu/reboot prevention, guaranteed execution while powered off, unconditional/non-opt-in or background front-camera capture, new camera/flashlight concurrency-prevention behavior, and premium/max expansion. The existing camera evidence feature is opt-in in Settings and permission-gated; when enabled, it attempts one still only after successful owner authentication while the Activity is visible. No claims of hardware shutdown prevention or powered-off persistence are made.
