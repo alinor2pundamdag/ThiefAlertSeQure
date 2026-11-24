@@ -27,6 +27,9 @@ checks = {
         "val removed = legacyPrefs.edit().remove(LEGACY_KEY_EVENTS).commit()" in source,
     "legacy cleanup verifies the plaintext key is actually absent":
         "return removed && !legacyPrefs.contains(LEGACY_KEY_EVENTS)" in source,
+    "legacy preference access and deletion exceptions fail closed":
+        "private fun clearLegacyPlaintext(context: Context): Boolean = runCatching" in source
+        and "}.getOrDefault(false)" in source,
     "cleanup failure leaves the history unhealthy rather than exposing plaintext":
         source.count('return HistoryRead("", false)') >= 3,
     "explicit clear removes both encrypted and legacy history":
