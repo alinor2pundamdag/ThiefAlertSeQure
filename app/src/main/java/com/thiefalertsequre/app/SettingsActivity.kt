@@ -1137,7 +1137,7 @@ class SettingsActivity : FragmentActivity() {
                 is AppUpdateResult.Ready -> {
                     val notes = result.releaseNotes.ifBlank { "No release notes were provided." }
                     MaterialAlertDialogBuilder(this)
-                        .setTitle("Version \${result.versionName} is available")
+                        .setTitle("Version ${result.versionName} is available")
                         .setMessage(
                             notes + "\n\nAndroid will ask you to confirm installation. " +
                                 "Because the package ID and official signing key match, this is an in-place update; Android preserves app-private data. Any enabled background monitor is restored after package replacement."
@@ -1220,7 +1220,7 @@ class SettingsActivity : FragmentActivity() {
             }
         }.onFailure {
             android.widget.Toast.makeText(
-                this, "Android could not open the package installer: \${it.message}", android.widget.Toast.LENGTH_LONG
+                this, "Android could not open the package installer: ${it.message}", android.widget.Toast.LENGTH_LONG
             ).show()
         }
     }
