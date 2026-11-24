@@ -119,8 +119,17 @@ if not pause_block or "stopPreview()" not in pause_block.group(0):
     errors.append("SettingsActivity must stop audio preview when it leaves the foreground")
 if "lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)" not in settings_activity or "candidate?.release()" not in settings_activity:
     errors.append("SettingsActivity must release a preview player that finishes preparing after the Activity is paused or destroyed")
-if "startActivity(installIntent)" in settings_activity:
-    errors.append("Package installer launch must use guarded Android Settings/activity fallback")
+installer_start = settings_activity.index("private fun launchAndroidInstaller")
+installer_end = settings_activity.index("override fun onResume", installer_start)
+installer_block = settings_activity[installer_start:installer_end]
+if (
+    "Intent(Intent.ACTION_INSTALL_PACKAGE)" not in installer_block
+    or "FileProvider.getUriForFile" not in installer_block
+    or "startActivity(installIntent)" not in installer_block
+):
+    errors.append("APK update handoff must use the explicit Package Installer with an app-private FileProvider URI")
+if "Intent(Intent.ACTION_VIEW)" in installer_block:
+    errors.append("Generic ACTION_VIEW APK installation fallback is forbidden")
 if "startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" in settings_activity:
     errors.append("Battery optimization request must use guarded Android Settings/activity fallback")
 if "AndroidDeviceCompatibility.open(" not in settings_activity:
