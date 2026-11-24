@@ -10,6 +10,7 @@ main = (ROOT / "app/src/main/java/com/thiefalertsequre/app/MainActivity.kt").rea
 about = (ROOT / "app/src/main/java/com/thiefalertsequre/app/AboutActivity.kt").read_text(encoding="utf-8")
 viewer = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LegalDocumentViewer.kt").read_text(encoding="utf-8")
 readme = (ROOT / "README.md").read_text(encoding="utf-8")
+gradle = (ROOT / "app/build.gradle.kts").read_text(encoding="utf-8")
 privacy_doc = (ROOT / "docs/PRIVACY_POLICY.md").read_text(encoding="utf-8")
 terms_doc = (ROOT / "docs/TERMS_OF_USE.md").read_text(encoding="utf-8")
 privacy_asset = (ROOT / "app/src/main/assets/legal/privacy_policy.txt").read_text(encoding="utf-8")
@@ -51,6 +52,19 @@ checks = {
         f"Privacy Notice version {privacy_version}" in privacy_doc,
     "repository terms document matches current in-app terms version":
         f"version:** {terms_version}" in terms_doc,
+    "About license acknowledgements match every direct runtime dependency version":
+        all(
+            f"{label} • {version}" in about
+            for coordinate, label, version in (
+                (match.group(1), match.group(1), match.group(2))
+                for match in re.finditer(r'implementation\("([^"]+):([0-9.]+)"\)', gradle)
+            )
+        )
+        and all(label in about for label in (
+            "AndroidX Core KTX", "AndroidX Activity KTX", "AndroidX Fragment KTX",
+            "AndroidX Biometric", "AndroidX Lifecycle Runtime KTX",
+            "AndroidX DocumentFile", "Google Material Components for Android"
+        )),
 }
 failed = [name for name, passed in checks.items() if not passed]
 for name, passed in checks.items():
