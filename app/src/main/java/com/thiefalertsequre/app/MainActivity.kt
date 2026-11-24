@@ -165,6 +165,20 @@ class MainActivity : FragmentActivity() {
         ), matchWrap())
         notice.addView(body)
         root.addView(notice, matchWrap())
+        root.addView(space(12))
+        root.addView(outlinedButton("Read full Privacy Policy (version ${PolicyAcknowledgementPolicy.PRIVACY_VERSION})") {
+            LegalDocumentViewer.show(
+                this, "legal/privacy_policy.txt",
+                "Privacy Policy • version ${PolicyAcknowledgementPolicy.PRIVACY_VERSION}"
+            )
+        }, matchWrap())
+        root.addView(space(8))
+        root.addView(outlinedButton("Read full Terms of Use (version ${PolicyAcknowledgementPolicy.TERMS_VERSION})") {
+            LegalDocumentViewer.show(
+                this, "legal/terms_of_use.txt",
+                "Terms of Use • version ${PolicyAcknowledgementPolicy.TERMS_VERSION}"
+            )
+        }, matchWrap())
         root.addView(space(22))
         root.addView(button("I understand & continue") {
             val acceptedAt = System.currentTimeMillis()
