@@ -135,6 +135,7 @@ for required in (
         errors.append("AboutActivity missing Batch Four developer/version/legal contract: " + required)
 
 intro_activity = (APP / "SeismicGenesisIntroActivity.kt").read_text(encoding="utf-8")
+renderer_activity = (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
 for required in (
     "ComposeView(this)", "SeismicGenesisIntroContent", "INTRO_DURATION_MS = 9_000",
     "Alinor Pundamdag", "Developed By:", "Color(0xFFFF5252)",
