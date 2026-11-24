@@ -155,8 +155,13 @@ for required in (
 ):
     if required not in intro_activity:
         errors.append("Seismic Genesis full-bleed system-bar contract missing: " + required)
-if "window.statusBarColor =" in intro_activity or "window.navigationBarColor =" in intro_activity:
-    errors.append("Seismic Genesis must not set disabled Android 15+ system-bar colors directly")
+legacy_intro_bars = re.search(r"private fun applyLegacySystemBarColors\(\).*?\n    }", intro_activity, re.S)
+if not legacy_intro_bars or "Build.VERSION_CODES.VANILLA_ICE_CREAM" not in legacy_intro_bars.group(0):
+    errors.append("Seismic Genesis may set legacy system-bar colors only behind the API 35 guard")
+else:
+    intro_modern = intro_activity.replace(legacy_intro_bars.group(0), "")
+    if "window.statusBarColor =" in intro_modern or "window.navigationBarColor =" in intro_modern:
+        errors.append("Seismic Genesis must not set disabled Android 15+ system-bar colors outside the guarded legacy helper")
 
 for required in (
     "ComposeView(this)", "SeismicGenesisIntroContent", "INTRO_DURATION_MS = 9_000",
