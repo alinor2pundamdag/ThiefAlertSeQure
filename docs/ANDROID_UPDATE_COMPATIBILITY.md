@@ -1,6 +1,6 @@
 # Android update compatibility contract
 
-**Current candidate snapshot (18 November 2026):** branch `work/batch-4-implementation`, PR #8 open/unmerged, versionName `1.1.5_Developer_Alinor`, versionCode `7`. This is not a production release. The last documented official baseline remains v1.1.3 / versionCode 5; v1.1.4 / code 6 was an intermediate candidate.
+**Current candidate snapshot (24 November 2026):** clean branch `release/v1.1.5-candidate`, PR #9 open/draft/unmerged, versionName `1.1.5_Developer_Alinor`, versionCode `7`. Clean head `56418b68e422ded696705fd4d07d76605151d19a` passed Android CI #45307869027 and CodeQL #45307868989. This is not a production release. The last published baseline remains v1.1.3 / code 5; v1.1.4 / code 6 was an intermediate candidate.
 
 ## Immutable production identity
 

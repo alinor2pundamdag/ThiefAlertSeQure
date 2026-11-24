@@ -1,4 +1,4 @@
-> **Current release candidate (24 November 2026):** clean integration branch `release/v1.1.5-candidate`, prepared from the audited PR #7/#8 tree. Previous code-bearing commit `5e850fc4a444a1e36541890ca022a745f3be021a` passed Android CI #45304517153 and CodeQL #45304517314; fresh exact-head checks are required on the clean branch. PR #7 has one unresolved CodeQL review thread for the intentional APK installer sink; a security reassessment reply is posted, but alert closure is not verified. The minified PR release APK is unsigned; permanent production signing availability is unknown. Phase 12 remains 0/25 PASS / 25/25 NOT TESTED.
+> **Current release candidate (24 November 2026):** clean integration branch `release/v1.1.5-candidate`, PR #9, head `56418b68e422ded696705fd4d07d76605151d19a`. Android CI #45307869027 and CodeQL #45307868989 passed. PR #7 still has one unresolved CodeQL review thread for the intentional APK installer sink; a security reassessment reply is posted, but alert closure is not verified. PR #9 produced no new review threads. The minified PR release APK is unsigned; permanent production signing availability is unknown. Phase 12 remains 0/25 PASS / 25/25 NOT TESTED.
 
 > Cross-feature corrections include A2 deadline invalidation after authenticated disarm/package replacement, emergency protection-state snapshots, non-blocking alarm recovery, dedicated flash timing workers, SafePreferences-only legacy Gallery index reads, explicit OS backup/device-transfer exclusions, API guards, and redacted diagnostics. Filament 1.80.1/1.81.0 require compileSdk 37; the approved compileSdk 36 / AGP 8.10.1 baseline therefore remains on Filament 1.75.1. Revisit the newer upstream swap-chain fix only with an approved API-37 toolchain migration.
 
@@ -209,3 +209,8 @@ No failure details were supplied. These results clear the reported HONOR 200 Pro
 - The clean release branch requires fresh exact-head Android CI and CodeQL before merge.
 - Production signing secrets are never read or printed by the audit. The signed preflight on `main` is the approved way to verify that the four required Actions secrets are present and that the keystore matches the pinned production certificate.
 - Physical acceptance remains a release acceptance requirement; no CI or historical v1.1.3 result is substituted for current-candidate testing.
+
+
+## Deferred security-sensitive features — no GO
+
+The owner explicitly deferred the following until a separate GO signal. They are not part of v1.1.5: active shutdown/power-menu/reboot prevention, guaranteed execution while powered off, automatic front-camera capture on successful owner credential entry, new camera/flashlight concurrency-prevention behavior, and premium/max expansion. Current camera evidence is owner-initiated and opt-in. No claims of hardware shutdown prevention or powered-off persistence are made.

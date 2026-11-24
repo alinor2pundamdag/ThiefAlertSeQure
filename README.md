@@ -166,7 +166,7 @@ No ordinary app can use one universal setting to override every manufacturer's p
 
 ### Bypass Charging integration status
 
-The development branch includes a guarded integration framework and a Settings entry for Bypass Charging. Direct ON/OFF control is **not available yet** because Android exposes no universal public app API and no model/firmware-specific OEM control adapter has been certified for this project. The control remains disabled and the actual mode remains UNKNOWN until an authorized OEM interface can be read back successfully. Owners can still use any Bypass Charging option exposed by their phone's own Settings or gaming tools. See [Bypass Charging Integration](docs/BYPASS_CHARGING_INTEGRATION.md).
+The development candidate includes a guarded integration framework and a Settings entry for Bypass Charging. Direct ON/OFF control is **not available yet** because Android exposes no universal public app API and no model/firmware-specific OEM control adapter has been certified for this project. The control remains disabled and the actual mode remains UNKNOWN until an authorized OEM interface can be read back successfully. Owners can still use any Bypass Charging option exposed by their phone's own Settings or gaming tools. See [Bypass Charging Integration](docs/BYPASS_CHARGING_INTEGRATION.md).
 
 ### Important Android system requirements
 
@@ -229,6 +229,11 @@ A successful CI build confirms that the configured automated checks and APK asse
 | [Device Owner Mode](docs/DEVICE_OWNER_MODE.md) | Managed-device requirements, capabilities, and rollback. |
 | [Android Settings & Alarm Hardening](docs/ANDROID_SETTINGS_AND_ALARM_HARDENING.md) | System settings and reliability guidance. |
 | [Android Device Compatibility](docs/ANDROID_DEVICE_COMPATIBILITY.md) | API 26–37 behavior, OEM-specific setup, fallback navigation, and device test matrix. |
+| [Official GitHub APK Release Runbook](docs/OFFICIAL_RELEASE_RUNBOOK.md) | Signing secrets, signed preflight, release tag, publication and post-release verification. |
+| [Bluetooth & Root Capability System](docs/BLUETOOTH_ROOT_CAPABILITY_SYSTEM.md) | Local Bluetooth capability catalog, paired-device behavior and optional root boundaries. |
+| [Device Intelligence](docs/DEVICE_INTELLIGENCE.md) | On-device model/API, permission, integrity and capability diagnostics. |
+| [Owner Bluetooth Policy](docs/OWNER_BLUETOOTH_IMPLEMENTATION_POLICY.md) | Approved Bluetooth scope and future-feature authorization boundary. |
+| [Protection Shield Indicator](docs/PROTECTION_SHIELD_INDICATOR.md) | Live protection state visual contract. |
 
 ## ⚠️ Honest security and reliability boundaries
 
@@ -249,7 +254,7 @@ Please test the app on your own device and confirm its permissions and backgroun
 
 ## 📦 Reliable APK updates
 
-**Current Batch Four candidate:** 1.1.5_Developer_Alinor (versionCode 7), branch `work/batch-4-implementation`, PR #8 open/unmerged. This is not a production release; official release availability is determined by the GitHub Releases page and signed APK assets attached there.
+**Current release candidate:** 1.1.5_Developer_Alinor (versionCode 7), clean branch `release/v1.1.5-candidate`, PR #9 open/draft/unmerged. Android CI #45307869027 and CodeQL #45307868989 passed on the initial clean candidate head. This is not a production release; the minified PR APK is unsigned and official availability is determined by the GitHub Releases page and signed APK assets attached there.
 
 > **Historical legacy upgrade note:** v1.1.2 was signed with a different signing certificate. Because that old private key is unavailable, v1.1.3 cannot update that installation in place. Users on v1.1.2 must review the migration instructions and data implications before uninstalling or reinstalling.
 
@@ -257,7 +262,7 @@ Please test the app on your own device and confirm its permissions and backgroun
 - Android confirmation is required. If the package ID and release key match, Android updates the installed app in place and retains its private app data; uninstalling is not required.
 - Updates are blocked while protection is ARMED, COUNTDOWN, or ALARM_TRIGGERED. The owner must first reach DISARMED; the background monitor preference may remain enabled. Android stops the old process during package replacement, and the package-replaced receiver attempts to restart monitoring afterward. The owner’s explicit monitor opt-out remains respected.
 - Android may require you to allow installs from ThiefAlertSeQure in its app-specific unknown-apps setting. This is system-controlled and can be revoked after the update.
-- The current development candidate is `1.1.5_Developer_Alinor` (versionCode `7`) on `work/batch-4-implementation`; PR #8 remains unmerged.
+- The current development candidate is `1.1.5_Developer_Alinor` (versionCode `7`) on `release/v1.1.5-candidate`; PR #9 remains unmerged.
 - Production updates must always use the same permanent release keystore. CI supports the four GitHub Actions secrets documented in [APK installation and update safety](docs/APK_INSTALL_AND_UPDATE.md).
 - CI labels release-signed and debug-only APKs separately and verifies the package ID, version, and signing certificate before upload.
 - A debug APK is for development only. Do not alternate debug and release builds on one installed app.

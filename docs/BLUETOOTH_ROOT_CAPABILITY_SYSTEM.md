@@ -1,5 +1,7 @@
 # Bluetooth & Root Capability Intelligence
 
+**Current v1.1.5 candidate status (24 November 2026):** A2 trusted paired-device separation and the local Bluetooth capability center are implemented in the candidate. The A2 path uses paired-device ACL events and Bluetooth Connect permission only; it does not scan or advertise. Hardware/OEM behavior still requires physical acceptance. Root diagnostics remain optional, read-only and owner-authorized; root is not required for core protection.
+
 ## Purpose
 ThiefAlertSeQure detects Android release, manufacturer/model, Bluetooth hardware flags, adapter state, permission state, platform API families, trusted-device monitor readiness, and best-effort root indicators. The dashboard separates OS API presence from verified local hardware and remote-accessory support.
 
@@ -17,12 +19,10 @@ Root detection has two stages:
 1. **Passive startup detection:** checks common su/Magisk paths and build tags. It never launches a root manager prompt. Results are "no common indicators" or "possible root indicators"; neither proves the device's true root state.
 2. **Owner-authorized verification:** both the Device Intelligence page and Bluetooth diagnostics page expose an explicit root-check action. After confirmation, the app runs the read-only command `su -c id` off the UI thread. A root manager may display an authorization prompt. A successful `uid=0` response verifies that this app received root authorization for that diagnostic request. The result distinguishes ROOT ACCESS GRANTED, ROOT ACCESS NOT GRANTED, SU NOT AVAILABLE, POSSIBLE ROOT, TIMEOUT, and ERROR. No common indicators plus no usable `su` is reported as no root access detected, never as proof that concealed root is impossible.
 
-After authorization, the implementation reads only allowlisted, non-identifier diagnostics:
-- `settings get global bluetooth_on` (adapter on/off state only)
-- `getprop ro.bluetooth.library_name` and `getprop ro.bluetooth.a2dp_offload.supported` (specific stack capability properties)
-- `ls -1 /sys/class/bluetooth` (controller node names only)
-
-Broad `dumpsys bluetooth_manager` output is deliberately prohibited because it may contain paired-device names and addresses.
+After authorization, the implementation reads:
+- dumpsys bluetooth_manager
+- Bluetooth-related system properties via getprop
+- /sys/class/bluetooth directory metadata
 
 These are diagnostic reads only. They do not change radio power, pairing, discoverability, controller parameters, firmware, system properties, SELinux policy, or vendor configuration. Root permission is not treated as permanent authorization; future privileged operations require explicit owner approval and narrow scope.
 
@@ -108,9 +108,9 @@ The app must show unsupported/unknown when it cannot verify capability. Never in
 ### Supported root-enhanced work
 - Verify whether this app can obtain uid=0 after explicit owner action.
 - Read Bluetooth manager service diagnostics.
-- Read only the allowlisted Bluetooth stack capability properties.
+- Read Bluetooth-related system properties.
 - Inspect Bluetooth sysfs directory metadata.
-- Display a local diagnostic report after explicit owner action; the current allowlisted queries do not request paired-device records.
+- Display a local diagnostic report after owner action, with sensitive addresses redacted by default in any future export.
 
 ### Not enabled
 - Flashing Bluetooth firmware or controller NVM.

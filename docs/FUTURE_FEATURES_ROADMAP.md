@@ -1,6 +1,6 @@
 # Future Features Roadmap
 
-Status (24 November 2026): A2 is implemented on the current PR #7/#8 development stack; release assignment and physical acceptance remain pending. A3 partially overlaps with owner-requested local location evidence, but a dedicated last-known-location view is not claimed. A1 and A4–A7 remain future features with no release assignment. D1–D5 have corresponding implementations in the current candidate.
+Status (24 November 2026): A2 is included in the owner-authorized v1.1.5 release candidate; official release and physical acceptance remain pending. A3 partially overlaps with owner-requested local location evidence, but a dedicated last-known-location view is not claimed. A1 and A4–A7 remain future features with no release assignment. D1–D5 have corresponding implementations in the current candidate.
 
 ## Scope decision
 
@@ -18,7 +18,7 @@ Keep future work small and independently testable. Add only features that solve 
 - Do not run sensors continuously while disarmed. Do not claim it can distinguish an owner from a thief.
 
 ### A2 — Trusted Bluetooth Device Separation Alert
-Implementation status: implemented in the current development candidate; physical acceptance and release assignment remain pending.
+Implementation status: included in the owner-authorized v1.1.5 release candidate; physical acceptance remains pending.
 - Optionally pair a trusted watch, earbuds, or other Bluetooth device.
 - Warn when the trusted device disconnects while anti-theft protection is armed.
 - Treat Bluetooth range and disconnect events as approximate; avoid claiming precise distance or guaranteed background detection.
@@ -94,6 +94,18 @@ Implementation status: implemented in the current development candidate; physica
 - Diagnostics and new sensors must never stop, delay, silence, or reset an active alarm.
 - Keep core theft-alert operation available offline.
 - Test normal, false-positive, failure, reboot, battery, and upgrade-over-install behavior where applicable.
+
+## Owner-deferred requests — no implementation GO
+
+The following requests were explicitly deferred by the owner on 17 November 2026, pending a separate GO signal. No later GO for these specific features was found in the retrieved project history. They are **not part of the v1.1.5 release scope** and must not be implemented as part of this release:
+
+- Active prevention/interruption of Android power-menu, shutdown or reboot actions. Existing code observes permitted power-transition signals; it does not prevent hardware shutdown.
+- Guaranteed protection execution while the device is powered off.
+- Automatic front-camera capture triggered by successful owner credential entry. Current camera evidence remains owner-initiated, opt-in and CAMERA-permission-gated; it is not automatic unlock-triggered capture.
+- New camera/flashlight conflict-prevention behavior beyond existing separate controls.
+- Maximum/premium capability expansion outside the approved v1.1.5 scope.
+
+These requests require a separate explicit owner GO and a new privacy/platform threat-model review before implementation or release assignment.
 
 ## Not approved / deferred
 

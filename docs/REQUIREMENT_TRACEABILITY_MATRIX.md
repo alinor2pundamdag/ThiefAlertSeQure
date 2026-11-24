@@ -1,6 +1,6 @@
-> **Current release candidate (24 November 2026):** clean integration branch `release/v1.1.5-candidate`, prepared as a single snapshot commit from the audited candidate tree; exact-head Android CI and CodeQL are pending. Candidate: `1.1.5_Developer_Alinor` / versionCode `7`, package `com.thiefalertsequre.app`, minSdk `26`, compileSdk/targetSdk `36`. Last published release: v1.1.3 / code 5. PR CI's minified release APK is unsigned; production signing availability is unverified. Phase 12 remains 0/25 PASS / 25/25 NOT TESTED.
+> **Current release candidate (24 November 2026):** `release/v1.1.5-candidate`, PR #9. The clean snapshot head `56418b68e422ded696705fd4d07d76605151d19a` passed Android CI #45307869027 and CodeQL #45307868989. Candidate: `1.1.5_Developer_Alinor` / versionCode `7`, package `com.thiefalertsequre.app`, minSdk `26`, compileSdk/targetSdk `36`. Latest debug artifact ID `14881119651`; APK SHA-256 `c0de410c4f26616d7629fef7251991414d2feba3141527f05bfbf636bb5771d1`. PR CI's minified release APK is unsigned; production signing availability is unverified. Phase 12 remains 0/25 PASS / 25/25 NOT TESTED. A docs/test-coverage follow-up requires fresh exact-head CI.
 
-> Historical FIXALL candidate: v`1.1.4` / versionCode `6`, package `com.thiefalertsequre.app`; side-by-side debug test variant is `com.thiefalertsequre.app.v114test`. Production identity and signing configuration are protected invariants. No production release is authorized by this verification work.
+> Historical FIXALL candidate: v`1.1.4` / versionCode `6`, package `com.thiefalertsequre.app`; side-by-side debug test variant is `com.thiefalertsequre.app.v114test`. Production identity and signing configuration are protected invariants. Owner authorization to continue to the official GitHub release was given on 2026-11-24; publication remains gated by signed preflight and acceptance.
 > Contract: [Universal Maximum Protection Specification](UNIVERSAL_MAXIMUM_PROTECTION_SPEC.md).
 > Status labels: **Implemented** means source code exists; **Unit-covered** means a named JVM unit test exists; **CI-verified** means the exact commit passed the named non-instrumentation GitHub Actions checks. Emulator and Android instrumentation compilation/execution remain excluded by owner policy. Physical-device acceptance is not an automated CI gate, but it is required before claiming full hardware acceptance for the official release. Dormant `androidTest` source files remain reference-only and must not be compiled or executed.
 
@@ -213,7 +213,7 @@ The CodeQL gate passed after the APK-installer suppression comments were moved t
 - CodeQL Java/Kotlin and Actions analysis: [#44005105442 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105442).
 - Branch comparison: 530 ahead / 0 behind; 131 changed files (90 added, 41 modified, 0 deleted).
 - Recursive tree: 64 production Kotlin source files; no truncation. Automated marker/pattern sweeps covered the source set, with focused manual review of high-risk paths; this is not claimed as exhaustive line-by-line formal verification.
-- PR #7 has one resolved inline review thread. The thread references CodeQL alert #8, but the alert's actual active/closed state could not be retrieved through the available GitHub connector. Alert closure remains **NOT VERIFIED**.
+- PR #7 has one unresolved inline review thread. The thread references CodeQL alert #8, but the alert's actual active/closed state could not be retrieved through the available GitHub connector. Alert closure remains **NOT VERIFIED**.
 - Permanent release signing-secret presence and production-signed APK availability remain **NOT VERIFIED**. Release workflow is fail-closed and production publication remains unauthorized.
 - Instrumentation compilation/execution, emulator tests and physical-device tests were not performed and remain excluded.
 - PR #7 remains draft/open/unmerged. `main` remains untouched.
@@ -267,3 +267,16 @@ The CodeQL gate passed after the APK-installer suppression comments were moved t
 - The current GitHub Actions release workflow has a manual signed preflight restricted to `main`; it verifies the permanent keystore, pinned production signer, monotonic versionCode and signed APK metadata without publishing. Tag publication is a separate step after preflight and physical acceptance.
 - The current APK installer CodeQL review thread remains unresolved. The candidate's validation path has been explained in the thread, but no alert closure is claimed.
 - The official release cannot be called complete until the signed preflight and physical-device acceptance record are complete.
+
+
+## Owner-deferred requests — no implementation GO
+
+The owner explicitly deferred these features pending a separate GO signal. No later GO for these specific features was found in the retrieved project history; they are not part of v1.1.5:
+
+- Active prevention/interruption of Android power-menu, shutdown or reboot actions. Existing code observes permitted power-transition signals; it does not prevent hardware shutdown.
+- Guaranteed protection execution while the device is powered off.
+- Automatic front-camera capture triggered by successful owner credential entry. Current evidence capture remains owner-initiated, opt-in and CAMERA-permission-gated.
+- New camera/flashlight concurrency-prevention behavior beyond existing separate controls.
+- Maximum/premium expansion outside the approved release scope.
+
+Do not implement or assign these to a release without a separate explicit owner GO.

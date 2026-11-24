@@ -1,13 +1,13 @@
 # Batch Four — Phases 14–17
 
-**Release integration branch:** `release/v1.1.5-candidate`  
+**Release integration branch:** `release/v1.1.5-candidate` / PR #9  
 **Source implementation:** audited Batch Three + Batch Four candidate tree from PR #7/#8  
 **Production identity:** `com.thiefalertsequre.app`  
 **Current candidate:** `1.1.5_Developer_Alinor` / versionCode `7`
 
-**24 November release continuation:** The original PR #7/#8 stack compared as 1,504 commits ahead of `main`, 0 behind, 196 changed paths and no deletions. To avoid importing that noisy history, the candidate is being consolidated into a single-snapshot release branch based on `main`. The original PRs remain open as audit history until the clean branch is verified. PR #4/#5 overlap the stack; PR #6 conflicts with minSdk 26 and the no-instrumentation policy.
+**24 November release continuation:** The original PR #7/#8 stack compared as 1,504 commits ahead of `main`, 0 behind, 196 changed paths and no deletions. The candidate was consolidated into a one-commit release branch based on `main`; PR #9 head `56418b68e422ded696705fd4d07d76605151d19a` passed Android CI #45307869027 and CodeQL #45307868989. The follow-up restoring selected PR #5 Bluetooth docs/tests requires fresh exact-head checks.
 
-Previous code-bearing commit `5e850fc4a444a1e36541890ca022a745f3be021a` passed Android CI #45304517153 and CodeQL #45304517314. The stacked PR #8 docs-only head `168222ca04ea0e36776d4f343e6b82add2e07494` passed CodeQL #45306480377; Android CI #45306480219 was still building the minified release APK when this audit snapshot was prepared. Fresh exact-head Android CI and CodeQL are required on the clean release branch.
+PR #4/#5 code is superseded by the newer candidate implementation; selected missing PR #5 docs/test coverage are being restored. PR #6's minSdk-23 and instrumentation experiment conflicts with the approved minSdk-26/no-instrumentation policy and is not included.
 
 Phase 12 remains 0/25 PASS / 25/25 NOT TESTED. No instrumentation or emulator testing is claimed. PR CI's minified release APK is unsigned; permanent production signing availability remains unverified. No tag, production publication or release is claimed.
 

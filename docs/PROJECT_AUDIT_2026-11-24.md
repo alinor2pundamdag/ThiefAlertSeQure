@@ -2,13 +2,13 @@
 
 **Audit date:** 24 November 2026  
 **Repository:** [alinor2pundamdag/ThiefAlertSeQure](https://github.com/alinor2pundamdag/ThiefAlertSeQure)  
-**Release integration branch:** `release/v1.1.5-candidate`
+**Release integration branch:** `release/v1.1.5-candidate` / PR #9
 
 ## Scope and project boundaries
 
-This audit consolidates the retrievable prior ThiefAlertSeQure discussions, approved requirements, repository documentation, open pull requests, source-level implementation and current CI evidence. It excludes unrelated OCVIP AutoPilot, Wi-Fi security and local AI/OpenCode conversations.
+This audit consolidates retrievable prior ThiefAlertSeQure discussions, approved requirements, repository documentation, pull requests, source-level implementation and current CI evidence. It excludes unrelated OCVIP AutoPilot, Wi-Fi security and local AI/OpenCode work.
 
-This is a cross-chat requirements audit plus targeted review of high-risk implementation paths. It is not a claim that every line of all 89 production Kotlin files has received a fresh manual review.
+This is a cross-chat requirements audit plus targeted review of high-risk implementation paths, not a claim that every line of all production Kotlin files received a fresh manual review.
 
 ## Approved requirements and current status
 
@@ -19,7 +19,7 @@ This is a cross-chat requirements audit plus targeted review of high-risk implem
 | Owner authentication | Fresh owner proof required; biometric/device credential paths; no authentication bypass added |
 | Alarm shutdown | Authenticated coordinator disarms, stops foreground alarm service and restores audio state; regression contract covers audio/flash/vibration/focus cleanup |
 | Six alarm choices | Packaged default plus five generated ToneGenerator presets; six-entry regression test |
-| Camera evidence | Owner-controlled capture after successful owner authentication; Gallery default, optional encrypted vault; no covert background camera |
+| Camera evidence | Owner-controlled capture after successful owner authentication; Gallery default, optional encrypted vault; no covert or automatic unlock-triggered camera |
 | Location evidence | Owner-requested local capture only; no continuous tracking or remote location backend |
 | Seismic Genesis intro | Four stages, approximately nine seconds, no skip path, developer credit, 20-color cycle, downward name exit; static regression contracts |
 | Filament cinematic rendering | 3D scene with PBR/IBL, fracture and post-processing; 2D canvas is fallback only when Filament is unavailable |
@@ -33,13 +33,14 @@ This is a cross-chat requirements audit plus targeted review of high-risk implem
 ## Repository and pull-request topology
 
 - `main` remains unchanged.
-- PR #7 is the draft Batch Three baseline: 790 commits, 181 changed paths.
-- PR #8 is the draft Batch Four continuation stacked on PR #7: 714 commits, 99 changed paths.
-- The combined original stack compares as 1,504 commits ahead of `main`, 0 behind, 196 changed paths and no deletions. It is being consolidated into a single-snapshot release branch to avoid importing the automation-heavy history into production.
-- PR #4 (R8 hardening) and PR #5 (A2) overlap the active stack; do not merge them independently. PR #6 lowers minSdk to 23 and adds instrumentation tests, conflicting with the approved minSdk 26 and no-instrumentation policy.
-- The clean release branch is based directly on `main`; `main` is not changed until its pull request is reviewed and merged.
+- PR #7 is the draft Batch Three baseline: 790 commits / 181 changed files.
+- PR #8 is the draft Batch Four continuation stacked on PR #7: 714 commits / 99 changed files.
+- The combined original stack compared as 1,504 commits ahead of `main`, 0 behind, 196 changed paths and no deletions. It was consolidated into clean PR #9: one snapshot commit based on `main`, 197 changed files, 151 added, 46 modified, no deletions.
+- PR #4 R8 hardening is superseded by the newer candidate's Gradle/minified release configuration and current compatibility contract. Its historical v1.1.4 hardening plan was not copied as current guidance.
+- PR #5 A2 Bluetooth implementation is included and superseded by later candidate refinements. Four missing design/policy docs and Bluetooth capability regression coverage are being restored in a follow-up.
+- PR #6 lowers minSdk to 23 and adds instrumentation tests; it conflicts with the approved minSdk 26 and no-instrumentation policy and is excluded.
 
-## Changes implemented during the audit continuation
+## Changes and reconciliations
 
 1. Fixed Kotlin string interpolation in Settings and configuration-backup messages.
 2. Made the 2D fracture canvas a compatibility fallback only when Filament 3D is unavailable.
@@ -48,24 +49,39 @@ This is a cross-chat requirements audit plus targeted review of high-risk implem
 5. Added a six-choice alarm preset regression test.
 6. Removed guarded `versionCode` deprecation warnings.
 7. Migrated system-bar icon styling to `WindowCompat`; legacy bar colors remain only below API 35. All seven ordinary view-based screens use the shared inset helper; the intro remains intentionally full-bleed.
-8. Migrated deprecated Android `kotlinOptions` JVM target configuration to Kotlin's typed `kotlin.compilerOptions` DSL in the clean release candidate.
-9. Added the official GitHub APK release runbook and reconciled release/security/physical-acceptance documentation.
+8. Migrated deprecated Android `kotlinOptions` JVM target configuration to Kotlin's typed `kotlin.compilerOptions` DSL.
+9. Added the official GitHub APK release runbook.
+10. Restored the Bluetooth capability regression cases and four PR #5 design/policy documents; corrected the shield visual spec to match the stable blue silhouette and state glyph.
+11. Reconciled the no-GO deferred feature list across the roadmap and security/traceability docs.
 
 ## Verification evidence
 
-- Previous code-bearing commit: `5e850fc4a444a1e36541890ca022a745f3be021a`; Android CI #45304517153 and CodeQL #45304517314 passed on that exact source commit.
-- Stacked PR #8 docs-only head: `168222ca04ea0e36776d4f343e6b82add2e07494`; CodeQL #45306480377 passed. Android CI #45306480219 was still running the minified release APK verification step when this audit snapshot was prepared.
-- Fresh exact-head Android CI and CodeQL are required on `release/v1.1.5-candidate`; previous runs are not substituted for it.
-- Previous development artifact: ID `14881036567`, archive SHA-256 `33127b9cf05c92bd9a5820bf983906cdc16244390d61200dd3ef1649c707f7ce`.
-- Debug package: `com.thiefalertsequre.app.v114test`, versionCode `7`, versionName `1.1.5-test`, minSdk `26`; debug signer SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`.
-- Production identity metadata: `com.thiefalertsequre.app`, versionCode `7`, versionName `1.1.5_Developer_Alinor`, compileSdk/targetSdk `36`. The PR minified release APK is unsigned; production signing-secret availability is not verified.
-- PR #7's CodeQL APK-installer review thread remains unresolved. A detailed security reassessment reply was posted; alert closure is not inferred from successful CodeQL analysis.
+- Previous code-bearing commit `5e850fc4a444a1e36541890ca022a745f3be021a`: Android CI #45304517153 and CodeQL #45304517314 passed.
+- Stacked PR #8 head `168222ca04ea0e36776d4f343e6b82add2e07494`: Android CI #45306480219 and CodeQL #45306480377 passed.
+- Clean PR #9 head `56418b68e422ded696705fd4d07d76605151d19a`: Android CI [#45307869027](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45307869027) and CodeQL [#45307868989](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45307868989) passed.
+- Clean-branch development artifact: ID `14881119651`, archive SHA-256 `3e34f8a8cfd5cef750a3ab31b265e4aeaaf37406bee70547d678b08ada424e99`; APK SHA-256 `c0de410c4f26616d7629fef7251991414d2feba3141527f05bfbf636bb5771d1`.
+- Debug package `com.thiefalertsequre.app.v114test`, versionCode `7`, versionName `1.1.5-test`, minSdk `26`; debug signer SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`.
+- Production identity metadata passed: `com.thiefalertsequre.app`, versionCode `7`, versionName `1.1.5_Developer_Alinor`, compileSdk/targetSdk `36`. The minified release APK is unsigned in PR CI; production signing-secret availability is not verified.
+- PR #7's CodeQL APK-installer review thread remains unresolved. A security reassessment reply was posted; PR #9 CodeQL passed with no new review threads. Alert closure is not inferred from workflow success.
+- Remaining non-fatal Android API deprecation warnings: own-service status inspection, display access, legacy Camera2 session overload, deprecated LocationListener override and legacy package-installer intent.
+
+## Owner-deferred requests — no implementation GO
+
+The following requests were explicitly deferred by the owner pending a separate GO signal. No later GO for these specific features was found in the retrieved project history; they are not part of v1.1.5:
+
+- Active prevention/interruption of Android power-menu, shutdown or reboot actions. Existing code observes permitted power-transition signals; it does not prevent hardware shutdown.
+- Guaranteed protection execution while the device is powered off.
+- Automatic front-camera capture triggered by successful owner credential entry. Current evidence capture remains owner-initiated, opt-in and CAMERA-permission-gated.
+- New camera/flashlight concurrency-prevention behavior beyond existing separate controls.
+- Maximum/premium expansion outside the approved release scope.
+
+Do not implement or assign these features to a release without a separate explicit owner GO.
 
 ## Open release and acceptance gates
 
 | Gate | Status |
 |---|---|
-| Exact-head Android CI and CodeQL on clean release branch | Pending |
+| Follow-up exact-head Android CI and CodeQL | Pending |
 | CodeQL alert #8 formal reassessment/closure | Unresolved / not verified |
 | Independent review of clean release PR | Pending |
 | Permanent production signing secrets and signed preflight | Not verified |

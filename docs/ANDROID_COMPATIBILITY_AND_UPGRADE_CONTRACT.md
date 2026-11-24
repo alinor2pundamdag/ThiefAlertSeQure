@@ -7,7 +7,7 @@ This document is the persistent acceptance contract for ThiefAlertSeQure Android
 - Production application ID / namespace: `com.thiefalertsequre.app`.
 - Last documented official installed baseline: v1.1.3, versionCode 5.
 - Historical intermediate candidate: v1.1.4, versionCode 6, versionName `1.1.4_Developer_Alinor` (not confirmed as a published release in this snapshot).
-- Current Batch Four candidate (21 November 2026): v1.1.5, versionCode 7, versionName `1.1.5_Developer_Alinor`, branch `work/batch-4-implementation`, PR #8 open/unmerged. This is not a production release. Exact-head Android CI and CodeQL are queued/not yet verified; Phase 12 physical acceptance remains 0/25 PASS / 25/25 NOT TESTED.
+- Current release candidate (24 November 2026): v1.1.5, versionCode 7, versionName `1.1.5_Developer_Alinor`, clean branch `release/v1.1.5-candidate`, PR #9 open/draft/unmerged. Clean head `56418b68e422ded696705fd4d07d76605151d19a` passed Android CI #45307869027 and CodeQL #45307868989. This is not a production release; Phase 12 physical acceptance remains 0/25 PASS / 25/25 NOT TESTED.
 - Official release signing-certificate SHA-256:
   `9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64`.
 - The development-only debug APK uses a separate `com.thiefalertsequre.app.v114test` application ID. It must never replace the production installation or be published as an update. No instrumentation APK is built.

@@ -1,6 +1,6 @@
 # Owner Bluetooth Implementation Policy
 
-Status: active project instruction, not a release assignment.
+Status: active owner policy. A2 trusted-device separation and the Bluetooth/Device Intelligence pages are included in the owner-authorized v1.1.5 candidate; future Bluetooth capabilities are not automatically assigned to a release.
 
 ## Owner direction
 - Treat Bluetooth capability work as an ongoing, comprehensive engineering scope for ThiefAlertSeQure.
@@ -10,7 +10,7 @@ Status: active project instruction, not a release assignment.
 - For unsupported, unverified, permission-blocked, adapter-off, or peer-dependent capabilities, display the precise reason and a safe next step. Never mark a feature active based only on Android API presence.
 - Root is optional. Core protection and standard Bluetooth functions must not depend on root. Root diagnostics require an explicit owner action, narrow read-only commands, timeouts, and no silent privileged background activity.
 - Preserve applicationId, minSdk 26, the existing release signing identity, preferences, local data, charger alarm, authentication flow, and upgrade compatibility.
-- Do not assign a release version, merge a draft PR, create a tag, or publish an APK without explicit owner approval.
+- Do not assign or release future Bluetooth features outside the owner-approved v1.1.5 scope without explicit owner approval. The 2026-11-24 owner instruction authorizes completion of the current GitHub release, subject to all technical and acceptance gates.
 - Do not promise universal Bluetooth compatibility. Device and peer limitations are physical/platform constraints, not implementation defects.
 
 ## Implementation record
@@ -22,3 +22,7 @@ Append each future owner-requested Bluetooth feature here with date, branch/PR, 
 
 
 - 2026-11-12: Added dedicated Bluetooth capability center and Device Intelligence pages. Settings and dashboard now link to separate organized screens instead of embedding the Bluetooth inventory in a long settings scroll. Added local inspection for Android platform, hardware feature flags, sensors, display, RAM/storage, battery/thermal/power, and app readiness. No telemetry or new automatic permission prompts.
+
+
+## Release integration record
+- 2026-11-24: A2 and the local Bluetooth capability/Device Intelligence surfaces are included in the clean v1.1.5 release candidate. Physical validation remains pending. The current branch is `release/v1.1.5-candidate`; see `docs/OFFICIAL_RELEASE_RUNBOOK.md` for release gates.
