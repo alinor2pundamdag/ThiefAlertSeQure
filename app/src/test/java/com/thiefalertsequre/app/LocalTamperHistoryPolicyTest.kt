@@ -62,6 +62,15 @@ class LocalTamperHistoryPolicyTest {
     }
 
     @Test
+    fun previouslyStoredHistoryDetailsAreRedactedOnMigration() {
+        val legacy = "2026-11-17 12:00:00 | alarm_audio_open_failed | IOException: /data/user/0/app/files/private.ogg"
+        assertEquals(
+            "2026-11-17 12:00:00 | alarm_audio_open_failed | IOException: [redacted]",
+            LocalTamperHistoryPolicy.sanitizeStoredHistory(legacy)
+        )
+    }
+
+    @Test
     fun safeOperationalDetailsAndEvidenceHashesRemainReadable() {
         val detail = "charger_countdown_started after 3 stable samples; sha256=" + "a".repeat(64)
         assertEquals(detail, LocalTamperHistoryPolicy.sanitizeDetail(detail))
