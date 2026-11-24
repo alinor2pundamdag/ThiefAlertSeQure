@@ -31,7 +31,7 @@ object LocalTamperHistory {
         if (!prefs.edit().putString(KEY_EVENTS, encrypted).commit()) return false
         // Remove legacy plaintext only after the encrypted replacement is durable.
         app.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE).edit().remove(LEGACY_KEY_EVENTS).commit()
-        if (writeEvidenceArchive) LocalEvidenceVault.recordAsync(app, safeEvent, safeDetail)
+        if (writeEvidenceArchive) LocalEvidenceVault.recordAsync(context, safeEvent, safeDetail)
         return true
     }
 
