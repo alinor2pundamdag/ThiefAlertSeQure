@@ -128,34 +128,88 @@ class BluetoothCenterActivity : FragmentActivity() {
 
     private fun addTrustedDeviceSection() {
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        val devices = TrustedBluetoothRegistry.read(prefs)
+        val registryRead = TrustedBluetoothRegistry.readStrict(prefs)
+        val baselineRead = TrustedBluetoothRegistry.readBaselineAddresses(prefs)
+        val registryCorrupt = registryRead is PreferenceRead.Corrupt
+        val baselineCorrupt = baselineRead is PreferenceRead.Corrupt
+        val integrityVerified = !registryCorrupt && !baselineCorrupt
+        val devices = when (registryRead) {
+            is PreferenceRead.Value -> registryRead.value
+            is PreferenceRead.Corrupt -> emptyList()
+        }
+        if (!integrityVerified) {
+            // Fail closed immediately; never overwrite an unreadable encrypted source.
+            runCatching { A2BluetoothReceiverController.sync(this) }
+        }
         val enabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-        val baselineCount = devices.count { TrustedBluetoothRegistry.hasConfirmedConnectionBaseline(prefs, it.address) }
+        val baselineCount = if (baselineCorrupt) 0 else
+            devices.count { TrustedBluetoothRegistry.hasConfirmedConnectionBaseline(prefs, it.address) }
         val monitorEnabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         val monitorRunning = runCatching {
             getSystemService(ActivityManager::class.java).getRunningServices(100)
                 .any { it.service.className == ProtectionMonitorService::class.java.name }
         }.getOrDefault(false)
         val protectionMode = ProtectionStore(this).read().mode
+        val exactAlarmAccess = if (Build.VERSION.SDK_INT < 31) {
+            "not required on this Android version"
+        } else {
+            when (runCatching {
+                getSystemService(android.app.AlarmManager::class.java)?.canScheduleExactAlarms()
+            }.getOrNull()) {
+                true -> "allowed"
+                false -> "not allowed; the inexact fallback is used"
+                null -> "unknown; the inexact fallback is attempted"
+            }
+        }
         addCard("TRUSTED ACCESSORY SEPARATION ALERT (A2)", listOf(
-            "Feature: ${if (enabled) "ON" else "OFF"}",
+            "Feature: " + when {
+                enabled && !integrityVerified -> "ON — INTEGRITY BLOCKED"
+                enabled -> "ON"
+                else -> "OFF"
+            },
+            "Trusted-device registry: ${if (registryCorrupt) "UNVERIFIED" else "verified"}",
+            "Connection baseline store: ${if (baselineCorrupt) "UNVERIFIED" else "verified"}",
             "Registered trusted accessories: ${devices.size}",
             "Connection baselines confirmed: $baselineCount / ${devices.size}",
             "Monitor setting: ${if (monitorEnabled) "Enabled" else "Disabled by owner"}",
             "Monitor runtime: ${if (monitorRunning) "Running" else "Not confirmed running"}",
             "Protection state: $protectionMode",
+            "Exact alarm access: $exactAlarmAccess",
             "Monitoring runs only while A2 is ON and the protection monitor setting is enabled. The foreground service handles live ACL events; a manifest receiver covers ACL connect/disconnect events while its process is absent. Each registered accessory needs a fresh connection baseline; disconnect starts an 8-second grace period, and reconnect cancels its pending alert. Exact-alarm access improves process-death response. Without it, Android may delay the inexact fallback in Doze; if the app process is absent, background alarm playback may be blocked until you reopen the app. Keep notifications enabled for recovery notices.",
             "Unregistering removes only this app's trust. Android pairing remains unchanged."
         ))
-        root.addView(button("Add trusted paired device") { requestTrustedDevicePicker() }, matchWrap())
+        if (!integrityVerified) {
+            addCard("A2 INTEGRITY WARNING", listOf(
+                "The encrypted trusted-device registry or connection-baseline store could not be verified. The original stored value is retained; no device data was deleted or overwritten.",
+                "A2 fails closed while either store is unreadable. Registration and enabling are blocked to avoid replacing the source.",
+                "This build does not perform an automatic or destructive reset. Preserve app data; recovery requires a verified backup or an explicit owner-approved reset."
+            ))
+        }
+        root.addView(button("Add trusted paired device") { requestTrustedDevicePicker() }.apply {
+            isEnabled = integrityVerified
+        }, matchWrap())
         devices.forEach { device ->
             root.addView(space(6))
-            root.addView(button("Unregister: ${device.name}") { confirmUnregister(device) }, matchWrap())
+            root.addView(button("Unregister: ${device.name}") { confirmUnregister(device) }.apply {
+                isEnabled = integrityVerified
+            }, matchWrap())
         }
         root.addView(space(7))
-        root.addView(button(if (enabled) "Disable trusted-device separation alert" else "Enable trusted-device separation alert") { toggleA2() }, matchWrap())
+        val toggleLabel = when {
+            enabled && !integrityVerified -> "Disable A2 (integrity blocked)"
+            enabled -> "Disable trusted-device separation alert"
+            !integrityVerified -> "A2 unavailable (integrity blocked)"
+            else -> "Enable trusted-device separation alert"
+        }
+        root.addView(button(toggleLabel) { toggleA2() }.apply {
+            isEnabled = enabled || integrityVerified
+        }, matchWrap())
         root.addView(space(14))
     }
+
+    private fun isA2RegistryReadable(prefs: android.content.SharedPreferences): Boolean =
+        TrustedBluetoothRegistry.readStrict(prefs) is PreferenceRead.Value &&
+            TrustedBluetoothRegistry.readBaselineAddresses(prefs) is PreferenceRead.Value
 
     private fun confirmUnregister(device: TrustedBluetoothDevice) {
         MaterialAlertDialogBuilder(this)
@@ -235,7 +289,15 @@ class BluetoothCenterActivity : FragmentActivity() {
 
     private fun toggleA2() {
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        if (SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)) {
+        val currentlyEnabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+        if (!currentlyEnabled && !isA2RegistryReadable(prefs)) {
+            showResult(
+                "A2 cannot be enabled",
+                "The encrypted trusted-device registry or connection-baseline store could not be verified. Existing source data was retained. Preserve app data; recovery requires a verified backup or an explicit owner-approved reset."
+            )
+            return
+        }
+        if (currentlyEnabled) {
             var deadlinesCleared = false
             var baselinesCleared = false
             var receiverSynced = false
@@ -285,6 +347,13 @@ class BluetoothCenterActivity : FragmentActivity() {
     private fun enableA2() {
         enableAfterPermission = false
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+        if (!isA2RegistryReadable(prefs)) {
+            showResult(
+                "A2 cannot be enabled",
+                "The encrypted trusted-device registry or connection-baseline store could not be verified. Existing source data was retained. Preserve app data; recovery requires a verified backup or an explicit owner-approved reset."
+            )
+            return
+        }
         if (TrustedBluetoothRegistry.read(prefs).isEmpty()) {
             showTrustedDevicePicker()
             return

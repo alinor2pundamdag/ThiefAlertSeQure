@@ -157,26 +157,53 @@ object AlarmScheduler {
         clockType: Int,
         triggerAt: Long
     ) {
+        val hadExactOperation = hasPendingIntent(context, token, fallback = false)
+        val hadFallbackOperation = hasPendingIntent(context, token, fallback = true)
         val exactOperation = pendingIntent(context, token, fallback = false)
         val fallbackOperation = pendingIntent(context, token, fallback = true)
-        val exactAllowed = Build.VERSION.SDK_INT < 31 || runCatching {
-            alarmManager.canScheduleExactAlarms()
-        }.getOrDefault(false)
+        val exactPermissionState: Boolean? = if (Build.VERSION.SDK_INT < 31) {
+            true
+        } else {
+            runCatching { alarmManager.canScheduleExactAlarms() }.getOrNull()
+        }
+        val exactAllowed = AlarmCallbackPolicy.shouldScheduleExactAlarm(
+            Build.VERSION.SDK_INT, exactPermissionState == true
+        )
 
         var exactScheduled = false
+        var exactRetained = false
         if (exactAllowed) {
             try {
                 alarmManager.setExactAndAllowWhileIdle(clockType, triggerAt, exactOperation)
                 exactScheduled = true
             } catch (error: Exception) {
-                runCatching { cancelPendingIntent(alarmManager, exactOperation) }
+                val permissionAfterFailure: Boolean? = if (Build.VERSION.SDK_INT < 31) {
+                    true
+                } else {
+                    runCatching { alarmManager.canScheduleExactAlarms() }.getOrNull()
+                }
+                if (AlarmCallbackPolicy.shouldCancelRejectedExactCallback(
+                        permissionAfterFailure, hadExactOperation
+                    )
+                ) {
+                    runCatching { cancelPendingIntent(alarmManager, exactOperation) }
+                } else {
+                    exactRetained = true
+                }
                 LocalTamperHistory.record(
                     context, "deadline_exact_schedule_failed",
                     error.javaClass.simpleName + ": " + error.message + "; trying the inexact fallback"
                 )
             }
         } else {
-            runCatching { cancelPendingIntent(alarmManager, exactOperation) }
+            if (AlarmCallbackPolicy.shouldCancelRejectedExactCallback(
+                    exactPermissionState, hadExactOperation
+                )
+            ) {
+                runCatching { cancelPendingIntent(alarmManager, exactOperation) }
+            } else {
+                exactRetained = true
+            }
             LocalTamperHistory.record(
                 context, "deadline_exact_access_missing",
                 "The inexact idle-aware countdown/recovery fallback is scheduled; Android may delay delivery"
@@ -184,22 +211,31 @@ object AlarmScheduler {
         }
 
         var fallbackScheduled = false
+        var fallbackRetained = false
         try {
             alarmManager.setAndAllowWhileIdle(clockType, triggerAt, fallbackOperation)
             fallbackScheduled = true
         } catch (error: Exception) {
+            if (hadFallbackOperation) {
+                fallbackRetained = true
+            } else {
+                runCatching { cancelPendingIntent(alarmManager, fallbackOperation) }
+            }
             LocalTamperHistory.record(
                 context, "deadline_inexact_fallback_schedule_failed",
                 error.javaClass.simpleName + ": " + error.message
             )
         }
 
-        // Do not discard a working exact callback merely because the independent
-        // inexact fallback was rejected (or vice versa).
-        if (!AlarmCallbackPolicy.hasUsableDeadlineCallback(exactScheduled, fallbackScheduled)) {
+        // A failed replacement must not discard a callback that was already accepted.
+        if (!AlarmCallbackPolicy.hasUsableDeadlineCallback(
+                exactScheduled || exactRetained, fallbackScheduled || fallbackRetained
+            )
+        ) {
             throw IllegalStateException("Android rejected both exact and inexact alarm callbacks")
         }
     }
+
     private fun cancelCallbacks(context: Context, token: String) {
         val manager = context.getSystemService(AlarmManager::class.java)
         cancelPendingIntent(manager, pendingIntent(context, token, fallback = false))

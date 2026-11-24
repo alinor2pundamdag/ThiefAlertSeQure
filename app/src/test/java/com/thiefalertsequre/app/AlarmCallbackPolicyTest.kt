@@ -11,4 +11,12 @@ class AlarmCallbackPolicyTest {
         assertTrue(AlarmCallbackPolicy.hasUsableDeadlineCallback(exactScheduled = true, fallbackScheduled = true))
         assertFalse(AlarmCallbackPolicy.hasUsableDeadlineCallback(exactScheduled = false, fallbackScheduled = false))
     }
+
+    @Test fun rejectedExactReschedulePreservesAnExistingCallbackUnlessPermissionWasRevoked() {
+        assertFalse(AlarmCallbackPolicy.shouldCancelRejectedExactCallback(true, existedBeforeAttempt = true))
+        assertFalse(AlarmCallbackPolicy.shouldCancelRejectedExactCallback(null, existedBeforeAttempt = true))
+        assertTrue(AlarmCallbackPolicy.shouldCancelRejectedExactCallback(false, existedBeforeAttempt = true))
+        assertTrue(AlarmCallbackPolicy.shouldCancelRejectedExactCallback(true, existedBeforeAttempt = false))
+        assertTrue(AlarmCallbackPolicy.shouldCancelRejectedExactCallback(null, existedBeforeAttempt = false))
+    }
 }

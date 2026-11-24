@@ -144,6 +144,43 @@ class A2DisconnectSchedulerInstrumentationTest {
         }
     }
 
+    @Test fun rescheduleAllRemovesOnlyDeadlinesFromAnotherBoot() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, 0)
+        val key = "trusted_bluetooth_pending_disconnects_v1"
+        val boot = ProtectionClock.bootCount(context)
+        assumeTrue("The emulator must expose BOOT_COUNT for reboot reconciliation tests", boot >= 0)
+        A2DisconnectScheduler.clearAll(context)
+        val firstAddress = "02:00:00:00:00:61"
+        val secondAddress = "02:00:00:00:00:62"
+        try {
+            val nowEpoch = System.currentTimeMillis()
+            val nowElapsed = SystemClock.elapsedRealtime()
+            val stale = A2DisconnectScheduler.Pending(
+                firstAddress, nowEpoch - 200L, nowElapsed - 200L, boot + 1, 71L, 5L
+            )
+            val current = A2DisconnectScheduler.Pending(
+                secondAddress, nowEpoch - 100L, nowElapsed - 100L, boot, 71L, 6L
+            )
+            val raw = listOf(stale, current).joinToString("\n") {
+                "${it.address}|${it.eventEpochMs}|${it.eventElapsedRealtimeMs}|${it.bootCount}|${it.monitorRevision}|${it.deviceRevision}"
+            }
+            assertTrue(prefs.edit().putString(key, LocalPreferenceCipher.encrypt(key, raw)).commit())
+
+            assertTrue(
+                "Rescheduling should discard the stale-boot record and reinstall only current-boot deadlines",
+                A2DisconnectScheduler.rescheduleAll(context, boot, nowElapsed)
+            )
+            val remaining = LocalPreferenceCipher.decrypt(key, prefs.getString(key, null)!!)
+            assertTrue(remaining.contains(secondAddress))
+            assertFalse(remaining.contains(firstAddress))
+            assertFalse(A2DisconnectScheduler.hasPendingIntent(context, firstAddress, fallback = true))
+            assertTrue(A2DisconnectScheduler.hasPendingIntent(context, secondAddress, fallback = true))
+        } finally {
+            A2DisconnectScheduler.clearAll(context)
+        }
+    }
+
     @Test fun staleReconnectCannotCancelANewerDeadlineForTheSameDevice() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, 0)

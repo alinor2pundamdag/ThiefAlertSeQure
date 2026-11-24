@@ -32,16 +32,20 @@ internal object A2DisconnectScheduler {
     }
 
     fun schedule(context: Context, pending: Pending): Boolean = A2DisconnectStateLock.withLock {
-        if (pending.bootCount < 0) {
+        val nowElapsed = android.os.SystemClock.elapsedRealtime()
+        val currentBootCount = ProtectionClock.bootCount(context)
+        if (!A2DisconnectPolicy.isSameBoot(
+                pending.bootCount, currentBootCount, pending.eventElapsedRealtimeMs, nowElapsed
+            )
+        ) {
             LocalTamperHistory.record(
                 context, "a2_deadline_boot_identity_unavailable",
-                "A durable A2 deadline was not scheduled because Android did not expose a verifiable boot count; the in-process timer remains available while the service is alive"
+                "A durable A2 deadline was not scheduled because its event could not be verified against the current boot; the in-process timer remains available while the service is alive"
             )
             return@withLock false
         }
         if (!TrustedBluetoothRegistry.isValidAddress(pending.address) ||
             pending.eventEpochMs <= 0L || pending.eventElapsedRealtimeMs <= 0L ||
-            pending.eventElapsedRealtimeMs > android.os.SystemClock.elapsedRealtime() ||
             pending.monitorRevision < 0L || pending.deviceRevision < 0L
         ) {
             LocalTamperHistory.record(context, "a2_deadline_metadata_rejected", "Invalid trusted-device deadline metadata was rejected")
@@ -69,31 +73,84 @@ internal object A2DisconnectScheduler {
         scheduled
     }
 
-    /** Reinstall persisted callbacks after exact-alarm access is granted or the APK is replaced. */
-    fun rescheduleAll(context: Context): Boolean = A2DisconnectStateLock.withLock {
+    /** Reinstall only deadlines whose monotonic event belongs to the current boot. */
+    fun rescheduleAll(context: Context): Boolean =
+        rescheduleAll(context, ProtectionClock.bootCount(context), android.os.SystemClock.elapsedRealtime())
+
+    /**
+     * Explicit clock inputs keep reboot reconciliation deterministic in instrumentation tests.
+     * A stale-boot record is cancelled and removed rather than reinstalled against a reset clock.
+     */
+    internal fun rescheduleAll(
+        context: Context,
+        currentBootCount: Int,
+        currentElapsedRealtimeMs: Long
+    ): Boolean = A2DisconnectStateLock.withLock {
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
         val records = read(prefs) ?: run {
             LocalTamperHistory.record(context, "a2_deadline_reschedule_store_unreadable", "Persisted A2 deadlines could not be read for rescheduling; source retained")
             return@withLock false
         }
+        if (records.isEmpty()) return@withLock true
+        val retained = mutableListOf<Pending>()
         var allScheduled = true
+        var removedStale = false
+
         records.forEach { pending ->
-            if (pending.bootCount < 0) {
-                allScheduled = false
-                LocalTamperHistory.record(
-                    context, "a2_deadline_boot_identity_unavailable",
-                    "A persisted A2 deadline was not rescheduled because its boot identity cannot be verified"
-                )
-            } else if (!scheduleCallbacks(context, pending)) {
-                allScheduled = false
+            when {
+                pending.bootCount < 0 -> {
+                    cancelCallbacks(context, pending.address)
+                    removedStale = true
+                    LocalTamperHistory.record(
+                        context, "a2_deadline_invalid_boot_removed",
+                        "An A2 deadline without a verifiable boot identity was removed without triggering an alarm"
+                    )
+                }
+                currentBootCount < 0 -> {
+                    retained += pending
+                    allScheduled = false
+                    LocalTamperHistory.record(
+                        context, "a2_deadline_boot_identity_unavailable",
+                        "A persisted A2 deadline was retained but not rescheduled because the current boot identity is unavailable"
+                    )
+                }
+                !A2DisconnectPolicy.isSameBoot(
+                    pending.bootCount, currentBootCount,
+                    pending.eventElapsedRealtimeMs, currentElapsedRealtimeMs
+                ) -> {
+                    cancelCallbacks(context, pending.address)
+                    removedStale = true
+                    LocalTamperHistory.record(
+                        context, "a2_deadline_stale_boot_removed",
+                        "A persisted A2 deadline from another boot or a future monotonic timestamp was discarded"
+                    )
+                }
+                else -> {
+                    retained += pending
+                    if (!scheduleCallbacks(context, pending)) allScheduled = false
+                }
             }
+        }
+
+        if (removedStale && !write(prefs, retained)) {
+            allScheduled = false
+            LocalTamperHistory.record(
+                context, "a2_deadline_stale_boot_cleanup_failed",
+                "Stale A2 callbacks were cancelled, but the encrypted schedule could not be rewritten"
+            )
         }
         allScheduled
     }
 
     /** Re-schedule a still-current expired deadline after a transient state-store commit failure. */
     fun scheduleRetry(context: Context, pending: Pending, delayMs: Long): Boolean = A2DisconnectStateLock.withLock {
-        if (pending.bootCount < 0 || delayMs < 0L) return@withLock false
+        if (delayMs < 0L) return@withLock false
+        val nowElapsed = android.os.SystemClock.elapsedRealtime()
+        val currentBootCount = ProtectionClock.bootCount(context)
+        if (!A2DisconnectPolicy.isSameBoot(
+                pending.bootCount, currentBootCount, pending.eventElapsedRealtimeMs, nowElapsed
+            )
+        ) return@withLock false
         val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
         val records = read(prefs) ?: run {
             LocalTamperHistory.record(context, "a2_deadline_retry_store_unreadable", "A2 retry could not read the encrypted deadline; source retained")
@@ -105,7 +162,6 @@ internal object A2DisconnectScheduler {
                 it.monitorRevision == pending.monitorRevision &&
                 it.deviceRevision == pending.deviceRevision
         } ?: return@withLock false
-        val nowElapsed = android.os.SystemClock.elapsedRealtime()
         val retryAt = A2DisconnectPolicy.retryDeadlineElapsedRealtimeMs(
             current.deadlineElapsedRealtimeMs, nowElapsed, delayMs.coerceAtLeast(250L)
         )
@@ -227,6 +283,8 @@ internal object A2DisconnectScheduler {
         minimumTriggerAtElapsedRealtimeMs: Long? = null
     ): Boolean = runCatching {
         val manager = context.getSystemService(AlarmManager::class.java)
+        val hadExactOperation = hasPendingIntent(context, pending.address, fallback = false)
+        val hadFallbackOperation = hasPendingIntent(context, pending.address, fallback = true)
         val exactOperation = pendingIntent(context, pending.address, fallback = false)
         val fallbackOperation = pendingIntent(context, pending.address, fallback = true)
         val deadline = maxOf(
@@ -234,11 +292,17 @@ internal object A2DisconnectScheduler {
             android.os.SystemClock.elapsedRealtime(),
             minimumTriggerAtElapsedRealtimeMs ?: 0L
         )
+        val exactPermissionState: Boolean? = if (Build.VERSION.SDK_INT < 31) {
+            true
+        } else {
+            runCatching { manager.canScheduleExactAlarms() }.getOrNull()
+        }
         val exactAllowed = A2DisconnectPolicy.shouldScheduleExactAlarm(
-            Build.VERSION.SDK_INT,
-            Build.VERSION.SDK_INT < 31 || manager.canScheduleExactAlarms()
+            Build.VERSION.SDK_INT, exactPermissionState == true
         )
+
         var exactScheduled = false
+        var exactRetained = false
         if (exactAllowed) {
             try {
                 manager.setExactAndAllowWhileIdle(
@@ -246,36 +310,63 @@ internal object A2DisconnectScheduler {
                 )
                 exactScheduled = true
             } catch (error: Exception) {
-                runCatching { cancelPendingIntent(manager, exactOperation) }
+                val permissionAfterFailure: Boolean? = if (Build.VERSION.SDK_INT < 31) {
+                    true
+                } else {
+                    runCatching { manager.canScheduleExactAlarms() }.getOrNull()
+                }
+                if (AlarmCallbackPolicy.shouldCancelRejectedExactCallback(
+                        permissionAfterFailure, hadExactOperation
+                    )
+                ) {
+                    runCatching { cancelPendingIntent(manager, exactOperation) }
+                } else {
+                    exactRetained = true
+                }
                 LocalTamperHistory.record(
                     context, "a2_exact_alarm_schedule_failed",
                     error.javaClass.simpleName + ": " + error.message + "; trying the inexact fallback"
                 )
             }
         } else {
-            runCatching { cancelPendingIntent(manager, exactOperation) }
+            if (AlarmCallbackPolicy.shouldCancelRejectedExactCallback(
+                    exactPermissionState, hadExactOperation
+                )
+            ) {
+                runCatching { cancelPendingIntent(manager, exactOperation) }
+            } else {
+                exactRetained = true
+            }
             LocalTamperHistory.record(
                 context, "a2_exact_alarm_access_missing",
                 "Using the inexact idle-aware A2 deadline fallback; Android may delay delivery"
             )
         }
 
-        // Keep the inexact callback independent of exact-alarm access. A failure
-        // in one channel must not cancel a callback accepted by the other channel.
         var fallbackScheduled = false
+        var fallbackRetained = false
         try {
             manager.setAndAllowWhileIdle(
                 AlarmManager.ELAPSED_REALTIME_WAKEUP, deadline, fallbackOperation
             )
             fallbackScheduled = true
         } catch (error: Exception) {
+            if (hadFallbackOperation) {
+                fallbackRetained = true
+            } else {
+                runCatching { cancelPendingIntent(manager, fallbackOperation) }
+            }
             LocalTamperHistory.record(
                 context, "a2_inexact_fallback_schedule_failed",
                 error.javaClass.simpleName + ": " + error.message
             )
         }
 
-        if (!AlarmCallbackPolicy.hasUsableDeadlineCallback(exactScheduled, fallbackScheduled)) {
+        // Keep a previously accepted callback when a replacement attempt fails.
+        if (!AlarmCallbackPolicy.hasUsableDeadlineCallback(
+                exactScheduled || exactRetained, fallbackScheduled || fallbackRetained
+            )
+        ) {
             throw IllegalStateException("Android rejected both exact and inexact A2 deadline callbacks")
         }
         true
@@ -286,6 +377,7 @@ internal object A2DisconnectScheduler {
         )
         false
     }
+
     private fun cancelCallbacks(context: Context, address: String) {
         val manager = context.getSystemService(AlarmManager::class.java)
         cancelPendingIntent(manager, pendingIntent(context, address, fallback = false))
