@@ -265,3 +265,13 @@ The active roadmap is **17 phases numbered Phase 0 through Phase 16**, organized
 - Exact-head Android CI and CodeQL are pending for the latest changes. Do not report Phase 2 as complete until those checks pass.
 - Owner-only gates remain: verify historical alert #8 in GitHub Security; verify production signing secrets and signed-artifact preflight; verify branch/tag protection; decide distribution channel and license; perform physical acceptance.
 - No merge, tag creation, signing preflight, APK publication, or release was performed. No Phase 3 transition is authorized.
+
+## Phase 2 exact-head verification update — 2026-11-24
+
+- Verified source head before this documentation update: `1685b3d7b8e241ba3ee114bd33665b0c187c89fa`.
+- Android CI #45361755954: completed successfully on that exact source head. All 33 steps passed, including JVM unit tests, lint, static contract checks, APK metadata/signer checks and artifact upload.
+- CodeQL #45361756074: completed successfully on that exact source head. Both Actions and Java/Kotlin analyses succeeded; SARIF upload completed.
+- CI artifact is a development/debug APK only: package `com.thiefalertsequre.app.v114test`, versionName `1.1.4-test`, versionCode `6`; 6,784,969 bytes; artifact ZIP SHA-256 `7e10e94cd78cdad286602d13607bc4c671165ee6a799a04798e150d75bae6da7`; expires 2026-12-08. The workflow also validates minified production-release APK metadata but did not use the permanent production signing key.
+- Historical CodeQL alert #8 remains unverified. The connected GitHub interface blocks the Code Scanning Alerts endpoint and Security page; user permission does not change the connector's endpoint allowlist. The old PR review thread is resolved/outdated, but that does not prove the alert record is closed.
+- No emulator, instrumentation, or physical-device test was run, per the code/GitHub-only Phase 2 scope. Owner device acceptance remains separate.
+- PR #10 remains draft/open/unmerged. No production signing preflight, merge, tag, release, or publication was performed.
