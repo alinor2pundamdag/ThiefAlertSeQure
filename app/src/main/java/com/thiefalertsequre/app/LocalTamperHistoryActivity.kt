@@ -35,6 +35,7 @@ class LocalTamperHistoryActivity : FragmentActivity() {
     private var activeCategory = "all"
     private var authenticatedUntilElapsedMs = 0L
     private var biometricPrompt: BiometricPrompt? = null
+    private var biometricChallenge: ByteArray? = null
     private var authenticationRequested = false
     private var waitingForSecureLockSetup = false
     private val filterButtons = linkedMapOf<String, MaterialButton>()
@@ -56,6 +57,13 @@ class LocalTamperHistoryActivity : FragmentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         renderLocked()
         requestAuthentication()
+    }
+
+    override fun onDestroy() {
+        biometricPrompt?.cancelAuthentication()
+        biometricPrompt = null
+        clearBiometricChallenge()
+        super.onDestroy()
     }
 
     override fun onResume() {
@@ -97,14 +105,17 @@ class LocalTamperHistoryActivity : FragmentActivity() {
             return
         }
         val challenge = LocalHistoryBiometricCrypto.newChallenge()
+        biometricChallenge = challenge
         val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this),
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     biometricPrompt = null
+                    val challenge = biometricChallenge
                     val proofValid = runCatching {
-                        LocalHistoryBiometricCrypto.verify(result.cryptoObject?.cipher, challenge)
+                        LocalHistoryBiometricCrypto.verify(result.cryptoObject?.cipher, challenge ?: byteArrayOf())
                     }.getOrDefault(false)
-                    challenge.fill(0)
+                    clearBiometricChallenge()
+                    if (isFinishing || isDestroyed) return
                     if (proofValid) {
                         grantAccess()
                     } else {
@@ -114,7 +125,8 @@ class LocalTamperHistoryActivity : FragmentActivity() {
                 }
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     biometricPrompt = null
-                    challenge.fill(0)
+                    clearBiometricChallenge()
+                    if (isFinishing || isDestroyed) return
                     if (errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON) launchDeviceCredential()
                     else {
                         authenticationRequested = false
@@ -137,7 +149,7 @@ class LocalTamperHistoryActivity : FragmentActivity() {
         runCatching {
             prompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cryptoCipher))
         }.onFailure {
-            challenge.fill(0)
+            clearBiometricChallenge()
             biometricPrompt = null
             authenticationRequested = false
             renderLocked("Secure biometric verification could not start. History remains locked; use device credential verification.")
@@ -423,6 +435,11 @@ class LocalTamperHistoryActivity : FragmentActivity() {
             }
         }.onSuccess { summaryOrToast("Event history and encrypted evidence metadata exported.") }
             .onFailure { summaryOrToast("Export failed: ${it.message}") }
+    }
+
+    private fun clearBiometricChallenge() {
+        biometricChallenge?.fill(0)
+        biometricChallenge = null
     }
 
     private fun requireAuthenticatedSession(): Boolean {
