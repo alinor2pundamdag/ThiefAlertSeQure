@@ -9,6 +9,7 @@ on:
       - "fix/**"
       - "security/**"
       - "work/**"
+      - "release/**"
   pull_request:
     branches:
       - main
