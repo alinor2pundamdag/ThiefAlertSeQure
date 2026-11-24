@@ -10,11 +10,12 @@ This runbook covers GitHub APK distribution only. Google Play is not included in
 
 ## 1. Clean integration and review
 
-- The original PR #7/#8 stack had 1,504 commits ahead of `main` and 196 changed paths. It has been consolidated into the single-snapshot PR #9 branch `release/v1.1.5-candidate`, based directly on `main`. PR #9 currently contains the restored PR #5 Bluetooth regression test and policy/design documents. The latest documentation-adjusted head is `d6c81640e8e8ee2338e1fa3e72f84972b0ebcd30`; exact-head Android CI #45310452864 and CodeQL #45310452757 were running at the last check.
+- The original PR #7/#8 stack was consolidated into the single-snapshot PR #9 branch `release/v1.1.5-candidate`, based directly on `main`. PR #9 includes the approved Batch Three/Four implementation, restored Bluetooth regression coverage and policy/design documents. The candidate head recorded on 24 November 2026 is `9ae3d15d9de909ab1a75e88f120ca7c9ff72b3c4` (197 changed files); `main` remains unchanged.
 - PR #4 and #5 overlap the active implementation and must not be merged independently. PR #6 lowers minSdk to 23 and adds instrumentation; it conflicts with the approved minSdk 26 and no-instrumentation policy.
-- Exact-head Android CI and CodeQL must pass on the clean release branch. Previous stack CI results do not substitute for clean-branch results.
-- Review the CodeQL APK-installer finding. The current path validates GitHub HTTPS hosts, bounds the download, verifies SHA-256, package/version, pinned signer and app-private cache location, revalidates immediately before installer handoff, requires protection DISARMED and requires an explicit owner tap. The PR #7 review thread remains unresolved; do not claim it closed until the alert is formally reassessed.
-- `main` must remain unchanged until the clean release PR has passed review and required checks.
+- Exact-head Android CI and CodeQL must pass on the clean release branch. The exact-head push and pull-request runs are now both green; see the evidence section below.
+- **APK-installer security reassessment:** The old CodeQL review thread on PR #7 was formally reassessed against the successor PR #9 source and resolved on 24 November 2026. The assessment verified owner-initiated installation, exact GitHub HTTPS host/port validation for every redirect, bounded download, SHA-256, production package/version and pinned-signer verification, app-private cache confinement, repeated pre-handoff verification, DISARMED-state enforcement, non-exported FileProvider, and Android's user-confirmed package-installer handoff. PR #9's exact-head CodeQL check reports “No new alerts in code changed by this pull request.” **The repository-wide CodeQL alert record #8 itself was not independently readable/dismissible through the available GitHub interface in this session; do not claim that alert record is closed.** The old PR #7 review thread resolution is not equivalent to dismissing the Security alert.
+- No formal approval review has been recorded on PR #9. The implementation/security reassessment above is not represented as an independent third-party approval.
+- `main` remains unchanged until the clean release PR has passed review and required checks.
 
 ## 2. Production signing secrets
 
@@ -27,7 +28,7 @@ In GitHub repository Settings → Secrets and variables → Actions, configure t
 
 Never paste secret values into chat, source files, workflow logs, commits or pull-request comments. Do not replace the permanent keystore with the CI debug keystore.
 
-The release workflow decodes the keystore in the runner's temporary directory and verifies that its certificate matches the pinned SHA-256 above before building. Missing or mismatched secrets cause the workflow to fail closed. Their current presence has not been independently verified.
+The release workflow decodes the keystore in the runner's temporary directory and verifies that its certificate matches the pinned SHA-256 above before building. Missing or mismatched secrets cause the workflow to fail closed. Their current presence has not been independently verified; only a successful signed preflight can verify that the configured secrets are usable and match the pinned certificate.
 
 ## 3. Signed preflight on main
 
@@ -77,13 +78,14 @@ The current targetSdk 36 meets the published Google Play target-API requirement 
 
 No implementation GO was found for active shutdown/power-menu/reboot prevention, guaranteed protection while powered off, unconditional, non-opt-in or background front-camera capture, new camera/flashlight conflict prevention, or maximum/premium expansion. The existing camera evidence feature remains opt-in and permission-gated; when enabled, its documented single-photo trigger is successful owner authentication while the app is visible. No covert/background capture is included. Do not add these features to this release without a separate owner GO.
 
-## Current blockers
+## Current blockers and verified state (24 November 2026)
 
-- Latest exact-head CodeQL passed; latest exact-head Android CI is running its final minified APK verification and artifact upload.
-- CodeQL APK-installation review thread remains unresolved.
-- Independent review of the release candidate has not yet been recorded.
-- Production signing-secret availability and signed preflight are not verified.
-- Owner physical acceptance is pending and intentionally excluded from coding/merge gates.
-- No release tag or production publication has occurred.
+- **Android CI — passed on exact candidate head:** push run [#45311423677](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45311423677) and PR run [#45311432586](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45311432586). Unit tests, lint, integration/security contracts, debug APK assembly, release APK metadata/minification and signer-metadata checks passed. The uploaded artifact is a **debug APK**, not the production-signed release APK.
+- **CodeQL — passed on exact candidate head:** push run [#45311423737](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45311423737) and PR run [#45311432532](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45311432532). Java/Kotlin and GitHub Actions analysis passed. The PR check reports no new alerts in changed code.
+- **Old PR #7 APK-installer review thread:** reassessed and resolved. **Repository Security alert #8 dismissal/closure remains unverified**; do not conflate thread resolution with alert dismissal.
+- **PR #9 formal review:** no review approval has been recorded. The candidate has been source-reviewed and CI-verified, but independent approval is still outstanding.
+- **Production signing secrets and signed preflight:** not verified. PR CI deliberately does not receive production signing secrets. A manual signed preflight on `main` is still required after merge.
+- **Owner physical acceptance:** owner-operated after delivery of the signed APK; intentionally excluded from coding, CI and merge gates.
+- **Merge, release tag and production publication:** not performed. No production-signed APK has been generated or published.
 
-**Release status:** Not published. Do not create the release tag until CI, security reassessment and signed preflight are cleared. Physical acceptance is owner-operated after delivery.
+**Release status:** Candidate implementation and exact-head automated checks are complete; official signed preflight and release publication are not. Do not create the release tag until the security alert record is reconciled, the candidate is merged, and signed preflight passes. Physical acceptance remains owner-operated after delivery.
