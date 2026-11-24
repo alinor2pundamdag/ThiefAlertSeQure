@@ -90,14 +90,31 @@ class LocalTamperHistoryActivity : FragmentActivity() {
             launchDeviceCredential()
             return
         }
+        val cryptoCipher = runCatching { LocalHistoryBiometricCrypto.createCipher() }.getOrElse {
+            authenticationRequested = false
+            renderLocked("Secure biometric verification is unavailable. History remains locked; use device credential verification.")
+            launchDeviceCredential()
+            return
+        }
+        val challenge = LocalHistoryBiometricCrypto.newChallenge()
         val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this),
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     biometricPrompt = null
-                    grantAccess()
+                    val proofValid = runCatching {
+                        LocalHistoryBiometricCrypto.verify(result.cryptoObject?.cipher, challenge)
+                    }.getOrDefault(false)
+                    challenge.fill(0)
+                    if (proofValid) {
+                        grantAccess()
+                    } else {
+                        authenticationRequested = false
+                        renderLocked("Secure biometric verification could not complete its Android Keystore operation. History remains locked; use device credential verification.")
+                    }
                 }
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     biometricPrompt = null
+                    challenge.fill(0)
                     if (errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON) launchDeviceCredential()
                     else {
                         authenticationRequested = false
@@ -117,7 +134,14 @@ class LocalTamperHistoryActivity : FragmentActivity() {
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
             .setNegativeButtonText("Use device PIN, pattern or password")
             .build()
-        prompt.authenticate(promptInfo)
+        runCatching {
+            prompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cryptoCipher))
+        }.onFailure {
+            challenge.fill(0)
+            biometricPrompt = null
+            authenticationRequested = false
+            renderLocked("Secure biometric verification could not start. History remains locked; use device credential verification.")
+        }
     }
 
     @Suppress("DEPRECATION")
