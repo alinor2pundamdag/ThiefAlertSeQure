@@ -26,7 +26,7 @@ checks = {
     "legacy cleanup checks the synchronous commit result":
         "val removed = legacyPrefs.edit().remove(LEGACY_KEY_EVENTS).commit()" in source,
     "legacy cleanup verifies the plaintext key is actually absent":
-        "return removed && !legacyPrefs.contains(LEGACY_KEY_EVENTS)" in source,
+        "removed && !legacyPrefs.contains(LEGACY_KEY_EVENTS)" in source,
     "legacy preference access and deletion exceptions fail closed":
         "private fun clearLegacyPlaintext(context: Context): Boolean = runCatching" in source
         and "}.getOrDefault(false)" in source,
