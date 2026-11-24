@@ -1,11 +1,29 @@
 package com.thiefalertsequre.app
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AppUpdatePolicyTest {
+    @Test fun officialReleaseTagsMapToExactAndroidVersionNames() {
+        assertEquals("1.1.3", AppUpdatePolicy.versionNameFromReleaseTag("v1.1.3"))
+        assertEquals(
+            "1.1.4_Developer_Alinor",
+            AppUpdatePolicy.versionNameFromReleaseTag("v1.1.4_Developer_Alinor")
+        )
+    }
+
+    @Test fun malformedOrUnapprovedReleaseTagSuffixesAreRejected() {
+        listOf("", "1.1.4", "v1.1.4-rc1", "v1.1.4_other", "v1.1.4_Developer_Alinor.evil")
+            .forEach { tag ->
+                assertThrows(IllegalArgumentException::class.java) {
+                    AppUpdatePolicy.versionNameFromReleaseTag(tag)
+                }
+            }
+    }
+
     @Test fun productionPackageIdentityIsFixed() {
         AppUpdatePolicy.requireInstalledPackage("com.thiefalertsequre.app")
         AppUpdatePolicy.requireCandidatePackage("com.thiefalertsequre.app", "com.thiefalertsequre.app")
