@@ -154,6 +154,13 @@ class AboutActivity : FragmentActivity() {
             showLicenseAcknowledgements()
         })
         root.addView(space(8))
+        root.addView(outlinedButton("Read full Privacy Policy (version ${PolicyAcknowledgementPolicy.PRIVACY_VERSION})") {
+            LegalDocumentViewer.show(
+                this, "legal/privacy_policy.txt",
+                "Privacy Policy • version ${PolicyAcknowledgementPolicy.PRIVACY_VERSION}"
+            )
+        })
+        root.addView(space(8))
         root.addView(outlinedButton("Terms of Use & Platform Limitations") { showTerms() })
         root.addView(space(8))
         root.addView(outlinedButton("Permissions and Android Setup") {
@@ -377,32 +384,26 @@ class AboutActivity : FragmentActivity() {
     }
 
     private fun showTerms() {
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Terms of Use & Platform Limitations")
-            .setMessage(
-                "Use ThiefAlertSeQure only on a device you own or are authorized to manage. You are responsible for choosing optional features, reviewing Android permissions, securing exported backups, and keeping your device and app updated.\n\n" +
-                    "The app provides local monitoring, alerts and deterrence. It does not guarantee theft prevention, recovery, uninterrupted background execution, exact alarm timing, camera/flashlight output, Bluetooth range detection, or resistance to force-stop, uninstall, physical shutdown, recovery/bootloader operations, battery removal or manufacturer restrictions. Android and the device manufacturer control those system behaviors.\n\n" +
-                    "Device Owner / Lock Task features require separate authorized Android Enterprise provisioning and may restrict device functions. Enable them only on a device you administer and retain a recovery path. Bypass Charging control remains unavailable unless a compatible, authorized adapter can verify the actual hardware state.\n\n" +
-                    "Optional location and camera evidence are owner-initiated and locally stored. Review the Privacy Notice for the exact capture, retention, export and deletion rules. Protect exported files and backup passwords; anyone with access to an exported file and its password may be able to read its contents.\n\n" +
-                    "Official updates are checked only when you initiate the check. Android displays the final installation confirmation. Do not install modified or unofficial packages as official updates."
-            )
-            .setNegativeButton("Close", null)
-            .setPositiveButton("I acknowledge") { _, _ ->
-                val acceptedAt = System.currentTimeMillis()
-                val saved = getSharedPreferences(PolicyAcknowledgementPolicy.TERMS_PREFS, MODE_PRIVATE).edit()
-                    .putString("decision", "acknowledged")
-                    .putInt("version", PolicyAcknowledgementPolicy.TERMS_VERSION)
-                    .putLong("decision_at", acceptedAt)
-                    .commit()
-                if (!saved) {
-                    android.widget.Toast.makeText(
-                        this,
-                        "Terms acknowledgement could not be saved. Review and acknowledge again.",
-                        android.widget.Toast.LENGTH_LONG
-                    ).show()
-                }
+        LegalDocumentViewer.show(
+            this,
+            "legal/terms_of_use.txt",
+            "Terms of Use • version ${PolicyAcknowledgementPolicy.TERMS_VERSION}",
+            acknowledgeLabel = "I acknowledge"
+        ) {
+            val acceptedAt = System.currentTimeMillis()
+            val saved = getSharedPreferences(PolicyAcknowledgementPolicy.TERMS_PREFS, MODE_PRIVATE).edit()
+                .putString("decision", "acknowledged")
+                .putInt("version", PolicyAcknowledgementPolicy.TERMS_VERSION)
+                .putLong("decision_at", acceptedAt)
+                .commit()
+            if (!saved) {
+                android.widget.Toast.makeText(
+                    this,
+                    "Terms acknowledgement could not be saved. Review and acknowledge again.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
             }
-            .showThemed(this)
+        }
     }
 
     private fun packageInfo(): PackageInfo? = runCatching {
