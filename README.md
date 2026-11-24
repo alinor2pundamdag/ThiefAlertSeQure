@@ -17,7 +17,7 @@
     </a>
     <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" alt="Android 8.0 and newer" />
     <img src="https://img.shields.io/badge/Privacy-On--device-2D6CDF" alt="On-device privacy" />
-    <img src="https://img.shields.io/badge/Version-1.1.3-1677D2" alt="Version 1.1.3" />
+    <img src="https://img.shields.io/badge/Version-1.1.4-1677D2" alt="Version 1.1.4 development candidate" />
     <img src="https://img.shields.io/badge/Owner%20device%20tests-11%2F11%20PASS-2E8B57" alt="Owner-reported 11 of 11 physical test scenarios passed" />
     <img src="https://img.shields.io/badge/Updates-Owner--initiated%20GitHub%20releases-2D6CDF" alt="Owner initiated GitHub updates" />
     <img src="https://img.shields.io/badge/License-See%20LICENSE-lightgrey" alt="License information" />
@@ -64,7 +64,7 @@ It is a practical deterrent and awareness tool—not a guarantee against theft, 
 | Persistent triggered state | Plugging the charger back in does not silence an already-triggered alarm. |
 | Synchronized visual alarm | Slow rear-LED flashlight pulses by default only while the alarm is latched; the owner can disable it. It stops after successful owner authentication, uses no camera permission and captures no images/video. |
 | Local-first privacy | No account, cloud backend, analytics service, or advertising SDK. Internet is used only for owner-initiated GitHub release checks and APK downloads; protection data is not uploaded. |
-| Your own alarm sound | Choose supported audio through Android's system file picker; the packaged alarm is available as the built-in option. |
+| Your own alarm sound | Choose from five Android-generated built-in alarm tones plus the packaged default, or select custom audio through Android's system file picker. A custom main alarm overrides the selected built-in tone. |
 | Owner-controlled updates | Check for official GitHub releases from Settings; the app verifies the APK checksum, package identity, version and pinned release certificate before opening Android's installer. |
 | Loud alarm behavior | The app requests the maximum alarm-stream volume Android reports and restores the previous level after successful disarm. Actual output remains device-dependent. |
 | Optional motion alert | Enable a separate motion-triggered alarm when wanted. It is OFF by default. |
@@ -110,7 +110,7 @@ ThiefAlertSeQure is designed to do its essential work on your Android device.
 - No configured advertising SDK or analytics tracker.
 - No sale or advertising-based sharing of app-collected data.
 - No collection of your device PIN, password, pattern, fingerprint data, or face templates.
-- No location, contacts, SMS, microphone, or **camera permission** is requested. The optional flashlight uses Android's public torch API; it does not open the camera or capture photos/video. Flash hardware is optional, so devices without a usable LED can still install and use the audio alarm.
+- Contacts, SMS, and microphone permissions are not requested. CAMERA permission is requested only if the owner explicitly enables front-camera photo evidence in Settings. One still photo is captured only after successful Android owner authentication disarms a latched alarm while the app is visible; Android shows its camera privacy indicator. Photos are AES-GCM encrypted locally, retained for up to 30 days (maximum 20, 2 MiB each), and can be viewed, exported, or deleted. No background camera service, video, or cloud upload is used. Optional coarse/fine location permission is requested only after the owner explicitly chooses to save one cached or one current GPS/network location result into the encrypted local evidence vault. Current requests time out after 20 seconds. No background location or continuous tracking is used. The owner can export or restore the metadata vault through a separate password-encrypted backup file. The optional flashlight uses Android's public torch API independently and does not capture photos/video.
 
 ### What stays on your device
 
@@ -120,11 +120,11 @@ The app keeps the operational data it needs in its private app storage, includin
 - Biometric failure counter and temporary cooldown deadline.
 - Your recorded privacy-notice choice.
 - Alarm-volume value needed for restoration after successful disarm.
-- A bounded local protection-event history.
+- A bounded local protection-event history and a separate AES-GCM encrypted evidence metadata vault (up to 100 records, 30-day retention). The vault includes only events and location snapshots the owner explicitly requests; the owner can export/restore the vault through a separate password-encrypted backup file.
 - Monitor preferences, such as motion sensitivity and optional battery-alert threshold.
 - References and Android access grants for audio files you explicitly select.
 
-The event history can be exported only when you choose a destination through Android's document picker. Exported files are then handled by you and the destination you select.
+The event history and encrypted evidence metadata can be exported only when you choose a destination through Android's document picker. A location snapshot is stored only after an explicit action and permission grant; it includes the cached fix age and reported accuracy. Exported files are then handled by you and the destination you select.
 
 ### Your phone's credentials remain yours
 
@@ -156,13 +156,17 @@ Read the complete [Privacy Policy](docs/PRIVACY_POLICY.md).
 - **Manufacturer-aware setup:** Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO, OPPO, realme, OnePlus, vivo / iQOO, Google Pixel, Motorola, ASUS, Sony Xperia, Nothing OS, Lenovo, TECNO / Infinix / itel, ZTE / nubia, and safe generic Android guidance.
 - **Settings fallback:** Public Android Settings action → app-specific settings → general Settings.
 - **Android 15+:** Edge-to-edge safe insets are applied to the app's scrollable screens.
-- **Android 17:** Background alarm audio remains inside the qualifying foreground-service architecture; Android 17 hardening still requires physical/emulator verification.
+- **Android 17:** Background alarm audio remains inside the qualifying foreground-service architecture; Android 17 hardening requires physical-device verification; instrumentation and emulator CI are intentionally disabled.
 
 - **Interface:** Material-based dark UI with a scrollable layout, readable text sizing, and large touch targets.
 
 See the full [Android Device Compatibility Matrix](docs/ANDROID_DEVICE_COMPATIBILITY.md) for API 26–37 behavior, OEM background controls, system-setting fallbacks, limitations, official manufacturer references, and physical-device acceptance tests.
 
 No ordinary app can use one universal setting to override every manufacturer's power manager.
+
+### Bypass Charging integration status
+
+The development branch includes a guarded integration framework and a Settings entry for Bypass Charging. Direct ON/OFF control is **not available yet** because Android exposes no universal public app API and no model/firmware-specific OEM control adapter has been certified for this project. The control remains disabled and the actual mode remains UNKNOWN until an authorized OEM interface can be read back successfully. Owners can still use any Bypass Charging option exposed by their phone's own Settings or gaming tools. See [Bypass Charging Integration](docs/BYPASS_CHARGING_INTEGRATION.md).
 
 ### Important Android system requirements
 
@@ -183,7 +187,7 @@ On supported builds, this can:
 
 - Keep the app in Lock Task / kiosk mode.
 - Hide the normal global-actions power dialog while Lock Task is active.
-- Apply selected restrictions to Settings factory reset, safe boot, USB file transfer, adding users, and debugging.
+- Apply supported restrictions to factory reset, adding users, and USB file transfer. Safe Boot and USB debugging remain available as owner recovery paths.
 - Provide an in-app action to exit managed mode and remove the policies.
 
 **This is optional and is not enabled on an ordinary phone by default.** Device Owner status requires deliberate provisioning, usually on a new or factory-reset test device. The app cannot grant itself that status.
@@ -209,7 +213,7 @@ Build a debug APK and run unit tests:
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 ```
 
-Branch and pull-request GitHub Actions run unit tests, Android lint, asset validation, APK assembly, package/version verification, and debug-signer verification. They upload a development-only side-by-side test APK using package ID `com.thiefalertsequre.app.v113test`, so it can be installed alongside v1.1.2 without replacing the production app. The test APK is not eligible for official in-app updates. After merge, a manual release preflight can build and verify a permanent-key production APK without publishing; only a `v*` tag push publishes an official release after the permanent signing secrets, version monotonicity, package identity, tests, and pinned certificate all pass.
+Branch and pull-request GitHub Actions run JVM unit tests, static/source-contract checks, Android lint, asset validation, debug and minified-release APK builds, package/version verification, and debug-signer verification. The owner-directed workflow does not compile or execute instrumentation tests and does not run emulator matrices. They upload a development-only side-by-side test APK using package ID `com.thiefalertsequre.app.v114test`, so it can be installed alongside the production app without replacing the production app. The test APK is not eligible for official in-app updates. After merge, a manual release preflight can build and verify a permanent-key production APK without publishing; only a `v*` tag push publishes an official release after the permanent signing secrets, version monotonicity, package identity, tests, and pinned certificate all pass.
 
 A successful CI build confirms that the configured automated checks and APK assembly passed. It does **not** prove correct behavior on every physical phone. Charger broadcasts, alarm timing, sound output, reboot recovery, notifications, and manufacturer battery controls still require real-device testing.
 

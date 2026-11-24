@@ -1,6 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Network access is used only for owner-initiated GitHub release checks/downloads. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Optional, one-shot owner-requested evidence location; never background-tracked. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Optional front-camera photo evidence; requested only after explicit owner opt-in in Settings. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Optional trusted Bluetooth separation alert; no scanning permission is requested. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -13,12 +22,19 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Bluetooth is an optional A2 capability; devices without either radio must still install. -->
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.front" android:required="false" />
     <uses-feature android:name="android.hardware.fingerprint" android:required="false" />
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
     <application android:allowBackup="false" android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round" android:label="ThiefAlertSeQure"
         android:usesCleartextTraffic="false" android:theme="@style/Theme.ThiefAlertSeQure">
+        <activity android:name=".SeismicGenesisIntroActivity" android:exported="false" />
+        <activity android:name=".AppearanceStudioOptionsActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true" android:excludeFromRecents="false">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -26,6 +42,45 @@
             </intent-filter>
         </activity>
         <activity android:name=".SettingsActivity" android:exported="false" />
+        <activity android:name=".BluetoothCenterActivity" android:exported="false" />
+        <activity android:name=".DeviceIntelligenceActivity" android:exported="false" />
+        <activity android:name=".ThemeActivity" android:exported="false" />
+        <activity android:name=".SetupStatusActivity" android:exported="false" />
+        <activity android:name=".AboutActivity" android:exported="false" />
+        <service android:name=".ProtectionQuickSettingsTile" android:label="ThiefAlertSeQure"
+            android:icon="@mipmap/ic_launcher"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE" android:value="true" />
+        </service>
+        <receiver android:name=".ProtectionWidgetCompact" android:exported="false" android:label="Protection">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" />
+        </receiver>
+        <receiver android:name=".ProtectionWidgetStatus" android:exported="false" android:label="Protection Status">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" />
+        </receiver>
+        <receiver android:name=".ProtectionWidgetShield" android:exported="false" android:label="Shield Status">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" />
+        </receiver>
+        <receiver android:name=".ProtectionWidgetWide" android:exported="false" android:label="Protection Overview">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" />
+        </receiver>
+        <receiver android:name=".ProtectionWidgetCountdown" android:exported="false" android:label="Charger Countdown">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" />
+        </receiver>
+        <receiver android:name=".ProtectionWidgetAlarm" android:exported="false" android:label="Alarm Status">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" />
+        </receiver>
+        <receiver android:name=".ProtectionWidgetMonitor" android:exported="false" android:label="Monitor Status">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" />
+        </receiver>
         <receiver android:name=".ThiefAlertAdminReceiver" android:label="ThiefAlertSeQure device management"
             android:permission="android.permission.BIND_DEVICE_ADMIN" android:exported="true">
             <meta-data android:name="android.app.device_admin" android:resource="@xml/device_admin" />
@@ -38,11 +93,17 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+        <receiver android:name=".A2BluetoothAclReceiver" android:enabled="false" android:exported="false">
+            <intent-filter>
+                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+                <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
+            </intent-filter>
+        </receiver>
         <receiver android:name=".AlarmDeadlineReceiver" android:enabled="true" android:exported="false" />
         <service android:name=".AlarmService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
         <service android:name=".ProtectionMonitorService" android:exported="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="User-enabled anti-theft monitoring for charger removal, motion detection, and optional battery threshold alerts" />
+                android:value="User-enabled anti-theft monitoring for charger removal, motion detection, trusted Bluetooth separation, and optional battery threshold alerts" />
         </service>
         <provider
             android:name="androidx.core.content.FileProvider"

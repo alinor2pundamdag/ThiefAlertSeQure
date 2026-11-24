@@ -24,11 +24,26 @@ import androidx.core.content.ContextCompat
 
 class AlarmService : Service() {
     private var player: MediaPlayer? = null
+    private var secondaryPlayer: MediaPlayer? = null
+    private var toneController: AlarmToneController? = null
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var vibrator: Vibrator? = null
+    private var hapticsActive = false
+    private var activeHapticPattern: AlarmHapticPattern? = null
     private var flashController: AlarmFlashController? = null
-    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { }
+    private var thermalFlashSuppressed = false
+    private var thermalFlashController: ThermalFlashController? = null
+    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { change ->
+        val label = when (change) {
+            AudioManager.AUDIOFOCUS_GAIN -> "GAIN"
+            AudioManager.AUDIOFOCUS_LOSS -> "LOSS"
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> "LOSS_TRANSIENT"
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> "LOSS_TRANSIENT_CAN_DUCK"
+            else -> "UNKNOWN($change)"
+        }
+        LocalTamperHistory.record(this, "alarm_audio_focus_changed", "Android reported audio focus $label; alarm output remains independently managed")
+    }
     private val channelId = CHANNEL_ID
     private val volumeHandler = Handler(Looper.getMainLooper())
     private val volumeEnforcement = object : Runnable {
@@ -41,6 +56,21 @@ class AlarmService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        if (Build.VERSION.SDK_INT >= 29) {
+            thermalFlashController = runCatching {
+                ThermalFlashController(this) { suppressFlash ->
+                    thermalFlashSuppressed = suppressFlash
+                    if (suppressFlash) {
+                        flashController?.stop()
+                        flashController = null
+                        LocalTamperHistory.record(this, "alarm_flash_thermal_suppressed", "Android thermal status is severe or higher; audio alarm continues")
+                    } else {
+                        LocalTamperHistory.record(this, "alarm_flash_thermal_resumed", "Android thermal status returned below severe; optional flash may resume")
+                        syncAlarmFlash()
+                    }
+                }.also { thermalFlashSuppressed = it.start() }
+            }.getOrNull()
+        }
         val nm = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) {
             nm.createNotificationChannel(
@@ -57,7 +87,12 @@ class AlarmService : Service() {
         if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED) {
             LocalTamperHistory.record(this, "alarm_service_rejected", "Protection state was not ALARM_TRIGGERED")
             stopAlarm()
-            stopForeground(STOP_FOREGROUND_REMOVE)
+            if (Build.VERSION.SDK_INT >= 24) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
             stopSelf()
             return START_NOT_STICKY
         }
@@ -65,17 +100,23 @@ class AlarmService : Service() {
             // Promote immediately before locking the device; lockNow() may
             // turn the display off and must not delay the FGS startup deadline.
             startForeground(NOTIFICATION_ID, notification())
+            BatchThreeUiBridge.refresh(this)
+            AlarmRecoveryCoordinator.onServiceStarted(this)
             val alarmStartedAt = ProtectionStore(this).read().changedAtEpochMs
             lockDeviceIfAdminEnabled(alarmStartedAt)
             LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active; device-lock request issued")
         } catch (error: Exception) {
             LocalTamperHistory.record(this, "alarm_service_start_failed", error.javaClass.simpleName + ": " + error.message)
-            AlarmRecoveryNotice.show(this, "Android refused to keep the alarm foreground service running")
+            AlarmRecoveryCoordinator.onStartFailure(
+                this, "Android refused to keep the alarm foreground service running"
+            )
             stopSelf()
             return START_NOT_STICKY
         }
-        if (player == null) startAlarmAudio()
+        if (player == null && toneController == null) startAlarmAudio()
         syncAlarmFlash()
+        syncSecondaryAlarm()
+        syncAlarmHaptics()
         volumeHandler.removeCallbacks(volumeEnforcement)
         volumeHandler.post(volumeEnforcement)
         return START_STICKY
@@ -87,7 +128,7 @@ class AlarmService : Service() {
      * Failure to access a flash unit never blocks or stops alarm audio.
      */
     private fun syncAlarmFlash() {
-        if (AlarmFlashSettings.isEnabled(this) && AlarmFlashSettings.shouldRun(ProtectionStore(this).read().mode)) {
+        if (!thermalFlashSuppressed && AlarmFlashSettings.isEnabled(this) && AlarmFlashSettings.shouldRun(ProtectionStore(this).read().mode)) {
             val controller = flashController ?: AlarmFlashController(this, volumeHandler) { event, detail ->
                 LocalTamperHistory.record(this, event, detail)
             }.also { flashController = it }
@@ -98,16 +139,134 @@ class AlarmService : Service() {
         }
     }
 
+    /** Optional looping secondary alarm; it never replaces or gates the primary alarm. */
+    private fun syncSecondaryAlarm() {
+        val shouldRun = ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED &&
+            AlarmSoundStore.isSecondaryAlarmEnabled(this)
+        if (!shouldRun) {
+            stopSecondaryAlarm()
+            return
+        }
+        if (secondaryPlayer != null) return
+        val uri = AlarmSoundStore.uri(this, AlarmSoundStore.ALERT)
+        if (uri == null) {
+            LocalTamperHistory.record(this, "secondary_alarm_unavailable", "Secondary alarm is enabled but no owner-selected alert sound is available")
+            return
+        }
+        val media = MediaPlayer()
+        secondaryPlayer = media
+        try {
+            media.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            media.setDataSource(this, uri)
+            media.setWakeMode(this, android.os.PowerManager.PARTIAL_WAKE_LOCK)
+            media.isLooping = true
+            media.setOnPreparedListener { prepared ->
+                if (secondaryPlayer === prepared &&
+                    ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED &&
+                    AlarmSoundStore.isSecondaryAlarmEnabled(this)
+                ) {
+                    runCatching {
+                        prepared.start()
+                        LocalTamperHistory.record(this, "secondary_alarm_started", "Owner-enabled secondary alarm is looping independently")
+                    }.onFailure {
+                        LocalTamperHistory.record(this, "secondary_alarm_start_failed", it.javaClass.simpleName + ": " + it.message)
+                        stopSecondaryAlarm()
+                    }
+                } else if (secondaryPlayer === prepared) {
+                    stopSecondaryAlarm()
+                } else {
+                    runCatching { prepared.release() }
+                }
+            }
+            media.setOnErrorListener { failed, what, extra ->
+                LocalTamperHistory.record(this, "secondary_alarm_playback_failed", "Secondary MediaPlayer error $what/$extra; primary alarm remains active")
+                if (secondaryPlayer === failed) secondaryPlayer = null
+                runCatching { failed.release() }
+                true
+            }
+            media.prepareAsync()
+            LocalTamperHistory.record(this, "secondary_alarm_preparing", "Preparing independent owner-selected secondary alarm")
+        } catch (error: Exception) {
+            LocalTamperHistory.record(this, "secondary_alarm_open_failed", error.javaClass.simpleName + ": " + error.message)
+            stopSecondaryAlarm()
+        }
+    }
+
+    private fun stopSecondaryAlarm() {
+        val active = secondaryPlayer
+        secondaryPlayer = null
+        runCatching { active?.stop() }
+        runCatching { active?.release() }
+    }
+
+    private fun requestToneAudioFocus() {
+        val audio = getSystemService(AudioManager::class.java)
+        audioManager = audio
+        if (!AlarmVolumeController.raiseToMaximum(this, audio)) {
+            LocalTamperHistory.record(this, "alarm_volume_raise_unconfirmed", "Built-in tone startup continued, but maximum alarm-stream volume was not confirmed")
+        }
+        val attributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        if (Build.VERSION.SDK_INT >= 26) {
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(attributes)
+                .setOnAudioFocusChangeListener(audioFocusListener)
+                .setWillPauseWhenDucked(false)
+                .build()
+            audioFocusRequest = request
+            runCatching { audio.requestAudioFocus(request) }
+        } else {
+            @Suppress("DEPRECATION")
+            runCatching { audio.requestAudioFocus(audioFocusListener, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN) }
+        }
+    }
+
+    private fun handleTonePresetFailure(error: Throwable) {
+        LocalTamperHistory.record(this, "alarm_tone_preset_failed", error.javaClass.simpleName + ": " + error.message)
+        volumeHandler.post {
+            toneController?.stop()
+            toneController = null
+            if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED && player == null) {
+                val defaultUri = Uri.parse("android.resource://$packageName/${R.raw.default_alarm}")
+                startAlarmAudio(defaultUri, true, defaultUri)
+            }
+        }
+    }
+
     private fun startAlarmAudio() {
         val defaultUri = Uri.parse("android.resource://$packageName/${R.raw.default_alarm}")
         val selectedUri = AlarmSoundStore.uri(this, AlarmSoundStore.ALARM)
+        if (selectedUri == null) {
+            val preset = AlarmSoundStore.selectedBuiltInPreset(this)
+            if (preset != AlarmTonePreset.DEFAULT_AUDIO) {
+                val controller = AlarmToneController(volumeHandler, preset) { error ->
+                    handleTonePresetFailure(error)
+                }
+                requestToneAudioFocus()
+                toneController = controller
+                if (controller.start()) {
+                    LocalTamperHistory.record(this, "alarm_tone_preset_started", "Built-in alarm tone preset active: ${preset.name}")
+                    return
+                }
+                toneController = null
+            }
+        }
         startAlarmAudio(selectedUri ?: defaultUri, selectedUri == null, defaultUri)
     }
 
     private fun startAlarmAudio(soundUri: Uri, usingDefault: Boolean, defaultUri: Uri) {
         val audio = getSystemService(AudioManager::class.java)
         audioManager = audio
-        AlarmVolumeController.raiseToMaximum(this, audio)
+        if (!AlarmVolumeController.raiseToMaximum(this, audio)) {
+            LocalTamperHistory.record(this, "alarm_volume_raise_unconfirmed", "Alarm audio startup continued, but maximum alarm-stream volume was not confirmed")
+        }
         val attributes = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_ALARM)
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
@@ -183,23 +342,49 @@ class AlarmService : Service() {
         }
     }
 
-    private fun startVibrationFallback() {
-        val deviceVibrator = getSystemService(Vibrator::class.java) ?: return
-        if (!deviceVibrator.hasVibrator()) {
-            LocalTamperHistory.record(this, "alarm_no_output_available", "Selected audio unavailable and device has no vibrator")
+    private fun syncAlarmHaptics() {
+        val shouldRun = ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED &&
+            AlarmHapticsPolicy.isEnabled(this)
+        if (!shouldRun) {
+            runCatching { vibrator?.cancel() }
+            vibrator = null
+            hapticsActive = false
+            activeHapticPattern = null
             return
         }
-        vibrator = deviceVibrator
+        val selectedPattern = AlarmHapticsPolicy.readPattern(this)
+        if (hapticsActive && activeHapticPattern == selectedPattern) return
+        runCatching { vibrator?.cancel() }
+        val deviceVibrator = getSystemService(Vibrator::class.java)
+        if (deviceVibrator == null || !deviceVibrator.hasVibrator()) {
+            LocalTamperHistory.record(this, "alarm_haptics_unavailable", "Selected vibration output is not available; audio alarm remains active")
+            vibrator = null
+            hapticsActive = false
+            activeHapticPattern = null
+            return
+        }
         runCatching {
-            if (Build.VERSION.SDK_INT >= 26) {
-                deviceVibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 700, 250, 700, 250), 0))
-            } else {
-                @Suppress("DEPRECATION")
-                deviceVibrator.vibrate(longArrayOf(0, 700, 250, 700, 250), 0)
-            }
-            LocalTamperHistory.record(this, "alarm_vibration_fallback", "Vibration active because selected audio could not play")
+            deviceVibrator.vibrate(VibrationEffect.createWaveform(AlarmHapticsPolicy.waveform(selectedPattern), 0))
+            vibrator = deviceVibrator
+            hapticsActive = true
+            activeHapticPattern = selectedPattern
+            LocalTamperHistory.record(this, "alarm_haptics_started", "Independent repeating haptic pattern active: ${selectedPattern.name}")
         }.onFailure {
-            LocalTamperHistory.record(this, "alarm_vibration_failed", it.javaClass.simpleName + ": " + it.message)
+            vibrator = null
+            hapticsActive = false
+            activeHapticPattern = null
+            LocalTamperHistory.record(this, "alarm_haptics_failed", it.javaClass.simpleName + ": " + it.message)
+        }
+    }
+
+    private fun startVibrationFallback() {
+        if (!AlarmHapticsPolicy.isEnabled(this)) {
+            LocalTamperHistory.record(this, "alarm_haptics_disabled", "Audio fallback vibration is disabled by the owner")
+            return
+        }
+        syncAlarmHaptics()
+        if (!hapticsActive) {
+            LocalTamperHistory.record(this, "alarm_no_output_available", "Selected audio failed and no usable vibration output was confirmed")
         }
     }
 
@@ -211,16 +396,23 @@ class AlarmService : Service() {
             this, 42, openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val dashboardEnabled = getSharedPreferences(
-            MainActivity.ALARM_DISPLAY_PREFS, MODE_PRIVATE
-        ).getBoolean(MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
+        val dashboardPrefs = getSharedPreferences(MainActivity.ALARM_DISPLAY_PREFS, MODE_PRIVATE)
+        val dashboardEnabled = SafePreferences.boolean(
+            dashboardPrefs, MainActivity.KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false
+        )
         val fullScreenAccessGranted = Build.VERSION.SDK_INT < 34 ||
             getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
         val builder = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setSmallIcon(R.drawable.ic_notification_shield)
+            .setLargeIcon(android.graphics.BitmapFactory.decodeResource(resources, R.drawable.app_logo))
             .setContentTitle("ThiefAlertSeQure — Alarm active")
             .setContentText("Open to authenticate with your device lock or supported biometric.")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(
+                "The theft alarm is latched. Verify with the existing Android device credential or an enrolled supported strong biometric. Notification actions cannot disarm the alarm."
+            ))
             .setContentIntent(contentIntent)
+            .setColor(ThemeStore.get(this).danger)
+            .addAction(android.R.drawable.ic_menu_view, "Open owner verification", contentIntent)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setOngoing(true)
@@ -239,36 +431,46 @@ class AlarmService : Service() {
 
     /** Force the keyguard before presenting the full-screen owner-authentication activity. */
     private fun lockDeviceIfAdminEnabled(alarmStartedAtEpochMs: Long) {
-        val manager = getSystemService(DevicePolicyManager::class.java)
-        val admin = ComponentName(this, ThiefAlertAdminReceiver::class.java)
-        val lockPrefs = getSharedPreferences("alarm_service_lock_v1", MODE_PRIVATE)
-        if (alarmStartedAtEpochMs > 0L &&
-            lockPrefs.getLong(KEY_LOCK_REQUESTED_FOR_ALARM_AT, 0L) == alarmStartedAtEpochMs
-        ) {
-            // Service starts may be repeated while the same alarm is active. Never
-            // re-lock a phone the owner has already unlocked for this alarm episode.
-            return
-        }
-        if (!getSystemService(android.app.KeyguardManager::class.java).isDeviceSecure) {
-            LocalTamperHistory.record(this, "automatic_screen_lock_unavailable", "No secure device PIN, pattern or password is configured")
-            return
-        }
-        if (!manager.isAdminActive(admin)) {
-            LocalTamperHistory.record(this, "automatic_screen_lock_unavailable", "Device administrator has not been activated")
-            return
-        }
-        runCatching {
+        // Device locking is an optional secondary response. Corrupt preferences,
+        // missing admin access, or OEM policy must never stop the audible alarm.
+        try {
+            val manager = getSystemService(DevicePolicyManager::class.java)
+            val keyguard = getSystemService(android.app.KeyguardManager::class.java)
+            val admin = ComponentName(this, ThiefAlertAdminReceiver::class.java)
+            val lockPrefs = getSharedPreferences("alarm_service_lock_v1", MODE_PRIVATE)
+            val previouslyRequested = runCatching {
+                SafePreferences.long(lockPrefs, KEY_LOCK_REQUESTED_FOR_ALARM_AT, 0L)
+            }.getOrDefault(0L)
+            if (alarmStartedAtEpochMs > 0L && previouslyRequested == alarmStartedAtEpochMs) {
+                // Service starts may repeat during one alarm episode. Do not re-lock
+                // a phone the owner has already unlocked for this same alarm.
+                return
+            }
+            if (!keyguard.isDeviceSecure) {
+                LocalTamperHistory.record(this, "automatic_screen_lock_unavailable", "No secure device PIN, pattern or password is configured")
+                return
+            }
+            if (!manager.isAdminActive(admin)) {
+                LocalTamperHistory.record(this, "automatic_screen_lock_unavailable", "Device administrator has not been activated")
+                return
+            }
             manager.lockNow()
-            if (alarmStartedAtEpochMs > 0L) {
-                lockPrefs.edit().putLong(KEY_LOCK_REQUESTED_FOR_ALARM_AT, alarmStartedAtEpochMs).apply()
+            if (alarmStartedAtEpochMs > 0L &&
+                !lockPrefs.edit().putLong(KEY_LOCK_REQUESTED_FOR_ALARM_AT, alarmStartedAtEpochMs).commit()
+            ) {
+                LocalTamperHistory.record(this, "automatic_screen_lock_state_not_saved", "Device was locked, but the once-per-alarm marker could not be persisted")
             }
             LocalTamperHistory.record(this, "automatic_screen_lock_requested", "Screen lock requested once for this alarm episode")
-        }.onFailure {
-            LocalTamperHistory.record(this, "automatic_screen_lock_failed", it.javaClass.simpleName + ": " + it.message)
+        } catch (error: Exception) {
+            // Never let a failed optional lock request abort alarm audio/vibration.
+            runCatching {
+                LocalTamperHistory.record(this, "automatic_screen_lock_failed", error.javaClass.simpleName + ": " + error.message)
+            }
         }
     }
 
     private fun stopAlarm() {
+        stopSecondaryAlarm()
         flashController?.stop()
         flashController = null
         runCatching { player?.stop() }
@@ -276,6 +478,8 @@ class AlarmService : Service() {
         player = null
         runCatching { vibrator?.cancel() }
         vibrator = null
+        hapticsActive = false
+        activeHapticPattern = null
         audioManager?.let { manager ->
             if (Build.VERSION.SDK_INT >= 26) {
                 audioFocusRequest?.let { request -> runCatching { manager.abandonAudioFocusRequest(request) } }
@@ -287,13 +491,29 @@ class AlarmService : Service() {
         audioFocusRequest = null
         audioManager = null
         if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED) {
-            runCatching { AlarmVolumeController.restore(this, getSystemService(AudioManager::class.java)) }
+            val restored = runCatching {
+                AlarmVolumeController.restore(this, getSystemService(AudioManager::class.java))
+            }.getOrElse { error ->
+                LocalTamperHistory.record(
+                    this, "alarm_volume_restore_exception",
+                    error.javaClass.simpleName + ": " + error.message
+                )
+                false
+            }
+            if (!restored) {
+                LocalTamperHistory.record(this, "alarm_volume_restore_unconfirmed", "Alarm service stopped without confirming full alarm-volume restoration and snapshot cleanup")
+            }
         }
     }
 
     override fun onDestroy() {
         volumeHandler.removeCallbacks(volumeEnforcement)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            thermalFlashController?.stop()
+        }
+        thermalFlashController = null
         stopAlarm()
+        BatchThreeUiBridge.refresh(this)
         super.onDestroy()
     }
 
@@ -305,6 +525,7 @@ class AlarmService : Service() {
         const val ACTION_START = "com.thiefalertsequre.START"
         const val ACTION_STOP_IF_AUTHENTICATED = "com.thiefalertsequre.STOP_AUTH"
         const val ACTION_REFRESH_FLASH = "com.thiefalertsequre.REFRESH_ALARM_FLASH"
+        const val ACTION_REFRESH_OUTPUTS = "com.thiefalertsequre.REFRESH_ALARM_OUTPUTS"
         private const val VOLUME_ENFORCEMENT_INTERVAL_MS = 500L
         private const val KEY_LOCK_REQUESTED_FOR_ALARM_AT = "lock_requested_for_alarm_started_at"
     }
