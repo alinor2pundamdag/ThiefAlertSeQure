@@ -13,10 +13,60 @@ object AlarmSoundStore {
     const val ALARM = "alarm"
     const val ALERT = "alert"
     private const val PREFS = "user_alarm_sounds_v1"
+    private const val KEY_BUILT_IN_PRESET = "built_in_alarm_preset"
+    private const val KEY_SECONDARY_ENABLED = "secondary_alarm_enabled"
 
-    fun uri(context: Context, slot: String): Uri? =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(key(slot), null)?.let { runCatching { Uri.parse(it) }.getOrNull() }
+    fun isSecondaryAlarmEnabled(context: Context): Boolean =
+        SafePreferences.boolean(
+            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE),
+            KEY_SECONDARY_ENABLED,
+            false
+        )
+
+    fun setSecondaryAlarmEnabled(context: Context, enabled: Boolean): Boolean =
+        ProtectionStore(context).runIfDisarmed {
+            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_SECONDARY_ENABLED, enabled).commit()
+        } == true
+
+    fun selectedBuiltInPreset(context: Context): AlarmTonePreset {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val raw = when (val value = SafePreferences.readString(prefs, KEY_BUILT_IN_PRESET, AlarmTonePreset.DEFAULT_AUDIO.name)) {
+            is PreferenceRead.Value -> value.value
+            is PreferenceRead.Corrupt -> AlarmTonePreset.DEFAULT_AUDIO.name
+        }
+        return AlarmTonePreset.fromStored(raw)
+    }
+
+    fun setBuiltInPreset(context: Context, preset: AlarmTonePreset): Boolean {
+        if (preset != AlarmTonePreset.DEFAULT_AUDIO && preset !in AlarmTonePreset.builtIns) return false
+        return ProtectionStore(context).runIfDisarmed {
+            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(KEY_BUILT_IN_PRESET, preset.name).commit()
+        } == true
+    }
+
+    fun selectNextBuiltInPreset(context: Context): AlarmTonePreset {
+        val current = selectedBuiltInPreset(context)
+        return ProtectionStore(context).runIfDisarmed {
+            val choices = listOf(AlarmTonePreset.DEFAULT_AUDIO) + AlarmTonePreset.builtIns
+            val latest = selectedBuiltInPreset(context)
+            val next = choices[(choices.indexOf(latest).coerceAtLeast(0) + 1) % choices.size]
+            val saved = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(KEY_BUILT_IN_PRESET, next.name).commit()
+            if (saved) next else latest
+        } ?: current
+    }
+
+    fun uri(context: Context, slot: String): Uri? {
+        require(slot == ALARM || slot == ALERT)
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val raw = when (val stored = SafePreferences.readString(prefs, key(slot), null)) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> return null
+        }
+        return raw?.let { runCatching { Uri.parse(it) }.getOrNull() }
+    }
 
     fun hasAlarmSound(context: Context): Boolean = effectiveUri(context, ALARM) != null
 
@@ -26,45 +76,74 @@ object AlarmSoundStore {
             Uri.parse("android.resource://${context.packageName}/${R.raw.default_alarm}")
         } else null
 
-    fun clear(context: Context, slot: String) {
+    /** Remove a selected sound only when both URI metadata reads and commit succeed. */
+    fun clear(context: Context, slot: String): Boolean {
         require(slot == ALARM || slot == ALERT)
-        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val granted = prefs.getString("grant_uri_$slot", null)
-        val otherSlot = if (slot == ALARM) ALERT else ALARM
-        val otherGrant = prefs.getString("grant_uri_$otherSlot", null)
-        prefs.edit().remove(key(slot)).remove("grant_uri_$slot").commit()
-        if (granted != null && granted != otherGrant) runCatching {
-            context.contentResolver.releasePersistableUriPermission(
-                Uri.parse(granted),
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-        }
+        return ProtectionStore(context).runIfDisarmed {
+            val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val granted = when (val stored = SafePreferences.readString(prefs, "grant_uri_$slot", null)) {
+                is PreferenceRead.Value -> stored.value
+                is PreferenceRead.Corrupt -> return@runIfDisarmed false
+            }
+            val otherSlot = if (slot == ALARM) ALERT else ALARM
+            val otherGrant = when (val stored = SafePreferences.readString(prefs, "grant_uri_$otherSlot", null)) {
+                is PreferenceRead.Value -> stored.value
+                is PreferenceRead.Corrupt -> return@runIfDisarmed false
+            }
+            val saved = prefs.edit().remove(key(slot)).remove("grant_uri_$slot").commit()
+            if (!saved) return@runIfDisarmed false
+            if (granted != null && granted != otherGrant) runCatching {
+                context.contentResolver.releasePersistableUriPermission(
+                    Uri.parse(granted), Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            true
+        } == true
     }
 
     fun save(context: Context, slot: String, soundUri: Uri, permissionUri: Uri): Boolean {
         require(slot == ALARM || slot == ALERT)
-        return runCatching {
-            context.contentResolver.takePersistableUriPermission(
-                permissionUri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-            val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            val oldGrant = prefs.getString("grant_uri_$slot", null)
-            val otherSlot = if (slot == ALARM) ALERT else ALARM
-            val otherGrant = prefs.getString("grant_uri_$otherSlot", null)
-            val saved = prefs.edit()
-                .putString(key(slot), soundUri.toString())
-                .putString("grant_uri_$slot", permissionUri.toString())
-                .commit()
-            if (saved && oldGrant != null && oldGrant != permissionUri.toString() && oldGrant != otherGrant) {
-                runCatching {
+        var newlyGranted = false
+        val saved = ProtectionStore(context).runIfDisarmed {
+            runCatching {
+                val alreadyGranted = context.contentResolver.persistedUriPermissions.any {
+                    it.uri == permissionUri && it.isReadPermission
+                }
+                context.contentResolver.takePersistableUriPermission(
+                    permissionUri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                newlyGranted = !alreadyGranted
+                val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                val oldGrant = when (val stored = SafePreferences.readString(prefs, "grant_uri_$slot", null)) {
+                    is PreferenceRead.Value -> stored.value
+                    is PreferenceRead.Corrupt -> return@runCatching false
+                }
+                val otherSlot = if (slot == ALARM) ALERT else ALARM
+                val otherGrant = when (val stored = SafePreferences.readString(prefs, "grant_uri_$otherSlot", null)) {
+                    is PreferenceRead.Value -> stored.value
+                    is PreferenceRead.Corrupt -> return@runCatching false
+                }
+                val newGrant = permissionUri.toString()
+                val committed = prefs.edit()
+                    .putString(key(slot), soundUri.toString())
+                    .putString("grant_uri_$slot", newGrant)
+                    .commit()
+                if (!committed) return@runCatching false
+                newlyGranted = false
+                if (oldGrant != null && oldGrant != newGrant && oldGrant != otherGrant) runCatching {
                     context.contentResolver.releasePersistableUriPermission(
                         Uri.parse(oldGrant), Intent.FLAG_GRANT_READ_URI_PERMISSION
                     )
                 }
-            }
-            saved
-        }.getOrDefault(false)
+                true
+            }.getOrElse { false }
+        } == true
+        if (!saved && newlyGranted) runCatching {
+            context.contentResolver.releasePersistableUriPermission(
+                permissionUri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        }
+        return saved
     }
 
     fun isReadable(context: Context, slot: String): Boolean {

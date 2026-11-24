@@ -235,4 +235,29 @@ class ProtectionEngineTest {
         assertEquals(false, ProtectionEngine.shouldScheduleDeadline(ProtectionMode.ARMED))
         assertEquals(false, ProtectionEngine.shouldScheduleDeadline(ProtectionMode.ALARM_TRIGGERED))
     }
+    @Test fun disablingMonitorDisarmsCountdownButPreservesLatchedAlarm() {
+        val countdown = ProtectionState(ProtectionMode.COUNTDOWN, 11_000L, 1_000L, 15_000L, 7)
+        assertEquals(
+            ProtectionMode.DISARMED,
+            ProtectionEngine.disableMonitoring(countdown, 5_000L).mode
+        )
+        val latched = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, 4_000L, 0L, 7)
+        assertEquals(latched, ProtectionEngine.disableMonitoring(latched, 5_000L))
+    }
+
+    @Test fun motionAndBluetoothAlarmCanLatchOnlyFromArmed() {
+        val armed = ProtectionState(ProtectionMode.ARMED, 0L, 1_000L)
+        assertEquals(
+            ProtectionMode.ALARM_TRIGGERED,
+            ProtectionEngine.triggerFromArmed(armed, 2_000L, 7).mode
+        )
+        val countdown = ProtectionState(ProtectionMode.COUNTDOWN, 11_000L, 1_000L, 15_000L, 7)
+        assertEquals(
+            countdown,
+            ProtectionEngine.triggerFromArmed(countdown, 2_000L, 7)
+        )
+        val latched = ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, 1_500L, 0L, 7)
+        assertEquals(latched, ProtectionEngine.triggerFromArmed(latched, 2_000L, 7))
+    }
+
 }

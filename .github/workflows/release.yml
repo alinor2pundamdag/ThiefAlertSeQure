@@ -20,20 +20,20 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out tagged source and release history
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - name: Restrict manual signed preflight to main
+      - name: Restrict manual signed preflight to trusted release branches
         if: github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           set -euo pipefail
           if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
-            echo "::error::Manual signed preflight must run from the main branch. Current ref: $GITHUB_REF"
+            echo "::error::Manual signed preflight is allowed only from the main branch. Current ref: $GITHUB_REF"
             exit 1
           fi
-          echo "Manual signed preflight is running from main."
+          echo "Manual signed preflight is running from main; workflow_dispatch never publishes a GitHub Release."
 
       - name: Confirm tag points to main
         if: github.event_name == 'push'
@@ -46,12 +46,15 @@ jobs:
             exit 1
           }
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
+        with:
+          cache-provider: basic
+
 
       - name: Require and verify permanent release keystore
         shell: bash
@@ -98,6 +101,7 @@ jobs:
             echo "Manual release preflight only: build and verify the signed APK, but do not publish a GitHub Release."
           fi
           PREVIOUS_TAG="$(gh release list --limit 1 --json tagName --jq '.[0].tagName // ""')"
+          PREVIOUS_CODE=""
           if [[ -n "$PREVIOUS_TAG" ]]; then
             PREVIOUS_CODE="$(git show "$PREVIOUS_TAG:app/build.gradle.kts" | sed -n 's/^val appVersionCode = \([0-9][0-9]*\)$/\1/p' | head -n 1)"
             if [[ -z "$PREVIOUS_CODE" || "$VERSION_CODE" -le "$PREVIOUS_CODE" ]]; then
@@ -107,9 +111,34 @@ jobs:
           fi
           echo "APP_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "APP_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "PREVIOUS_RELEASE_TAG=$PREVIOUS_TAG" >> "$GITHUB_ENV"
+          echo "PREVIOUS_RELEASE_VERSION_CODE=$PREVIOUS_CODE" >> "$GITHUB_ENV"
           echo "Release version $VERSION_NAME ($VERSION_CODE) passed tag/version checks."
         env:
           GH_TOKEN: ${{ github.token }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Verify instrumentation is disabled
+        run: python3 scripts/verify_no_instrumentation.py
+
+      - name: Verify optional ranging permission boundary
+        run: python3 scripts/verify_ranging_privacy.py
+
+      - name: Run release safety and integration contracts
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_no_instrumentation.py
+          python3 scripts/verify_ranging_privacy.py
+          python3 scripts/verify_evidence_privacy.py
+          python3 scripts/verify_batch2_contracts.py
+          python3 scripts/verify_bypass_charging_contract.py
+          python3 scripts/verify_navigation.py
+          python3 scripts/verify_preferences.py
+          python3 scripts/verify_manifest_contract.py
+          python3 scripts/verify_state_ownership.py
+          python3 scripts/verify_release_identity.py
 
       - name: Run unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
@@ -159,7 +188,7 @@ jobs:
 
       - name: Upload signed release preflight artifact (manual runs only)
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ThiefAlertSeQure-v${{ env.APP_VERSION_NAME }}-release-preflight
           path: |

@@ -1,10 +1,12 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val appVersionCode = 5
-val appVersionName = "1.1.3"
+val appVersionCode = 7
+val appVersionName = "1.1.5_Developer_Alinor"
+val appTestVersionName = "${appVersionName.substringBefore("_Developer_Alinor")}-test"
 
 val releaseSigningReady = listOf(
     "ANDROID_KEYSTORE_PATH",
@@ -23,7 +25,6 @@ android {
         // Increase this for every distributable update. Never reset it between releases.
         versionCode = appVersionCode
         versionName = appVersionName
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
         create("release") {
@@ -39,10 +40,17 @@ android {
         // Keep CI/device-test APKs side-by-side with the production installation.
         // This prevents debug builds from replacing the production package.
         getByName("debug") {
-            applicationIdSuffix = ".v113test"
+            applicationIdSuffix = ".v114test"
+
         }
         getByName("release") {
-            isMinifyEnabled = false
+            // Harden every distributable release build.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             // A release APK is signed only with the persistent owner-controlled key.
             if (releaseSigningReady) {
                 signingConfig = signingConfigs.getByName("release")
@@ -53,13 +61,41 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+    buildFeatures { compose = true }
     androidResources { noCompress += "opus" }
-    testOptions { unitTests.isReturnDefaultValues = true }
+    testOptions {
+        testBuildType = "release"
+        unitTests.isReturnDefaultValues = true
+    }
+
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        variant.outputs.forEach { output ->
+            output.versionCode.set(appVersionCode)
+            output.versionName.set(appTestVersionName)
+        }
+    }
+}
 
 dependencies {
+    // Compose 1.11 stable line is compatible with this project's compileSdk 36 / AGP 8.10.x.
+    implementation(platform("androidx.compose:compose-bom:2026.04.01"))
+    implementation("androidx.compose.ui:ui")
+    // Filament real-time PBR renderer and Android surface helpers (same pinned release).
+    implementation("com.google.android.filament:filament-android:1.75.1")
+    implementation("com.google.android.filament:filament-utils-android:1.75.1")
+    implementation("com.google.android.filament:filamat-android:1.75.1")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.animation:animation")
+    implementation("androidx.compose.material3:material3")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-ktx:1.10.0")
     implementation("androidx.fragment:fragment-ktx:1.8.5")

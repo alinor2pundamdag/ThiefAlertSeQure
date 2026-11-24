@@ -7,19 +7,25 @@ import java.util.concurrent.Executors
 
 class PowerTransitionReceiver : BroadcastReceiver() {
     companion object {
-        // Preserve event order across CONNECTED and DISCONNECTED work.
+        // Preserve event order across CONNECTED, DISCONNECTED and restart recovery work.
         private val powerEventExecutor = Executors.newSingleThreadExecutor()
+
+        fun enqueuePendingRecovery(context: Context) {
+            try {
+                powerEventExecutor.execute {
+                    PowerTransitionCoordinator.recoverPendingDisconnectCandidate(context.applicationContext)
+                }
+            } catch (error: Exception) {
+                LocalTamperHistory.record(
+                    context, "pending_unplug_recovery_queue_failed",
+                    error.javaClass.simpleName + ": " + error.message
+                )
+            }
+        }
     }
     override fun onReceive(context: Context, intent: Intent?) {
         val action = intent?.action ?: return
         if (action != Intent.ACTION_POWER_CONNECTED && action != Intent.ACTION_POWER_DISCONNECTED) return
-        val monitorEnabled = context.getSharedPreferences(
-            ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
-        ).getBoolean(
-            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
-        )
-        if (!monitorEnabled) return
-
         // Capture the physical event time before serialized debounce work. Otherwise
         // the five-sample confirmation (~1.4 s) is incorrectly added before the
         // user's ten-second grace period even begins.
@@ -30,10 +36,24 @@ class PowerTransitionReceiver : BroadcastReceiver() {
         try {
             powerEventExecutor.execute {
                 try {
+                    val app = context.applicationContext
+                    if (!ConfigurationBackup.recoverPendingRestore(app)) {
+                        LocalTamperHistory.record(
+                            app, "configuration_restore_recovery_pending",
+                            "Physical charger transition was deferred until interrupted settings recovery completes"
+                        )
+                        return@execute
+                    }
+                    val monitorEnabled = SafePreferences.boolean(
+                        app.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE),
+                        ProtectionMonitorService.KEY_ENABLED,
+                        ProtectionMonitorPolicy.DEFAULT_ENABLED
+                    )
+                    if (!monitorEnabled) return@execute
                     when (action) {
-                        Intent.ACTION_POWER_CONNECTED -> PowerTransitionCoordinator.onPowerConnected(context.applicationContext)
+                        Intent.ACTION_POWER_CONNECTED -> PowerTransitionCoordinator.onPowerConnected(app)
                         Intent.ACTION_POWER_DISCONNECTED -> PowerTransitionCoordinator.onPowerDisconnected(
-                            context.applicationContext, eventEpochMs, eventElapsedRealtimeMs, eventBootCount
+                            app, eventEpochMs, eventElapsedRealtimeMs, eventBootCount
                         )
                     }
                 } catch (error: Exception) {

@@ -4,6 +4,7 @@ import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.os.Handler
+import android.os.PowerManager
 
 /**
  * Pulses the device LED through CameraManager's torch API. This does not open
@@ -14,14 +15,51 @@ import android.os.Handler
  * deliberately independent from this controller.
  */
 internal class AlarmFlashController(
-    context: Context,
+    private val context: Context,
     private val handler: Handler,
     private val onEvent: (String, String) -> Unit
 ) {
     private val cameraManager = context.getSystemService(CameraManager::class.java)
+    private val cpuWakeLock by lazy(LazyThreadSafetyMode.NONE) {
+        context.getSystemService(PowerManager::class.java)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "${context.packageName}:AlarmFlashController")
+            .apply { setReferenceCounted(false) }
+    }
     private var cameraId: String? = null
     private var running = false
     private var torchOn = false
+    private var pulseStep = 0
+    private var pattern = AlarmFlashPattern.SLOW
+    private var speedPercent = 100
+    private var customTimings = 700L to 700L
+    private var torchCallbackRegistered = false
+
+    private val torchCallback = object : CameraManager.TorchCallback() {
+        override fun onTorchModeChanged(changedCameraId: String, enabled: Boolean) {
+            if (changedCameraId != cameraId || !running) return
+            if (torchOn && !enabled) {
+                torchOn = false
+                report("alarm_flash_external_interruption", "Android reported that another camera resource or app turned the torch off")
+                stop()
+            } else {
+                torchOn = enabled
+            }
+        }
+
+        override fun onTorchModeUnavailable(unavailableCameraId: String) {
+            if (unavailableCameraId != cameraId || !running) return
+            report("alarm_flash_output_unavailable", "Android camera service reported the torch unavailable; audio and haptics continue")
+            running = false
+            handler.removeCallbacks(pulse)
+            torchOn = false
+            cameraId = null
+            releaseCpuWakeLock()
+            if (torchCallbackRegistered) {
+                runCatching { cameraManager.unregisterTorchCallback(this) }
+                torchCallbackRegistered = false
+            }
+        }
+    }
 
     private val pulse = object : Runnable {
         override fun run() {
@@ -30,14 +68,15 @@ internal class AlarmFlashController(
                 stop()
                 return
             }
-            val nextState = AlarmFlashSettings.nextTorchState(torchOn)
+            val nextState = AlarmFlashPatternPolicy.nextTorchState(pattern, torchOn)
             try {
-                cameraManager.setTorchMode(id, nextState)
+                if (nextState != torchOn) cameraManager.setTorchMode(id, nextState)
                 torchOn = nextState
-                handler.postDelayed(
-                    this,
-                    AlarmFlashSettings.delayAfter(nextState)
+                val delay = AlarmFlashPatternPolicy.delayMs(
+                    pattern, pulseStep, speedPercent, customTimings.first, customTimings.second
                 )
+                pulseStep = (pulseStep + 1) % 64
+                handler.postDelayed(this, delay)
             } catch (error: Exception) {
                 report("alarm_flash_interrupted", error.javaClass.simpleName + ": " + error.message)
                 stop()
@@ -53,12 +92,25 @@ internal class AlarmFlashController(
             return false
         }
         cameraId = selectedCamera
+        pattern = AlarmFlashPatternPolicy.read(context)
+        speedPercent = AlarmFlashPatternPolicy.speedPercent(context)
+        customTimings = AlarmFlashPatternPolicy.customTimings(context)
+        pulseStep = 0
         return try {
+            // Keep Handler-based pulse timing alive while the display is off.
+            // This lock belongs to the torch controller and is released on every stop path.
+            if (pattern != AlarmFlashPattern.STEADY && !cpuWakeLock.isHeld) cpuWakeLock.acquire()
             cameraManager.setTorchMode(selectedCamera, true)
             torchOn = true
             running = true
-            handler.postDelayed(pulse, AlarmFlashSettings.ON_DURATION_MS)
-            report("alarm_flash_started", "Camera LED pulsing while the theft alarm is latched")
+            cameraManager.registerTorchCallback(torchCallback, handler)
+            torchCallbackRegistered = true
+            val initialDelay = AlarmFlashPatternPolicy.delayMs(
+                pattern, 0, speedPercent, customTimings.first, customTimings.second
+            )
+            pulseStep = 1
+            if (pattern != AlarmFlashPattern.STEADY) handler.postDelayed(pulse, initialDelay)
+            report("alarm_flash_started", "Camera LED active using ${pattern.label} pattern while the theft alarm is latched")
             true
         } catch (error: Exception) {
             report("alarm_flash_start_failed", error.javaClass.simpleName + ": " + error.message)
@@ -75,11 +127,18 @@ internal class AlarmFlashController(
             runCatching { cameraManager.setTorchMode(id, false) }
                 .onFailure { report("alarm_flash_stop_failed", it.javaClass.simpleName + ": " + it.message) }
         }
+        if (torchCallbackRegistered) {
+            runCatching { cameraManager.unregisterTorchCallback(torchCallback) }
+            torchCallbackRegistered = false
+        }
+        releaseCpuWakeLock()
         val hadState = cameraId != null || torchOn
         torchOn = false
         cameraId = null
         if (hadState) report("alarm_flash_stopped", "Camera LED switched off because the alarm output stopped")
     }
+
+    fun hasFlashHardware(): Boolean = findFlashCameraId() != null
 
     private fun findFlashCameraId(): String? = runCatching {
         val candidates = cameraManager.cameraIdList.mapNotNull { id ->
@@ -94,6 +153,14 @@ internal class AlarmFlashController(
             ?: candidates.firstOrNull()?.first
     }.getOrNull()
 
+    private fun releaseCpuWakeLock() {
+        runCatching {
+            if (cpuWakeLock.isHeld) cpuWakeLock.release()
+        }.onFailure {
+            report("alarm_flash_wake_lock_release_failed", it.javaClass.simpleName + ": " + it.message)
+        }
+    }
+
     private fun report(event: String, detail: String) {
         runCatching { onEvent(event, detail) }
     }
@@ -107,8 +174,15 @@ internal object AlarmFlashSettings {
     const val OFF_DURATION_MS = 700L
 
     fun isEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getBoolean(KEY_ENABLED, true)
+        SafePreferences.boolean(
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE), KEY_ENABLED, true
+        )
+
+    fun setEnabled(context: Context, enabled: Boolean): Boolean =
+        ProtectionStore(context).runIfDisarmed {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_ENABLED, enabled).commit()
+        } == true
 
     fun shouldRun(mode: ProtectionMode): Boolean = mode == ProtectionMode.ALARM_TRIGGERED
 

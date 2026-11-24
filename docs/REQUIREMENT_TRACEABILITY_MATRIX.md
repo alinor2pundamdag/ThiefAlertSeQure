@@ -1,22 +1,25 @@
-# Requirement Traceability Matrix — ThiefAlertSeQure
+> **Authoritative release candidate (24 November 2026):** `release/v1.1.5-candidate`, PR #9; initial runbook/status documentation commit `e2965418536aaacf71295ae8a1cc22623a8e8bdf` (followed by docs-only consistency commits), code-bearing head `9ae3d15d9de909ab1a75e88f120ca7c9ff72b3c4`. Android CI push/PR #45311423677/#45311432586 and CodeQL push/PR #45311423737/#45311432532 passed on the code-bearing head. Latest documentation-only follow-up has no observed CI run. Candidate: `1.1.5_Developer_Alinor` / versionCode `7`, package `com.thiefalertsequre.app`, minSdk `26`, compileSdk/targetSdk `36`. The Android artifact is debug-only; minified release metadata passed but the PR release APK is unsigned. Production signing secrets and signed preflight are unverified. The obsolete PR #7 installer review thread is resolved; repository CodeQL alert #8 dismissal remains unverified. Physical acceptance is owner-operated after signed APK delivery and is not a coding/merge gate.
 
-> Previous verified application baseline: `1.1.2` / versionCode `4`, with exact-head CI run [42479548944](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/42479548944). Current feature branch contains v`1.1.3` / versionCode `5`, synchronized alarm flashlight and acknowledgement-only onboarding. CI run [43004454206](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43004454206) passed on head `4dc3a7a553e7da43265cbd2feaa4c3e5ae64d294`; a newer documentation/release-workflow head is undergoing CI.
-> Verified v1.1.3 test APK: artifact `ThiefAlertSeQure-debug-apk`, artifact ID `13846979259`, run `43004454206`. Package `com.thiefalertsequre.app.v113test`, versionCode `5`, versionName `1.1.3`; APK file `ThiefAlertSeQure-v1.1.3-debug-test.apk`. This is a side-by-side development/test APK, not a production update. The four permanent release-signing secrets are configured; no signed production APK or official release has been created yet.
+> Historical FIXALL candidate: v`1.1.4` / versionCode `6`, package `com.thiefalertsequre.app`; side-by-side debug test variant is `com.thiefalertsequre.app.v114test`. Production identity and signing configuration are protected invariants. Owner authorization to continue to the official GitHub release was given on 2026-11-24; publication remains gated by signed preflight and acceptance.
 > Contract: [Universal Maximum Protection Specification](UNIVERSAL_MAXIMUM_PROTECTION_SPEC.md).
-> Status labels: **Implemented** means source code exists; **Unit-covered** means a named local test exists; **CI-verified** means the exact baseline commit passed GitHub Actions; **Device-unverified** means no physical-device evidence is recorded for that case. These labels are deliberately not interchangeable.
+> Status labels: **Implemented** means source code exists; **Unit-covered** means a named JVM unit test exists; **CI-verified** means the exact commit passed the named non-instrumentation GitHub Actions checks. Emulator and Android instrumentation compilation/execution remain excluded by owner policy. Physical-device acceptance is not an automated CI gate, but it is required before claiming full hardware acceptance for the official release. Dormant `androidTest` source files remain reference-only and must not be compiled or executed.
 
 ## 1. Verification snapshot
 
-| Area | Evidence at baseline | Status / limitation |
+**Historical code-bearing verification snapshot (superseded by the current Batch Four head):** Android run [43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535) and CodeQL run [43950015623](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623) passed on source commit `475c1fa00b8c30c1280f77053d83eb91c0db7f64`. Subsequent Phase 10–12 follow-up commits changed documentation only. The final documentation snapshot `ffe5fdae9150cb8ca791478d48cfc68263776ff8` passed Android run [43951488247](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43951488247) and CodeQL run [43951488080](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43951488080). The current owner policy prohibits instrumentation execution/compilation and emulator matrices; only JVM unit tests, source-contract checks, lint, APK build/metadata/signer checks and CodeQL are in scope.
+
+| Area | Current evidence | Status / limitation |
 |---|---|---|
-| Branch / PR | PR #2 remains open and draft; managed-policy safety implementation is on the current feature branch | Not merged |
-| CI | v1.1.3 run `43004454206` passed unit tests, Android lint, asset validation, version extraction, APK assembly, package/version verification, debug signer verification and artifact upload on head `4dc3a7a553e7da43265cbd2feaa4c3e5ae64d294`. Subsequent commits, including the alarm recovery-notice fallback fix, require a successful CI run on the exact current PR head. Check PR #2 / GitHub Actions for the live run; do not merge on an earlier-head success. | Prior v1.1.3 head CI-verified; latest head pending |
-| Unit tests | `:app:testDebugUnitTest` in workflow | Unit tests execute in CI |
-| Lint | `:app:lintDebug` in workflow | CI-verified |
-| APK | v1.1.3 artifact ID `13846979259` from run `43004454206`; versionCode 5 / versionName 1.1.3; package `com.thiefalertsequre.app.v113test`; filename `ThiefAlertSeQure-v1.1.3-debug-test.apk`. | Verified side-by-side debug test APK; not production-signed; permanent signing secrets are configured; signed production artifact remains pending |
-| Instrumentation / emulator matrix | No `app/src/androidTest` suite or emulator matrix exists in the inspected tree | Not implemented |
-| Physical OEM acceptance | Owner-reported HONOR 200 Pro PASS for all 11 scenarios on 11 Nov 2026: automatic arming, charger countdown, reconnect cancellation, alarm persistence, authentication protection, volume restoration, flashlight independence, camera conflict, background operation, reboot recovery, lock-screen presentation. Device Owner enrollment/rollback separately reported PASS on a test device. | Owner-reported evidence; not independently reproduced. Exact Android/MagicOS build not supplied. Android 17 audio and additional platform edge cases remain pending. Force-stop resilience is not guaranteed. |
-| Universal claim | Android/OEM policies differ and ordinary apps cannot defeat privileged system controls | Never claim universal guarantee |
+| Branch / identity | Historical FIXALL coding branch `work/phase-0-12-coding`, latest code-bearing commit `475c1fa00b8c30c1280f77053d83eb91c0db7f64`; production branch `main` remains untouched; package `com.thiefalertsequre.app`; minSdk 26, compile/target SDK 36; Java/Kotlin 17; versionCode 6 / versionName 1.1.4 | Working candidate only; not merged or released |
+| Phase One baseline build and static checks | Workflow run [#1270](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43734061025), exact Phase One baseline; build, unit tests, navigation verification, lint, asset/config checks, APK assembly and package/version/signer validation | PASS on that exact Phase One source head |
+| Latest code-bearing non-instrumentation CI | Android [#45304517153](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45304517153) and CodeQL [#45304517314](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45304517314) on `5e850fc`; JVM tests, source/manifest/release contracts, lint, APK build/metadata/signer checks and CodeQL | PASS on the exact code-bearing commit; development artifact uploaded; minified release APK unsigned in PR CI; production signing availability not independently verified |
+| Historical instrumentation API 26 / 28 | 25 tests per API; zero failures and errors; one documented biometric-enrollment skip per API on the earlier Phase One baseline | Historical PASS only; not evidence for current coding-branch head |
+| Historical instrumentation API 30 | 25 tests; zero failures and errors; one documented biometric-enrollment skip on the earlier Phase One baseline | Historical PASS only; current coding-branch instrumentation has not run |
+| Historical instrumentation API 32 / 34 / 35 / 36 | 25 tests per API; zero failures and errors; one documented biometric-enrollment skip per API on the earlier Phase One baseline | Historical PASS only; current coding-branch instrumentation has not run |
+| Historical diagnostics | All seven API diagnostic artifacts from run #1270 on the earlier Phase One baseline were inspected, including XML reports and logcat/crash context | Historical review found no ThiefAlertSeQure process crash or test failure; not a current-head instrumentation result |
+| Architecture / event ownership | Source-backed map covers charger, countdown/alarm, authentication, Bluetooth, boot, settings, theme, history and updater paths | Documented and source-checked for Phase 1; hardware/OEM behavior remains device-dependent |
+| Physical-device acceptance | HONOR 200 Pro testing for changed v1.1.4 behavior | Reserved for Phase 12; not a Phase 1 blocker and not inferred from emulator results |
+| Release boundary | No merge, tag, production APK publication or official release in this work | Not authorized |
 
 ## 2. Core protection requirements
 
@@ -25,49 +28,50 @@
 | CORE-01 | A single authoritative state machine: DISARMED, ARMED, COUNTDOWN, ALARM_TRIGGERED | `ProtectionState.kt`, `ProtectionEngine.kt` | `ProtectionEngineTest` | Unit-covered |
 | CORE-02 | Confirmed plug arms; unplug only starts countdown from ARMED | `PowerTransitionCoordinator.kt`, `ProtectionEngine.kt` | `unplugStartsTenSecondCountdown`; coordinator tests | Unit-covered; physical event ordering device-dependent |
 | CORE-03 | No countdown from a disconnected snapshot, unknown state, or service startup | `PowerTransitionCoordinator.kt`, `ExternalPowerState.kt` | `ExternalPowerStateTest`, coordinator tests | Unit-covered |
-| CORE-04 | Debounce charger state; reject stale or superseded connect/disconnect candidates | `PowerTransitionCoordinator.kt`, `PowerTransitionReceiver.kt` | `acceptsPowerConnectedEvent` regression; inspect coordinator tests | Partially unit-covered; event races need instrumentation |
-| CORE-05 | Start countdown from captured OS event time, not after debounce delay | `PowerTransitionReceiver.kt`, `PowerTransitionCoordinator.kt` | Source inspection; owner-reported charger countdown PASS | Implemented; target-device timing reported PASS |
+| CORE-04 | Debounce charger state; reject stale or superseded connect/disconnect candidates; stop sampling as soon as three consecutive live-state reads confirm the event | `PowerTransitionCoordinator.kt`, `PowerTransitionSamplingPolicy.kt`, `PowerTransitionReceiver.kt` | `PowerTransitionSamplingPolicyTest`; generation-token and same-boot recovery tests | Unit-covered for stable/unstable/unknown samples; live OS event ordering remains device-dependent |
+| CORE-05 | Start countdown from captured OS event time, not after debounce delay | `PowerTransitionReceiver.kt`, `PowerTransitionCoordinator.kt` | Source inspection; owner-reported v1.1.3 charger countdown PASS (historical only) | Implemented; v1.1.3 target-device timing reported PASS; current v1.1.5 candidate not revalidated |
 | CORE-06 | Reconnect before expiry cancels countdown and arms | `ProtectionEngine.kt`, coordinator, deadline receiver | `reconnectBeforeDeadlineRearms`, `reconnectAtDeadlineCancelsAlarmEvenIfDeadlineHasElapsed` | Unit-covered |
 | CORE-07 | Unknown power state never expires countdown; retry without false alarm | `ProtectionEngine.kt`, `AlarmDeadlineReceiver.kt`, monitor service | `unknownChargerStateNeverTriggersCountdown` | Unit-covered |
 | CORE-08 | Monotonic elapsed-time deadline and boot identity; never compare old-boot monotonic time | `ProtectionClock.kt`, `ProtectionState.kt`, engine/store | wall-clock, boot identity and reboot tests | Unit-covered |
-| CORE-09 | Reboot invalidates the old charger baseline even when BOOT_COUNT is unavailable; unknown initial power sample waits on a dedicated marker; first confirmed disconnected sample starts a fresh grace period | `BootReceiver.kt`, `PowerTransitionCoordinator.kt`, engine, state decoder | Unit tests plus owner-reported reboot recovery PASS | Source/unit-covered; target-device reboot recovery reported PASS |
+| CORE-09 | Reboot invalidates the old charger baseline even when BOOT_COUNT is unavailable; unknown initial power sample waits on a dedicated marker; first confirmed disconnected sample starts a fresh grace period | `BootReceiver.kt`, `PowerTransitionCoordinator.kt`, engine, state decoder | Unit tests plus owner-reported v1.1.3 reboot recovery PASS (historical only) | Source/unit-covered; v1.1.3 target-device reboot recovery reported PASS; current v1.1.5 candidate not revalidated |
 | CORE-10 | ARMED + unplugged boot snapshot must not invent a physical transition | `BootReceiver.kt`, engine | `rebootWhileArmedAndUnpluggedDoesNotInventTransition` | Unit-covered |
 | CORE-11 | ALARM_TRIGGERED is latched; reconnect, reboot, or service recovery cannot clear it | engine, coordinator, boot receiver | reconnect/reboot latch tests | Unit-covered |
-| CORE-12 | Only successful app-launched Android device-credential confirmation or BIOMETRIC_STRONG authentication clears the latched alarm | `MainActivity.kt`, `OwnerAuthenticationCoordinator.kt`, `ProtectionEngine.kt` | state transition tests plus owner-reported authentication protection PASS | State transition unit-covered; target-device authentication reported PASS |
+| CORE-12 | Only successful app-launched Android device-credential confirmation or BIOMETRIC_STRONG authentication clears the latched alarm | `MainActivity.kt`, `OwnerAuthenticationCoordinator.kt`, `ProtectionEngine.kt` | state transition tests plus owner-reported v1.1.3 authentication protection PASS (historical only) | State transition unit-covered; v1.1.3 target-device authentication reported PASS; current v1.1.5 candidate not revalidated |
 | CORE-13 | Stale AlarmManager callbacks cannot affect a newer countdown | `ProtectionEngine.kt`, deadline receiver, scheduler | `staleDeadlineCallbackCannotMatchNewCountdown` | Unit-covered |
-| CORE-14 | Persistence write failures do not report an uncommitted state as saved | `ProtectionStore.kt` | `writeUnlocked` uses synchronous `commit()`; `update()` returns the prior state if commit fails | Source behavior reviewed; failure-injection test still missing |
-| CORE-15 | Corrupt or partially written state fails safely and is recoverable | `ProtectionState.fromPersisted`, `ProtectionStore.kt`, boot recovery | `ProtectionEngineTest.partialOrCorruptPersistedStateFailsClosed`, `validPersistedCountdownRetainsItsDeadline`; malformed preference reads are caught in store | Fail-closed decoder implemented and unit-covered; Android SharedPreferences corruption injection still needs instrumentation coverage |
-| CORE-16 | Service process death / duplicate receiver / queue saturation do not create duplicate or lost transitions | receiver, coordinator, monitor service | No instrumentation/process-death suite identified | Needs integration tests |
-| CORE-17 | Monitoring opt-out stops monitoring without clearing a latched alarm | monitor service, boot receiver, policy | `ProtectionMonitorPolicyTest` | Unit-covered; lifecycle integration unverified |
+| CORE-14 | Persistence write failures do not report an uncommitted state as saved | `ProtectionStore.kt` | `writeUnlocked` uses synchronous `commit()`; `update()` returns the prior state if commit fails; `ProtectionStoreUpdateResultTest` includes failed-commit coverage | Unit/source coverage exists; current Android instrumentation execution is prohibited by owner direction |
+| CORE-15 | Corrupt or partially written state fails safely and is recoverable | `ProtectionState.fromPersisted`, `ProtectionStore.kt`, boot recovery | `ProtectionEngineTest.partialOrCorruptPersistedStateFailsClosed`, `validPersistedCountdownRetainsItsDeadline`; malformed preference reads are caught in store | Fail-closed decoder implemented and JVM policy-covered; Android SharedPreferences backend fault-injection is excluded with instrumentation, so physical persistence/recovery acceptance remains device-dependent |
+| CORE-16 | Persisted disconnect candidates recover idempotently after monitor/process interruption; stale or duplicate events cannot create a second countdown | receiver, coordinator, monitor service | `PowerTransitionRecoveryInstrumentationTest.persistedDisconnectCandidateRecoversIdempotently`; serialized receiver queue and generation-token guards | Legacy instrumentation source exists but is not compiled or executed; JVM recovery policy is covered, while actual OS process-kill/OEM lifecycle and queue-saturation behavior remain device/lifecycle acceptance items |
+| CORE-17 | Monitoring opt-out stops monitoring without clearing a latched alarm | monitor service, boot receiver, policy | `ProtectionMonitorPolicyTest` plus source ownership checks | Unit/source-covered; actual foreground-service lifecycle remains physical-device acceptance |
 
 ## 3. Alarm, audio, lock, and authentication
 
 | ID | Requirement / acceptance condition | Primary owner(s) | Existing test / evidence | Baseline status |
 |---|---|---|---|---|
-| ALARM-01 | Alarm starts only from persisted ALARM_TRIGGERED state | `AlarmService.kt`, deadline receiver | source guard | Implemented; integration test needed |
-| ALARM-02 | Alarm runs as foreground service with ongoing notification | `AlarmService.kt`, manifest | CI lint/build plus owner-reported lock-screen presentation PASS | Implemented; target-device presentation reported PASS; denied-notification permission case remains unverified |
-| ALARM-03 | Built-in alarm loops; invalid custom audio falls back to built-in, then vibration | `AlarmService.kt`, `AlarmSoundStore.kt` | no media instrumentation test identified | Implemented; device audio matrix required |
-| ALARM-04 | Preserve user's prior alarm-stream volume and restore only after authenticated disarm; malformed saved-volume metadata must not crash recovery | `AlarmVolumeController.kt`, auth coordinator | source review plus owner-reported volume restoration PASS | Implemented; target-device volume restoration reported PASS |
+| ALARM-01 | Alarm starts only from persisted ALARM_TRIGGERED state | `AlarmService.kt`, deadline receiver | source guard | Implemented with source/state ownership checks; trigger lifecycle remains physical-device acceptance |
+| ALARM-02 | Alarm runs as foreground service with ongoing notification | `AlarmService.kt`, manifest | CI lint/build plus owner-reported v1.1.3 lock-screen presentation PASS (historical only) | Implemented; v1.1.3 target-device presentation reported PASS; current v1.1.5 candidate and denied-notification case remain unverified |
+| ALARM-03 | Built-in alarm loops; invalid custom audio falls back to built-in, then vibration | `AlarmService.kt`, `AlarmSoundStore.kt` | audio fallback policy is source-reviewed; media decode/routing remains physical-device acceptance | Implemented; device audio matrix required |
+| ALARM-04 | Preserve user's prior alarm-stream volume and restore only after authenticated disarm; malformed saved-volume metadata must not crash recovery | `AlarmVolumeController.kt`, auth coordinator | source review plus owner-reported v1.1.3 volume restoration PASS (historical only) | Implemented; v1.1.3 target-device volume restoration reported PASS; current v1.1.5 candidate not revalidated |
 | ALARM-05 | Reassert maximum alarm stream while latched, without claiming hardware-level volume control | `AlarmService.kt`, volume controller | source inspection | Implemented; OEM/fixed-volume/Bluetooth behavior varies |
-| ALARM-06 | Device lock is optional and only requested when secure keyguard + active Device Admin permit it | `AlarmService.kt`, admin receiver, settings UI | no DPM instrumentation test identified | Implemented; physical test required |
+| ALARM-06 | Device lock is optional and only requested when secure keyguard + active Device Admin permit it | `AlarmService.kt`, admin receiver, settings UI | Device Admin/Keyguard runtime behavior remains physical-device acceptance | Implemented; physical test required |
 | ALARM-07 | Do not relock after owner unlock during the same alarm episode | `AlarmService.kt` | persisted per-episode lock timestamp | Implemented; keyguard transition device test required |
-| ALARM-08 | Full-screen dashboard requires local owner opt-in and Android 14+ system access; otherwise retain normal alarm notification | `AlarmPresentationPolicy.kt`, `AlarmService.kt`, SettingsActivity | `AlarmPresentationPolicyTest` plus owner-reported lock-screen presentation PASS | Unit-covered policy; target-device presentation reported PASS; permission-denied fallback remains separately unverified |
-| ALARM-09 | Optional camera LED pulses only while persisted mode is ALARM_TRIGGERED; it stops on authenticated disarm/service teardown; flash failure never blocks audio; owner can disable it | `AlarmFlashController.kt`, `AlarmService.kt`, `SettingsActivity.kt`, manifest | `AlarmFlashPolicyTest`; source guards; owner-reported flashlight independence and camera-conflict PASS | Implemented; cadence/state unit-covered; target-device flashlight and audio independence reported PASS; thermal/long-duration behavior pending |
+| ALARM-08 | Full-screen dashboard requires local owner opt-in and Android 14+ system access; otherwise retain normal alarm notification | `AlarmPresentationPolicy.kt`, `AlarmService.kt`, SettingsActivity | `AlarmPresentationPolicyTest` plus owner-reported v1.1.3 lock-screen presentation PASS (historical only) | Unit-covered policy; v1.1.3 target-device presentation reported PASS; current v1.1.5 candidate and permission-denied fallback remain unverified |
+| ALARM-09 | Optional camera LED pulses only while persisted mode is ALARM_TRIGGERED; it stops on authenticated disarm/service teardown; flash failure never blocks audio; owner can disable it | `AlarmFlashController.kt`, `AlarmService.kt`, `SettingsActivity.kt`, manifest | `AlarmFlashPolicyTest`; source guards; owner-reported v1.1.3 flashlight independence and camera-conflict PASS (historical only) | Implemented; cadence/state unit-covered; v1.1.3 flashlight/audio independence reported PASS; current v1.1.5 dedicated-worker behavior, thermal handling, and long-duration operation remain physically unverified |
 | AUTH-01 | Android verifies PIN/pattern/password/biometric; app never reads credential material | auth coordinator, MainActivity | source inspection | Implemented by design; integration test required |
 | AUTH-02 | Failed authentication is throttled and persisted across process restart | `AuthenticationThrottle.kt`, store | `AuthenticationThrottleTest` | Unit-covered |
-| AUTH-03 | Only explicit app-launched Android device-credential confirmation or BIOMETRIC_STRONG success clears the alarm; keyguard dismissal alone never clears it | `MainActivity.kt`, `OwnerAuthenticationCoordinator.kt` | authentication result handling; owner-reported authentication protection PASS | Implemented by source; target-device authentication reported PASS |
+| AUTH-03 | Only explicit app-launched Android device-credential confirmation or BIOMETRIC_STRONG success clears the alarm; keyguard dismissal alone never clears it | `MainActivity.kt`, `OwnerAuthenticationCoordinator.kt` | authentication result handling; owner-reported v1.1.3 authentication protection PASS (historical only) | Implemented by source; v1.1.3 target-device authentication reported PASS; current v1.1.5 candidate not revalidated |
 
 ## 4. Android platform and universal OEM compatibility
 
 | ID | Requirement / acceptance condition | Primary owner(s) | Existing test / evidence | Baseline status |
 |---|---|---|---|---|
-| AND-01 | minSdk 26 and target/compile SDK 36 are consistent with current project build | `app/build.gradle.kts` | CI build/lint | CI-verified at baseline; re-evaluate on SDK upgrades |
+| AND-01 | minSdk 26 and target/compile SDK 36 are consistent with the owner-approved project invariant | `app/build.gradle.kts` | Android run #1421 on predecessor `9168d1d` | Source configuration minSdk 26; exact-head build/lint on the current head must be rechecked after final edits; instrumentation is excluded |
 | AND-02 | Charger events are registered at runtime from foreground monitor; do not rely on manifest-only implicit broadcast delivery | monitor service, receiver, manifest | source inspection | Implemented; Android-version device matrix required |
-| AND-03 | Foreground-service declarations/types/permissions match service behavior and target SDK | manifest, monitor/alarm service | CI lint/build | Needs API 34–36 emulator/instrumentation validation and policy review |
-| AND-04 | Exact-alarm denial does not silently claim precise delivery; fallback/recovery is surfaced | scheduler, boot receiver, UI | scheduler test not identified | Needs explicit tests and UI state verification |
-| AND-05 | Notification permission/channel denial is reflected in readiness UI | MainActivity, SettingsActivity | no UI/instrumentation test identified | Needs UI tests |
+| AND-03 | Foreground-service declarations/types/permissions match service behavior and target SDK | manifest, monitor/alarm service | CI lint/build | Manifest, source-contract and lint checks are the non-instrumentation evidence; API 34–37 foreground-service runtime behavior remains physical-device/platform-unverified |
+| AND-04 | Exact-alarm denial does not silently claim precise delivery; fallback/recovery is surfaced | scheduler, boot receiver, UI | `A2DisconnectSchedulerInstrumentationTest`; Settings and Setup Status expose exact-alarm access | Inexact idle-aware fallback is implemented and recorded; Android can defer it substantially in Doze, so precise eight-second delivery is not claimed. Historical instrumentation source is not run under current policy |
+| A2-01 | Trusted ACL connect/disconnect is detected while the foreground service is alive and while its process is absent; per-device encrypted grace deadlines survive process death, reconnect invalidates the matching deadline, and stale/old-boot, pre-authentication, and pre-package-update callbacks cannot latch an alarm | `A2BluetoothAclReceiver.kt`, `A2DisconnectScheduler.kt`, `ProtectionMonitorService.kt`, `AlarmDeadlineReceiver.kt`, `TrustedBluetoothRegistry.kt` | `A2DisconnectPolicyTest`, `A2DisconnectSchedulerInstrumentationTest`, `A2BluetoothReceiverControllerInstrumentationTest` | Implementation and JVM policy/registry coverage exist; instrumentation source is dormant and not compiled/executed; Doze throttling, force-stop, process-absent delivery and OEM ACL behavior remain device-dependent |
+| AND-05 | Notification permission/channel denial is reflected in readiness UI | `SetupStatusSnapshot.kt`, `NotificationSetupStatusPolicy.kt`, Settings and Setup Status screens | `NotificationSetupStatusPolicyTest` covers enabled/disabled app notifications and missing/blocked/available alarm channels | State mapping is unit-covered; actual OS permission-dialog and notification-delivery behavior remains physical-device acceptance |
 | AND-06 | Full-screen intent access is treated separately from app lock-screen dashboard preference | alarm service, settings UI | source/UI inspection | Implemented; API 34+ policy and behavior require verification |
-| AND-07 | Edge-to-edge/system bars/cutouts keep controls reachable | compatibility helper, both activities | no screenshot/instrumentation test identified | Implemented; emulator UI matrix required |
+| AND-07 | Edge-to-edge/system bars/cutouts keep controls reachable | compatibility helper, both activities | no screenshot/instrumentation test identified | Implemented; TalkBack, font scaling, edge-to-edge and OEM display behavior require physical-device acceptance |
 | OEM-01 | Detect Samsung One UI and provide manual background guidance | compatibility helper | compatibility unit tests | Unit-covered guidance; device menus vary |
 | OEM-02 | Detect HONOR MagicOS / Huawei EMUI and explain Manage automatically + three manual switches | compatibility helper | HONOR guide unit tests | Unit-covered guidance; user-reported HONOR 200 Pro test only |
 | OEM-03 | Detect Xiaomi / Redmi / POCO (MIUI / HyperOS) | compatibility helper | family unit tests | Unit-covered detection; device menus unverified |
@@ -84,13 +88,13 @@
 | ID | Requirement / acceptance condition | Primary owner(s) | Existing test / evidence | Baseline status |
 |---|---|---|---|---|
 | PRIV-01 | Local protection core has no backend, analytics, advertising, or cloud dependency; INTERNET permission is restricted to explicit GitHub release checks | manifest, updater, Gradle dependencies, app code | manifest/dependency inspection and updater code review | Implemented; re-audit every dependency and network change |
-| PRIV-02 | No unnecessary contacts/location/microphone/CAMERA/SMS permissions; optional flash uses CameraManager torch control without camera capture permission; camera and flash hardware are optional features | manifest, `AlarmFlashController.kt` | manifest inspection; no CAMERA permission added | Implemented by source; Google Play device filtering and torch behavior require final merged-manifest/physical validation |
+| PRIV-02 | No unnecessary contacts/SMS/microphone permissions; CAMERA permission is optional and requested only after owner opt-in for front-camera evidence; torch control remains CAMERA-permission-free; camera/flash hardware remain optional | manifest, `AlarmFlashController.kt`, `CameraEvidenceCapture.kt`, `CameraEvidenceVault.kt` | manifest + consent-flow static checks, JVM camera policy tests, Android lint/build | Implemented in software; actual front-camera output and OEM camera contention remain physical-device-only |
 | PRIV-03 | Backup disabled for sensitive local protection state | manifest | manifest inspection | Implemented at baseline |
-| PRIV-04 | Local event history bounded and contains no owner credential material | local tamper history | source inspection; capacity test not identified | Implemented; boundedness test needed |
-| PRIV-05 | Audio document URI permissions are scoped to user-selected files | audio store | source inspection | Implemented; provider revocation test needed |
+| PRIV-04 | Local event history bounded and contains no owner credential material | `LocalTamperHistory.kt` | `LocalTamperHistoryPolicyTest` verifies the 100-entry cap, newest-first reads, length bounds and control/line-separator sanitization without Android instrumentation | Implementation and pure retention/sanitization policy are JVM-covered; Android preference persistence and CSV export remain physical-device acceptance items |
+| PRIV-05 | Audio document URI permissions are scoped to user-selected files | audio store | source inspection | Implemented; provider permission revocation remains physical-device acceptance |
 | SEC-01 | No accessibility-based power-menu interception, privilege escalation, or hidden system API | app source/dependencies | source review | Prohibited by design; audit on each change |
-| SEC-02 | Device Admin and Device Owner are clearly distinguished | managed controller, docs, UI | source/docs review; user-reported separate-device enrollment/rollback PASS | Implemented; user-reported physical pass, independent reproduction not recorded |
-| SEC-03 | Managed restrictions require explicit Device Owner provisioning; snapshot admin-scoped restriction values and the DPM-visible Lock Task baseline; roll back partial enable; expose recovery for damaged metadata; keep Safe Boot and USB debugging available; never auto-reenter kiosk while rollback is pending | `ManagedProtectionController.kt`, `ManagedPolicySnapshot.kt`, MainActivity, Device Owner guide | `ManagedPolicySnapshotTest`; exact-source/workflow CI run `42479548944`; no Device Owner instrumentation test | Source and unit coverage implemented. New builds restrict Settings factory reset, adding users and USB file transfer only. Safe Boot and USB debugging remain recovery paths. Emergency rollback clears this feature's restrictions, removes its allowlist, and re-enables Home, Overview, notifications, system info, global actions and Keyguard. Android 14+ Lock Task getters return resolved policy rather than per-admin values; a multi-admin device may not expose enough information to reconstruct another admin's contribution. User reports Device Owner enrollment and in-app rollback PASS on a separate test device; device model/build and independent reproduction are not recorded |
+| SEC-02 | Device Admin and Device Owner are clearly distinguished | managed controller, docs, UI | source/docs review; user-reported separate-device enrollment/rollback PASS (historical report) | Implemented; separate-device owner report only; model/build and independent reproduction not recorded; current candidate not revalidated |
+| SEC-03 | Managed restrictions require explicit Device Owner provisioning; snapshot admin-scoped restriction values and the DPM-visible Lock Task baseline; roll back partial enable; expose recovery for damaged metadata; keep Safe Boot and USB debugging available; never auto-reenter kiosk while rollback is pending | `ManagedProtectionController.kt`, `ManagedPolicySnapshot.kt`, MainActivity, Device Owner guide | `ManagedPolicySnapshotTest`; exact-source/workflow CI run `42479548944`; no Device Owner instrumentation test | Source and unit coverage implemented. New builds restrict Settings factory reset, adding users and USB file transfer only. Safe Boot and USB debugging remain recovery paths. Emergency rollback clears this feature's restrictions, removes its allowlist, and re-enables Home, Overview, notifications, system info, global actions and Keyguard. Android 14+ Lock Task getters return resolved policy rather than per-admin values; a multi-admin device may not expose enough information to reconstruct another admin's contribution. User reports Device Owner enrollment and in-app rollback PASS on a separate test device (historical report); device model/build and independent reproduction are not recorded; current candidate not revalidated |
 | SEC-04 | Do not claim protection against force-stop, uninstall, physical shutdown, battery removal, recovery/bootloader, firmware, or factory reset | UI, privacy notice, docs | source/docs review | Documented limitation |
 | DOC-01 | Master spec is implementation contract | `UNIVERSAL_MAXIMUM_PROTECTION_SPEC.md` | file exists | Present |
 | DOC-02 | Every requirement maps to owner files, tests, and evidence | this matrix | updated source baseline and explicit device-unverified labels | Implemented; update when code or test evidence changes |
@@ -101,9 +105,10 @@
 
 ### Automated
 - Unit tests for state transitions, stale event rejection, monotonic deadlines, reboot identity, authentication throttling, compatibility-family mapping, alarm volume restoration, corrupted storage, and failed persistence writes.
-- Android instrumentation tests for runtime receiver registration, foreground-service start restrictions, exact-alarm permission changes, notification permission/channel behavior, keyguard dismissal, Device Admin lock behavior, audio routing, and process recreation.
-- Emulator runs for API 26, 28, 29, 30, 31, 32, 33, 34, 35, and 36 (at minimum, representative API levels plus boundary versions).
-- Static checks: lint, manifest/permission audit (confirm no CAMERA permission and optional camera/flash hardware features), dependency audit, packaged asset integrity, APK package/version/signer verification.
+- JVM unit tests for pure state, policy, crypto, preference-decoding and compatibility logic; source-contract checks for manifest, permissions, state ownership, navigation and release identity; Android lint; debug/release APK packaging and metadata/signer verification; CodeQL.
+- Android instrumentation tests and emulator matrices are excluded by owner direction. Do not compile or execute `app/src/androidTest` sources.
+- Physical OEM acceptance remains a separate real-device gate for process lifecycle, alarm delivery/audio, Bluetooth accessories, Keyguard, Device Owner, permissions, TalkBack and manufacturer battery policies.
+- Static checks: lint, manifest/permission audit (confirm CAMERA is declared but requested only after explicit owner opt-in, no camera FGS or microphone/background-location permission), dependency audit, packaged asset integrity, APK package/version/signer verification.
 - Alarm flashlight unit checks for ALARM_TRIGGERED-only gating and slow pulse cadence; physical test must confirm LED pulses with audio and turns off after successful authentication.
 
 ### Physical OEM acceptance
@@ -117,18 +122,17 @@
 - ASUS, Sony, Nothing, Tecno, Infinix, and ZTE when hardware is available.
 - For each device: plug/unplug event timing; reconnect; screen off; foreground/background; battery saver; app swipe-away; force-stop boundary; reboot; exact-alarm denied/granted; notification denied/granted; audio route/volume; secure lock screen; Device Admin opt-in/out; OS update; app update.
 
-## 7. Definition of Done
+## 7. Definition of Done — code/GitHub scope
 
-A requirement is **complete** only when:
-1. Its owner implementation is present and reviewed.
-2. Its failure modes and cross-file interactions are covered by automated tests where testable.
-3. CI passes on the exact commit.
-4. Device-dependent behavior is validated on the named Android/OEM targets, or explicitly remains marked **Device-unverified**.
-5. UI and documentation accurately describe actual capability and limitations.
-6. No unrelated feature or cloud dependency is introduced.
-7. PR remains unmerged until the owner explicitly approves integration.
+A requirement is **complete** for this task only when:
+1. Its implementation is present and reviewed across the connected source files.
+2. Its software failure modes and cross-file interactions are covered by JVM tests or explicit static/source-contract checks where testable.
+3. Android build, JVM unit tests, lint, APK metadata/package/signing-contract checks, and CodeQL pass on the exact final commit.
+4. UI, security claims, permissions, and documentation accurately describe implemented behavior and platform limitations.
+5. No unrelated feature, cloud dependency, or destructive migration is introduced.
+6. The Draft PR remains unmerged until the owner explicitly approves integration.
 
-**No universal compatibility guarantee is implied by generic fallback guidance or a successful CI run.**
+Physical-device tests, emulator tests, and instrumentation compilation/execution are excluded from this task and do not block code/GitHub completion. **A green CI run does not imply universal hardware/OEM compatibility.**
 
 
 ## 8. Recent audit changes
@@ -154,3 +158,125 @@ A requirement is **complete** only when:
 - CI debug signing: the debug keystore path is created before cache restore so the cache action can save the first generated development key; push builds can reuse that identity. This is not a production release key.
 - Documentation corrections align charger receiver registration with the runtime foreground-service registration, and align the stated target SDK with Gradle (API 36).
 - Android 17 background-audio behavior is documented against the official platform guidance: [Android 17 background audio hardening](https://developer.android.com/develop/background-work/services/fgs/changes) and [Android 17 audio hardening details](https://developer.android.com/about/versions/17/changes/bg-audio).
+
+
+## Phase 10–12 additional traceability
+
+| ID | Requirement / acceptance condition | Primary owner(s) | Existing test / evidence | Status / limitation |
+|---|---|---|---|---|
+| DEV-INT-01 | Android 16+ ranging capability check is explicitly owner-initiated from Device Intelligence or Bluetooth Center; both screens share one bounded local availability callback; do not declare/request RANGING or location permission; never discover peers or create a ranging session | `DeviceIntelligenceActivity.kt`, `BluetoothCenterActivity.kt`, `RangingCapabilityQuery.kt`, `RangingCapabilityStatus.kt` | `RangingCapabilityStatusTest`; `verify_ranging_privacy.py`; exact-head Kotlin compile/JVM CI; Android API 36 RangingManager contract review | Implemented and CI-verified; callback is bounded to 8 seconds and lifecycle-cleaned; OEM capability response requires physical API 36+ device verification |
+| PRIV-06 | Privacy policy accurately states that no RANGING permission is requested and no peer/session/location data is collected or uploaded | `docs/PRIVACY_POLICY.md`, Device Intelligence screen | Manifest permission inventory and source review | Documentation aligned; exact-head CI still required |
+| CI-10 | No Android instrumentation source compilation/execution or emulator matrix in Android/release workflows | `scripts/verify_no_instrumentation.py`, Android and release workflows, Gradle config | CI policy guard | Enforced by source-contract step; physical-device and emulator acceptance excluded |
+| REL-11 | Release candidate remains off `main` until exact-head CI, security reassessment and signed preflight are complete; publish only the approved signed GitHub release | Release workflow and branch policy | GitHub branch/PR/release inventory review | Owner authorized official GitHub release continuation on 2026-11-24; physical-device testing is owner-operated after delivery, not a merge gate |
+| DEV-12 | Physical acceptance records exact device, OS/API, OEM build, app version, tested commit, scenario and observed result | Device compatibility and HONOR 200 Pro acceptance documents | Physical-device evidence template | OUT OF SCOPE for current code/GitHub completion; retained as reference only |
+
+
+## Owner scope and current GitHub review — 2026-11-17
+
+- Authorized completion scope: repository code, documentation, non-instrumentation CI, and GitHub branch/PR readiness only.
+- Explicitly excluded: physical-device tests, emulator tests, instrumentation compilation/execution, and hardware/OEM acceptance.
+- Working branch HEAD: `c711bc16cb9a42452e10c8ec47f40b7d20fefe8a`.
+- Draft review PR: [#7 — ThiefAlertSeQure Phases 0–12 code completion](https://github.com/alinor2pundamdag/ThiefAlertSeQure/pull/7); draft and unmerged.
+- Exact-head CI for PR #7 has not yet been observed in the connector results at the time of this update. The last evidenced Android/CodeQL success remains the earlier commits listed above.
+- Branch comparison at this snapshot: 500 commits ahead (API comparison cap), 1 behind `main`; divergence remains unresolved. No merge or rebase was performed.
+
+
+## Continued software audit — 2026-11-17
+
+- Confirmed authentication freshness defect fixed in `e17f482264eba0d027b92499010be3b72c6d0086`: mismatched availability of issued/current boot identity now rejects the ephemeral proof.
+- Regression coverage added in `80c8c52be927db24a31a7c08d699998ffb72d559`: known-to-unknown, unknown-to-known, and both-unknown identity cases.
+- Instrumentation policy guard strengthened in `1e69aeb6b412ca52c9b79049e8be024cda8fb817`: it now scans every Gradle build/configuration file (`.gradle`, `.gradle.kts`, `.toml`) and all GitHub Actions workflow YAML files for forbidden instrumentation/emulator build wiring.
+- Historical FIXALL changes were committed on `work/phase-0-12-coding`; they have not yet received independently confirmed exact-head Android/JVM/CodeQL CI results.
+- Source review in this continuation covers the charger, protection state/persistence, alarm scheduling/recovery, boot, monitor lifecycle, A2 Bluetooth registry/scheduler/receiver, encryption, updater, alarm audio/volume, and authentication flows. Repository-wide audit remains open; no claim of 100% source audit is made.
+- Physical-device, emulator, and instrumentation execution remain explicitly excluded from the owner's completion criteria.
+
+
+### A2 concurrent deadline-store hardening — 2026-11-17
+
+- A2 pending deadline persistence now serializes schedule/find/cancel/clear operations to prevent concurrent ACL callbacks for different accessories from overwriting the shared encrypted list.
+- Failed schedule cleanup now uses the same isolated preference/PendingIntent namespace as the originating operation.
+- Pure per-device merge helper preserves unrelated accessory records and replaces only a case-insensitive match.
+- JVM tests added in `app/src/test/java/com/thiefalertsequre/app/A2DisconnectSchedulerMergeTest.kt`.
+- Source commits: `5cf2da0b7c1f134e9a1fcdfd4b913a2561aa85c3`, `679f22ac7c2721af15e298a851fdbbfbf8c4b31e`; test commit: `f5bf25576de8a903699a989924a515ea506401a6`.
+- Exact-head CI remains pending; this is not yet CI-verified.
+
+
+## 2026-11-17 continuation snapshot
+
+The CodeQL gate passed after the APK-installer suppression comments were moved to the exact flagged sink lines in `SettingsActivity.kt`. The underlying updater still verifies its private-cache APK by SHA-256, production package ID, increasing versionCode and pinned release certificate. The release workflow's manual signed preflight allowlist is restricted to `main` only. Android JVM/static/lint/APK verification is rerun on the final follow-up branch HEAD; do not reuse a prior commit's result as exact-head evidence. Physical-device, emulator and instrumentation testing remain outside the owner-authorized task scope.
+
+
+## Exact-head verification update — 2026-11-17
+
+- Exact working-branch HEAD: `a1a567bf53f97189be2547ccf872ae665c30a54b`.
+- Android/JVM/static/lint/APK workflow: [#44005105554 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105554).
+- CodeQL Java/Kotlin and Actions analysis: [#44005105442 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105442).
+- Branch comparison: 530 ahead / 0 behind; 131 changed files (90 added, 41 modified, 0 deleted).
+- Recursive tree: 64 production Kotlin source files; no truncation. Automated marker/pattern sweeps covered the source set, with focused manual review of high-risk paths; this is not claimed as exhaustive line-by-line formal verification.
+- PR #7 has one unresolved inline review thread. The thread references CodeQL alert #8, but the alert's actual active/closed state could not be retrieved through the available GitHub connector. Alert closure remains **NOT VERIFIED**.
+- Permanent release signing-secret presence and production-signed APK availability remain **NOT VERIFIED**. Release workflow is fail-closed and production publication remains unauthorized.
+- Instrumentation compilation/execution, emulator tests and physical-device tests were not performed and remain excluded.
+- PR #7 remains draft/open/unmerged. `main` remains untouched.
+
+
+## Exact-head verification closeout — 2026-11-17
+
+- Android [#44010766603 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010766603) and CodeQL [#44010774991 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010774991) on `e97817903976689f02cba8bb485fc160a7122fd3`.
+- 30 JVM unit-test source files; all passed in the Android workflow. Fifteen dormant `androidTest` source files were not compiled or executed.
+- Android lint, manifest/preferences/navigation/state-ownership checks, asset validation, release workflow YAML validation, release identity check, debug APK metadata, minified release metadata, package/version/signer checks and artifact upload all passed.
+- Branch comparison is 530 ahead / 0 behind, 131 changed files (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged and mergeable.
+- CodeQL alert #8 closure and permanent release signing-secret availability remain unverified; neither is inferred from workflow success.
+- No physical-device, emulator or instrumentation test was performed.
+
+
+## Final verified candidate snapshot — 2026-11-17
+
+- Exact candidate `e97817903976689f02cba8bb485fc160a7122fd3`: Android [#44010766603 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010766603), CodeQL [#44010774991 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010774991).
+- 30 JVM unit-test source files passed; 15 dormant instrumentation source files were not compiled or executed.
+- Source checks, lint, asset validation, release workflow YAML, release identity, APK metadata/package/version/signer checks and artifact upload passed.
+- Branch comparison before this one documentation-only refresh: 530 ahead / 0 behind; after it: 531 ahead / 0 behind. PR #7 remains draft/open/unmerged.
+- Alert #8 closure and permanent production signing-secret availability remain unverified.
+
+
+## Authoritative latest candidate verification — 2026-11-17
+
+- Exact candidate `524754f683d43450c844bca05147e66c15baf3d6`: Android [#44011669247 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44011669247), CodeQL [#44011663424 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44011663424).
+- Android passed the 30-file JVM unit suite, instrumentation-disabled guard, source-contract checks, lint, asset validation, APK packaging/metadata, release metadata, package/version/signer checks and artifact upload. CodeQL Java/Kotlin and Actions analyses passed.
+- The artifact is development-only; production signing is not verified. CodeQL alert #8's active/closed status is not verified.
+- Branch comparison: 531 ahead / 0 behind; 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged.
+- No instrumentation compilation/execution, emulator or physical-device testing was performed.
+
+
+## Bypass Charging integration — product roadmap Phase 4
+
+| ID | Requirement | Source / evidence | Status |
+|---|---|---|---|
+| BYPASS-01 | Per-device OEM adapter must explicitly probe hardware support; manufacturer/model name alone is not proof | BypassChargingController.kt, BypassChargingAdapterRegistry, BypassChargingControllerTest | Framework implemented; registry intentionally empty pending certified OEM interface |
+| BYPASS-02 | ON/OFF command requires explicit authorization and a readable initial state | BypassChargingController.kt, JVM tests | Unit-covered policy |
+| BYPASS-03 | Actual mode must be read back after every command; no optimistic green state | BypassChargingController.kt, JVM tests | Unit-covered policy |
+| BYPASS-04 | UI must not offer a functional toggle without a verified adapter; unknown must not be labelled OFF | SettingsActivity.kt, source guard | Implemented; switch remains disabled on current devices |
+| BYPASS-05 | Do not add hidden/privileged permissions, arbitrary shell, sysfs, hidden APIs, Accessibility workarounds or privilege escalation | Manifest review, verify_bypass_charging_contract.py | Source guard added; no new permission |
+| BYPASS-06 | OEM persistence/reboot behavior and physical charging path must be certified per model/firmware | docs/BYPASS_CHARGING_INTEGRATION.md | Not verified; requires authorized OEM interface and separate device acceptance |
+
+
+## Official GitHub release continuation — 2026-11-24
+
+- The owner explicitly authorized continuing to the official release. The selected target is the existing GitHub Releases APK channel.
+- The 1,504-commit PR #7/#8 stack was audited and consolidated into the clean single-snapshot release branch `release/v1.1.5-candidate`; `main` remains unchanged.
+- Exact-head CI and CodeQL must pass on the clean branch. The previous stack's CI results are not substituted for clean-branch evidence.
+- The current GitHub Actions release workflow has a manual signed preflight restricted to `main`; it verifies the permanent keystore, pinned production signer, monotonic versionCode and signed APK metadata without publishing. Tag publication is a separate step after preflight; physical-device testing is performed separately by the owner after APK delivery.
+- The obsolete PR #7 APK-installer review thread was formally reassessed against PR #9 and resolved. The repository-wide CodeQL alert #8 active/closed state remains **NOT VERIFIED**; no alert dismissal is claimed.
+- The software candidate and exact code-head automated checks are complete. Official signed preflight, owner physical acceptance after delivery, and tag publication remain separate release operations.
+
+
+## Owner-deferred requests — no implementation GO
+
+The owner explicitly deferred these features pending a separate GO signal. No later GO for these specific features was found in the retrieved project history; they are not part of v1.1.5:
+
+- Active prevention/interruption of Android power-menu, shutdown or reboot actions. Existing code observes permitted power-transition signals; it does not prevent hardware shutdown.
+- Guaranteed protection execution while the device is powered off.
+- Unconditional, non-opt-in, or background front-camera capture. The existing feature is explicitly enabled in Settings and CAMERA-permission-gated; it attempts one still only after successful owner authentication while the Activity is visible.
+- New camera/flashlight concurrency-prevention behavior beyond existing separate controls.
+- Maximum/premium expansion outside the approved release scope.
+
+Do not implement or assign these to a release without a separate explicit owner GO.

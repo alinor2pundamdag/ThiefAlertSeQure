@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
+import java.util.Locale
 import android.view.View
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -24,7 +25,7 @@ object AndroidDeviceCompatibility {
     }
 
     fun family(manufacturer: String, brand: String): Family {
-        val value = "${manufacturer.lowercase()} ${brand.lowercase()}"
+        val value = "${manufacturer.lowercase(Locale.ROOT)} ${brand.lowercase(Locale.ROOT)}"
         return when {
             "samsung" in value -> Family.SAMSUNG
             "honor" in value || "huawei" in value -> Family.HONOR_HUAWEI
@@ -45,7 +46,7 @@ object AndroidDeviceCompatibility {
 
     fun familyLabel(manufacturer: String, brand: String): String = when (family(manufacturer, brand)) {
         Family.SAMSUNG -> "Samsung One UI"
-        Family.HONOR_HUAWEI -> if ("huawei" in manufacturer.lowercase() + brand.lowercase()) "Huawei / EMUI" else "HONOR / MagicOS"
+        Family.HONOR_HUAWEI -> if ("huawei" in manufacturer.lowercase(Locale.ROOT) + brand.lowercase(Locale.ROOT)) "Huawei / EMUI" else "HONOR / MagicOS"
         Family.XIAOMI -> "Xiaomi / Redmi / POCO (MIUI / HyperOS)"
         Family.OPPO_REALME_ONEPLUS -> "OPPO / realme / OnePlus"
         Family.VIVO_IQOO -> "vivo / iQOO"
@@ -96,7 +97,7 @@ object AndroidDeviceCompatibility {
             Family.SAMSUNG ->
                 "Samsung One UI: Settings → Battery (or Battery and device care → Battery) → Background usage limits → Never sleeping apps → add ThiefAlertSeQure. Also check App info → Battery for an Unrestricted option if your One UI release offers it. Do not place the app in Sleeping or Deep sleeping apps. Samsung may move these controls between One UI releases."
             Family.HONOR_HUAWEI ->
-                "HONOR MagicOS / Huawei EMUI: Settings → Apps → App launch (or Launch management) → ThiefAlertSeQure. If Manage automatically is available, turn it off and enable Auto-launch, Secondary launch, and Run in background. Also review Battery optimization / App launch settings. Some releases use different labels."
+                "HONOR MagicOS / Huawei EMUI: Settings → Apps → App launch (or search Settings for App launch) → ThiefAlertSeQure. On some MagicOS builds, use Optimizer / Phone Manager → Battery or % remaining → App launch. Turn Manage automatically OFF, then enable Auto-launch, Secondary launch, and Run in background. Next search Settings for Battery optimization → select All apps → ThiefAlertSeQure → choose Don't allow (wording can vary). Open Recents and swipe down on the ThiefAlertSeQure card until the lock icon appears. For acceptance testing, turn off Power saving and Ultra power saving, keep app notifications enabled, and do not Force stop the app. Menu names vary by MagicOS release and region; these are owner actions, not settings the app can change programmatically."
             Family.XIAOMI ->
                 "Xiaomi / Redmi / POCO: App info → Battery saver / Power → No restrictions (where offered). Then Settings → Apps → Permissions → Background autostart (or Autostart) → allow ThiefAlertSeQure. If available, lock the app in Recents. HyperOS and MIUI menus differ by release and region."
             Family.OPPO_REALME_ONEPLUS ->

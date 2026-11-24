@@ -3,8 +3,22 @@ package com.thiefalertsequre.app
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 class AndroidDeviceCompatibilityTest {
+    @Test fun manufacturerDetectionIsIndependentOfTheDeviceLocale() {
+        val previous = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.forLanguageTag("tr-TR"))
+            assertEquals(AndroidDeviceCompatibility.Family.XIAOMI, AndroidDeviceCompatibility.family("XIAOMI", "REDMI"))
+            assertEquals(AndroidDeviceCompatibility.Family.TRANSSION, AndroidDeviceCompatibility.family("INFINIX", "INFINIX"))
+            assertEquals(AndroidDeviceCompatibility.Family.GOOGLE_PIXEL, AndroidDeviceCompatibility.family("GOOGLE", "PIXEL"))
+            assertEquals("Huawei / EMUI", AndroidDeviceCompatibility.familyLabel("HUAWEI", "HUAWEI"))
+        } finally {
+            Locale.setDefault(previous)
+        }
+    }
+
     @Test fun recognizesSamsungFromManufacturerOrBrand() {
         assertEquals(AndroidDeviceCompatibility.Family.SAMSUNG, AndroidDeviceCompatibility.family("samsung", "SM"))
         assertEquals(AndroidDeviceCompatibility.Family.SAMSUNG, AndroidDeviceCompatibility.family("unknown", "Samsung"))
@@ -82,6 +96,17 @@ class AndroidDeviceCompatibilityTest {
             .forEach { expected -> assertTrue(guides.any { it.contains(expected, ignoreCase = true) }) }
     }
 
+    @Test fun honorBackgroundGuideIncludesBatteryAndRecentsSafeguards() {
+        val guide = AndroidDeviceCompatibility.backgroundSettingsGuide("HONOR", "HONOR")
+        listOf(
+            "Manage automatically OFF", "Auto-launch", "Secondary launch",
+            "Run in background", "Optimizer", "App launch", "Battery optimization",
+            "All apps", "Don't allow", "Recents", "lock icon", "Power saving", "Force stop"
+        ).forEach { expected ->
+            assertTrue("HONOR guide must include $expected", guide.contains(expected, ignoreCase = true))
+        }
+    }
+
     @Test fun everyRecognizedFamilyHasGuidanceForAllThreeControls() {
         val devices = listOf("Samsung", "HONOR", "Huawei", "Xiaomi", "OPPO", "realme",
             "OnePlus", "vivo", "iQOO", "Google", "Motorola", "Unknown")
@@ -124,4 +149,31 @@ class AndroidDeviceCompatibilityTest {
             )
         }
     }
+    @Test fun honorBackgroundLaunchControlsRemainExplicitlyUnverified() {
+        val item = OemBackgroundSetupPolicy.evaluate("HONOR", "HONOR")
+        assertEquals("oem_background", item?.id)
+        assertEquals(SetupState.UNKNOWN, item?.state)
+        listOf("Manage automatically OFF", "Auto-launch", "Secondary launch",
+            "Run in background", "Battery optimization", "Recents", "Power saving")
+            .forEach { assertTrue(item!!.detail.contains(it, ignoreCase = true)) }
+    }
+
+    @Test fun huaweiUsesTheSameManualBackgroundLaunchPolicy() {
+        assertEquals(SetupState.UNKNOWN, OemBackgroundSetupPolicy.evaluate("HUAWEI", "HUAWEI")?.state)
+    }
+
+    @Test fun nonHonorDevicesDoNotReceiveHonorOnlySetupItem() {
+        assertEquals(null, OemBackgroundSetupPolicy.evaluate("Google", "Pixel"))
+    }
+
+    @Test fun HONORSetupSummaryRetainsAllTenReadinessItems() {
+        val items = (1..9).map { index ->
+            SetupItem("item_$index", "Readiness $index", SetupState.UNKNOWN, "Manual check")
+        } + SetupItem(
+            "a2", "Trusted Bluetooth readiness", SetupState.UNKNOWN, "Reconnect trusted accessory"
+        )
+        val summary = SetupSnapshot(items).dashboardSummary()
+        assertTrue(summary.contains("Trusted Bluetooth readiness"))
+    }
+
 }

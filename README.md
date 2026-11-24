@@ -17,8 +17,8 @@
     </a>
     <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" alt="Android 8.0 and newer" />
     <img src="https://img.shields.io/badge/Privacy-On--device-2D6CDF" alt="On-device privacy" />
-    <img src="https://img.shields.io/badge/Version-1.1.3-1677D2" alt="Version 1.1.3" />
-    <img src="https://img.shields.io/badge/Owner%20device%20tests-11%2F11%20PASS-2E8B57" alt="Owner-reported 11 of 11 physical test scenarios passed" />
+    <img src="https://img.shields.io/badge/Candidate-1.1.5%5FDeveloper%5FAlinor-1677D2" alt="Candidate 1.1.5_Developer_Alinor" />
+    <img src="https://img.shields.io/badge/v1.1.3%20owner%20tests-11%2F11%20PASS-2E8B57" alt="Owner-reported 11 of 11 physical test scenarios passed on v1.1.3 only" />
     <img src="https://img.shields.io/badge/Updates-Owner--initiated%20GitHub%20releases-2D6CDF" alt="Owner initiated GitHub updates" />
     <img src="https://img.shields.io/badge/License-See%20LICENSE-lightgrey" alt="License information" />
   </p>
@@ -26,9 +26,9 @@
 
 ---
 
-## ✅ Owner-reported physical-device verification
+## ✅ Historical owner-reported physical-device verification — v1.1.3 only
 
-The app owner reports that all 11 planned v1.1.3 scenarios passed on a HONOR 200 Pro:
+The app owner reports that all 11 planned v1.1.3 scenarios passed on a HONOR 200 Pro. These results apply only to that earlier v1.1.3 build and do not certify the current v1.1.5 Batch Four candidate:
 
 1. Automatic arming after charger connection
 2. Charger-removal countdown
@@ -42,7 +42,7 @@ The app owner reports that all 11 planned v1.1.3 scenarios passed on a HONOR 200
 10. Recovery after reboot
 11. Lock-screen alarm presentation
 
-These are owner-performed physical-device tests. CI separately verifies automated build, unit-test, lint, and APK checks; it does not independently reproduce every handset scenario. Results on other Android devices and OEM builds may differ.
+These are owner-performed physical-device tests on the earlier v1.1.3 build. The current v1.1.5 Batch Four candidate has not undergone physical-device acceptance: the Phase 12 record remains 0/25 PASS and 25/25 NOT TESTED. CI separately verifies automated build, unit-test, lint, and APK checks; it does not independently reproduce handset scenarios. Results on other Android devices and OEM builds may differ.
 
 ## 🛡️ A small layer of protection when your phone is charging
 
@@ -64,7 +64,7 @@ It is a practical deterrent and awareness tool—not a guarantee against theft, 
 | Persistent triggered state | Plugging the charger back in does not silence an already-triggered alarm. |
 | Synchronized visual alarm | Slow rear-LED flashlight pulses by default only while the alarm is latched; the owner can disable it. It stops after successful owner authentication, uses no camera permission and captures no images/video. |
 | Local-first privacy | No account, cloud backend, analytics service, or advertising SDK. Internet is used only for owner-initiated GitHub release checks and APK downloads; protection data is not uploaded. |
-| Your own alarm sound | Choose supported audio through Android's system file picker; the packaged alarm is available as the built-in option. |
+| Your own alarm sound | Choose from five Android-generated built-in alarm tones plus the packaged default, or select custom audio through Android's system file picker. A custom main alarm overrides the selected built-in tone. |
 | Owner-controlled updates | Check for official GitHub releases from Settings; the app verifies the APK checksum, package identity, version and pinned release certificate before opening Android's installer. |
 | Loud alarm behavior | The app requests the maximum alarm-stream volume Android reports and restores the previous level after successful disarm. Actual output remains device-dependent. |
 | Optional motion alert | Enable a separate motion-triggered alarm when wanted. It is OFF by default. |
@@ -110,7 +110,7 @@ ThiefAlertSeQure is designed to do its essential work on your Android device.
 - No configured advertising SDK or analytics tracker.
 - No sale or advertising-based sharing of app-collected data.
 - No collection of your device PIN, password, pattern, fingerprint data, or face templates.
-- No location, contacts, SMS, microphone, or **camera permission** is requested. The optional flashlight uses Android's public torch API; it does not open the camera or capture photos/video. Flash hardware is optional, so devices without a usable LED can still install and use the audio alarm.
+- Contacts, SMS, and microphone permissions are not requested. CAMERA permission is requested only if the owner explicitly enables front-camera photo evidence in Settings. One still photo is captured only after successful Android owner authentication disarms a latched alarm while the app is visible; Android shows its camera privacy indicator. New photos appear in Gallery as unencrypted JPEGs by default; Settings can enable AES-GCM encryption for future captures into the private photo vault. The two storage locations cap at 20 photos each and apply a 30-day retention window (2 MiB each). Expired-photo cleanup is deferred while protection is active and runs only while DISARMED, so expired Gallery files may remain visible until the next disarmed session. Changing the toggle affects future captures. Settings also provides an explicit existing-photo migration: each verified app-owned Gallery image is copied to the AES-GCM vault, read back and verified, then its original is removed only if unchanged and protection remains DISARMED; failed or capacity-limited items stay in Gallery. Android 10+ uses MediaStore owner attribution. On Android 8–9, only rows recorded in the app's encrypted private ownership index can be managed; older unindexed Gallery files are left untouched. Gallery photos are visible to apps with photo access until safely migrated or deleted. The private photo-vault key is Android Keystore-backed and is never exported; clearing app data or uninstalling can make encrypted photos unrecoverable. The separate password-encrypted event-metadata backup does not include camera-photo bytes; export individual photos while protection is DISARMED if portable copies are needed. No background camera service, video, or cloud upload is used. Optional coarse/fine location permission is requested only after the owner explicitly chooses to save one cached or one current GPS/network location result into the encrypted local evidence vault. Current requests time out after 20 seconds. No background location or continuous tracking is used. The owner can export or restore the metadata vault through a separate password-encrypted backup file. The optional flashlight uses Android's public torch API independently and does not capture photos/video.
 
 ### What stays on your device
 
@@ -120,11 +120,11 @@ The app keeps the operational data it needs in its private app storage, includin
 - Biometric failure counter and temporary cooldown deadline.
 - Your recorded privacy-notice choice.
 - Alarm-volume value needed for restoration after successful disarm.
-- A bounded local protection-event history.
+- A bounded local protection-event history and a separate AES-GCM encrypted evidence metadata vault (up to 100 records, 30-day retention). The vault includes only events and location snapshots the owner explicitly requests; the owner can export/restore the vault through a separate password-encrypted backup file.
 - Monitor preferences, such as motion sensitivity and optional battery-alert threshold.
 - References and Android access grants for audio files you explicitly select.
 
-The event history can be exported only when you choose a destination through Android's document picker. Exported files are then handled by you and the destination you select.
+The event history and encrypted evidence metadata can be exported only when you choose a destination through Android's document picker. A location snapshot is stored only after an explicit action and permission grant; it includes the cached fix age and reported accuracy. Exported files are then handled by you and the destination you select.
 
 ### Your phone's credentials remain yours
 
@@ -156,13 +156,17 @@ Read the complete [Privacy Policy](docs/PRIVACY_POLICY.md).
 - **Manufacturer-aware setup:** Samsung One UI, HONOR MagicOS, Huawei EMUI, Xiaomi / Redmi / POCO, OPPO, realme, OnePlus, vivo / iQOO, Google Pixel, Motorola, ASUS, Sony Xperia, Nothing OS, Lenovo, TECNO / Infinix / itel, ZTE / nubia, and safe generic Android guidance.
 - **Settings fallback:** Public Android Settings action → app-specific settings → general Settings.
 - **Android 15+:** Edge-to-edge safe insets are applied to the app's scrollable screens.
-- **Android 17:** Background alarm audio remains inside the qualifying foreground-service architecture; Android 17 hardening still requires physical/emulator verification.
+- **Android 17:** Background alarm audio remains inside the qualifying foreground-service architecture; Android 17 hardening requires physical-device verification; instrumentation and emulator CI are intentionally disabled.
 
 - **Interface:** Material-based dark UI with a scrollable layout, readable text sizing, and large touch targets.
 
 See the full [Android Device Compatibility Matrix](docs/ANDROID_DEVICE_COMPATIBILITY.md) for API 26–37 behavior, OEM background controls, system-setting fallbacks, limitations, official manufacturer references, and physical-device acceptance tests.
 
 No ordinary app can use one universal setting to override every manufacturer's power manager.
+
+### Bypass Charging integration status
+
+The development candidate includes a guarded integration framework and a Settings entry for Bypass Charging. Direct ON/OFF control is **not available yet** because Android exposes no universal public app API and no model/firmware-specific OEM control adapter has been certified for this project. The control remains disabled and the actual mode remains UNKNOWN until an authorized OEM interface can be read back successfully. Owners can still use any Bypass Charging option exposed by their phone's own Settings or gaming tools. See [Bypass Charging Integration](docs/BYPASS_CHARGING_INTEGRATION.md).
 
 ### Important Android system requirements
 
@@ -183,7 +187,7 @@ On supported builds, this can:
 
 - Keep the app in Lock Task / kiosk mode.
 - Hide the normal global-actions power dialog while Lock Task is active.
-- Apply selected restrictions to Settings factory reset, safe boot, USB file transfer, adding users, and debugging.
+- Apply supported restrictions to factory reset, adding users, and USB file transfer. Safe Boot and USB debugging remain available as owner recovery paths.
 - Provide an in-app action to exit managed mode and remove the policies.
 
 **This is optional and is not enabled on an ordinary phone by default.** Device Owner status requires deliberate provisioning, usually on a new or factory-reset test device. The app cannot grant itself that status.
@@ -209,7 +213,7 @@ Build a debug APK and run unit tests:
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 ```
 
-Branch and pull-request GitHub Actions run unit tests, Android lint, asset validation, APK assembly, package/version verification, and debug-signer verification. They upload a development-only side-by-side test APK using package ID `com.thiefalertsequre.app.v113test`, so it can be installed alongside v1.1.2 without replacing the production app. The test APK is not eligible for official in-app updates. After merge, a manual release preflight can build and verify a permanent-key production APK without publishing; only a `v*` tag push publishes an official release after the permanent signing secrets, version monotonicity, package identity, tests, and pinned certificate all pass.
+Branch and pull-request GitHub Actions run JVM unit tests, static/source-contract checks, Android lint, asset validation, debug and minified-release APK builds, package/version verification, and debug-signer verification. The owner-directed workflow does not compile or execute instrumentation tests and does not run emulator matrices. They upload a development-only side-by-side test APK using package ID `com.thiefalertsequre.app.v114test`, so it can be installed alongside the production app without replacing the production app. The test APK is not eligible for official in-app updates. After merge, a manual release preflight can build and verify a permanent-key production APK without publishing; only a `v*` tag push publishes an official release after the permanent signing secrets, version monotonicity, package identity, tests, and pinned certificate all pass.
 
 A successful CI build confirms that the configured automated checks and APK assembly passed. It does **not** prove correct behavior on every physical phone. Charger broadcasts, alarm timing, sound output, reboot recovery, notifications, and manufacturer battery controls still require real-device testing.
 
@@ -225,6 +229,11 @@ A successful CI build confirms that the configured automated checks and APK asse
 | [Device Owner Mode](docs/DEVICE_OWNER_MODE.md) | Managed-device requirements, capabilities, and rollback. |
 | [Android Settings & Alarm Hardening](docs/ANDROID_SETTINGS_AND_ALARM_HARDENING.md) | System settings and reliability guidance. |
 | [Android Device Compatibility](docs/ANDROID_DEVICE_COMPATIBILITY.md) | API 26–37 behavior, OEM-specific setup, fallback navigation, and device test matrix. |
+| [Official GitHub APK Release Runbook](docs/OFFICIAL_RELEASE_RUNBOOK.md) | Signing secrets, signed preflight, release tag, publication and post-release verification. |
+| [Bluetooth & Root Capability System](docs/BLUETOOTH_ROOT_CAPABILITY_SYSTEM.md) | Local Bluetooth capability catalog, paired-device behavior and optional root boundaries. |
+| [Device Intelligence](docs/DEVICE_INTELLIGENCE.md) | On-device model/API, permission, integrity and capability diagnostics. |
+| [Owner Bluetooth Policy](docs/OWNER_BLUETOOTH_IMPLEMENTATION_POLICY.md) | Approved Bluetooth scope and future-feature authorization boundary. |
+| [Protection Shield Indicator](docs/PROTECTION_SHIELD_INDICATOR.md) | Live protection state visual contract. |
 
 ## ⚠️ Honest security and reliability boundaries
 
@@ -245,15 +254,15 @@ Please test the app on your own device and confirm its permissions and backgroun
 
 ## 📦 Reliable APK updates
 
-**Version:** 1.1.3 (version code 5). Official release availability is determined by the GitHub Releases page and the signed APK assets attached there—not by this README version label.
+**Current release candidate:** 1.1.5_Developer_Alinor (versionCode 7), clean branch `release/v1.1.5-candidate`, PR #9 open/draft/unmerged. Android CI #45307869027 and CodeQL #45307868989 passed on the initial clean candidate head. This is not a production release; the minified PR APK is unsigned and official availability is determined by the GitHub Releases page and signed APK assets attached there.
 
-> **Legacy upgrade note:** v1.1.2 was signed with a different signing certificate. Because that old private key is unavailable, v1.1.3 cannot update that installation in place. Users on v1.1.2 must review the migration instructions and data implications before uninstalling or reinstalling.
+> **Historical legacy upgrade note:** v1.1.2 was signed with a different signing certificate. Because that old private key is unavailable, v1.1.3 cannot update that installation in place. Users on v1.1.2 must review the migration instructions and data implications before uninstalling or reinstalling.
 
 - In Settings, tap **Check for official updates**. The app contacts GitHub only when you request it, downloads the published stable APK and checksum, verifies the checksum, package ID, version and pinned release certificate, then opens Android's installer.
 - Android confirmation is required. If the package ID and release key match, Android updates the installed app in place and retains its private app data; uninstalling is not required.
-- Updates are blocked while protection monitoring is enabled or a countdown/alarm is active. Disable monitoring first so package replacement cannot interrupt an active protection event.
+- Updates are blocked while protection is ARMED, COUNTDOWN, or ALARM_TRIGGERED. The owner must first reach DISARMED; the background monitor preference may remain enabled. Android stops the old process during package replacement, and the package-replaced receiver attempts to restart monitoring afterward. The owner’s explicit monitor opt-out remains respected.
 - Android may require you to allow installs from ThiefAlertSeQure in its app-specific unknown-apps setting. This is system-controlled and can be revoked after the update.
-- The current development baseline is `1.1.3` (version code `5`).
+- The current development candidate is `1.1.5_Developer_Alinor` (versionCode `7`) on `release/v1.1.5-candidate`; PR #9 remains unmerged.
 - Production updates must always use the same permanent release keystore. CI supports the four GitHub Actions secrets documented in [APK installation and update safety](docs/APK_INSTALL_AND_UPDATE.md).
 - CI labels release-signed and debug-only APKs separately and verifies the package ID, version, and signing certificate before upload.
 - A debug APK is for development only. Do not alternate debug and release builds on one installed app.

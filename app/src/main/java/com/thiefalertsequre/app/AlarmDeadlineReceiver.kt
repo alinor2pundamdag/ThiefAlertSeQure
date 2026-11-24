@@ -11,17 +11,152 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         val pending = goAsync()
         Thread {
             try {
-                handleDeadline(context.applicationContext, callbackIntent)
+                val app = context.applicationContext
+                val alarmAlreadyLatched = ProtectionStore(app).read().mode == ProtectionMode.ALARM_TRIGGERED
+                if (!ConfigurationBackup.recoverPendingRestore(app) && !alarmAlreadyLatched) {
+                    // AlarmManager one-shot callbacks are consumed when delivered.
+                    // Persist a retry so an interrupted settings rollback cannot
+                    // silently erase an active countdown or trusted-device grace deadline.
+                    if (callbackIntent.action == A2DisconnectScheduler.ACTION_DEADLINE) {
+                        val token = callbackIntent.data?.lastPathSegment
+                        if (token != null) {
+                            A2DisconnectScheduler.find(app, token)?.let { pendingDeadline ->
+                                A2DisconnectScheduler.scheduleRetry(app, pendingDeadline, 30_000L)
+                            }
+                        }
+                    } else if (ProtectionStore(app).read().mode == ProtectionMode.COUNTDOWN) {
+                        AlarmScheduler.scheduleRetry(app, 30_000L)
+                    }
+                    LocalTamperHistory.record(
+                        app, "configuration_restore_recovery_pending",
+                        "A non-alarm deadline was deferred and a 30-second retry was requested because interrupted settings could not be recovered"
+                    )
+                    ProtectionMonitorRecoveryNotice.show(
+                        app, "An interrupted settings restore must be recovered before protection deadlines can be processed. The deadline will retry automatically."
+                    )
+                    return@Thread
+                }
+                if (callbackIntent.action == A2DisconnectScheduler.ACTION_DEADLINE) {
+                    handleA2DisconnectDeadline(app, callbackIntent)
+                } else {
+                    handleDeadline(app, callbackIntent)
+                }
             } catch (error: Exception) {
                 LocalTamperHistory.record(
                     context, "deadline_receiver_error",
                     error.javaClass.simpleName + ": " + error.message
                 )
-                AlarmScheduler.scheduleRetry(context, 1_000L)
+                if (callbackIntent.action == A2DisconnectScheduler.ACTION_DEADLINE) {
+                    val token = callbackIntent.data?.lastPathSegment
+                    if (token != null) A2DisconnectScheduler.find(context, token)?.let {
+                        A2DisconnectScheduler.scheduleRetry(context, it, 1_000L)
+                    }
+                } else if (ProtectionStore(context).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                    AlarmRecoveryCoordinator.onStartFailure(
+                        context, "Deadline receiver failed while the alarm was latched"
+                    )
+                } else {
+                    AlarmScheduler.scheduleRetry(context, 1_000L)
+                }
             } finally {
                 pending.finish()
             }
         }.start()
+    }
+
+    private fun handleA2DisconnectDeadline(context: Context, intent: Intent) {
+        val token = intent.data?.lastPathSegment ?: return
+        val pending = A2DisconnectScheduler.find(context, token) ?: return
+        val protectionState = ProtectionStore(context).read()
+        if (protectionState.mode == ProtectionMode.ALARM_TRIGGERED) {
+            A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+            startAlarm(context, "Recovering an already-latched A2 alarm")
+            return
+        }
+        if (protectionState.mode != ProtectionMode.ARMED) {
+            A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+            LocalTamperHistory.record(
+                context, "a2_deadline_cancelled_protection_not_armed",
+                "A2 disconnect deadline was discarded because protection was not ARMED; it cannot survive disarm or countdown state"
+            )
+            return
+        }
+        if (A2DisconnectScheduler.wasConfirmedConnectedAfter(pending)) {
+            A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+            LocalTamperHistory.record(
+                context, "a2_deadline_reconnect_observed",
+                "A confirmed reconnect superseded this disconnect event; no separation alarm was triggered"
+            )
+            return
+        }
+        val nowElapsed = ProtectionClock.elapsedRealtime()
+        val sameBoot = A2DisconnectPolicy.isSameBoot(
+            pending.bootCount, ProtectionClock.bootCount(context),
+            pending.eventElapsedRealtimeMs, nowElapsed
+        )
+        if (!sameBoot) {
+            A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+            LocalTamperHistory.record(context, "a2_deadline_old_boot_rejected", "A2 deadline belonged to a different or unverifiable boot")
+            return
+        }
+        if (!ProtectionStore(context).isA2EventAfterLastInvalidation(
+                pending.eventElapsedRealtimeMs, pending.bootCount
+            )
+        ) {
+            A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+            LocalTamperHistory.record(
+                context, "a2_deadline_invalidated_by_epoch",
+                "Pre-invalidation A2 deadline was discarded before retry or alarm evaluation"
+            )
+            return
+        }
+        if (nowElapsed < pending.deadlineElapsedRealtimeMs) {
+            if (!A2DisconnectScheduler.schedule(context, pending)) {
+                A2DisconnectScheduler.scheduleRetry(context, pending, 1_000L)
+            }
+            return
+        }
+
+        val prefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        val valid = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false) &&
+            TrustedBluetoothRegistry.isTrusted(prefs, pending.address) &&
+            A2DisconnectPolicy.isPendingDisconnectCurrent(
+                pending.monitorRevision,
+                TrustedBluetoothRegistry.revision(prefs),
+                pending.deviceRevision,
+                TrustedBluetoothRegistry.deviceRevision(prefs, pending.address)
+            ) &&
+            !TrustedBluetoothRegistry.isBaselineConnected(prefs, pending.address) &&
+            ProtectionStore(context).read().mode == ProtectionMode.ARMED
+        if (!valid) {
+            A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+            LocalTamperHistory.record(context, "a2_deadline_invalidated", "A2 disconnect deadline failed a current trust, generation, connection, or protection-state guard")
+            return
+        }
+
+        val update = ProtectionStore(context).updatePersisted { current ->
+            ProtectionEngine.triggerFromArmed(
+                current, System.currentTimeMillis(), ProtectionClock.bootCount(context)
+            )
+        }
+        if (!update.persisted) {
+            val retryScheduled = A2DisconnectScheduler.scheduleRetry(context, pending, 1_000L)
+            LocalTamperHistory.record(
+                context, "a2_alarm_state_persist_failed",
+                if (retryScheduled) {
+                    "A2 alarm state commit failed; the original disconnect deadline remains pending for a one-second retry"
+                } else {
+                    "A2 alarm state commit failed and its retry could not be scheduled; owner action may be required"
+                }
+            )
+            return
+        }
+        A2DisconnectScheduler.cancel(context, pending.address, pending.eventElapsedRealtimeMs)
+        if (update.state.mode == ProtectionMode.ALARM_TRIGGERED) {
+            LocalTamperHistory.record(context, "trusted_bluetooth_separation_alarm", "A registered trusted Bluetooth device remained disconnected beyond grace period")
+            context.stopService(Intent(context, ProtectionMonitorService::class.java))
+            startAlarm(context, "Trusted Bluetooth separation deadline validated")
+        }
     }
 
     private fun handleDeadline(context: Context, intent: Intent) {
@@ -30,7 +165,7 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         PowerTransitionCoordinator.initializeBaseline(context)
 
         val token = intent.data?.lastPathSegment ?: return
-        val state = ProtectionStore(context).read()
+        var state = ProtectionStore(context).read()
 
         // Recovery callbacks are distinct from countdown callbacks and may only
         // restart an already-latched alarm.
@@ -48,18 +183,41 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             return
         }
 
-        val monitorEnabled = context.getSharedPreferences(
+        val monitorPrefs = context.getSharedPreferences(
             ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
-        ).getBoolean(
-            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
-        if (!monitorEnabled && state.mode != ProtectionMode.ALARM_TRIGGERED) {
-            ProtectionStore(context).update { current ->
-                if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
-                else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
-            }
+        val monitorEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        )
+        if (!monitorEnabled && state.mode == ProtectionMode.DISARMED) {
             AlarmScheduler.cancel(context)
             return
+        }
+        if (!monitorEnabled &&
+            (state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN)
+        ) {
+            // A stale/OEM preference must never disarm active protection. Repair
+            // it only while the same active protection state remains authoritative.
+            val repaired = ProtectionStore(context).runIfProtectionActive {
+                monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
+            }
+            if (repaired == false) {
+                LocalTamperHistory.record(
+                    context, "active_monitor_preference_repair_failed",
+                    "Active protection remains authoritative; the monitor-enabled preference could not be restored"
+                )
+                if (state.mode == ProtectionMode.COUNTDOWN) AlarmScheduler.scheduleRetry(context, 1_000L)
+                return
+            }
+            state = ProtectionStore(context).read()
+            if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
+                startAlarm(context, "Alarm became latched during monitor preference repair")
+                return
+            }
+            if (state.mode != ProtectionMode.COUNTDOWN) {
+                if (state.mode == ProtectionMode.DISARMED) AlarmScheduler.cancel(context)
+                return
+            }
         }
 
         val tokenParts = token.split(":")
@@ -89,13 +247,13 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         val boot = ProtectionClock.bootCount(context)
         var transitionedToAlarm = false
         var callbackStillCurrent = false
-        val updated = ProtectionStore(context).update { current ->
+        val update = ProtectionStore(context).updatePersisted { current ->
             // Revalidate the token under the same store lock as the transition.
             // A newer countdown or reconnect may have replaced it during sampling.
             if (!ProtectionEngine.isCurrentDeadline(
                     current, tokenDeadline, tokenElapsed, tokenBoot
                 )
-            ) return@update current
+            ) return@updatePersisted current
 
             callbackStillCurrent = true
             val next = ProtectionEngine.reconcileCountdown(current, connected, now, elapsed, boot)
@@ -107,11 +265,24 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
             LocalTamperHistory.record(context, "stale_deadline_rejected", "Countdown changed while deadline callback was validating")
             return
         }
+        if (!update.persisted) {
+            LocalTamperHistory.record(context, "deadline_state_persist_failed", "Alarm deadline transition was not committed; persisted state was retained")
+            if (update.state.mode == ProtectionMode.COUNTDOWN) {
+                AlarmScheduler.scheduleRetry(context, 1_000L)
+            }
+            return
+        }
 
+        val updated = update.state
         when (updated.mode) {
-            ProtectionMode.COUNTDOWN -> AlarmScheduler.schedule(
-                context, updated.deadlineEpochMs, updated.deadlineElapsedRealtimeMs, updated.bootCount
-            )
+            ProtectionMode.COUNTDOWN -> {
+                if (!AlarmScheduler.schedule(
+                        context, updated.deadlineEpochMs, updated.deadlineElapsedRealtimeMs, updated.bootCount
+                    )
+                ) {
+                    AlarmScheduler.scheduleRetry(context, 1_000L)
+                }
+            }
             ProtectionMode.ALARM_TRIGGERED -> if (transitionedToAlarm) {
                 AlarmScheduler.cancel(context)
                 context.stopService(Intent(context, ProtectionMonitorService::class.java))
@@ -131,13 +302,19 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
     }
 
     private fun startAlarm(context: Context, reason: String) {
+        // The theft alarm owns audio output. Stop the monitor service first so
+        // any secondary battery-threshold MediaPlayer is released on every
+        // deadline/recovery entry path, including an already-latched state.
+        runCatching { context.stopService(Intent(context, ProtectionMonitorService::class.java)) }
         runCatching {
             ContextCompat.startForegroundService(
                 context, Intent(context, AlarmService::class.java).setAction(AlarmService.ACTION_START)
             )
         }.onFailure {
             LocalTamperHistory.record(context, "alarm_fgs_launch_failed", it.javaClass.simpleName + ": " + it.message)
-            AlarmRecoveryNotice.show(context, "Android rejected the alarm foreground-service launch: $reason")
+            AlarmRecoveryCoordinator.onStartFailure(
+                context, "Android rejected the alarm foreground-service launch: $reason"
+            )
         }
     }
 }
