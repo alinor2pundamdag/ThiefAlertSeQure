@@ -3,12 +3,58 @@ package com.thiefalertsequre.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import java.util.concurrent.Executors
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.RejectedExecutionHandler
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+
+internal object PowerTransitionQueuePolicy {
+    const val MAX_PENDING_EVENTS = 4
+    const val BACKPRESSURE_TIMEOUT_MS = 2_000L
+
+    fun createExecutor(
+        queueCapacity: Int = MAX_PENDING_EVENTS,
+        backpressureTimeoutMs: Long = BACKPRESSURE_TIMEOUT_MS
+    ): ThreadPoolExecutor {
+        require(queueCapacity > 0) { "queueCapacity must be positive" }
+        require(backpressureTimeoutMs > 0) { "backpressureTimeoutMs must be positive" }
+        val queue = ArrayBlockingQueue<Runnable>(queueCapacity)
+        val rejectionHandler = RejectedExecutionHandler { task, executor ->
+            if (executor.isShutdown) {
+                throw RejectedExecutionException("Power transition executor is shut down")
+            }
+            try {
+                if (!executor.queue.offer(task, backpressureTimeoutMs, TimeUnit.MILLISECONDS)) {
+                    throw RejectedExecutionException("Power transition queue remained full")
+                }
+            } catch (interrupted: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw RejectedExecutionException("Interrupted while waiting for power transition queue", interrupted)
+            }
+        }
+        val threadFactory = ThreadFactory { task ->
+            Thread(task, "power-transition-events").apply { isDaemon = true }
+        }
+        return ThreadPoolExecutor(
+            1,
+            1,
+            0L,
+            TimeUnit.MILLISECONDS,
+            queue,
+            threadFactory,
+            rejectionHandler
+        )
+    }
+}
 
 class PowerTransitionReceiver : BroadcastReceiver() {
     companion object {
-        // Preserve event order across CONNECTED, DISCONNECTED and restart recovery work.
-        private val powerEventExecutor = Executors.newSingleThreadExecutor()
+        // One FIFO worker preserves CONNECTED/DISCONNECTED/recovery ordering.
+        // The bounded queue applies at most 2 seconds of backpressure rather than
+        // allowing a broadcast burst to grow an unbounded in-memory backlog.
+        private val powerEventExecutor = PowerTransitionQueuePolicy.createExecutor()
 
         fun enqueuePendingRecovery(context: Context) {
             try {
@@ -33,9 +79,8 @@ class PowerTransitionReceiver : BroadcastReceiver() {
         )
         if (!monitorEnabled) return
 
-        // Capture the physical event time before serialized debounce work. Otherwise
-        // the five-sample confirmation (~1.4 s) is incorrectly added before the
-        // user's ten-second grace period even begins.
+        // Capture the physical event time before serialized debounce work so the
+        // confirmation window is not added before the user's ten-second grace period.
         val eventEpochMs = System.currentTimeMillis()
         val eventElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime()
         val eventBootCount = ProtectionClock.bootCount(context)
