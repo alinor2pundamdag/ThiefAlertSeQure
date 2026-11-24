@@ -16,6 +16,8 @@ camera_policy = (ROOT / "app/src/main/java/com/thiefalertsequre/app/CameraEviden
 settings = (ROOT / "app/src/main/java/com/thiefalertsequre/app/SettingsActivity.kt").read_text(encoding="utf-8")
 privacy = (ROOT / "docs/PRIVACY_POLICY.md").read_text(encoding="utf-8")
 main = (ROOT / "app/src/main/java/com/thiefalertsequre/app/MainActivity.kt").read_text(encoding="utf-8")
+history = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistory.kt").read_text(encoding="utf-8")
+history_policy = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistoryPolicy.kt").read_text(encoding="utf-8")
 
 required = {
     "coarse and fine location are optional manifest declarations":
@@ -70,6 +72,10 @@ required = {
         "front-camera photo evidence" in main and "CAMERA permission is requested only after that choice" in main
         and "explicitly enables front-camera photo evidence" in privacy
         and "camera_permission" in (ROOT / "app/src/main/java/com/thiefalertsequre/app/PermissionChangeMonitor.kt").read_text(encoding="utf-8"),
+    "local event history redacts exception messages and common sensitive values":
+        all(token in history_policy for token in ("exceptionMessage", "credentialAssignment", "bearerCredential", "knownToken", "jwt", "uri", "filesystemPath", "email")),
+    "legacy local event details are sanitized on read and append":
+        history.count("sanitizeStoredHistory") >= 2,
 }
 for description, passed in required.items():
     if not passed:
