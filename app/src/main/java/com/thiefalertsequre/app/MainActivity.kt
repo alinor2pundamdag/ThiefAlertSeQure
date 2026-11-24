@@ -1139,6 +1139,7 @@ class MainActivity : FragmentActivity() {
 
     private fun navigationTab(value: String, description: String, key: String, action: () -> Unit) = MaterialButton(this).apply {
         tag = value
+        contentDescription = "Open $description"
         navigationTabs[key] = this
         navigationDescriptions[key] = description
         isAllCaps = false
