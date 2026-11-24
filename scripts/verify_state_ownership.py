@@ -36,6 +36,18 @@ for required in (
     if required not in receiver:
         errors.append("PowerTransitionReceiver missing bounded FIFO queue contract: " + required)
 
+a2_receiver = (JAVA / "com/thiefalertsequre/app/A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
+for required in (
+    "A2BluetoothReceiverQueuePolicy.createExecutor()",
+    "MAX_PENDING_EVENTS = 16",
+    "A2BluetoothReceiverQueue.executor.execute",
+    "pendingResult.finish()",
+):
+    if required not in a2_receiver:
+        errors.append("A2BluetoothAclReceiver missing bounded receiver contract: " + required)
+if re.search(r"\\bThread\\s*\\{", a2_receiver) or ".start()" in a2_receiver:
+    errors.append("A2BluetoothAclReceiver must not create a raw thread per broadcast")
+
 if errors:
     print("\n".join("ERROR: " + item for item in errors))
     sys.exit(1)

@@ -3,12 +3,6 @@ package com.thiefalertsequre.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import java.util.concurrent.ArrayBlockingQueue
-import java.util.concurrent.RejectedExecutionException
-import java.util.concurrent.RejectedExecutionHandler
-import java.util.concurrent.ThreadFactory
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.TimeUnit
 
 internal object PowerTransitionQueuePolicy {
     const val MAX_PENDING_EVENTS = 4
@@ -17,36 +11,12 @@ internal object PowerTransitionQueuePolicy {
     fun createExecutor(
         queueCapacity: Int = MAX_PENDING_EVENTS,
         backpressureTimeoutMs: Long = BACKPRESSURE_TIMEOUT_MS
-    ): ThreadPoolExecutor {
-        require(queueCapacity > 0) { "queueCapacity must be positive" }
-        require(backpressureTimeoutMs > 0) { "backpressureTimeoutMs must be positive" }
-        val queue = ArrayBlockingQueue<Runnable>(queueCapacity)
-        val rejectionHandler = RejectedExecutionHandler { task, executor ->
-            if (executor.isShutdown) {
-                throw RejectedExecutionException("Power transition executor is shut down")
-            }
-            try {
-                if (!executor.queue.offer(task, backpressureTimeoutMs, TimeUnit.MILLISECONDS)) {
-                    throw RejectedExecutionException("Power transition queue remained full")
-                }
-            } catch (interrupted: InterruptedException) {
-                Thread.currentThread().interrupt()
-                throw RejectedExecutionException("Interrupted while waiting for power transition queue", interrupted)
-            }
-        }
-        val threadFactory = ThreadFactory { task ->
-            Thread(task, "power-transition-events").apply { isDaemon = true }
-        }
-        return ThreadPoolExecutor(
-            1,
-            1,
-            0L,
-            TimeUnit.MILLISECONDS,
-            queue,
-            threadFactory,
-            rejectionHandler
+    ): java.util.concurrent.ThreadPoolExecutor =
+        BoundedSerialExecutor.create(
+            queueCapacity = queueCapacity,
+            backpressureTimeoutMs = backpressureTimeoutMs,
+            threadName = "power-transition-events"
         )
-    }
 }
 
 class PowerTransitionReceiver : BroadcastReceiver() {

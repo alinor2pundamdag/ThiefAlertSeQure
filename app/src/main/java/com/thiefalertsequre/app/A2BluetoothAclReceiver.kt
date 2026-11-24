@@ -36,6 +36,26 @@ internal object A2BluetoothReceiverController {
     }
 }
 
+internal object A2BluetoothReceiverQueuePolicy {
+    const val MAX_PENDING_EVENTS = 16
+    const val BACKPRESSURE_TIMEOUT_MS = 1_000L
+
+    fun createExecutor(
+        queueCapacity: Int = MAX_PENDING_EVENTS,
+        backpressureTimeoutMs: Long = BACKPRESSURE_TIMEOUT_MS
+    ): java.util.concurrent.ThreadPoolExecutor =
+        BoundedSerialExecutor.create(
+            queueCapacity = queueCapacity,
+            backpressureTimeoutMs = backpressureTimeoutMs,
+            threadName = "a2-bluetooth-acl-events"
+        )
+}
+
+/** Process-lifetime queue shared by manifest receiver instances. */
+internal object A2BluetoothReceiverQueue {
+    val executor = A2BluetoothReceiverQueuePolicy.createExecutor()
+}
+
 /**
  * Receives Android's manifest-exempt ACL broadcasts while the app process is absent.
  * When the foreground service's runtime receiver is ready, that service owns the event.
@@ -49,25 +69,26 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
         val eventElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime()
         val eventBootCount = ProtectionClock.bootCount(context)
         val pendingResult = goAsync()
-        Thread {
-            try {
+        try {
+            A2BluetoothReceiverQueue.executor.execute {
+                try {
                 val app = context.applicationContext
                 val prefs = app.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
                 if (!SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED) ||
                     !SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-                ) return@Thread
+                ) return@execute
                 if (Build.VERSION.SDK_INT >= 31 &&
                     ContextCompat.checkSelfPermission(app, android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
                 ) {
                     A2BluetoothReceiverController.sync(app)
                     LocalTamperHistory.record(app, "bluetooth_permission_missing", "Trusted Bluetooth separation monitoring paused; grant Bluetooth Connect permission")
-                    return@Thread
+                    return@execute
                 }
                 val device = runCatching {
                     intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
-                }.getOrNull() ?: return@Thread
-                val address = device.address ?: return@Thread
-                if (!TrustedBluetoothRegistry.isTrusted(prefs, address)) return@Thread
+                }.getOrNull() ?: return@execute
+                val address = device.address ?: return@execute
+                if (!TrustedBluetoothRegistry.isTrusted(prefs, address)) return@execute
 
                 when (intent.action) {
                     BluetoothDevice.ACTION_ACL_CONNECTED -> {
@@ -108,6 +129,17 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
             } finally {
                 pendingResult.finish()
             }
-        }.start()
+            }
+        } catch (error: Exception) {
+            pendingResult.finish()
+            LocalTamperHistory.record(
+                context, "a2_manifest_receiver_queue_failed",
+                error.javaClass.simpleName + ": " + error.message
+            )
+            ProtectionMonitorRecoveryNotice.show(
+                context,
+                "A trusted Bluetooth event could not be queued. Open the app to review protection monitoring."
+            )
+        }
     }
 }

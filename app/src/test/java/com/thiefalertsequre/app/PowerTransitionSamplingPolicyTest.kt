@@ -90,6 +90,21 @@ class PowerTransitionSamplingPolicyTest {
         }
     }
 
+    @Test fun a2ManifestReceiverQueueIsBoundedAndSingleWorker() {
+        val executor = A2BluetoothReceiverQueuePolicy.createExecutor(
+            queueCapacity = 2,
+            backpressureTimeoutMs = 50L
+        )
+        try {
+            assertTrue(executor.queue is ArrayBlockingQueue<*>)
+            assertEquals(2, executor.queue.remainingCapacity() + executor.queue.size)
+            assertEquals(1, executor.corePoolSize)
+            assertEquals(1, executor.maximumPoolSize)
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
     @Test fun unknownSamplesNeverCountAsConnectedOrDisconnectedConfirmation() {
         val result = PowerTransitionSamplingPolicy.confirm(
             expectedConnected = true,
