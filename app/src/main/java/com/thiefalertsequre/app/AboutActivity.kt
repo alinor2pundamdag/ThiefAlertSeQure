@@ -137,7 +137,7 @@ class AboutActivity : FragmentActivity() {
 
         addSection("PRIVACY, TERMS AND OWNER CHOICE", "Review the current in-app notice and the limitations before enabling optional capabilities.")
         root.addView(text(
-            "Privacy Notice version 5 • Terms version 1. Acknowledgements and timestamps are stored locally. First launch requires both current versions. Reviewing the privacy notice from Settings resets its acknowledgement; the Terms dialog records its own acknowledgement. For a material policy change, increment the corresponding versioned preference key so the app requires fresh acknowledgement.",
+            "Privacy Notice version ${PolicyAcknowledgementPolicy.PRIVACY_VERSION} • Terms version ${PolicyAcknowledgementPolicy.TERMS_VERSION}. Acknowledgements and timestamps are stored locally. First launch requires both current versions. Reviewing the privacy notice from Settings resets its acknowledgement; the Terms dialog records its own acknowledgement. Increment the corresponding policy version to require fresh acknowledgement after a material policy change.",
             13f, R.color.tas_muted
         ))
         root.addView(space(10))
@@ -319,11 +319,18 @@ class AboutActivity : FragmentActivity() {
             .setNegativeButton("Close", null)
             .setPositiveButton("I acknowledge") { _, _ ->
                 val acceptedAt = System.currentTimeMillis()
-                getSharedPreferences("terms_notice_v1", MODE_PRIVATE).edit()
+                val saved = getSharedPreferences(PolicyAcknowledgementPolicy.TERMS_PREFS, MODE_PRIVATE).edit()
                     .putString("decision", "acknowledged")
-                    .putInt("version", 1)
+                    .putInt("version", PolicyAcknowledgementPolicy.TERMS_VERSION)
                     .putLong("decision_at", acceptedAt)
-                    .apply()
+                    .commit()
+                if (!saved) {
+                    android.widget.Toast.makeText(
+                        this,
+                        "Terms acknowledgement could not be saved. Review and acknowledge again.",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
             }
             .showThemed(this)
     }

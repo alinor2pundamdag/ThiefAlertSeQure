@@ -179,9 +179,19 @@ checks = {
         and "Terms of Use & Platform Limitations" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
         and "FEATURE CATALOG" in (APP / "AboutActivity.kt").read_text(encoding="utf-8"),
     "Privacy Notice and Terms acknowledgements are versioned and timestamped":
-        "terms_notice_v1" in dashboard and 'putInt("version", 1)' in dashboard
+        "PolicyAcknowledgementPolicy.isCurrent" in dashboard
+        and "PolicyAcknowledgementPolicy.PRIVACY_VERSION" in dashboard
+        and "PolicyAcknowledgementPolicy.TERMS_VERSION" in dashboard
         and "decision_at" in dashboard
+        and '.commit()' in dashboard
         and 'setPositiveButton("I acknowledge")' in (APP / "AboutActivity.kt").read_text(encoding="utf-8"),
+    "policy acknowledgement versions are centralized and stale acknowledgements are rejected":
+        "PRIVACY_VERSION" in (APP / "PolicyAcknowledgementPolicy.kt").read_text(encoding="utf-8")
+        and "TERMS_VERSION" in (APP / "PolicyAcknowledgementPolicy.kt").read_text(encoding="utf-8")
+        and "storedVersion == requiredVersion" in (APP / "PolicyAcknowledgementPolicy.kt").read_text(encoding="utf-8"),
+    "Terms acknowledgement is durably committed before reporting success":
+        "PolicyAcknowledgementPolicy.TERMS_PREFS" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
+        and ".commit()" in (APP / "AboutActivity.kt").read_text(encoding="utf-8"),
     "dashboard tab selection persists and restores a visible selected state":
         "dashboard_navigation_v1" in dashboard and "selected_tab" in dashboard
         and "refreshNavigationSelection()" in dashboard and "tab.isSelected = active" in dashboard

@@ -702,9 +702,19 @@ class SettingsActivity : FragmentActivity() {
         ))
         root.addView(space(10))
         root.addView(action("Review privacy notice") {
-            getSharedPreferences("privacy_notice_v5", MODE_PRIVATE).edit().clear().apply()
-            startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK))
-            finish()
+            val reset = getSharedPreferences(PolicyAcknowledgementPolicy.PRIVACY_PREFS, MODE_PRIVATE)
+                .edit().clear().commit()
+            if (reset) {
+                startActivity(Intent(this, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK))
+                finish()
+            } else {
+                android.widget.Toast.makeText(
+                    this,
+                    "The privacy acknowledgement could not be reset. Please try again.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
         })
         root.addView(space(22))
         root.addView(action("Back to protection dashboard") { finish() })

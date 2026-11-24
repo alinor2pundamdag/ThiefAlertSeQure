@@ -85,10 +85,20 @@ class MainActivity : FragmentActivity() {
         runCatching { CameraEvidenceVault.entries(this) }
         applyAlarmWindowPolicy()
 
-        val privacyDecision = SafePreferences.string(getSharedPreferences("privacy_notice_v5", MODE_PRIVATE), "decision", null)
-        val termsDecision = SafePreferences.string(getSharedPreferences("terms_notice_v1", MODE_PRIVATE), "decision", null)
-        // Versioned acknowledgements are local and must be renewed when either policy version changes.
-        if (privacyDecision != "acknowledged" || termsDecision != "acknowledged") {
+        val privacyPrefs = getSharedPreferences(PolicyAcknowledgementPolicy.PRIVACY_PREFS, MODE_PRIVATE)
+        val termsPrefs = getSharedPreferences(PolicyAcknowledgementPolicy.TERMS_PREFS, MODE_PRIVATE)
+        val privacyAcknowledged = PolicyAcknowledgementPolicy.isCurrent(
+            SafePreferences.string(privacyPrefs, "decision", null),
+            SafePreferences.int(privacyPrefs, "version", -1),
+            PolicyAcknowledgementPolicy.PRIVACY_VERSION
+        )
+        val termsAcknowledged = PolicyAcknowledgementPolicy.isCurrent(
+            SafePreferences.string(termsPrefs, "decision", null),
+            SafePreferences.int(termsPrefs, "version", -1),
+            PolicyAcknowledgementPolicy.TERMS_VERSION
+        )
+        // Acknowledgements are valid only for the exact current policy versions.
+        if (!privacyAcknowledged || !termsAcknowledged) {
             showPrivacyScreen()
             return
         }
@@ -158,13 +168,25 @@ class MainActivity : FragmentActivity() {
         root.addView(space(22))
         root.addView(button("I understand & continue") {
             val acceptedAt = System.currentTimeMillis()
-            getSharedPreferences("privacy_notice_v5", MODE_PRIVATE).edit()
-                .putString("decision", "acknowledged").putInt("version", 5)
-                .putLong("decision_at", acceptedAt).apply()
-            getSharedPreferences("terms_notice_v1", MODE_PRIVATE).edit()
-                .putString("decision", "acknowledged").putInt("version", 1)
-                .putLong("decision_at", acceptedAt).apply()
-            buildDashboard()
+            val privacySaved = getSharedPreferences(PolicyAcknowledgementPolicy.PRIVACY_PREFS, MODE_PRIVATE).edit()
+                .putString("decision", "acknowledged")
+                .putInt("version", PolicyAcknowledgementPolicy.PRIVACY_VERSION)
+                .putLong("decision_at", acceptedAt)
+                .commit()
+            val termsSaved = getSharedPreferences(PolicyAcknowledgementPolicy.TERMS_PREFS, MODE_PRIVATE).edit()
+                .putString("decision", "acknowledged")
+                .putInt("version", PolicyAcknowledgementPolicy.TERMS_VERSION)
+                .putLong("decision_at", acceptedAt)
+                .commit()
+            if (privacySaved && termsSaved) {
+                buildDashboard()
+            } else {
+                android.widget.Toast.makeText(
+                    this,
+                    "Acknowledgement could not be saved. Please try again before continuing.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
         }, matchWrap())
         root.addView(space(16))
         root.addView(label("LOCAL-FIRST • NO ACCOUNT • NO CLOUD SYNC", 10f, getColor(R.color.tas_muted), true), matchWrap())
