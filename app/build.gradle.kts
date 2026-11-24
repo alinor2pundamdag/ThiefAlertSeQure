@@ -4,7 +4,7 @@ plugins {
 }
 
 val appVersionCode = 6
-val appVersionName = "1.1.4"
+val appVersionName = "1.1.4_Developer_Alinor"
 
 val releaseSigningReady = listOf(
     "ANDROID_KEYSTORE_PATH",
