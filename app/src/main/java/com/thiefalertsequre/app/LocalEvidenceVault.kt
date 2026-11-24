@@ -24,7 +24,7 @@ object LocalEvidenceVault {
     private const val KEY_PAYLOAD = "encrypted_records"
     private const val PURPOSE = "thiefalertsequre:evidence-vault:v1"
     private const val MAX_RECORDS = 100
-    private const val RETENTION_MS = 30L * 24L * 60L * 60L * 1000L
+    private const val RETENTION_MS = LocalEvidenceVaultPolicy.RETENTION_MS
     private val generation = AtomicLong(0L)
     private val writer = ThreadPoolExecutor(
         1, 1, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue(64),
@@ -67,7 +67,9 @@ object LocalEvidenceVault {
             is PreferenceRead.Corrupt -> return false
         }
         val existing = readEntries(raw) ?: return false
-        val retained = (existing.filter { now - it.timestampEpochMs in 0..RETENTION_MS } + entry)
+        // A wall-clock rollback can make valid records appear to be from the future.
+        // Preserve those records and surface the clock condition instead of deleting them.
+        val retained = (existing.filter { LocalEvidenceVaultPolicy.isWithinRetention(now, it.timestampEpochMs) } + entry)
             .takeLast(MAX_RECORDS)
         val encoded = JSONArray().apply {
             retained.forEach { item ->
@@ -94,10 +96,11 @@ object LocalEvidenceVault {
         val validated = imported.mapNotNull { item ->
             val event = LocalTamperHistoryPolicy.sanitizeEvent(item.event)
             val detail = LocalTamperHistoryPolicy.sanitizeDetail(item.detail).take(240)
+            if (!LocalEvidenceVaultPolicy.isValidTimestampMetadata(item.timestampEpochMs, item.timezoneOffsetMinutes)) return false
             if (item.integritySha256 != digest(item.timestampEpochMs, item.timezoneOffsetMinutes, event, detail)) {
                 return false
             }
-            if (now - item.timestampEpochMs !in 0..RETENTION_MS) null
+            if (!LocalEvidenceVaultPolicy.isWithinRetention(now, item.timestampEpochMs)) null
             else Entry(item.timestampEpochMs, item.timezoneOffsetMinutes, event, detail, item.integritySha256)
         }.takeLast(MAX_RECORDS)
         val encoded = JSONArray().apply {
@@ -138,7 +141,7 @@ object LocalEvidenceVault {
         } ?: return emptyList()
         val entries = readEntries(raw) ?: return emptyList()
         val now = System.currentTimeMillis()
-        return entries.filter { now - it.timestampEpochMs in 0..RETENTION_MS }
+        return entries.filter { LocalEvidenceVaultPolicy.isWithinRetention(now, it.timestampEpochMs) }
             .takeLast(limit).asReversed()
     }
 
@@ -160,6 +163,9 @@ object LocalEvidenceVault {
                     val item = array.getJSONObject(index)
                     val at = item.getLong("at")
                     val tz = item.getInt("tz")
+                    require(LocalEvidenceVaultPolicy.isValidTimestampMetadata(at, tz)) {
+                        "Evidence timestamp or timezone offset is invalid."
+                    }
                     val event = LocalTamperHistoryPolicy.sanitizeEvent(item.getString("event"))
                     val detail = LocalTamperHistoryPolicy.sanitizeDetail(item.optString("detail")).take(240)
                     val hash = item.getString("sha256")

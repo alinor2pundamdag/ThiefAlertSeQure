@@ -208,6 +208,13 @@ class LocalTamperHistoryActivity : FragmentActivity() {
             root.addView(space(8))
             root.addView(text("WARNING: Encrypted history integrity/decryption failed. Stored data is preserved; export is disabled. Preserve app data for diagnosis.", 13f, R.color.tas_danger, true))
         }
+        if (evidence.any { LocalEvidenceVaultPolicy.isFutureDated(System.currentTimeMillis(), it.timestampEpochMs) }) {
+            root.addView(space(8))
+            root.addView(text(
+                "Some evidence timestamps are ahead of the device clock. Records are retained; review Android automatic date and time settings.",
+                12f, R.color.tas_warning, true
+            ))
+        }
         root.addView(space(12))
         search = EditText(this).apply {
             hint = "Search event code or redacted detail"
