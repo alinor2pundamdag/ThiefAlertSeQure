@@ -64,71 +64,31 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
     @Suppress("DEPRECATION", "MissingPermission")
     override fun onReceive(context: Context, intent: Intent) {
         if (ProtectionMonitorService.isBluetoothReceiverRegistered) return
-        // Capture at broadcast receipt, before async scheduling or trust-store I/O.
+
+        // Capture at broadcast receipt, before queueing or trust-store I/O.
         val eventEpochMs = System.currentTimeMillis()
         val eventElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime()
         val eventBootCount = ProtectionClock.bootCount(context)
         val pendingResult = goAsync()
+
         try {
             A2BluetoothReceiverQueue.executor.execute {
                 try {
-                val app = context.applicationContext
-                val prefs = app.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
-                if (!SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED) ||
-                    !SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
-                ) return@execute
-                if (Build.VERSION.SDK_INT >= 31 &&
-                    ContextCompat.checkSelfPermission(app, android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    A2BluetoothReceiverController.sync(app)
-                    LocalTamperHistory.record(app, "bluetooth_permission_missing", "Trusted Bluetooth separation monitoring paused; grant Bluetooth Connect permission")
-                    return@execute
+                    processEvent(
+                        context.applicationContext,
+                        intent,
+                        eventEpochMs,
+                        eventElapsedRealtimeMs,
+                        eventBootCount
+                    )
+                } catch (error: Exception) {
+                    LocalTamperHistory.record(
+                        context, "a2_manifest_receiver_error",
+                        error.javaClass.simpleName + ": " + error.message
+                    )
+                } finally {
+                    pendingResult.finish()
                 }
-                val device = runCatching {
-                    intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
-                }.getOrNull() ?: return@execute
-                val address = device.address ?: return@execute
-                if (!TrustedBluetoothRegistry.isTrusted(prefs, address)) return@execute
-
-                when (intent.action) {
-                    BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                        TrustedBluetoothRegistry.markConnected(prefs, address, true)
-                        A2DisconnectScheduler.cancel(app, address)
-                        LocalTamperHistory.record(app, "trusted_bluetooth_connected", "A registered trusted Bluetooth device connected while the monitor process was absent")
-                    }
-                    BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
-                        val hadBaseline = TrustedBluetoothRegistry.markConnected(prefs, address, false)
-                        if (A2DisconnectPolicy.shouldStartGracePeriod(
-                                alertEnabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false),
-                                trusted = TrustedBluetoothRegistry.isTrusted(prefs, address),
-                                hadConnectionBaseline = hadBaseline,
-                                protectionMode = ProtectionStore(app).read().mode
-                            )
-                        ) {
-                            val pending = A2DisconnectScheduler.Pending(
-                                address = address,
-                                eventEpochMs = eventEpochMs,
-                                eventElapsedRealtimeMs = eventElapsedRealtimeMs,
-                                bootCount = eventBootCount,
-                                monitorRevision = TrustedBluetoothRegistry.revision(prefs),
-                                deviceRevision = TrustedBluetoothRegistry.deviceRevision(prefs, address)
-                            )
-                            if (A2DisconnectScheduler.schedule(app, pending)) {
-                                LocalTamperHistory.record(app, "trusted_bluetooth_disconnected", "Registered trusted device disconnected while the monitor process was absent; durable 8-second grace deadline scheduled")
-                            } else {
-                                LocalTamperHistory.record(app, "a2_durable_deadline_unavailable", "A2 disconnect was detected without a foreground service, but the durable grace deadline could not be scheduled")
-                            }
-                        }
-                    }
-                }
-            } catch (error: Exception) {
-                LocalTamperHistory.record(
-                    context, "a2_manifest_receiver_error",
-                    error.javaClass.simpleName + ": " + error.message
-                )
-            } finally {
-                pendingResult.finish()
-            }
             }
         } catch (error: Exception) {
             pendingResult.finish()
@@ -140,6 +100,84 @@ class A2BluetoothAclReceiver : BroadcastReceiver() {
                 context,
                 "A trusted Bluetooth event could not be queued. Open the app to review protection monitoring."
             )
+        }
+    }
+
+    @Suppress("DEPRECATION", "MissingPermission")
+    private fun processEvent(
+        app: Context,
+        intent: Intent,
+        eventEpochMs: Long,
+        eventElapsedRealtimeMs: Long,
+        eventBootCount: Int
+    ) {
+        val prefs = app.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        if (!SafePreferences.boolean(
+                prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+            ) ||
+            !SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false)
+        ) return
+
+        if (Build.VERSION.SDK_INT >= 31 &&
+            ContextCompat.checkSelfPermission(
+                app, android.Manifest.permission.BLUETOOTH_CONNECT
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            A2BluetoothReceiverController.sync(app)
+            LocalTamperHistory.record(
+                app, "bluetooth_permission_missing",
+                "Trusted Bluetooth separation monitoring paused; grant Bluetooth Connect permission"
+            )
+            return
+        }
+
+        val device = runCatching {
+            intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+        }.getOrNull() ?: return
+        val address = device.address ?: return
+        if (!TrustedBluetoothRegistry.isTrusted(prefs, address)) return
+
+        when (intent.action) {
+            BluetoothDevice.ACTION_ACL_CONNECTED -> {
+                TrustedBluetoothRegistry.markConnected(prefs, address, true)
+                A2DisconnectScheduler.cancel(app, address)
+                LocalTamperHistory.record(
+                    app, "trusted_bluetooth_connected",
+                    "A registered trusted Bluetooth device connected while the monitor process was absent"
+                )
+            }
+            BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                val hadBaseline = TrustedBluetoothRegistry.markConnected(prefs, address, false)
+                if (A2DisconnectPolicy.shouldStartGracePeriod(
+                        alertEnabled = SafePreferences.boolean(
+                            prefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false
+                        ),
+                        trusted = TrustedBluetoothRegistry.isTrusted(prefs, address),
+                        hadConnectionBaseline = hadBaseline,
+                        protectionMode = ProtectionStore(app).read().mode
+                    )
+                ) {
+                    val pending = A2DisconnectScheduler.Pending(
+                        address = address,
+                        eventEpochMs = eventEpochMs,
+                        eventElapsedRealtimeMs = eventElapsedRealtimeMs,
+                        bootCount = eventBootCount,
+                        monitorRevision = TrustedBluetoothRegistry.revision(prefs),
+                        deviceRevision = TrustedBluetoothRegistry.deviceRevision(prefs, address)
+                    )
+                    if (A2DisconnectScheduler.schedule(app, pending)) {
+                        LocalTamperHistory.record(
+                            app, "trusted_bluetooth_disconnected",
+                            "Registered trusted device disconnected while the monitor process was absent; durable 8-second grace deadline scheduled"
+                        )
+                    } else {
+                        LocalTamperHistory.record(
+                            app, "a2_durable_deadline_unavailable",
+                            "A2 disconnect was detected without a foreground service, but the durable grace deadline could not be scheduled"
+                        )
+                    }
+                }
+            }
         }
     }
 }
