@@ -2,16 +2,18 @@ name: Android build and tests
 
 on:
   push:
-    branches: [main, 'dev/**', 'feat/**', 'feature/**', 'fix/**', 'fixall/**', 'security/**', 'work/**']
+    branches: [main, 'dev/**', 'feat/**', 'feature/**', 'fix/**', 'fixall/**', 'security/**', 'work/**', 'release/**']
   pull_request:
     branches: [main, 'work/**']
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: android-ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Do not cancel a valid build merely because a second PR event arrives.
+  cancel-in-progress: false
 
 jobs:
   build:
