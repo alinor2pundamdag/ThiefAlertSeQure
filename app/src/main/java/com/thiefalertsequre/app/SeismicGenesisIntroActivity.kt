@@ -12,6 +12,7 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.activity.OnBackPressedCallback
+import androidx.core.view.WindowCompat
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -136,8 +137,11 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
             override fun handleOnBackPressed() = Unit
         })
 
-        window.statusBarColor = android.graphics.Color.BLACK
-        window.navigationBarColor = android.graphics.Color.BLACK
+        // This cinematic intentionally remains full-bleed; its black Compose surface protects the system bars.
+        applyLegacySystemBarColors()
+        val systemBars = WindowCompat.getInsetsController(window, window.decorView)
+        systemBars.isAppearanceLightStatusBars = false
+        systemBars.isAppearanceLightNavigationBars = false
         val reducedMotion = AppearanceStudioStore.reduceMotion(this)
         val introAudio = AppearanceStudioStore.audio(this)
         val introHaptics = AppearanceStudioStore.haptics(this)
@@ -190,6 +194,14 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
                     }
                 }, 280L)
             }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun applyLegacySystemBarColors() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            window.statusBarColor = android.graphics.Color.BLACK
+            window.navigationBarColor = android.graphics.Color.BLACK
         }
     }
 

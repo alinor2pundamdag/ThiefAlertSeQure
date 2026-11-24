@@ -134,8 +134,30 @@ for required in (
     if required not in about_activity:
         errors.append("AboutActivity missing Batch Four developer/version/legal contract: " + required)
 
+theme_store_source = (APP / "ThemeStore.kt").read_text(encoding="utf-8")
+for required in (
+    "WindowCompat.getInsetsController(a.window,decor)",
+    "systemBars.isAppearanceLightStatusBars = p.mode==\"Light\"",
+    "systemBars.isAppearanceLightNavigationBars = p.mode==\"Light\"",
+    "Build.VERSION_CODES.VANILLA_ICE_CREAM"
+):
+    if required not in theme_store_source:
+        errors.append("ThemeRuntime must use AndroidX system-bar icon control and retain legacy bar colors only below API 35: " + required)
+if "decor.systemUiVisibility" in theme_store_source:
+    errors.append("ThemeRuntime must not use deprecated systemUiVisibility flags")
 intro_activity = (APP / "SeismicGenesisIntroActivity.kt").read_text(encoding="utf-8")
 renderer_activity = (APP / "GenesisFilamentRendererView.kt").read_text(encoding="utf-8")
+for required in (
+    "WindowCompat.getInsetsController(window, window.decorView)",
+    "systemBars.isAppearanceLightStatusBars = false",
+    "systemBars.isAppearanceLightNavigationBars = false",
+    "applyLegacySystemBarColors()"
+):
+    if required not in intro_activity:
+        errors.append("Seismic Genesis full-bleed system-bar contract missing: " + required)
+if "window.statusBarColor =" in intro_activity or "window.navigationBarColor =" in intro_activity:
+    errors.append("Seismic Genesis must not set disabled Android 15+ system-bar colors directly")
+
 for required in (
     "ComposeView(this)", "SeismicGenesisIntroContent", "INTRO_DURATION_MS = 9_000",
     "Alinor Pundamdag", "Developed By:", "Color(0xFFFF5252)",
