@@ -87,7 +87,9 @@ class GenesisFilamentRendererView(
         val mass: Float = (radius * radius * radius * 18f).coerceAtLeast(0.025f),
         var angularX: Float = 0f,
         var angularY: Float = 0f,
-        var angularZ: Float = 0f
+        var angularZ: Float = 0f,
+        // Reused on the render thread to avoid per-body matrix allocation every frame.
+        val transformMatrix: FloatArray = FloatArray(16)
     )
     /** Hierarchical articulated intruder skeleton; each bone becomes an independent rigid fragment on impact. */
     private data class RigBone(
@@ -166,6 +168,10 @@ class GenesisFilamentRendererView(
     private var released = false
     private var surfaceWidth = 1
     private var surfaceHeight = 1
+    // Scratch matrices are reused on the single Choreographer/render thread.
+    private val coreTransformMatrix = FloatArray(16)
+    private val shieldTransformMatrix = FloatArray(16)
+    private val shieldRimTransformMatrix = FloatArray(16)
     var isReady: Boolean = false
         private set
 
@@ -1216,12 +1222,12 @@ class GenesisFilamentRendererView(
             }
             val appear = (progress / 0.13f).coerceIn(0f, 1f)
             val scale = 0.015f + appear * 0.985f
-            val matrix = FloatArray(16)
+            val matrix = shieldTransformMatrix
             GlMatrix.setIdentityM(matrix, 0)
             GlMatrix.scaleM(matrix, 0, scale, scale, scale)
             transformManager.setTransform(shieldTransform, matrix)
             shieldRimMesh?.let { rim ->
-                val rimMatrix = FloatArray(16)
+                val rimMatrix = shieldRimTransformMatrix
                 GlMatrix.setIdentityM(rimMatrix, 0)
                 GlMatrix.translateM(rimMatrix, 0, 0f, 0f, 0.118f)
                 GlMatrix.scaleM(rimMatrix, 0, scale, scale, scale)
@@ -1402,7 +1408,7 @@ class GenesisFilamentRendererView(
             progress < 0.82f -> 1f + sin(progress * 42f).toFloat() * 0.055f
             else -> (1f - (progress - 0.82f) / 0.18f).coerceIn(0f, 1f)
         }
-        val matrix = FloatArray(16)
+        val matrix = coreTransformMatrix
         GlMatrix.setIdentityM(matrix, 0)
         GlMatrix.scaleM(matrix, 0, scale, scale, scale)
         transformManager.setTransform(transformManager.getInstance(core.entity), matrix)
@@ -1417,7 +1423,7 @@ class GenesisFilamentRendererView(
         body: Body
     ) {
         val instance = transformManager.getInstance(body.mesh.entity)
-        val matrix = FloatArray(16)
+        val matrix = body.transformMatrix
         GlMatrix.setIdentityM(matrix, 0)
         GlMatrix.translateM(matrix, 0, body.x, body.y, body.z)
         GlMatrix.rotateM(matrix, 0, body.rx, 1f, 0f, 0f)
