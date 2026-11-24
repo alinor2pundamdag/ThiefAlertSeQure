@@ -41,6 +41,7 @@ class SettingsActivity : FragmentActivity() {
     private var flashPreviewStopRunnable: Runnable? = null
     private var pendingUpdateInstall: AppUpdateResult.Ready? = null
     private var pendingCameraEvidenceExportId: String? = null
+    private var cancelEvidenceLocationRequest: (() -> Unit)? = null
     private var requestedSection: String? = null
     private val sectionAnchors = mutableMapOf<String, View>()
     private val pickSoundFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -1199,8 +1200,14 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun requestFreshEvidenceLocation() {
+        cancelEvidenceLocationRequest?.invoke()
+        cancelEvidenceLocationRequest = null
         android.widget.Toast.makeText(this, "Requesting one current location fix…", android.widget.Toast.LENGTH_SHORT).show()
-        EvidenceLocationCapture.requestCurrent(this) { snapshot ->
+        val cancel = EvidenceLocationCapture.requestCurrent(this) { snapshot ->
+            cancelEvidenceLocationRequest = null
+            if (isFinishing || isDestroyed ||
+                !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+            ) return@requestCurrent
             if (snapshot == null) {
                 android.widget.Toast.makeText(this, "No current location fix was returned within 20 seconds. Nothing was saved.", android.widget.Toast.LENGTH_LONG).show()
                 return@requestCurrent
@@ -1217,6 +1224,19 @@ class SettingsActivity : FragmentActivity() {
                 android.widget.Toast.LENGTH_LONG
             ).show()
         }
+        cancelEvidenceLocationRequest = cancel
+        if (isFinishing || isDestroyed ||
+            !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        ) {
+            cancelEvidenceLocationRequest?.invoke()
+            cancelEvidenceLocationRequest = null
+        }
+    }
+
+    override fun onStop() {
+        cancelEvidenceLocationRequest?.invoke()
+        cancelEvidenceLocationRequest = null
+        super.onStop()
     }
 
     private fun saveLastKnownEvidenceLocation() {
