@@ -125,6 +125,9 @@ jobs:
       - name: Verify optional ranging permission boundary
         run: python3 scripts/verify_ranging_privacy.py
 
+      - name: Verify local history biometric authentication and lifecycle
+        run: python3 scripts/verify_local_history_auth.py
+
       - name: Run unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
 
