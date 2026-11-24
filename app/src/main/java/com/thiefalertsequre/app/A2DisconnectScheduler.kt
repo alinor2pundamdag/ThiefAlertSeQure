@@ -75,8 +75,14 @@ internal object A2DisconnectScheduler {
 
         val delayMs = A2DisconnectPolicy.nextRetryDelayMs(current.retryCount)
         if (delayMs == null) {
-            cancelInternal(context, current.address, current.eventElapsedRealtimeMs, preferencesName, namespace)
-            LocalTamperHistory.record(context, "a2_deadline_retry_exhausted", "A2 deadline validation could not be durably completed after ${A2DisconnectPolicy.MAX_RETRIES} bounded retries")
+            val cleared = runCatching {
+                cancelInternal(context, current.address, current.eventElapsedRealtimeMs, preferencesName, namespace)
+            }.getOrDefault(false)
+            LocalTamperHistory.record(
+                context,
+                "a2_deadline_retry_exhausted",
+                "A2 deadline validation could not be durably completed after ${A2DisconnectPolicy.MAX_RETRIES} bounded retries; pending record cleared=$cleared"
+            )
             ProtectionMonitorRecoveryNotice.show(context, "A trusted-device separation deadline could not be verified. Open the app to review protection monitoring.")
             return false
         }
