@@ -44,7 +44,7 @@ If preflight fails, do not create the release tag. Fix the failure, rerun CI and
 
 ## 4. Publish the official GitHub Release
 
-Only after exact-head CI, security review and signed preflight pass. Physical-device acceptance is performed separately by the owner and is not a development gate:
+Only after exact-head CI, security reassessment and signed preflight pass. The signed preflight APK is then handed to the owner for physical testing. Physical testing is not a coding, CI or merge gate, but public tag publication should wait until the owner has completed the device test and authorized publication:
 
 - Create and push the exact tag `v1.1.5_Developer_Alinor` on the approved commit already merged into `main`.
 - The tag push starts the **Official signed Android release** workflow.
