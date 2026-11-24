@@ -196,7 +196,7 @@ class LocalTamperHistoryActivity : FragmentActivity() {
         ))
         if (!historyHealthy || !evidenceHealthy) {
             root.addView(space(8))
-            root.addView(text("WARNING: Encrypted history integrity/decryption failed. Stored data is preserved; export is disabled. Preserve app data for diagnosis.", 13f, R.color.tas_error, true))
+            root.addView(text("WARNING: Encrypted history integrity/decryption failed. Stored data is preserved; export is disabled. Preserve app data for diagnosis.", 13f, R.color.tas_danger, true))
         }
         root.addView(space(12))
         search = EditText(this).apply {
@@ -276,7 +276,7 @@ class LocalTamperHistoryActivity : FragmentActivity() {
         rows.removeAllViews()
         val query = if (::search.isInitialized) search.text?.toString()?.trim().orEmpty() else ""
         if (!historyHealthy) {
-            rows.addView(text("Event timeline unavailable: encrypted history integrity check failed.", 13f, R.color.tas_error))
+            rows.addView(text("Event timeline unavailable: encrypted history integrity check failed.", 13f, R.color.tas_danger))
         } else {
             val filtered = history.filter { line ->
                 val code = LocalTamperHistoryPolicy.eventCodeFromLine(line)
@@ -293,9 +293,9 @@ class LocalTamperHistoryActivity : FragmentActivity() {
         }
         rows.addView(space(14))
         rows.addView(text("ENCRYPTED EVIDENCE ARCHIVE • INTEGRITY ${if (evidenceHealthy) "VERIFIED" else "FAILED"}",
-            10f, if (evidenceHealthy) R.color.tas_primary else R.color.tas_error, true))
+            10f, if (evidenceHealthy) R.color.tas_primary else R.color.tas_danger, true))
         if (!evidenceHealthy) {
-            rows.addView(text("Archive records are hidden because decryption or integrity verification failed.", 13f, R.color.tas_error))
+            rows.addView(text("Archive records are hidden because decryption or integrity verification failed.", 13f, R.color.tas_danger))
         } else {
             val filteredEvidence = evidence.filter { entry ->
                 LocalTamperHistoryPolicy.matchesCategory(entry.event, activeCategory) &&
