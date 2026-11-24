@@ -320,7 +320,7 @@ internal object A2DisconnectScheduler {
                     )
                 ) {
                     runCatching { cancelPendingIntent(manager, exactOperation) }
-
+                }
                 LocalTamperHistory.record(
                     context, "a2_exact_alarm_schedule_failed",
                     error.javaClass.simpleName + ": " + error.message + "; trying the inexact fallback"
@@ -332,7 +332,7 @@ internal object A2DisconnectScheduler {
                 )
             ) {
                 runCatching { cancelPendingIntent(manager, exactOperation) }
-
+            }
             LocalTamperHistory.record(
                 context, "a2_exact_alarm_access_missing",
                 "Using the inexact idle-aware A2 deadline fallback; Android may delay delivery"

@@ -184,7 +184,7 @@ object AlarmScheduler {
                     )
                 ) {
                     runCatching { cancelPendingIntent(alarmManager, exactOperation) }
-
+                }
                 LocalTamperHistory.record(
                     context, "deadline_exact_schedule_failed",
                     error.javaClass.simpleName + ": " + error.message + "; trying the inexact fallback"
@@ -196,7 +196,7 @@ object AlarmScheduler {
                 )
             ) {
                 runCatching { cancelPendingIntent(alarmManager, exactOperation) }
-
+            }
             LocalTamperHistory.record(
                 context, "deadline_exact_access_missing",
                 "The inexact idle-aware countdown/recovery fallback is scheduled; Android may delay delivery"
