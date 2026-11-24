@@ -25,4 +25,11 @@ class AlarmTonePresetTest {
             AlarmTonePreset.PULSE.durationMs
         )
     }
+    @Test fun sixAlarmChoicesIncludeThePackagedDefaultFirst() {
+        assertEquals(6, AlarmTonePreset.entries.size)
+        assertEquals(AlarmTonePreset.DEFAULT_AUDIO, AlarmTonePreset.entries.first())
+        assertEquals(5, AlarmTonePreset.builtIns.size)
+        assertTrue(AlarmTonePreset.DEFAULT_AUDIO !in AlarmTonePreset.builtIns)
+    }
+
 }
