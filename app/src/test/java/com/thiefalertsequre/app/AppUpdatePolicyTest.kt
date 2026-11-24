@@ -20,6 +20,19 @@ class AppUpdatePolicyTest {
         }
     }
 
+    @Test fun updaterAcceptsOnlyExactGithubHttpsHostsAndStandardPorts() {
+        assertTrue(AppUpdatePolicy.isAllowedHttpsUrl("https://api.github.com/repos/owner/repo/releases/latest"))
+        assertTrue(AppUpdatePolicy.isAllowedHttpsUrl("https://github.com/owner/repo/releases/download/v1.0/app.apk"))
+        assertTrue(AppUpdatePolicy.isAllowedHttpsUrl("https://release-assets.githubusercontent.com/assets/app.apk"))
+        assertTrue(AppUpdatePolicy.isAllowedHttpsUrl("https://objects.githubusercontent.com/assets/app.apk:443"))
+        assertFalse(AppUpdatePolicy.isAllowedHttpsUrl("http://api.github.com/repos/owner/repo"))
+        assertFalse(AppUpdatePolicy.isAllowedHttpsUrl("https://github.com.evil.example/app.apk"))
+        assertFalse(AppUpdatePolicy.isAllowedHttpsUrl("https://evilgithub.com/app.apk"))
+        assertFalse(AppUpdatePolicy.isAllowedHttpsUrl("https://user@github.com/app.apk"))
+        assertFalse(AppUpdatePolicy.isAllowedHttpsUrl("https://github.com:8443/app.apk"))
+        assertFalse(AppUpdatePolicy.isAllowedHttpsUrl("not a URL"))
+    }
+
     @Test fun onlyPinnedSingleSignerIsAccepted() {
         assertTrue(AppUpdatePolicy.hasOfficialSigner(listOf(AppUpdatePolicy.EXPECTED_CERT_SHA256)))
         assertTrue(AppUpdatePolicy.hasOfficialSigner(listOf(AppUpdatePolicy.EXPECTED_CERT_SHA256.uppercase())))
