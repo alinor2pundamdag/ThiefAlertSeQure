@@ -20,6 +20,7 @@ history = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistory
 history_policy = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistoryPolicy.kt").read_text(encoding="utf-8")
 history_activity = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistoryActivity.kt").read_text(encoding="utf-8")
 history_session_policy = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalHistorySessionPolicy.kt").read_text(encoding="utf-8")
+license_asset = ROOT / "app/src/main/assets/licenses/Apache-2.0.txt"
 evidence_timestamp_policy = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalEvidenceVaultPolicy.kt").read_text(encoding="utf-8")
 policy_acknowledgements = (ROOT / "app/src/main/java/com/thiefalertsequre/app/PolicyAcknowledgementPolicy.kt").read_text(encoding="utf-8")
 about = (ROOT / "app/src/main/java/com/thiefalertsequre/app/AboutActivity.kt").read_text(encoding="utf-8")
@@ -119,6 +120,10 @@ required = {
         "isValidTimestampMetadata" in vault
         and "timestampEpochMs >= 0L" in evidence_timestamp_policy
         and "timezoneOffsetMinutes in -840..840" in evidence_timestamp_policy,
+    "About license acknowledgements bundle the complete Apache 2.0 license text":
+        license_asset.is_file()
+        and "Apache License" in license_asset.read_text(encoding="utf-8")
+        and "END OF TERMS AND CONDITIONS" in license_asset.read_text(encoding="utf-8"),
     "local event history redacts exception messages and common sensitive values":
         all(token in history_policy for token in ("exceptionMessage", "credentialAssignment", "bearerCredential", "knownToken", "jwt", "uri", "filesystemPath", "email")),
     "legacy local event details are sanitized on read and append":

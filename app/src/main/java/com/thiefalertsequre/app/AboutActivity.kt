@@ -57,6 +57,8 @@ class AboutActivity : FragmentActivity() {
         scroll.addView(root)
         root.addView(button("‹  Back to dashboard") { finish() })
         root.addView(space(16))
+        addDeveloperSignature()
+        root.addView(space(18))
         root.addView(text("PRODUCT INFORMATION", 11f, R.color.tas_primary, true))
         root.addView(space(6))
         root.addView(text("ThiefAlertSeQure", 30f, R.color.tas_text, true).markAsPageHeading())
@@ -65,8 +67,6 @@ class AboutActivity : FragmentActivity() {
             "A local-first Android anti-theft protection app. Protection state, alarms and evidence remain on this device; no account or app backend is required.",
             14f, R.color.tas_muted
         ))
-        root.addView(space(18))
-        addDeveloperSignature()
         root.addView(space(18))
         addVersionCard()
         root.addView(space(20))
@@ -146,6 +146,14 @@ class AboutActivity : FragmentActivity() {
                 .putExtra(SettingsActivity.EXTRA_SECTION, SettingsActivity.SECTION_PRIVACY))
         })
         root.addView(space(8))
+        root.addView(outlinedButton("Open Android App Info") {
+            AndroidDeviceCompatibility.open(this, AndroidDeviceCompatibility.appInfoIntent(packageName))
+        })
+        root.addView(space(8))
+        root.addView(outlinedButton("Open-source license acknowledgements") {
+            showLicenseAcknowledgements()
+        })
+        root.addView(space(8))
         root.addView(outlinedButton("Terms of Use & Platform Limitations") { showTerms() })
         root.addView(space(8))
         root.addView(outlinedButton("Permissions and Android Setup") {
@@ -163,10 +171,6 @@ class AboutActivity : FragmentActivity() {
             12f, R.color.tas_muted
         ))
         root.addView(space(14))
-        root.addView(text(
-            "Developed by Alinor Pundamdag • ThiefAlertSeQure",
-            12f, R.color.tas_muted, true
-        ))
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
         ThemeRuntime.apply(this, root)
@@ -194,23 +198,15 @@ class AboutActivity : FragmentActivity() {
             gravity = Gravity.CENTER
         })
         content.addView(space(10))
-        content.addView(TextView(this).apply {
-            text = "ALINOR PUNDAMDAG"
-            textSize = 19f
-            letterSpacing = 0.08f
-            setTextColor(Color.WHITE)
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-            gravity = Gravity.CENTER
-        })
         content.addView(space(12))
         signatureText = TextView(this).apply {
-            text = "A  •  B  •  C  •  D  •  E  •  F  •  G"
-            textSize = 12f
-            letterSpacing = 0.12f
+            text = "Developed by Alinor Pundamdag"
+            textSize = 17f
+            letterSpacing = 0.02f
             setTextColor(Color.rgb(90, 180, 255))
-            typeface = Typeface.MONOSPACE
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
             gravity = Gravity.CENTER
-            contentDescription = "Animated seven-letter developer signature spectrum"
+            contentDescription = "Animated developer credit: Developed by Alinor Pundamdag"
         }
         content.addView(signatureText)
         content.addView(space(8))
@@ -273,6 +269,22 @@ class AboutActivity : FragmentActivity() {
         details.addView(space(10))
         details.addView(text("Android compatibility", 11f, R.color.tas_muted, true))
         details.addView(text("Minimum API 26 • target API 36 • running API ${Build.VERSION.SDK_INT}", 13f, R.color.tas_text))
+        details.addView(space(12))
+        details.addView(text("APP AUTHENTICITY", 10f, R.color.tas_primary, true))
+        val installedSigners = runCatching { AppUpdateManager.installedSignerSha256(this) }.getOrDefault(emptyList())
+        val officialSigner = AppUpdatePolicy.hasOfficialSigner(installedSigners)
+        details.addView(space(5))
+        details.addView(text(
+            if (officialSigner) "VERIFIED • installed signer matches the pinned official release key"
+            else "DEVELOPMENT / NON-OFFICIAL SIGNER • official in-app updates are blocked for this build",
+            12f, if (officialSigner) R.color.tas_success else R.color.tas_warning, true
+        ))
+        details.addView(space(5))
+        details.addView(text("Installed signer SHA-256", 11f, R.color.tas_muted, true))
+        details.addView(text(installedSigners.singleOrNull() ?: "Unavailable or multiple signers", 10f, R.color.tas_text))
+        details.addView(space(5))
+        details.addView(text("Pinned official signer SHA-256", 11f, R.color.tas_muted, true))
+        details.addView(text(AppUpdatePolicy.EXPECTED_CERT_SHA256, 10f, R.color.tas_text))
         card.addView(details)
         root.addView(card)
     }
@@ -304,6 +316,64 @@ class AboutActivity : FragmentActivity() {
         card.addView(body)
         root.addView(card)
         root.addView(space(8))
+    }
+
+    private fun showLicenseAcknowledgements() {
+        val apacheLicense = runCatching {
+            assets.open("licenses/Apache-2.0.txt").bufferedReader(Charsets.UTF_8).use { it.readText() }
+        }.getOrElse {
+            android.widget.Toast.makeText(this, "Bundled Apache 2.0 license text is unavailable.", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(12), dp(16), dp(16))
+        }
+        content.addView(text("PROJECT LICENSE", 11f, R.color.tas_primary, true))
+        content.addView(space(6))
+        content.addView(text("ThiefAlertSeQure source code • Apache License 2.0", 14f, R.color.tas_text, true))
+        content.addView(space(14))
+        content.addView(text("DIRECT RUNTIME DEPENDENCIES", 11f, R.color.tas_primary, true))
+        content.addView(space(6))
+        val dependencies = listOf(
+            "AndroidX Core KTX • 1.15.0",
+            "AndroidX Activity KTX • 1.10.0",
+            "AndroidX Fragment KTX • 1.8.5",
+            "AndroidX Biometric • 1.1.0",
+            "AndroidX Lifecycle Runtime KTX • 2.8.7",
+            "AndroidX DocumentFile • 1.0.1",
+            "Google Material Components for Android • 1.12.0"
+        )
+        dependencies.forEach { dependency ->
+            content.addView(text("$dependency — Apache License 2.0", 12f, R.color.tas_text))
+            content.addView(space(5))
+        }
+        content.addView(space(8))
+        content.addView(text(
+            "Upstream projects: github.com/androidx/androidx and github.com/material-components/material-components-android. The complete Apache License 2.0 text follows.",
+            11f, R.color.tas_muted
+        ))
+        content.addView(space(12))
+        content.addView(text("APACHE LICENSE, VERSION 2.0", 11f, R.color.tas_primary, true))
+        content.addView(space(6))
+        content.addView(TextView(this).apply {
+            text = apacheLicense
+            textSize = 10f
+            setTextColor(getColor(R.color.tas_muted))
+            typeface = Typeface.MONOSPACE
+            setTextIsSelectable(true)
+            setLineSpacing(dp(2).toFloat(), 1f)
+        })
+        val scroll = ScrollView(this).apply {
+            isFillViewport = false
+            layoutParams = android.view.ViewGroup.LayoutParams(-1, dp(520))
+            addView(content)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Open-source license acknowledgements")
+            .setView(scroll)
+            .setPositiveButton("Close", null)
+            .showThemed(this)
     }
 
     private fun showTerms() {

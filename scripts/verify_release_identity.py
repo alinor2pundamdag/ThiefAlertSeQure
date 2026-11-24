@@ -9,6 +9,7 @@ policy = (ROOT / "app/src/main/java/com/thiefalertsequre/app/AppUpdatePolicy.kt"
 release = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
 updater = (ROOT / "app/src/main/java/com/thiefalertsequre/app/AppUpdateManager.kt").read_text(encoding="utf-8")
 settings = (ROOT / "app/src/main/java/com/thiefalertsequre/app/SettingsActivity.kt").read_text(encoding="utf-8")
+about = (ROOT / "app/src/main/java/com/thiefalertsequre/app/AboutActivity.kt").read_text(encoding="utf-8")
 installer_start = settings.index("private fun launchAndroidInstaller")
 installer_end = settings.index("override fun onResume", installer_start)
 installer = settings[installer_start:installer_end]
@@ -33,6 +34,9 @@ assert policy_cert.lower() == release_cert.lower(), (
 assert "AppUpdatePolicy.requireInstalledPackage(context.packageName)" in updater
 assert "AppUpdatePolicy.requireNewerVersionCode" in updater
 assert "AppUpdatePolicy.hasOfficialSigner" in updater
+assert "installedSignerSha256" in updater
+assert "AppUpdateManager.installedSignerSha256(this)" in about
+assert "AppUpdatePolicy.EXPECTED_CERT_SHA256" in about
 assert "Intent(Intent.ACTION_INSTALL_PACKAGE)" in installer
 assert "FileProvider.getUriForFile" in installer
 assert "Intent(Intent.ACTION_VIEW)" not in installer

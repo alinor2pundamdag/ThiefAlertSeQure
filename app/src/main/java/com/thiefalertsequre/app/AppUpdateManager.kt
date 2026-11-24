@@ -260,7 +260,8 @@ object AppUpdateManager {
         AppUpdatePolicy.isNewerVersionCode(installedCode, candidateCode)
     }.getOrDefault(false)
 
-    private fun installedSignerMatchesOfficialKey(context: Context): Boolean {
+    /** Returns the SHA-256 digests of the installed APK signers for transparent About-page verification. */
+    fun installedSignerSha256(context: Context): List<String> {
         val packageManager = context.packageManager
         val installed = packageManager.getPackageInfo(context.packageName, signingFlags())
         val signatures = if (Build.VERSION.SDK_INT >= 28) {
@@ -269,13 +270,15 @@ object AppUpdateManager {
             @Suppress("DEPRECATION")
             installed.signatures
         }
-        if (signatures.isNullOrEmpty()) return false
-        val digests = signatures.map { signature ->
+        if (signatures.isNullOrEmpty()) return emptyList()
+        return signatures.map { signature ->
             MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
                 .joinToString("") { byte -> "%02x".format(byte) }
         }
-        return AppUpdatePolicy.hasOfficialSigner(digests)
     }
+
+    private fun installedSignerMatchesOfficialKey(context: Context): Boolean =
+        AppUpdatePolicy.hasOfficialSigner(installedSignerSha256(context))
 
     private fun signingFlags(): Int =
         if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES

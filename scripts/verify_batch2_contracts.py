@@ -175,9 +175,17 @@ checks = {
         and "SECTION_PRIVACY" in (APP / "AboutActivity.kt").read_text(encoding="utf-8"),
     "About screen exposes developer identity, version history, terms and feature catalog":
         "DEVELOPER SIGNATURE" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
+        and "Developed by Alinor Pundamdag" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
+        and "startSignatureAnimation" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
+        and "repeatCount = ValueAnimator.INFINITE" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
         and "VERSION HISTORY" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
         and "Terms of Use & Platform Limitations" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
         and "FEATURE CATALOG" in (APP / "AboutActivity.kt").read_text(encoding="utf-8"),
+    "About exposes Android App Info, signer authenticity and open-source license acknowledgements":
+        "AndroidDeviceCompatibility.appInfoIntent(packageName)" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
+        and "AppUpdateManager.installedSignerSha256(this)" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
+        and "Open-source license acknowledgements" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
+        and 'assets.open("licenses/Apache-2.0.txt")' in (APP / "AboutActivity.kt").read_text(encoding="utf-8"),
     "Privacy Notice and Terms acknowledgements are versioned and timestamped":
         "PolicyAcknowledgementPolicy.isCurrent" in dashboard
         and "PolicyAcknowledgementPolicy.PRIVACY_VERSION" in dashboard
