@@ -1,5 +1,7 @@
 package com.thiefalertsequre.app
 
+import java.net.URL
+
 /** Immutable release identity and pure validation rules shared by updater tests. */
 internal object AppUpdatePolicy {
     const val EXPECTED_PACKAGE = "com.thiefalertsequre.app"
@@ -15,6 +17,24 @@ internal object AppUpdatePolicy {
         requireNotNull(match) { "The official release tag has an invalid version format." }
         return match.groupValues[1]
     }
+
+    /**
+     * Restricts updater requests and redirects to approved GitHub HTTPS hosts,
+     * the standard HTTPS port, and URLs without embedded user credentials.
+     */
+    fun isAllowedHttpsUrl(address: String): Boolean = runCatching {
+        val url = URL(address)
+        url.protocol.equals("https", ignoreCase = true) &&
+            url.host.isNotBlank() &&
+            listOf(
+                "api.github.com",
+                "github.com",
+                "release-assets.githubusercontent.com",
+                "objects.githubusercontent.com"
+            ).any { it.equals(url.host, ignoreCase = true) } &&
+            (url.port == -1 || url.port == 443) &&
+            url.userInfo == null
+    }.getOrDefault(false)
 
     fun requireInstalledPackage(installedPackage: String) {
         require(installedPackage == EXPECTED_PACKAGE) {

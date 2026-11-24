@@ -39,13 +39,6 @@ object AppUpdateManager {
         "https://api.github.com/repos/alinor2pundamdag/ThiefAlertSeQure/releases/latest"
     private const val EXPECTED_PACKAGE = AppUpdatePolicy.EXPECTED_PACKAGE
     private const val MAX_APK_BYTES = 100L * 1024L * 1024L
-    private val allowedHosts = setOf(
-        "api.github.com",
-        "github.com",
-        "release-assets.githubusercontent.com",
-        "objects.githubusercontent.com"
-    )
-
     fun checkAndDownload(
         context: Context,
         executor: ExecutorService,
@@ -193,10 +186,9 @@ object AppUpdateManager {
     private fun openHttps(address: String): HttpURLConnection {
         var currentUrl = URL(address)
         repeat(6) {
-            require(
-                currentUrl.protocol.equals("https", ignoreCase = true) &&
-                    currentUrl.host in allowedHosts
-            ) { "The update server or redirect is not an approved HTTPS GitHub host." }
+            require(AppUpdatePolicy.isAllowedHttpsUrl(currentUrl.toExternalForm())) {
+                "The update server or redirect is not an approved HTTPS GitHub host."
+            }
 
             val connection = (currentUrl.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 15_000
