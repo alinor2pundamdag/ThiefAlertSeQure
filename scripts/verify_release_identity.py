@@ -8,6 +8,10 @@ gradle = (ROOT / "app/build.gradle.kts").read_text(encoding="utf-8")
 policy = (ROOT / "app/src/main/java/com/thiefalertsequre/app/AppUpdatePolicy.kt").read_text(encoding="utf-8")
 release = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
 updater = (ROOT / "app/src/main/java/com/thiefalertsequre/app/AppUpdateManager.kt").read_text(encoding="utf-8")
+settings = (ROOT / "app/src/main/java/com/thiefalertsequre/app/SettingsActivity.kt").read_text(encoding="utf-8")
+installer_start = settings.index("private fun launchAndroidInstaller")
+installer_end = settings.index("override fun onResume", installer_start)
+installer = settings[installer_start:installer_end]
 
 def capture(pattern: str, source: str, label: str) -> str:
     match = re.search(pattern, source)
@@ -29,5 +33,9 @@ assert policy_cert.lower() == release_cert.lower(), (
 assert "AppUpdatePolicy.requireInstalledPackage(context.packageName)" in updater
 assert "AppUpdatePolicy.requireNewerVersionCode" in updater
 assert "AppUpdatePolicy.hasOfficialSigner" in updater
+assert "Intent(Intent.ACTION_INSTALL_PACKAGE)" in installer
+assert "FileProvider.getUriForFile" in installer
+assert "Intent(Intent.ACTION_VIEW)" not in installer
+assert "installerFallback" not in installer
 assert 'applicationIdSuffix = ".v114test"' in gradle
 print(f"Production identity consistent: {gradle_package}; signer SHA-256 {policy_cert.lower()}")
