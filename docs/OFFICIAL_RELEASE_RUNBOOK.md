@@ -10,7 +10,7 @@ This runbook covers GitHub APK distribution only. Google Play is not included in
 
 ## 1. Clean integration and review
 
-- The original PR #7/#8 stack had 1,504 commits ahead of `main` and 196 changed paths. It has been consolidated into the single-snapshot PR #9 branch `release/v1.1.5-candidate`, based directly on `main`. PR #9 head `56418b68e422ded696705fd4d07d76605151d19a` passed Android CI #45307869027 and CodeQL #45307868989. The follow-up restoring PR #5 Bluetooth docs/tests requires fresh exact-head CI.
+- The original PR #7/#8 stack had 1,504 commits ahead of `main` and 196 changed paths. It has been consolidated into the single-snapshot PR #9 branch `release/v1.1.5-candidate`, based directly on `main`. PR #9 currently contains the restored PR #5 Bluetooth regression test and policy/design documents. The latest documentation-adjusted head is `d6c81640e8e8ee2338e1fa3e72f84972b0ebcd30`; exact-head Android CI #45310452864 and CodeQL #45310452757 were running at the last check.
 - PR #4 and #5 overlap the active implementation and must not be merged independently. PR #6 lowers minSdk to 23 and adds instrumentation; it conflicts with the approved minSdk 26 and no-instrumentation policy.
 - Exact-head Android CI and CodeQL must pass on the clean release branch. Previous stack CI results do not substitute for clean-branch results.
 - Review the CodeQL APK-installer finding. The current path validates GitHub HTTPS hosts, bounds the download, verifies SHA-256, package/version, pinned signer and app-private cache location, revalidates immediately before installer handoff, requires protection DISARMED and requires an explicit owner tap. The PR #7 review thread remains unresolved; do not claim it closed until the alert is formally reassessed.
@@ -75,13 +75,13 @@ The current targetSdk 36 meets the published Google Play target-API requirement 
 
 ## Explicitly deferred — not part of v1.1.5
 
-No implementation GO was found for active shutdown/power-menu/reboot prevention, guaranteed protection while powered off, automatic front-camera capture on successful owner credential entry, new camera/flashlight conflict prevention, or maximum/premium expansion. The current camera evidence flow remains owner-initiated and opt-in. Do not add these features to this release without a separate owner GO.
+No implementation GO was found for active shutdown/power-menu/reboot prevention, guaranteed protection while powered off, automatic front-camera capture on successful owner credential entry, new camera/flashlight conflict prevention, or maximum/premium expansion. The existing camera evidence feature remains opt-in and permission-gated; when enabled, its documented single-photo trigger is successful owner authentication while the app is visible. No covert/background capture is included. Do not add these features to this release without a separate owner GO.
 
 ## Current blockers
 
 - Latest exact-head CodeQL passed; latest exact-head Android CI is running its final minified APK verification and artifact upload.
 - CodeQL APK-installation review thread remains unresolved.
-- Independent review is pending.
+- Independent review of the release candidate has not yet been recorded.
 - Production signing-secret availability and signed preflight are not verified.
 - Owner physical acceptance is pending and intentionally excluded from coding/merge gates.
 - No release tag or production publication has occurred.
