@@ -43,6 +43,8 @@ checks = {
         'putInt("version", PolicyAcknowledgementPolicy.TERMS_VERSION)' in about,
     "shared legal viewer fails closed when a bundled document is missing":
         "The selected legal document is unavailable" in viewer,
+    "legal document viewer bounds scroll height on small screens":
+        "heightPixels * 0.65f" in viewer and "dp(520)" in viewer,
     "README accurately describes both first-launch acknowledgements":
         "records both acknowledgements in separate versioned app-private preferences" in readme,
     "repository privacy policy matches current in-app privacy version":
