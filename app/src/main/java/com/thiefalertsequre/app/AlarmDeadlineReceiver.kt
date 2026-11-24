@@ -5,38 +5,91 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
 
+internal object AlarmDeadlineReceiverQueuePolicy {
+    const val MAX_PENDING_EVENTS = 8
+    const val BACKPRESSURE_TIMEOUT_MS = 2_000L
+
+    fun createExecutor(
+        queueCapacity: Int = MAX_PENDING_EVENTS,
+        backpressureTimeoutMs: Long = BACKPRESSURE_TIMEOUT_MS
+    ): java.util.concurrent.ThreadPoolExecutor =
+        BoundedSerialExecutor.create(
+            queueCapacity = queueCapacity,
+            backpressureTimeoutMs = backpressureTimeoutMs,
+            threadName = "alarm-deadline-events"
+        )
+}
+
+/** Process-lifetime queue shared by charger and A2 deadline broadcasts. */
+internal object AlarmDeadlineReceiverQueue {
+    val executor = AlarmDeadlineReceiverQueuePolicy.createExecutor()
+}
+
 class AlarmDeadlineReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         val callbackIntent = intent ?: return
         val pending = goAsync()
-        Thread {
-            try {
-                if (callbackIntent.action == A2DisconnectScheduler.ACTION_DEADLINE) {
-                    handleA2DisconnectDeadline(context.applicationContext, callbackIntent)
-                } else {
-                    handleDeadline(context.applicationContext, callbackIntent)
-                }
-            } catch (error: Exception) {
-                LocalTamperHistory.record(
-                    context, "deadline_receiver_error",
-                    error.javaClass.simpleName + ": " + error.message
-                )
-                if (callbackIntent.action == A2DisconnectScheduler.ACTION_DEADLINE) {
-                    val token = callbackIntent.data?.lastPathSegment
-                    if (token != null) A2DisconnectScheduler.find(context, token)?.let {
-                        A2DisconnectScheduler.scheduleRetry(context, it)
+        try {
+            AlarmDeadlineReceiverQueue.executor.execute {
+                try {
+                    if (callbackIntent.action == A2DisconnectScheduler.ACTION_DEADLINE) {
+                        handleA2DisconnectDeadline(context.applicationContext, callbackIntent)
+                    } else {
+                        handleDeadline(context.applicationContext, callbackIntent)
                     }
-                } else if (ProtectionStore(context).read().mode == ProtectionMode.ALARM_TRIGGERED) {
-                    AlarmRecoveryCoordinator.onStartFailure(
-                        context, "Deadline receiver failed while the alarm was latched"
-                    )
-                } else {
-                    AlarmScheduler.scheduleRetry(context, 1_000L)
+                } catch (error: Exception) {
+                    handleReceiverFailure(context, callbackIntent, error, queueRejected = false)
+                } finally {
+                    pending.finish()
                 }
+            }
+        } catch (error: Exception) {
+            try {
+                handleReceiverFailure(context, callbackIntent, error, queueRejected = true)
             } finally {
                 pending.finish()
             }
-        }.start()
+        }
+    }
+
+    private fun handleReceiverFailure(
+        context: Context,
+        callbackIntent: Intent,
+        error: Exception,
+        queueRejected: Boolean
+    ) {
+        LocalTamperHistory.record(
+            context,
+            if (queueRejected) "deadline_receiver_queue_failed" else "deadline_receiver_error",
+            error.javaClass.simpleName + ": " + error.message
+        )
+        runCatching {
+            if (callbackIntent.action == A2DisconnectScheduler.ACTION_DEADLINE) {
+                val token = callbackIntent.data?.lastPathSegment
+                if (token != null) {
+                    A2DisconnectScheduler.find(context, token)?.let {
+                        A2DisconnectScheduler.scheduleRetry(context, it)
+                    }
+                }
+            } else if (ProtectionStore(context).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                AlarmRecoveryCoordinator.onStartFailure(
+                    context, "Deadline receiver failed while the alarm was latched"
+                )
+            } else {
+                AlarmScheduler.scheduleRetry(context, 1_000L)
+            }
+        }.onFailure { recoveryError ->
+            LocalTamperHistory.record(
+                context, "deadline_receiver_recovery_failed",
+                recoveryError.javaClass.simpleName + ": " + recoveryError.message
+            )
+        }
+        if (queueRejected) {
+            ProtectionMonitorRecoveryNotice.show(
+                context,
+                "A protection deadline event could not be queued. Open the app to review monitoring and alarm recovery."
+            )
+        }
     }
 
     private fun handleA2DisconnectDeadline(context: Context, intent: Intent) {
@@ -236,7 +289,7 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         }.onFailure {
             LocalTamperHistory.record(context, "alarm_fgs_launch_failed", it.javaClass.simpleName + ": " + it.message)
             AlarmRecoveryCoordinator.onStartFailure(
-                context, "Android rejected the alarm foreground-service launch: $reason"
+                context, "Android rejected the alarm foreground-service launch: " + reason
             )
         }
     }
