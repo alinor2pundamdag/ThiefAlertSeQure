@@ -212,6 +212,9 @@ jobs:
           fi
           echo "APK_VARIANT=$APK_VARIANT" >> "$GITHUB_ENV"
 
+      - name: Verify legal policy assets are packaged in the APK
+        run: python3 scripts/verify_packaged_legal_assets.py "$APK_PATH"
+
       - name: Inspect manifest and verify APK output metadata
         shell: bash
         run: |
