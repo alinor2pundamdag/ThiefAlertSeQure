@@ -25,7 +25,7 @@ checks = {
     "terms asset carries the current app terms version":
         f"Terms version: {terms_version}" in terms_asset,
     "privacy asset and repository policy agree on the effective date":
-        "Effective date: 17 November 2026" in privacy_doc and
+        "Effective date:** 17 November 2026" in privacy_doc and
         "Effective date: 17 November 2026" in privacy_asset,
     "first-launch screen exposes the full privacy document":
         'LegalDocumentViewer.show(' in main and '"legal/privacy_policy.txt"' in main,
