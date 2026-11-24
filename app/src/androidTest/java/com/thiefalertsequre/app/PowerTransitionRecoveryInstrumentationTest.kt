@@ -81,9 +81,14 @@ class PowerTransitionRecoveryInstrumentationTest {
 
         try {
             runShell(instrumentation, "dumpsys battery unplug")
+            val disconnectedConfirmation = PowerTransitionSamplingPolicy.confirm(
+                expectedConnected = false,
+                readConnected = { ExternalPowerState.readConnected(context) }
+            )
             assumeTrue(
-                "Emulator did not expose a confirmed disconnected battery snapshot",
-                ExternalPowerState.readConnected(context) == false
+                "Emulator did not maintain a stable disconnected battery snapshot " +
+                    "(samples=${disconnectedConfirmation.sampleCount}, last=${disconnectedConfirmation.lastObserved})",
+                disconnectedConfirmation.confirmed
             )
 
             val eventEpochMs = System.currentTimeMillis() - 250L
