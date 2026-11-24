@@ -75,7 +75,7 @@ The current targetSdk 36 meets the published Google Play target-API requirement 
 
 ## Explicitly deferred — not part of v1.1.5
 
-No implementation GO was found for active shutdown/power-menu/reboot prevention, guaranteed protection while powered off, automatic front-camera capture on successful owner credential entry, new camera/flashlight conflict prevention, or maximum/premium expansion. The existing camera evidence feature remains opt-in and permission-gated; when enabled, its documented single-photo trigger is successful owner authentication while the app is visible. No covert/background capture is included. Do not add these features to this release without a separate owner GO.
+No implementation GO was found for active shutdown/power-menu/reboot prevention, guaranteed protection while powered off, unconditional, non-opt-in or background front-camera capture, new camera/flashlight conflict prevention, or maximum/premium expansion. The existing camera evidence feature remains opt-in and permission-gated; when enabled, its documented single-photo trigger is successful owner authentication while the app is visible. No covert/background capture is included. Do not add these features to this release without a separate owner GO.
 
 ## Current blockers
 
