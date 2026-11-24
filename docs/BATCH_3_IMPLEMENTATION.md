@@ -51,10 +51,6 @@ This document records the implementation scope and integration boundaries for Ba
 
 The initial Batch Three CI candidates exposed two correctable issues: typed preference reads outside `SafePreferences`, then the deprecated Quick Settings Intent overload. Both were corrected in follow-up commits. The current branch must still pass all required checks on its final head before Batch Three is called complete or handed over for user testing.
 
-## Batch Four — preserved sequence
+## Batch Four — Phases 14–16
 
-- **Phase 14:** About, Version, Legal and Privacy.
-- **Phase 15:** Integration, Quality and Release Readiness.
-- **Phase 16:** Local Tamper History and Final Verification.
-
-Only the Batch Four phase names and high-level objectives have been recovered. Its detailed acceptance criteria must be taken from the original agreed plan before implementation; they are intentionally not invented here.
+The implementation acceptance criteria and source/test mapping are defined in [Batch Four — Phases 14–16](BATCH_4_IMPLEMENTATION.md). That document is the controlling integration checklist for About/version/legal/privacy, cross-workflow quality and release readiness, and authenticated local tamper history. Exact-head Android CI and CodeQL remain mandatory before the batch is considered software-verified.
