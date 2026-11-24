@@ -201,7 +201,7 @@ class LocalTamperHistoryActivity : FragmentActivity() {
         root.addView(space(12))
         search = EditText(this).apply {
             hint = "Search event code or redacted detail"
-            singleLine = true
+            setSingleLine(true)
             textSize = 14f
             setTextColor(getColor(R.color.tas_text))
             setHintTextColor(getColor(R.color.tas_muted))
