@@ -64,14 +64,14 @@ object EvidenceLocationCapture {
      * is bounded to 20 seconds and never starts a background location service.
      */
     @Suppress("MissingPermission", "DEPRECATION")
-    fun requestCurrent(context: Context, onResult: (Snapshot?) -> Unit) {
+    fun requestCurrent(context: Context, onResult: (Snapshot?) -> Unit): () -> Unit {
         if (!hasPermission(context)) {
             onResult(null)
-            return
+            return {}
         }
         val manager = context.getSystemService(LocationManager::class.java) ?: run {
             onResult(null)
-            return
+            return {}
         }
         // Try every enabled location provider. A GPS-only request can time out
         // indoors even when the network provider could return a useful fix.
@@ -81,7 +81,7 @@ object EvidenceLocationCapture {
         )
         if (providers.isEmpty()) {
             onResult(null)
-            return
+            return {}
         }
 
         val handler = Handler(Looper.getMainLooper())
@@ -91,12 +91,25 @@ object EvidenceLocationCapture {
         val cancellations = mutableListOf<CancellationSignal>()
         var timeout: Runnable? = null
 
-        fun finish(location: Location?) {
-            if (!completed.compareAndSet(false, true)) return
+        fun cleanup() {
             timeout?.let(handler::removeCallbacks)
             listeners.forEach { listener -> runCatching { manager.removeUpdates(listener) } }
+            listeners.clear()
             cancellations.forEach { signal -> runCatching { signal.cancel() } }
+            cancellations.clear()
+        }
+
+        fun finish(location: Location?) {
+            if (!completed.compareAndSet(false, true)) return
+            cleanup()
             onResult(location?.let { snapshot(it, "CURRENT_REQUEST_RESULT") })
+        }
+
+        // The caller owns this cancellation handle and should invoke it when
+        // its visible screen stops. Cancellation releases provider callbacks
+        // without delivering a misleading "no fix" result to a dead screen.
+        val cancel = {
+            if (completed.compareAndSet(false, true)) cleanup()
         }
 
         fun providerFinished(location: Location?) {
@@ -134,6 +147,7 @@ object EvidenceLocationCapture {
                 providerFinished(null)
             }
         }
+        return cancel
     }
 
     internal fun enabledProviders(gpsEnabled: Boolean, networkEnabled: Boolean): List<String> =
