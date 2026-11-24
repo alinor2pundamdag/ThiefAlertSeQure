@@ -38,13 +38,13 @@ After the clean release PR is merged into `main`:
 3. This manual run is a preflight only; it does not publish a GitHub Release.
 4. The workflow verifies the permanent keystore, version/tag format, monotonic versionCode, unit tests, release lint, minified release APK metadata, package identity, official signer and APK checksum.
 5. Download and retain the signed preflight artifact before its three-day retention expires.
-6. Verify the signed APK on the approved physical test device. Confirm that it installs over the previous official package without changing the application ID or signer, preserves app data, and passes the Phase 12 manual acceptance scenarios.
+6. The owner will perform physical-device acceptance after receiving the signed APK. Physical acceptance is intentionally not a coding, CI, or merge gate.
 
-If preflight fails, do not create the release tag. Fix the failure, rerun CI and preflight, and repeat acceptance checks.
+If preflight fails, do not create the release tag. Fix the failure, rerun CI and preflight, then hand the signed artifact to the owner for physical acceptance.
 
 ## 4. Publish the official GitHub Release
 
-Only after exact-head CI, security review, signed preflight and required physical acceptance pass:
+Only after exact-head CI, security review and signed preflight pass. Physical-device acceptance is performed separately by the owner and is not a development gate:
 
 - Create and push the exact tag `v1.1.5_Developer_Alinor` on the approved commit already merged into `main`.
 - The tag push starts the **Official signed Android release** workflow.
@@ -79,11 +79,11 @@ No implementation GO was found for active shutdown/power-menu/reboot prevention,
 
 ## Current blockers
 
-- Clean release branch exact-head CI and CodeQL are pending.
+- Latest exact-head CodeQL passed; latest exact-head Android CI is running its final minified APK verification and artifact upload.
 - CodeQL APK-installation review thread remains unresolved.
 - Independent review is pending.
 - Production signing-secret availability and signed preflight are not verified.
-- Phase 12 physical acceptance remains 0/25 PASS / 25/25 NOT TESTED.
+- Owner physical acceptance is pending and intentionally excluded from coding/merge gates.
 - No release tag or production publication has occurred.
 
-**Release status:** Not published. Do not create the release tag until every gate above is cleared.
+**Release status:** Not published. Do not create the release tag until CI, security reassessment and signed preflight are cleared. Physical acceptance is owner-operated after delivery.
