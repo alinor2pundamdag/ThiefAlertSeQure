@@ -19,6 +19,7 @@ main = (ROOT / "app/src/main/java/com/thiefalertsequre/app/MainActivity.kt").rea
 history = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistory.kt").read_text(encoding="utf-8")
 history_policy = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistoryPolicy.kt").read_text(encoding="utf-8")
 history_activity = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalTamperHistoryActivity.kt").read_text(encoding="utf-8")
+policy_acknowledgements = (ROOT / "app/src/main/java/com/thiefalertsequre/app/PolicyAcknowledgementPolicy.kt").read_text(encoding="utf-8")
 about = (ROOT / "app/src/main/java/com/thiefalertsequre/app/AboutActivity.kt").read_text(encoding="utf-8")
 preference_cipher = (ROOT / "app/src/main/java/com/thiefalertsequre/app/LocalPreferenceCipher.kt").read_text(encoding="utf-8")
 
@@ -42,13 +43,22 @@ required = {
     "privacy policy discloses one-shot location":
         "one cached location fix or request one current GPS/network fix" in privacy and "No background location permission" in privacy,
     "first-launch notice discloses optional location snapshot and encrypted backups":
-        "current GPS/network location request" in main and "password-protected file" in main and "privacy_notice_v5" in main,
-    "first launch requires versioned Privacy Notice and Terms acknowledgements":
-        "terms_notice_v1" in main and 'putInt("version", 1)' in main
-        and "Terms of use and platform limitations" in main and "decision_at" in main,
-    "Terms dialog stores its own versioned acknowledgement":
-        'setPositiveButton("I acknowledge")' in about and "terms_notice_v1" in about
-        and 'putInt("version", 1)' in about and "decision_at" in about,
+        "current GPS/network location request" in main and "password-protected file" in main
+        and "PolicyAcknowledgementPolicy.PRIVACY_PREFS" in main,
+    "first launch requires current versioned Privacy Notice and Terms acknowledgements":
+        "PolicyAcknowledgementPolicy.PRIVACY_VERSION" in main
+        and "PolicyAcknowledgementPolicy.TERMS_VERSION" in main
+        and "Terms of use and platform limitations" in main and "decision_at" in main
+        and ".commit()" in main,
+    "policy acknowledgement policy rejects stale or missing versions":
+        "PRIVACY_VERSION = 5" in policy_acknowledgements
+        and "TERMS_VERSION = 1" in policy_acknowledgements
+        and "storedVersion == requiredVersion" in policy_acknowledgements,
+    "Terms dialog stores its own versioned acknowledgement durably":
+        'setPositiveButton("I acknowledge")' in about
+        and "PolicyAcknowledgementPolicy.TERMS_PREFS" in about
+        and "PolicyAcknowledgementPolicy.TERMS_VERSION" in about
+        and "decision_at" in about and ".commit()" in about,
     "evidence backup uses password-derived authenticated encryption":
         "PBKDF2WithHmacSHA256" in (ROOT / "app/src/main/java/com/thiefalertsequre/app/EvidenceVaultBackup.kt").read_text(encoding="utf-8")
         and "AES/GCM/NoPadding" in (ROOT / "app/src/main/java/com/thiefalertsequre/app/EvidenceVaultBackup.kt").read_text(encoding="utf-8")

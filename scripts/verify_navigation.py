@@ -90,7 +90,8 @@ for screen in (
 
 for screen in (
     "MainActivity.kt", "SettingsActivity.kt", "BluetoothCenterActivity.kt",
-    "DeviceIntelligenceActivity.kt", "ThemeActivity.kt", "SetupStatusActivity.kt", "AboutActivity.kt", "LocalTamperHistoryActivity.kt"
+    "DeviceIntelligenceActivity.kt", "ThemeActivity.kt", "SetupStatusActivity.kt", "AboutActivity.kt",
+    "LocalTamperHistoryActivity.kt", "AppearanceStudioOptionsActivity.kt"
 ):
     source = (APP / screen).read_text(encoding="utf-8")
     if "applySystemBarInsets" not in source:
@@ -101,7 +102,8 @@ for screen in (
 # Every user-facing page exposes its primary title as an accessibility heading.
 for screen in (
     "MainActivity.kt", "SettingsActivity.kt", "BluetoothCenterActivity.kt",
-    "DeviceIntelligenceActivity.kt", "ThemeActivity.kt", "SetupStatusActivity.kt", "AboutActivity.kt", "LocalTamperHistoryActivity.kt"
+    "DeviceIntelligenceActivity.kt", "ThemeActivity.kt", "SetupStatusActivity.kt", "AboutActivity.kt",
+    "LocalTamperHistoryActivity.kt", "AppearanceStudioOptionsActivity.kt"
 ):
     source = (APP / screen).read_text(encoding="utf-8")
     if ".markAsPageHeading()" not in source:

@@ -24,6 +24,11 @@ class AppearanceStudioOptionsActivity : FragmentActivity() {
         render()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::root.isInitialized) ThemeRuntime.apply(this, root)
+    }
+
     private fun render() {
         val palette = ThemeStore.get(this)
         val scroll = ScrollView(this)
