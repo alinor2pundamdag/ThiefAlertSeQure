@@ -161,6 +161,12 @@ jobs:
       - name: Verify Batch 3 notification and widget safety contracts
         run: python3 scripts/verify_batch3_contracts.py
 
+      - name: Verify legal policy versions and in-app disclosure
+        run: python3 scripts/verify_legal_policy_contract.py
+
+      - name: Verify release preflight parity
+        run: python3 scripts/verify_release_preflight_parity.py
+
       - name: Run unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
 
