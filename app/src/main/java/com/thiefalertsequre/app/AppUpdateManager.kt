@@ -297,6 +297,7 @@ object AppUpdateManager {
             PackageManager.GET_SIGNATURES
         }
 
+    @Suppress("DEPRECATION")
     private fun versionCode(info: PackageInfo): Long =
         if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
 

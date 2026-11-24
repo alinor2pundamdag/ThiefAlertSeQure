@@ -710,6 +710,7 @@ class DeviceIntelligenceActivity : FragmentActivity() {
         root.addView(space(8))
     }
 
+    @Suppress("DEPRECATION")
     private fun appVersion(): String = runCatching {
         val info = packageManager.getPackageInfo(packageName, 0)
         val code = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
