@@ -118,19 +118,16 @@ Strong face authentication is available only if Android reports the enrolled fac
 - Device Owner enrollment is a deliberate enterprise provisioning operation, not a runtime permission and not something the app can self-grant.
 
 ## Release gates
-1. Exact-head non-instrumentation GitHub Actions and CodeQL passed on `475c1fa` (runs 43950015535 and 43950015623): JVM unit tests, source-contract checks, lint, APK assembly/metadata/signer checks and CodeQL.
-2. Debug test APK assembles with its isolated development package identity.
-3. Install on physical Android 8–17 devices where available (API 26–37); API 23–25 are below the approved minSdk and are not supported.
-4. Verify selected audio URI survives reboot, decodes, previews and loops; verify vibration fallback on missing/corrupt audio.
-5. Verify foreground monitor, motion sensitivity, battery threshold crossing and stop action on physical devices.
-6. Verify icon and label before and after installation.
-7. Verify charger events, ten-second timing with monitor enabled, AlarmManager backup, reconnect and reboot.
-8. Verify PIN, pattern, password, fingerprint and supported strong face.
-9. Verify repeated five-failure / 30-second cooldown and cancellation.
-10. Verify volume restoration, DND, silent mode, notification denial, battery settings, and full-screen dashboard with Android 14+ access both granted and denied.
-11. Device Owner enrollment, lock-task restrictions and in-app rollback are user-reported PASS on a separate test device; record its Android build and repeat after managed-policy changes.
-12. Complete the Google Play foreground-service declaration for specialUse; approval is not guaranteed. The repository references four permanent release-signing secrets, but their current presence and a signed production APK were not independently verified in this session. Branch CI uploads only the isolated debug test APK. Keep the branch unmerged until owner review and explicit approval. The 11 HONOR 200 Pro v1.1.3 scenarios are historical owner-reported PASS; they do not establish acceptance of the v1.1.5 candidate. Android 17 and remaining OEM/permission edge cases stay pending.
 
+1. **Exact-head Android CI:** JVM unit tests, project contract scripts, Android lint, asset validation, debug APK packaging, minified release APK metadata checks, package/version/signer checks and artifact upload must pass on the final source head.
+2. **Exact-head CodeQL:** Java/Kotlin and GitHub Actions analysis must pass on the final source head. The older PR #7 APK-installer review thread requires a formal security reassessment; workflow success alone is not described as closure of the historical alert.
+3. **Merge:** PR #9 is the owner-authorized clean integration candidate. Merge only after current exact-head checks and security reassessment are clear; do not merge the stacked PR #7/#8 branches or the conflicting PR #6.
+4. **Signed preflight:** after merge, run the manual **Official signed Android release** workflow from `main`. It requires the four permanent Actions secrets, verifies the pinned production certificate and monotonic versionCode, runs the release contract suite and unit tests, builds the minified signed APK, verifies package/version/signer and uploads the signed preflight artifact. Missing or mismatched secrets fail closed.
+5. **Owner physical test:** the owner installs and tests the signed preflight APK on the target handset. This is deliberately outside coding, CI and merge completion; no physical result is inferred from CI.
+6. **Public release:** after the owner has completed their device test and authorizes publication, push the exact tag `v1.1.5_Developer_Alinor` to the approved commit already on `main`. The release workflow independently repeats signing, identity, contract and build checks, then publishes the APK and SHA-256 sidecar.
+7. **Post-publication:** verify release assets, checksum, package, version and pinned signer; record the release URL and artifact evidence.
+
+Google Play is not part of this release. The selected distribution path is the existing GitHub Releases APK channel; Play-specific declarations and policy approval are separate future work.
 
 > **Exact-head verification closeout:** Android run [#44010766603](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010766603) and CodeQL run [#44010774991](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010774991) both passed on `e97817903976689f02cba8bb485fc160a7122fd3`. The Android job passed the 30-file JVM unit suite, instrumentation-disabled guard, source checks, lint, asset validation, debug APK packaging/metadata, minified release metadata, signer checks and artifact upload. The development artifact is not a production release. Branch comparison: 530 ahead / 0 behind, 131 changed paths, no deletions. Alert #8 closure and permanent production signing-secret availability remain unverified.
 
