@@ -6,8 +6,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ExternalPowerStateTest {
-    @Test fun noExternalPowerIsDisconnected() {
+    @Test fun explicitNoExternalPowerIsDisconnected() {
         assertFalse(ExternalPowerState.isPluggedIn(0))
+    }
+
+    @Test fun missingPluggedExtraIsUnknown() {
+        assertTrue(ExternalPowerState.readPluggedValue(false, 0) == null)
+    }
+
+    @Test fun explicitDisconnectedValueIsFalse() {
+        assertFalse(ExternalPowerState.readPluggedValue(true, 0)!!)
+    }
+
+    @Test fun sentinelValueIsUnknownEvenWhenExtraFlagIsPresent() {
+        assertTrue(ExternalPowerState.readPluggedValue(true, Int.MIN_VALUE) == null)
     }
 
     @Test fun usbPowerIsConnected() {

@@ -1,8 +1,9 @@
 # ThiefAlertSeQure — Universal Maximum Protection Specification
 
 **Status:** Master implementation plan; not a claim that every item is implemented or physically verified.  
-**Source branch:** `feat/custom-audio-and-reliability`  
-**Baseline commit reviewed:** `49a7571c397d09fb76108148218cea348ace2159`  
+**Historical source branch:** `feat/custom-audio-and-reliability`  
+**Historical baseline commit reviewed:** `49a7571c397d09fb76108148218cea348ace2159`  
+**Current FIXALL coding branch:** `work/phase-0-12-coding` (see `PROJECT_STATE.md` and `docs/REQUIREMENT_TRACEABILITY_MATRIX.md` for exact-head evidence).  
 **Minimum Android version:** API 26 (Android 8.0), per current Gradle configuration.  
 **Current target SDK:** API 36. Re-audit platform behavior before changing target SDK.  
 **Product rule:** One universal local protection engine, Android-version-aware platform integration, and optional manufacturer guidance. HONOR is a test device, not the compatibility boundary.
@@ -399,22 +400,23 @@ The app must not use covert persistence, exploit APIs, root, hidden accessibilit
 - Managed-mode policy decision logic (pure logic separated from Android calls where practical).
 - Compatibility family selection and fallback guidance.
 
-**Layer B — Android integration / instrumentation tests**
-- Manifest declarations and receiver/service exported flags.
-- AlarmManager scheduling/cancellation and permission-race behavior.
-- Service start/idempotency/stop lifecycle.
-- Notification channel and full-screen-intent handling.
-- Audio resource decode/fallback and volume restoration.
-- Keyguard and DevicePolicyManager behavior where testable.
+**Layer B — Android platform contracts (non-instrumentation)**
+- Static manifest declarations, receiver/service exported flags, foreground-service types and permissions.
+- Source-contract checks for AlarmManager scheduling/cancellation and permission-race handling.
+- Source-contract checks for service start/idempotency/stop lifecycle.
+- JVM policy tests for notification/full-screen-intent decisions, audio fallback policy, authentication proof and Device Owner rollback policy.
+- Android lint and APK manifest/package metadata checks.
+- Runtime-only Android framework behavior is recorded for physical-device acceptance; no Android instrumentation source is compiled or executed.
 
-**Layer C — Emulator / OS matrix**
-- Minimum supported API 26 baseline where emulator image is available.
+**Layer C — Physical Android OS / OEM acceptance (real devices only)**
+- API 26 minimum-supported baseline.
 - API 31/32 exact-alarm behavior.
 - API 33 notification permission.
-- API 34 full-screen-intent behavior.
-- API 35 boot FGS restrictions.
+- API 34 full-screen-intent and foreground-service behavior.
+- API 35 boot foreground-service restrictions.
 - API 36 edge-to-edge and target behavior.
-- API 37 background-audio hardening before/when supported image is available.
+- API 37 Android 17 background-audio hardening.
+- Record actual device model, OS/API, OEM build, permissions, app commit and observed evidence. Do not use emulator results as a substitute.
 
 **Layer D — Physical OEM acceptance**
 - At least one device per OEM family before advertising that family as physically validated.

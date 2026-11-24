@@ -1,3 +1,7 @@
+> **Current release candidate (24 November 2026):** clean integration branch `release/v1.1.5-candidate`, prepared from the audited PR #7/#8 tree. Previous code-bearing commit `5e850fc4a444a1e36541890ca022a745f3be021a` passed Android CI #45304517153 and CodeQL #45304517314; fresh exact-head checks are required on the clean branch. PR #7 has one unresolved CodeQL review thread for the intentional APK installer sink; a security reassessment reply is posted, but alert closure is not verified. The minified PR release APK is unsigned; permanent production signing availability is unknown. Phase 12 remains 0/25 PASS / 25/25 NOT TESTED.
+
+> Cross-feature corrections include A2 deadline invalidation after authenticated disarm/package replacement, emergency protection-state snapshots, non-blocking alarm recovery, dedicated flash timing workers, SafePreferences-only legacy Gallery index reads, explicit OS backup/device-transfer exclusions, API guards, and redacted diagnostics. Filament 1.80.1/1.81.0 require compileSdk 37; the approved compileSdk 36 / AGP 8.10.1 baseline therefore remains on Filament 1.75.1. Revisit the newer upstream swap-chain fix only with an approved API-37 toolchain migration.
+
 <div align="right">
   <a href="../README.md"><img src="../ThiefAlertSeQureIcon.jpg" alt="ThiefAlertSeQure icon" width="64" /></a>
 </div>
@@ -14,7 +18,7 @@ Android 17 (API 37) applies background-audio hardening to all apps running on th
 
 For apps targeting API 37, Android adds while-in-use foreground-service capability requirements, with an exception when the app has exact-alarm access and interacts with USAGE_ALARM streams. The current app targets API 36. Exact-alarm access denial can delay the countdown callback and may prevent a background-started alarm service from starting; the inexact fallback is best-effort and is not an audible-alarm guarantee.
 
-Android 17 test command: `adb shell cmd audio set-enable-hardening throw`. Trigger the alarm with the app backgrounded and screen off, then inspect logcat / dumpsys audio for AudioHardening failures. Disable the test override afterward with `adb shell cmd audio set-enable-hardening disable`. This test remains pending on real Android 17 hardware/emulator.
+Android 17 test command: `adb shell cmd audio set-enable-hardening throw`. Trigger the alarm with the app backgrounded and screen off, then inspect logcat / dumpsys audio for AudioHardening failures. Disable the test override afterward with `adb shell cmd audio set-enable-hardening disable`. This test remains pending on a real Android 17 physical device. Emulator testing is excluded by the current owner direction.
 
 ## GitHub repository security automation
 
@@ -24,7 +28,7 @@ Checked on 11 November 2026:
 - Open secret-scanning alerts: none returned.
 - Dependabot vulnerability alerts: enabled; no open alerts returned.
 - Dependabot automated security updates: enabled. GitHub may open dependency update pull requests; these are not auto-merged.
-- Code scanning: no completed analysis was available at the time of this check; static code scanning remains a separate follow-up.
+- Code scanning: the advanced CodeQL workflow analyzes Java/Kotlin application code and GitHub Actions workflow code on pushes to `main`, `feat/**`, `feature/**`, `fix/**`, `security/**`, and `work/**`, pull requests to `main`, and a weekly schedule. The FIXALL coding branch is included. CodeQL run [#14](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43872054576) completed successfully on head `1141b10db19afc9ffa085b549adfd61ae0c39629`; this records successful analysis execution, not a guarantee that no findings exist.
 
 The signed release workflow's manual preflight is restricted to `refs/heads/main`. Tag-triggered publication separately verifies that the tagged commit is already an ancestor of `main`. The preflight builds and verifies but does not publish a GitHub Release.
 
@@ -55,7 +59,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 - Only the result of the app-launched Android device-credential confirmation activity or a successful BIOMETRIC_STRONG prompt clears ALARM_TRIGGERED through one shared coordinator. `ACTION_USER_PRESENT` and keyguard locked-to-unlocked polling are not proof of credential entry: trusted-unlock flows can dismiss the keyguard without a fresh PIN or biometric.
 
 ## Audio and lockscreen
-- Packaged Ogg Opus alarm asset is played in a loop through MediaPlayer. If selected and packaged audio both fail, repeating vibration is the fallback; there is no ToneGenerator implementation.
+- The packaged Ogg Opus default and owner-selected audio use MediaPlayer; five generated built-in presets use ToneGenerator. The complete built-in choice set is six entries (packaged default plus five generated presets). If selected and packaged audio both fail, repeating vibration is the fallback.
 - Audio uses USAGE_ALARM and requests maximum available alarm-stream volume.
 - Prior alarm volume is saved and restored after successful disarm. If service is destroyed while alarm remains latched, it does not restore volume prematurely. Corrupt saved-volume metadata is removed and reported; the original value cannot be reconstructed from a malformed preference.
 - While AlarmService is active, the alarm stream maximum is reasserted every 500 ms; this is best-effort volume control, not hardware-key interception.
@@ -65,7 +69,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 
 ## Visual alarm flashlight
 - AlarmService starts the optional LED output only after ProtectionStore confirms ALARM_TRIGGERED; countdown and ARMED states never pulse the LED.
-- The implementation uses CameraManager.setTorchMode, which controls the torch without opening a camera capture session. No CAMERA permission, camera foreground-service type, photo, video, microphone or network access is added.
+- The alarm flashlight uses CameraManager.setTorchMode without CAMERA permission or a camera capture session. Separately, optional front-camera photo evidence requests CAMERA permission only after explicit owner opt-in; it captures one still only after successful owner authentication while the authentication Activity is visible. New photos are unencrypted Gallery JPEGs by default in the app-owned Pictures/ThiefAlertSeQure folder; Settings can enable Android Keystore AES-GCM encryption for future captures. Existing photos are not converted when the setting changes. Both stores are bounded to 20 images / 30 days / 2 MiB each; encrypted-vault photos are individually viewable/exportable/deletable, while Gallery photos are managed through Gallery and the app's scoped delete action. No camera foreground-service type, background camera capture, video, microphone capture or cloud upload is used.
 - Flash hardware is declared optional in the manifest so Play does not require a flash unit for installation. Audio alarm remains the primary output and is not gated by flash availability.
 - The default pulse is 700 ms on / 700 ms off (about 0.71 cycles per second), not a rapid strobe. Photosensitive users can disable it in Settings.
 - Torch access is best-effort: camera contention, an unavailable camera service, thermal management, OEM policy or process termination can stop light output. stopAlarm() explicitly turns the torch off on authenticated disarm and service teardown. Android also may turn it off when the client exits.
@@ -93,7 +97,7 @@ Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPl
 - Biometric availability depends on hardware, enrollment and Android strength classification.
 - Device Owner APIs and restrictions depend on Android version, provisioning state and OEM build.
 - HONOR/MagicOS, Xiaomi/HyperOS, Samsung/One UI and other OEM battery managers may require user-side background/autostart configuration. No universal public API disables all OEM power management.
-- Optional flash hardware is declared non-required; the torch is controlled without CAMERA permission, camera capture, or a camera foreground-service type.
+- Optional flash and front-camera hardware are declared non-required. Torch control does not request CAMERA permission. The separate photo-evidence feature requires explicit owner opt-in and runtime CAMERA permission, and runs only after successful owner authentication while the app is visible. Gallery mode additionally requests READ/WRITE external-storage permission only on API 26–28; Android 10+ uses app-owned MediaStore without broad media permissions. No camera foreground-service type is declared.
 
 ## Source-review correction — 11 November 2026
 
@@ -120,7 +124,7 @@ A final alarm recovery-path review found that `ProtectionMonitorService.startThe
 No failure details were supplied. These results clear the reported HONOR 200 Pro functional test gate for the listed scenarios. They do not establish Android 17 compatibility, all Android/OEM versions, Play policy approval, Device Owner behavior on every build, or production signing/update migration.
 
 ## Remaining verification
-1. Last recorded successful CI run: **PASS** (run 43004454206 on head `4dc3a7a553e7da43265cbd2feaa4c3e5ae64d294`). Subsequent branch commits require a successful run on the exact current PR head before merge. The live head and run status are maintained in PR #2 and GitHub Actions; this document does not freeze a transient run ID.
+1. Last fully verified non-instrumentation baseline: **PASS** (Android run [#1421](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43938339649) and CodeQL run [#25](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43938339708) on `9168d1d`). Later Phase 10–12 commits require fresh exact-head CI. Instrumentation compilation/execution and emulator matrices are prohibited by owner direction.
 2. Android 8 through Android 17 compatibility paths: still pending where devices are unavailable; Android 17 background-audio hardening remains specifically unverified.
 3. Target HONOR 200 Pro: the 11 scenarios above are owner-reported **PASS**; capture exact Android/MagicOS build and date-stamped evidence if available.
 4. Opus decoding/loop and volume restoration: volume restoration is reported **PASS**; separate decoder-failure/vibration fallback test remains pending.
@@ -138,3 +142,70 @@ No failure details were supplied. These results clear the reported HONOR 200 Pro
 - `AlarmService` does not treat `ACTION_USER_PRESENT`, `isDeviceSecure`, or an unlocked keyguard as authentication. After the phone is unlocked, the owner must open the app/notification and complete the explicit Android credential or strong-biometric prompt.
 - The system credential and biometric remain entirely Android-managed. The app receives only the successful result from its explicit authentication activity/prompt and never accesses credential material.
 - These changes were included in the owner-reported 11 November 2026 HONOR 200 Pro physical test set; lock-screen presentation and authentication protection were reported PASS. CI still cannot independently verify OEM keyguard behavior.
+
+
+## 17 November 2026 — continuation security checks
+
+- The `java/android/arbitrary-apk-installation` CodeQL finding was traced to the explicit Android Package Installer handoff. The updater verifies the app-private cached APK's SHA-256, production package ID, increasing versionCode and pinned release signer before the system installer is opened. The in-source suppression is placed at the exact `setDataAndType` sink, not at the Intent constructor. The PR CodeQL gate passed after this correction; the full Java/Kotlin and Actions analysis jobs also completed successfully.
+- Manual signed release preflight is restricted to `main` only, consistent with the release policy. Manual preflight never publishes a release.
+- Current task excludes emulator, instrumentation and physical-device testing. Non-instrumentation JVM/static/lint/build/APK checks are the required software verification.
+
+
+## Current software verification snapshot — 2026-11-17
+
+- Exact branch head `a1a567bf53f97189be2547ccf872ae665c30a54b`: Android workflow [#44005105554](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105554) and CodeQL workflow [#44005105442](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44005105442) both completed successfully.
+- The Android workflow passed its instrumentation-disabled guard, JVM unit tests, source-contract checks, lint, APK assembly and package/version/signer metadata checks.
+- The CodeQL Java/Kotlin source build and Actions analysis completed successfully. This verifies scan execution, not the absence or closure of every alert.
+- PR #7's inline review thread for APK installation alert #8 remains **UNRESOLVED**. A security reassessment reply documents the current validated updater flow and requests review; the underlying Code Scanning alert state remains **NOT VERIFIED**.
+- The updater still revalidates its private-cache APK against SHA-256, production package ID, higher versionCode and pinned signer before Android installer handoff. The two sink suppressions are located immediately before the `setDataAndType` calls.
+- Current branch comparison: 530 ahead / 0 behind; 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged.
+- Permanent production signing secret availability and a production-signed APK are **NOT VERIFIED**. No secret values were accessed or exposed.
+- No instrumentation compilation/execution, emulator testing or physical-device testing was performed.
+
+
+## Exact-head software verification closeout — 2026-11-17
+
+- Android run [#44010766603](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010766603) and CodeQL run [#44010774991](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010774991) passed on `e97817903976689f02cba8bb485fc160a7122fd3`.
+- CodeQL completed Java/Kotlin and Actions analysis and uploaded SARIF successfully. This is not evidence that alert #8 is closed; the alert's active/closed state remains not verified through the available connector.
+- Android CI passed the 30-file JVM unit suite, instrumentation-disabled guard, source checks, lint, asset checks, APK assembly and package/version/signer metadata checks.
+- Branch comparison: 530 ahead / 0 behind, 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 is draft/open/unmerged and mergeable.
+- Permanent production signing-secret availability and production-signed APK availability remain not verified.
+- No instrumentation compilation/execution, emulator or physical-device testing was performed.
+
+
+## Final verified candidate snapshot — 2026-11-17
+
+- Android [#44010766603 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010766603) and CodeQL [#44010774991 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010774991) passed on `e97817903976689f02cba8bb485fc160a7122fd3`.
+- CodeQL Java/Kotlin and Actions analysis completed; SARIF upload succeeded. This does not prove alert #8 is closed; alert state remains not verified.
+- Android workflow passed 30 JVM unit tests, instrumentation-disabled guard, source checks, lint, assets, APK build, metadata/package/version/signer checks and artifact upload.
+- Branch comparison before this one docs-only refresh: 530 ahead / 0 behind; after it: 531 ahead / 0 behind; 131 changed paths and no deletions.
+- Production signing-secret presence and production-signed APK availability remain not verified.
+- No instrumentation compilation/execution, emulator or physical-device testing was performed.
+
+
+## Authoritative latest security/build verification — 2026-11-17
+
+- Exact candidate `524754f683d43450c844bca05147e66c15baf3d6`: Android [#44011669247 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44011669247) and CodeQL [#44011663424 — SUCCESS](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44011663424).
+- CodeQL Java/Kotlin and Actions analysis completed successfully. This does not prove CodeQL alert #8 is closed; the alert record remains **NOT VERIFIED** because the available GitHub connection cannot read that alert record.
+- Android CI passed 30 JVM unit-test source files, instrumentation-disabled guard, source-contract checks, lint, assets, APK build/metadata and package/version/signer checks.
+- The uploaded debug artifact is not production-signed. Permanent signing-secret availability and a production-signed APK remain **NOT VERIFIED**.
+- Branch comparison: 531 ahead / 0 behind, 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged.
+- No instrumentation, emulator or physical-device test was performed.
+
+
+## Distribution-channel policy review — 24 November 2026
+
+- The current updater checks GitHub Releases and launches the Android package installer using `REQUEST_INSTALL_PACKAGES`. This is a direct APK/sideload update path.
+- Google Play policy does not permit an ordinary app to use `REQUEST_INSTALL_PACKAGES` for self-updating; the stated exception is qualifying enterprise device-management use. If Google Play distribution is intended, replace the GitHub APK self-update path with Play-managed updates or a separate Play-compatible build before submission: https://support.google.com/googleplay/android-developer/answer/16559646
+- The app declares a `specialUse` foreground service for persistent user-enabled protection monitoring. A Play release requires the appropriate foreground-service declaration and justification; full-screen-intent and battery-optimization exemptions also require policy review and must remain user-controlled: https://support.google.com/googleplay/android-developer/answer/16559646
+- The distribution channel has not been selected in this audit. No Play-compliance claim is made.
+
+
+## Official GitHub release security gate — 24 November 2026
+
+- The owner authorized continuation to an official GitHub APK release. The existing owner-initiated GitHub updater remains the selected distribution path; Google Play is not part of this candidate.
+- The APK installer sink is intentional, but the unresolved CodeQL alert must be formally reassessed. The current path uses a GitHub HTTPS host allowlist, bounded download, SHA-256, package/version validation, pinned production signer, private cache FileProvider, repeat validation immediately before handoff, DISARMED-state gating and explicit owner confirmation.
+- PR #8's current docs-only head passed CodeQL run #45306480377. This verifies that analysis ran and uploaded SARIF; it does not close alert #8.
+- The clean release branch requires fresh exact-head Android CI and CodeQL before merge.
+- Production signing secrets are never read or printed by the audit. The signed preflight on `main` is the approved way to verify that the four required Actions secrets are present and that the keystore matches the pinned production certificate.
+- Physical acceptance remains a release acceptance requirement; no CI or historical v1.1.3 result is substituted for current-candidate testing.

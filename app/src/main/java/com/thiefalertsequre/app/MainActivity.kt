@@ -17,6 +17,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -28,10 +29,13 @@ import androidx.fragment.app.FragmentActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import java.util.concurrent.Executors
 
 class MainActivity : FragmentActivity() {
     private lateinit var status: TextView
+    private lateinit var shield: ProtectionShieldView
     private lateinit var details: TextView
+    private lateinit var setupSummary: TextView
     private lateinit var biometricButton: MaterialButton
     private lateinit var credentialButton: MaterialButton
     private lateinit var cancelButton: MaterialButton
@@ -40,6 +44,10 @@ class MainActivity : FragmentActivity() {
     private var fullScreenAccessButton: MaterialButton? = null
     private var biometricPrompt: BiometricPrompt? = null
     private var autoAuthenticationRequested = false
+    private var privacyScreenVisible = false
+    private var notificationPermissionAskedThisSession = false
+    private var lastBatchThreeRefreshAt = 0L
+    private val maintenanceExecutor = Executors.newSingleThreadExecutor()
 
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -54,20 +62,64 @@ class MainActivity : FragmentActivity() {
     private val ticker = object : Runnable {
         override fun run() {
             render()
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastBatchThreeRefreshAt >= 30_000L) {
+                BatchThreeUiBridge.refresh(this@MainActivity)
+                lastBatchThreeRefreshAt = now
+            }
             launchAutomaticOwnerAuthenticationIfNeeded()
             status.postDelayed(this, 1_000L)
         }
     }
 
+    private val privacyRecoveryPoll = object : Runnable {
+        override fun run() {
+            if (isFinishing || isDestroyed || !privacyScreenVisible) return
+            if (ProtectionStore(this@MainActivity).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                window.decorView.removeCallbacks(this)
+                buildDashboard()
+                return
+            }
+            window.decorView.postDelayed(this, 500L)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val configurationRecovered = !ConfigurationBackup.isRestoreOrRecoveryInProgress() &&
+            ConfigurationBackup.recoverPendingRestore(this)
+        if (!configurationRecovered) {
+            android.widget.Toast.makeText(
+                this,
+                "An interrupted settings restore could not be recovered. Background monitoring remains paused; review settings recovery before arming.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
+        val introPrefs = getSharedPreferences(AppLaunchIntroPolicy.PREFS, MODE_PRIVATE)
+        val protectionModeAtLaunch = ProtectionStore(this).read().mode
+        val installedVersionCode = AppLaunchIntroPolicy.currentVersionCode(this)
+        val lastIntroVersionCode = AppLaunchIntroPolicy.lastCompletedVersionCode(introPrefs, installedVersionCode)
+        // Show the cinematic intro once per installed app version, but never delay active protection or owner authentication.
+        if (AppLaunchIntroPolicy.shouldShow(lastIntroVersionCode, installedVersionCode, protectionModeAtLaunch == ProtectionMode.DISARMED)) {
+            startActivity(Intent(this, SeismicGenesisIntroActivity::class.java))
+            finish()
+            return
+        }
+        // Prune both app-managed photo stores off the main thread; keep startup responsive.
+        maintenanceExecutor.execute {
+            runCatching { CameraEvidenceVault.entries(applicationContext) }
+            runCatching { CameraEvidenceMediaStore.enforceRetention(applicationContext) }
+        }
         applyAlarmWindowPolicy()
 
-        val privacyDecision = getSharedPreferences("privacy_notice_v2", MODE_PRIVATE)
-            .getString("decision", null)
+        val privacyDecision = SafePreferences.string(getSharedPreferences(PRIVACY_NOTICE_PREFS, MODE_PRIVATE), "decision", null)
         // Require acknowledgement of this updated notice on every existing
         // install once; it now discloses the optional alarm flashlight and its safety toggle.
-        if (privacyDecision != "acknowledged") {
+        // Privacy acknowledgement remains mandatory for normal app use, but it must
+        // never cover the active-alarm recovery UI or delay Android owner authentication.
+        if (privacyDecision != "acknowledged" &&
+            protectionModeAtLaunch != ProtectionMode.ALARM_TRIGGERED
+        ) {
             showPrivacyScreen()
             return
         }
@@ -75,6 +127,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun showPrivacyScreen() {
+        privacyScreenVisible = true
         val scroll = ScrollView(this).apply {
             isFillViewport = true
             setBackgroundColor(getColor(R.color.tas_background))
@@ -91,7 +144,7 @@ class MainActivity : FragmentActivity() {
         }
         root.addView(icon, LinearLayout.LayoutParams(dp(84), dp(84)))
         root.addView(space(22))
-        root.addView(label("YOUR DEVICE.\nYOUR CONTROL.", 30f, getColor(R.color.tas_text), true), matchWrap())
+        root.addView(label("YOUR DEVICE.\nYOUR CONTROL.", 30f, getColor(R.color.tas_text), true).markAsPageHeading(), matchWrap())
         root.addView(space(10))
         root.addView(label("PRIVACY NOTICE & LOCAL PROTECTION", 11f, getColor(R.color.tas_primary), true), matchWrap())
         root.addView(space(18))
@@ -108,28 +161,28 @@ class MainActivity : FragmentActivity() {
         body.addView(label("Data and privacy", 18f, getColor(R.color.tas_text), true), matchWrap())
         body.addView(space(8))
         body.addView(label(
-            "The app does not require an account, analytics, advertising, or a cloud backend. Internet access is used only when you manually check for an official GitHub release and download its APK. The app does not upload protection state, event history, credentials, or other personal data. GitHub receives ordinary network request metadata, such as your request IP address, when you check for updates. Protection state, biometric-failure cooldown counters, a bounded local event history, monitor preferences, and references to audio files you select are stored locally on this device. Selected audio remains with its Android document provider; the app retains only the access grant and URI. Your PIN, pattern, password, and biometric templates are never collected or stored by this app; Android performs verification.",
+            "The app does not require an account, analytics, advertising, or a cloud backend. Internet access is used only when you manually check for an official GitHub release and download its APK. The app does not upload protection state, event history, evidence, location, credentials, photos, or other personal data. GitHub receives ordinary network request metadata, such as your request IP address, when you check for updates. Protection state, biometric-failure cooldown counters, a bounded local event history, monitor preferences, and AES-GCM encrypted local evidence metadata are stored on this device. Optional front-camera photos are saved as normal, unencrypted images in Pictures/ThiefAlertSeQure and appear in Gallery by default, only after explicit owner opt-in and successful Android owner authentication that disarms a latched alarm while this app is visible. Settings can enable AES-GCM encryption for future captures, moving them to the private app vault instead of Gallery. Existing app-owned Gallery photos can be moved through the explicit verified migration action in Settings; each encrypted copy is read back and checked before an unchanged original is removed. On Android 8–9, only Gallery rows recorded in the app's encrypted private ownership index can be verified or migrated; older unindexed files are left untouched. Android 10+ additionally verifies MediaStore owner attribution. Existing encrypted-vault photos remain encrypted when future-capture storage changes. A cached location fix or one bounded current GPS/network location request (20-second timeout) is saved only after you explicitly request it and grant location permission. The metadata evidence vault can be exported or restored only through a password-protected file you choose; camera photos can be exported individually. Backup passwords are not stored. Selected audio remains with its Android document provider; the app retains only the access grant and URI. Device Intelligence reads manufacturer/model, Android compatibility, battery/thermal, permission, and protection-readiness information locally. If you explicitly export diagnostics, the redacted report may include those device/protection fields and event codes; Android writes it only to the destination you choose, which may be cloud-backed. The app does not upload the report. It excludes serial, IMEI, MAC/Wi-Fi identifiers, precise location, photo content, credentials, and build fingerprint. Your PIN, pattern, password, and biometric templates are never collected or stored by this app; Android performs verification.",
             14f, getColor(R.color.tas_muted), false
         ), matchWrap())
         body.addView(space(16))
         body.addView(label("System access and limitations", 18f, getColor(R.color.tas_text), true), matchWrap())
         body.addView(space(8))
         body.addView(label(
-            "The app may use boot and charger broadcasts, alarm scheduling, notifications, alarm audio, the camera flashlight's Android torch control while the alarm is active, and foreground services. The flash feature is enabled by default when compatible hardware is available, does not capture photos or video, and does not request camera permission. Flashing light may affect photosensitive users; you can disable the flash alert in Settings. Exact alarm access and notification permission are controlled by Android. Optional Device Owner mode requires separate device enrollment and can restrict device settings. No ordinary app can guarantee protection against force-stop, uninstall, physical shutdown, recovery controls, battery removal, or every manufacturer-specific power policy. Alarm delivery may be delayed when Android restricts background execution or exact alarms.",
+            "The app may use boot and charger broadcasts, alarm scheduling, notifications, alarm audio, the camera flashlight's Android torch control while the alarm is active, and foreground services. Five optional built-in alarm tones and owner-selected custom audio are stored locally. The flash feature does not request camera permission and does not capture images. Separately, you may explicitly enable optional front-camera photo evidence in Settings; CAMERA permission is requested only after that choice, and one photo is captured only after a successful owner PIN/password or supported strong-biometric verification that disarms a latched alarm while the app is visible. Android displays its camera privacy indicator. Photos are saved unencrypted in the app-specific Gallery folder by default, or in the private AES-GCM vault when photo encryption is enabled in Settings. App-managed photos are limited to 20 images and 30 days; Gallery images are visible to anyone with Gallery access. The setting controls future captures. Existing app-owned Gallery photos can be moved through the explicit verified migration action in Settings; originals remain if encrypted read-back, source recheck, deletion, or vault capacity prevents a safe move. On Android 8–9, older Gallery rows without an encrypted ownership-index record are left untouched; Android 10+ uses MediaStore owner attribution. Photos are never uploaded. If permission, camera hardware, or foreground access is unavailable, capture is skipped and alarm/authentication behavior is unaffected. The encrypted local evidence vault stores app-observed event metadata and only cached location snapshots or a one-shot current GPS/network location request that you explicitly initiate after granting location permission; the current request times out after 20 seconds. No background location, continuous tracking, microphone capture, or cloud evidence upload is used. You may export or restore the metadata evidence vault using a separate password-protected file encrypted with AES-GCM; camera photos are exported individually. The backup password is not stored by the app. Flashing light may affect photosensitive users; you can disable the flash alert in Settings. Exact alarm access and notification permission are controlled by Android. Optional Device Owner mode requires separate device enrollment and can restrict device settings. No ordinary app can guarantee protection against force-stop, uninstall, physical shutdown, recovery controls, battery removal, or every manufacturer-specific power policy. Alarm delivery may be delayed when Android restricts background execution or exact alarms.",
             14f, getColor(R.color.tas_muted), false
         ), matchWrap())
         body.addView(space(16))
         body.addView(label("Acknowledgement", 18f, getColor(R.color.tas_text), true), matchWrap())
         body.addView(space(6))
         body.addView(label(
-            "Review this notice before continuing. Tapping the button below records that you have acknowledged the app's local data handling, alarm behavior, optional flashlight alert, and Android platform limitations. You can review this notice again later in Settings.",
+            "Review this notice before continuing. Tapping the button below records that you have acknowledged local event evidence, optional owner-requested location, optional front-camera photo evidence after successful owner authentication, password-protected backup, alarm behavior, optional flashlight alert, and Android platform limitations. You can review this notice again later in Settings.",
             13f, getColor(R.color.tas_muted), false
         ), matchWrap())
         notice.addView(body)
         root.addView(notice, matchWrap())
         root.addView(space(22))
         root.addView(button("I understand & continue") {
-            getSharedPreferences("privacy_notice_v2", MODE_PRIVATE).edit()
+            getSharedPreferences(PRIVACY_NOTICE_PREFS, MODE_PRIVATE).edit()
                 .putString("decision", "acknowledged").putLong("decision_at", System.currentTimeMillis()).apply()
             buildDashboard()
         }, matchWrap())
@@ -137,9 +190,16 @@ class MainActivity : FragmentActivity() {
         root.addView(label("LOCAL-FIRST • NO ACCOUNT • NO CLOUD SYNC", 10f, getColor(R.color.tas_muted), true), matchWrap())
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
+        ThemeRuntime.apply(this, scroll)
+        // If a countdown reaches ALARM_TRIGGERED while this first-run notice is open,
+        // replace the notice with owner recovery immediately; never cover authentication.
+        window.decorView.removeCallbacks(privacyRecoveryPoll)
+        window.decorView.postDelayed(privacyRecoveryPoll, 500L)
     }
 
     private fun buildDashboard() {
+        privacyScreenVisible = false
+        window.decorView.removeCallbacks(privacyRecoveryPoll)
         val scroll = ScrollView(this).apply {
             isFillViewport = true
             setBackgroundColor(getColor(R.color.tas_background))
@@ -155,7 +215,7 @@ class MainActivity : FragmentActivity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         val brandIcon = ImageView(this).apply {
-            setImageResource(R.drawable.app_logo)
+            AppearanceStudioStore.applyIconPreview(this@MainActivity, this, ThemeStore.get(this@MainActivity))
             contentDescription = "ThiefAlertSeQure shield and alarm icon"
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
@@ -169,27 +229,106 @@ class MainActivity : FragmentActivity() {
         root.addView(brandRow, matchWrap())
         root.addView(space(8))
 
-        root.addView(label("Protection that stays\non this device.", 30f, getColor(R.color.tas_text), true), matchWrap())
+        root.addView(label("Protection that stays\non this device.", 30f, getColor(R.color.tas_text), true).markAsPageHeading(), matchWrap())
         root.addView(space(8))
         root.addView(label("LOCAL SECURITY  •  NO ACCOUNT  •  NO BACKEND", 10f, getColor(R.color.tas_muted), true), matchWrap())
-        root.addView(space(24))
+        var hardeningAnchor: View? = null
+        var authenticationEvidenceAnchor: View? = null
 
         val statusCard = card()
         val statusContent = column()
         statusContent.setPadding(dp(20), dp(20), dp(20), dp(20))
         statusContent.addView(label("LIVE PROTECTION STATUS", 11f, getColor(R.color.tas_muted), true), matchWrap())
-        statusContent.addView(space(12))
+        statusContent.addView(space(4))
+        val shieldRow = LinearLayout(this).apply { gravity = Gravity.CENTER }
+        shield = ProtectionShieldView(this)
+        shieldRow.addView(shield, LinearLayout.LayoutParams(dp(136), dp(136)))
+        statusContent.addView(shieldRow, matchWrap())
+        statusContent.addView(space(8))
         status = label("Checking device…", 24f, getColor(R.color.tas_text), true)
         statusContent.addView(status, matchWrap())
         statusContent.addView(space(12))
         details = label("Reading local protection state.", 14f, getColor(R.color.tas_muted), false)
         details.setLineSpacing(dp(4).toFloat(), 1f)
         statusContent.addView(details, matchWrap())
+        setupSummary = label("Checking Android setup…", 12f, getColor(R.color.tas_muted), false)
+        statusContent.addView(setupSummary, matchWrap())
         statusCard.addView(statusContent)
         root.addView(statusCard, matchWrap())
+        root.addView(space(10))
+
+        // Compact, horizontally swipeable section tabs sit BELOW the live shield,
+        // so navigation never pushes the primary protection indicator down.
+        val navigationScroll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            contentDescription = "Swipe left or right to browse dashboard sections"
+        }
+        val navigationRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        fun addTab(label: String, description: String, action: () -> Unit) {
+            navigationRow.addView(navigationTab(label, description, action))
+            navigationRow.addView(horizontalSpace(5))
+        }
+        addTab("Bluetooth", "Bluetooth Settings") {
+            startActivity(Intent(this, BluetoothCenterActivity::class.java))
+        }
+        addTab("Hardening", "Device Hardening and Reliability") {
+            hardeningAnchor?.let { scroll.smoothScrollTo(0, it.top) }
+        }
+        addTab("Sounds / Flash", "Sounds and Flash Alert") {
+            startActivity(Intent(this, SettingsActivity::class.java)
+                .putExtra(SettingsActivity.EXTRA_SECTION, SettingsActivity.SECTION_SOUNDS_FLASH))
+        }
+        addTab("Auth / Evidence", "Authentication Evidence") {
+            authenticationEvidenceAnchor?.let { scroll.smoothScrollTo(0, it.top) }
+        }
+        addTab("Device Info", "Device Intelligence") {
+            startActivity(Intent(this, DeviceIntelligenceActivity::class.java))
+        }
+        addTab("Appearance", "Appearance Studio") {
+            startActivity(Intent(this, ThemeActivity::class.java))
+        }
+        addTab("Tamper History", "Local Tamper History") {
+            startActivity(Intent(this, SettingsActivity::class.java)
+                .putExtra(SettingsActivity.EXTRA_SECTION, SettingsActivity.SECTION_TAMPER_HISTORY))
+        }
+        addTab("More", "More Settings") {
+            startActivity(Intent(this, SettingsActivity::class.java)
+                .putExtra(SettingsActivity.EXTRA_SECTION, SettingsActivity.SECTION_MORE))
+        }
+        addTab("About", "About ThiefAlertSeQure") {
+            startActivity(Intent(this, AboutActivity::class.java))
+        }
+        navigationScroll.addView(navigationRow)
+        root.addView(navigationScroll, matchWrap())
+        root.addView(space(16))
+
+        root.addView(sectionTitle("DEVICE INTELLIGENCE"), matchWrap())
+        root.addView(space(10))
+        val intelligenceCard = card()
+        val intelligenceContent = column()
+        intelligenceContent.setPadding(dp(16), dp(16), dp(16), dp(16))
+        intelligenceContent.addView(label(
+            "Automatically inspect this phone's Bluetooth controller, Android platform, sensors, hardware, resources, and protection-related readiness. Each capability has its own organized page.",
+            13f, getColor(R.color.tas_muted), false
+        ), matchWrap())
+        intelligenceContent.addView(space(12))
+        intelligenceContent.addView(outlinedButton("Open Bluetooth capability center") {
+            startActivity(Intent(this, BluetoothCenterActivity::class.java))
+        }, matchWrap())
+        intelligenceContent.addView(space(8))
+        intelligenceContent.addView(outlinedButton("Open Device Intelligence") {
+            startActivity(Intent(this, DeviceIntelligenceActivity::class.java))
+        }, matchWrap())
+        intelligenceCard.addView(intelligenceContent)
+        root.addView(intelligenceCard, matchWrap())
         root.addView(space(20))
 
-        root.addView(sectionTitle("OWNER AUTHENTICATION"), matchWrap())
+        val authenticationTitle = sectionTitle("OWNER AUTHENTICATION")
+        authenticationEvidenceAnchor = authenticationTitle
+        root.addView(authenticationTitle, matchWrap())
         root.addView(space(10))
         biometricButton = button("Use fingerprint or supported strong face") { authenticateBiometric() }
         credentialButton = outlinedButton("Use device PIN, pattern or password") { authenticateDeviceCredential() }
@@ -204,11 +343,16 @@ class MainActivity : FragmentActivity() {
         root.addView(credentialButton, matchWrap())
         root.addView(space(4))
         root.addView(cancelButton, matchWrap())
+        root.addView(space(8))
+        root.addView(outlinedButton("Review authentication & tamper evidence") {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }, matchWrap())
         root.addView(space(24))
 
         root.addView(sectionTitle("DEVICE HARDENING"), matchWrap())
         root.addView(space(10))
         val hardeningCard = card()
+        hardeningAnchor = hardeningCard
         val hardeningContent = column()
         hardeningContent.setPadding(dp(16), dp(16), dp(16), dp(16))
         hardeningContent.addView(label("Managed-device lockdown", 17f, getColor(R.color.tas_text), true), matchWrap())
@@ -276,24 +420,46 @@ class MainActivity : FragmentActivity() {
 
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
+        ThemeRuntime.apply(this, scroll)
+        setupSummary.text = SetupStatusSnapshot.read(this).dashboardSummary()
         reconcileCharging()
         render()
         status.removeCallbacks(ticker)
         status.post(ticker)
 
-        if (ProtectionStore(this).read().mode != ProtectionMode.ALARM_TRIGGERED && Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        requestNotificationPermissionIfNeeded()
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (
+            notificationPermissionAskedThisSession ||
+            Build.VERSION.SDK_INT < 33 ||
+            ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED ||
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        ) return
+        // Do not interrupt alarm recovery. Ask once the owner has returned to normal app use.
+        notificationPermissionAskedThisSession = true
+        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     override fun onResume() {
         super.onResume()
+        PermissionChangeMonitor.check(this)
         applyAlarmWindowPolicy()
         reconcileCharging()
         ManagedProtectionController.startIfConfigured(this)
-        if (!::status.isInitialized) return
+        if (!::status.isInitialized) {
+            if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+                buildDashboard()
+            } else {
+                window.decorView.removeCallbacks(privacyRecoveryPoll)
+                window.decorView.postDelayed(privacyRecoveryPoll, 500L)
+            }
+            return
+        }
+        requestNotificationPermissionIfNeeded()
+        ThemeRuntime.apply(this, window.decorView)
+        if (::setupSummary.isInitialized) setupSummary.text = SetupStatusSnapshot.read(this).dashboardSummary()
         render()
         launchAutomaticOwnerAuthenticationIfNeeded()
         status.removeCallbacks(ticker)
@@ -303,17 +469,28 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        launchAutomaticOwnerAuthenticationIfNeeded()
+        if (!::status.isInitialized && ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED) {
+            buildDashboard()
+        } else {
+            launchAutomaticOwnerAuthenticationIfNeeded()
+        }
     }
 
     override fun onPause() {
+        window.decorView.removeCallbacks(privacyRecoveryPoll)
         if (::status.isInitialized) status.removeCallbacks(ticker)
         super.onPause()
     }
 
+    override fun onDestroy() {
+        window.decorView.removeCallbacks(privacyRecoveryPoll)
+        if (::status.isInitialized) status.removeCallbacks(ticker)
+        maintenanceExecutor.shutdown()
+        super.onDestroy()
+    }
+
     private fun applyAlarmWindowPolicy() {
-        val showOverLockScreen = getSharedPreferences(ALARM_DISPLAY_PREFS, MODE_PRIVATE)
-            .getBoolean(KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
+        val showOverLockScreen = SafePreferences.boolean(getSharedPreferences(ALARM_DISPLAY_PREFS, MODE_PRIVATE), KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
         if (Build.VERSION.SDK_INT >= 27) {
             setShowWhenLocked(showOverLockScreen)
             setTurnScreenOn(showOverLockScreen)
@@ -368,18 +545,19 @@ class MainActivity : FragmentActivity() {
             return
         }
         autoAuthenticationRequested = true
-        val strongBiometric = BiometricManager.from(this)
-            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
-        if ((Build.VERSION.SDK_INT >= 30 && keyguard.isDeviceSecure) || strongBiometric) {
-            authenticateBiometric()
-        } else if (keyguard.isDeviceSecure) {
-            authenticateDeviceCredential()
-        } else {
-            // Do not latch the one-shot prompt guard when the owner has not yet
-            // configured a secure credential. Re-check automatically on resume.
-            autoAuthenticationRequested = false
-            details.text = "No secure device credential is configured. Set a PIN, pattern or password in Android settings to enable owner verification."
-            render()
+        val strongBiometricAvailable = keyguard.isDeviceSecure &&
+            BiometricManager.from(this)
+                .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
+        when (OwnerAuthenticationPolicy.select(strongBiometricAvailable, keyguard.isDeviceSecure)) {
+            OwnerAuthenticationMethod.BIOMETRIC -> authenticateBiometric()
+            OwnerAuthenticationMethod.DEVICE_CREDENTIAL -> authenticateDeviceCredential()
+            OwnerAuthenticationMethod.UNAVAILABLE -> {
+                // Do not latch the one-shot prompt guard when the owner has not yet
+                // configured a secure credential. Re-check automatically on resume.
+                autoAuthenticationRequested = false
+                details.text = "No secure device credential is configured. Set a PIN, pattern or password in Android settings to enable owner verification."
+                render()
+            }
         }
     }
 
@@ -396,7 +574,7 @@ class MainActivity : FragmentActivity() {
                 )
                 .setPositiveButton("Open Android settings") { _, _ -> openAppSettings() }
                 .setNegativeButton("Close", null)
-                .show()
+                .showThemed(this)
             return
         }
 
@@ -412,7 +590,7 @@ class MainActivity : FragmentActivity() {
                         .onSuccess { render() }
                         .onFailure { showError("Could not disable managed policies: ${it.message}") }
                 }
-                .show()
+                .showThemed(this)
         } else {
             MaterialAlertDialogBuilder(this)
                 .setTitle("Enable managed lockdown?")
@@ -423,7 +601,7 @@ class MainActivity : FragmentActivity() {
                         .onSuccess { render() }
                         .onFailure { showError("Managed protection could not be enabled: ${it.message}") }
                 }
-                .show()
+                .showThemed(this)
         }
     }
 
@@ -432,28 +610,61 @@ class MainActivity : FragmentActivity() {
             .setTitle("Protection setup")
             .setMessage(message)
             .setPositiveButton("OK", null)
-            .show()
+            .showThemed(this)
     }
 
     private fun reconcileCharging() {
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress() ||
+            !ConfigurationBackup.recoverPendingRestore(this)
+        ) {
+            val deferredState = ProtectionStore(this).read()
+            if (deferredState.mode == ProtectionMode.ALARM_TRIGGERED) {
+                runCatching {
+                    ContextCompat.startForegroundService(
+                        this, Intent(this, AlarmService::class.java).setAction(AlarmService.ACTION_START)
+                    )
+                }.onFailure {
+                    LocalTamperHistory.record(this, "activity_alarm_restore_failed", it.javaClass.simpleName + ": " + it.message)
+                    AlarmScheduler.scheduleImmediateRecovery(this)
+                }
+            } else if (deferredState.mode == ProtectionMode.ARMED ||
+                deferredState.mode == ProtectionMode.COUNTDOWN
+            ) {
+                ProtectionMonitorRecoveryNotice.show(
+                    this,
+                    "Background monitoring is deferred until the interrupted settings restore is safely recovered. Existing protection state is preserved."
+                )
+            }
+            return
+        }
         // A battery snapshot is state evidence, not proof of a physical transition.
         // Only PowerTransitionReceiver may create a charger countdown.
         PowerTransitionCoordinator.initializeBaseline(this)
         val store = ProtectionStore(this)
         val current = store.read()
-        val monitorEnabled = getSharedPreferences(
-            ProtectionMonitorService.PREFS, MODE_PRIVATE
-        ).getBoolean(
+        val monitorEnabled = SafePreferences.boolean(
+            getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE),
             ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
-        // Owner opt-out is authoritative for every non-triggered state. A
-        // connected snapshot may arm only while monitoring is enabled.
+        // A stale or legacy OFF preference must never disarm active protection.
+        // Active ARMED/COUNTDOWN state owns the monitor requirement.
         val state = when {
-            !monitorEnabled && current.mode != ProtectionMode.ALARM_TRIGGERED ->
-                store.update { old ->
-                    if (old.mode == ProtectionMode.ALARM_TRIGGERED) old
-                    else ProtectionState(ProtectionMode.DISARMED, 0L, System.currentTimeMillis(), 0L, -1)
+            !monitorEnabled &&
+                (current.mode == ProtectionMode.ARMED || current.mode == ProtectionMode.COUNTDOWN) -> {
+                val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
+                val repaired = store.runIfProtectionActive {
+                    monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
                 }
+                if (repaired == false) {
+                    LocalTamperHistory.record(
+                        this, "active_monitor_preference_repair_failed",
+                        "Active protection remains authoritative, but the monitor-enabled preference could not be restored"
+                    )
+                }
+                A2BluetoothReceiverController.sync(this)
+                store.read()
+            }
+            !monitorEnabled && current.mode == ProtectionMode.DISARMED -> current
             monitorEnabled && current.mode != ProtectionMode.ALARM_TRIGGERED &&
                 ExternalPowerState.readConnected(this) == true ->
                 PowerTransitionCoordinator.confirmConnectedAndArm(this, "Connected power confirmed during app reconciliation")
@@ -481,14 +692,30 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun syncProtectionMonitor(state: ProtectionState) {
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress() ||
+            !ConfigurationBackup.recoverPendingRestore(this)
+        ) {
+            stopService(Intent(this, ProtectionMonitorService::class.java))
+            if (state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN) {
+                ProtectionMonitorRecoveryNotice.show(
+                    this,
+                    "Active protection is preserved, but monitoring is deferred until settings recovery completes."
+                )
+            }
+            return
+        }
         val prefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        val enabled = prefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        val enabled = SafePreferences.boolean(prefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
         if (ProtectionMonitorPolicy.shouldRun(enabled, state.mode)) {
             runCatching {
                 ContextCompat.startForegroundService(this, Intent(this, ProtectionMonitorService::class.java))
             }.onFailure {
                 LocalTamperHistory.record(this, "monitor_start_blocked", it.javaClass.simpleName + ": " + it.message)
                 prefs.edit().putBoolean(ProtectionMonitorService.KEY_RUNNING, false).apply()
+                ProtectionMonitorRecoveryNotice.show(
+                    this,
+                    "Protection remains active, but Android rejected background monitoring startup. Open the app to review permissions and restore monitoring."
+                )
             }
         } else if (!enabled || state.mode == ProtectionMode.DISARMED || state.mode == ProtectionMode.ALARM_TRIGGERED) {
             stopService(Intent(this, ProtectionMonitorService::class.java))
@@ -584,9 +811,15 @@ class MainActivity : FragmentActivity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         val launch = outlinedButton(title, click).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginEnd = dp(8)
+            val statusId = when (tutorialTitle) { "Exact alarms" -> "exact"; "Full-screen intent" -> "fullscreen"; "Alarm notifications" -> "notifications"; "Secure screen lock" -> "lock"; "Battery optimization" -> "battery"; else -> null }
+            statusId?.let { id ->
+                val p = ThemeStore.get(this@MainActivity)
+                val state = SetupStatusSnapshot.read(this@MainActivity).items.firstOrNull { it.id == id }?.state
+                val accent = when (state) { SetupState.VERIFIED -> p.success; SetupState.ACTION_REQUIRED -> p.warning; SetupState.NEUTRAL, SetupState.UNSUPPORTED -> p.muted; SetupState.UNKNOWN -> p.danger; null -> p.primary }
+                strokeColor = android.content.res.ColorStateList.valueOf(accent)
+                setTextColor(accent)
             }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(8) }
         }
         val info = MaterialButton(this).apply {
             text = "i"
@@ -600,7 +833,7 @@ class MainActivity : FragmentActivity() {
                     .setTitle(tutorialTitle + " • Android " + Build.VERSION.SDK_INT)
                     .setMessage(androidVersionGuide() + "\n\n" + tutorial)
                     .setPositiveButton("Got it", null)
-                    .show()
+                    .showThemed(this@MainActivity)
             }
         }
         row.addView(launch)
@@ -614,6 +847,20 @@ class MainActivity : FragmentActivity() {
             AndroidDeviceCompatibility.appInfoIntent(packageName),
             Intent(Settings.ACTION_SETTINGS)
         )
+    }
+
+    private fun isAlarmChannelReady(manager: NotificationManager): Boolean {
+        return if (Build.VERSION.SDK_INT >= 26) {
+            isAlarmChannelReadyApi26(manager)
+        } else {
+            true
+        }
+    }
+
+    @androidx.annotation.RequiresApi(26)
+    private fun isAlarmChannelReadyApi26(manager: NotificationManager): Boolean {
+        val channel = manager.getNotificationChannel(AlarmService.CHANNEL_ID)
+        return channel == null || channel.importance >= NotificationManager.IMPORTANCE_HIGH
     }
 
     private fun render() {
@@ -632,12 +879,13 @@ class MainActivity : FragmentActivity() {
             ProtectionMode.COUNTDOWN -> "Charger removed"
             ProtectionMode.ALARM_TRIGGERED -> "ALARM TRIGGERED"
         }
-        status.setTextColor(getColor(when (state.mode) {
-            ProtectionMode.DISARMED -> R.color.tas_text
-            ProtectionMode.ARMED -> R.color.tas_success
-            ProtectionMode.COUNTDOWN -> R.color.tas_warning
-            ProtectionMode.ALARM_TRIGGERED -> R.color.tas_danger
-        }))
+        val palette = ThemeStore.get(this)
+        status.setTextColor(when (state.mode) {
+            ProtectionMode.DISARMED -> palette.text
+            ProtectionMode.ARMED -> palette.success
+            ProtectionMode.COUNTDOWN -> palette.warning
+            ProtectionMode.ALARM_TRIGGERED -> palette.danger
+        })
 
         val stateMessage = when (state.mode) {
             ProtectionMode.DISARMED -> "Connect the charger to arm protection automatically. The built-in alarm is ready; a custom sound is optional."
@@ -660,7 +908,7 @@ class MainActivity : FragmentActivity() {
             "Precise alarm scheduling is available on this device."
         }
         val notificationManager = getSystemService(NotificationManager::class.java)
-        val notificationsAllowed = notificationManager.areNotificationsEnabled() &&
+        val notificationsAllowed = androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled() &&
             (Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
         val notificationMessage = if (!notificationsAllowed) {
             "Notifications are disabled; enable them for alarm presentation and recovery controls."
@@ -672,7 +920,7 @@ class MainActivity : FragmentActivity() {
         val screenLockMessage = if (adminActive) "Automatic screen locking: ENABLED." else "Automatic screen locking: OFF; enable the device administrator in Device Hardening."
         val fullScreenDashboardEnabled = getSharedPreferences(
             ALARM_DISPLAY_PREFS, MODE_PRIVATE
-        ).getBoolean(KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false)
+        ).let { SafePreferences.boolean(it, KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN, false) }
         val fullScreenAccessGranted = Build.VERSION.SDK_INT < 34 || notificationManager.canUseFullScreenIntent()
         val fullScreenMessage = when {
             !fullScreenDashboardEnabled ->
@@ -682,8 +930,7 @@ class MainActivity : FragmentActivity() {
             else ->
                 "Optional full-screen alarm dashboard: ON and Android full-screen access is available."
         }
-        val alarmChannel = if (Build.VERSION.SDK_INT >= 26) notificationManager.getNotificationChannel(AlarmService.CHANNEL_ID) else null
-        val alarmChannelReady = alarmChannel == null || alarmChannel.importance >= NotificationManager.IMPORTANCE_HIGH
+        val alarmChannelReady = isAlarmChannelReady(notificationManager)
         val alarmChannelMessage = if (!alarmChannelReady) {
             "Alarm notification channel is below High importance; Android may suppress full-screen presentation. Open Alarm notification settings and set importance to High."
         } else {
@@ -698,26 +945,31 @@ class MainActivity : FragmentActivity() {
         }
         val soundMessage = "Main alarm sound: ${AlarmSoundStore.displayName(this, AlarmSoundStore.ALARM)} (custom override optional)"
         val monitorPrefs = getSharedPreferences(ProtectionMonitorService.PREFS, MODE_PRIVATE)
-        val motionAlarmEnabled = monitorPrefs.getBoolean(
-            ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED
-        )
+        val motionAlarmEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_MOTION_ENABLED, ProtectionMonitorPolicy.DEFAULT_MOTION_ENABLED)
         val motionMessage = if (motionAlarmEnabled) {
             "Independent motion alarm: ON; it can trigger while the charger is connected."
         } else {
             "Independent motion alarm: OFF; charger-removal-only behavior is active."
         }
-        val monitorMessage = if (monitorPrefs.getBoolean(ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)) {
-            "Charger protection monitor: ENABLED; keep its persistent notification visible. $motionMessage"
-        } else {
-            "Charger protection monitor: OFF by owner choice; automatic plug/unplug detection is unavailable until re-enabled."
+        val monitorEnabled = SafePreferences.boolean(monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED)
+        val monitorRunning = ProtectionMonitorService.isRunning
+        val activeProtectionRequiresMonitor = state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN
+        val monitorMessage = when {
+            state.mode == ProtectionMode.ARMED || state.mode == ProtectionMode.COUNTDOWN ->
+                if (monitorRunning) "Charger protection monitor: ACTIVE for the current armed/countdown state. The monitor remains running until protection is disarmed. $motionMessage"
+                else "Charger protection monitor: NOT CONFIRMED while protection is active. Open Setup Status and review Android background restrictions. $motionMessage"
+            state.mode == ProtectionMode.ALARM_TRIGGERED ->
+                "The latched theft alarm is handled by AlarmService. $motionMessage"
+            monitorEnabled ->
+                "Charger protection monitor: ENABLED; keep its persistent notification visible. $motionMessage"
+            else ->
+                "Charger protection monitor: OFF by owner choice while protection is disarmed; automatic plug/unplug detection is unavailable until re-enabled."
         }
         val keyguard = getSystemService(KeyguardManager::class.java)
         val secureCredentialReady = keyguard.isDeviceSecure
         val exactAlarmReady = Build.VERSION.SDK_INT < 31 || getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
-        val monitorEnabled = monitorPrefs.getBoolean(
-            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
-        )
-        val monitorRunning = ProtectionMonitorService.isRunning
+        val monitorActive = monitorRunning && (monitorEnabled || activeProtectionRequiresMonitor)
+        shield.update(state.mode, monitorActive)
         val bootIdentityReady = ProtectionClock.bootCount(this) >= 0
         val bootIdentityMessage = if (bootIdentityReady) {
             "Boot identity: available for monotonic countdown recovery."
@@ -731,8 +983,10 @@ class MainActivity : FragmentActivity() {
         if (!notificationsAllowed) readinessIssues.add("Allow notifications")
         if (!exactAlarmReady) readinessIssues.add("Allow Alarms & reminders for exact deadline recovery")
         if (!alarmChannelReady) readinessIssues.add("Set Anti-theft alarm notification importance to High")
-        if (!monitorEnabled) readinessIssues.add("Enable charger monitoring")
-        if (monitorEnabled && state.mode != ProtectionMode.ALARM_TRIGGERED && !monitorRunning) {
+        if (!monitorEnabled && state.mode == ProtectionMode.DISARMED) readinessIssues.add("Enable charger monitoring")
+        if ((monitorEnabled || activeProtectionRequiresMonitor) &&
+            state.mode != ProtectionMode.ALARM_TRIGGERED && !monitorRunning
+        ) {
             readinessIssues.add("Wait for the charger-monitor foreground service to start")
         }
         val batteryPowerManager = getSystemService(PowerManager::class.java)
@@ -749,9 +1003,9 @@ class MainActivity : FragmentActivity() {
         details.text = listOf(stateMessage, readinessMessage, bootIdentityMessage, batteryOptimizationMessage, soundMessage, monitorMessage, attemptMessage, exactAlarmMessage, notificationMessage, screenLockMessage, fullScreenMessage, alarmChannelMessage, ownerMessage).filter { it.isNotBlank() }.joinToString("\n\n")
 
         val alarmActive = state.mode == ProtectionMode.ALARM_TRIGGERED
-        val biometricAvailable = BiometricManager.from(this)
-            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
         val credentialAvailable = getSystemService(KeyguardManager::class.java).isDeviceSecure
+        val biometricAvailable = credentialAvailable && BiometricManager.from(this)
+            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
         biometricButton.isEnabled = alarmActive && biometricAvailable && !coolingDown
         credentialButton.isEnabled = alarmActive && credentialAvailable
         cancelButton.isEnabled = biometricPrompt != null
@@ -780,11 +1034,7 @@ class MainActivity : FragmentActivity() {
         }
         val manager = BiometricManager.from(this)
         val keyguard = getSystemService(KeyguardManager::class.java)
-        val allowedAuthenticators = if (Build.VERSION.SDK_INT >= 30 && keyguard.isDeviceSecure) {
-            BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
-        } else {
-            BiometricManager.Authenticators.BIOMETRIC_STRONG
-        }
+        val allowedAuthenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG
         if (manager.canAuthenticate(allowedAuthenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
             if (keyguard.isDeviceSecure) authenticateDeviceCredential()
             else {
@@ -794,11 +1044,31 @@ class MainActivity : FragmentActivity() {
             return
         }
 
+        val preparedAuthentication = runCatching { OwnerAuthenticationCrypto.createCryptoObject() }.getOrElse {
+            if (keyguard.isDeviceSecure) authenticateDeviceCredential()
+            else {
+                autoAuthenticationRequested = false
+                details.text = "Secure biometric verification is unavailable. The alarm remains active."
+                render()
+            }
+            return
+        }
+
         val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this),
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     biometricPrompt = null
-                    completeOwnerAuthentication()
+                    val proof = OwnerAuthenticationCrypto.consume(result, preparedAuthentication)
+                    val verifiedBiometricProof = proof?.let {
+                        OwnerAuthenticationProof.fromBiometricKeystoreProof(this@MainActivity, it)
+                    }
+                    if (verifiedBiometricProof != null) {
+                        completeOwnerAuthentication(verifiedBiometricProof)
+                    } else {
+                        autoAuthenticationRequested = false
+                        details.text = "Android authentication did not complete the protected Keystore operation. The alarm remains active."
+                        render()
+                    }
                 }
 
                 override fun onAuthenticationFailed() {
@@ -806,6 +1076,11 @@ class MainActivity : FragmentActivity() {
                     val failedElapsed = ProtectionClock.elapsedRealtime()
                     val failedBoot = ProtectionClock.bootCount(this@MainActivity)
                     val next = store.recordAuthenticationFailure(failedAt, failedElapsed, failedBoot)
+                    LocalEvidenceVault.recordAsync(
+                        this@MainActivity,
+                        "owner_biometric_failed",
+                        "failedAttempts=${next.failedAttempts}; cooldownActive=${AuthenticationThrottle.remainingMs(next, failedAt, failedElapsed, failedBoot) > 0L}"
+                    )
                     if (AuthenticationThrottle.remainingMs(next, failedAt, failedElapsed, failedBoot) > 0L) {
                         biometricPrompt?.cancelAuthentication()
                         biometricPrompt = null
@@ -859,12 +1134,12 @@ class MainActivity : FragmentActivity() {
         biometricPrompt = prompt
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Verify ThiefAlertSeQure owner")
-            .setSubtitle("Authenticate with your device biometric or screen-lock credential")
+            .setSubtitle("Use your enrolled fingerprint or supported strong biometric")
             .setAllowedAuthenticators(allowedAuthenticators)
-        if ((allowedAuthenticators and BiometricManager.Authenticators.DEVICE_CREDENTIAL) == 0) {
-            promptInfo.setNegativeButtonText(if (keyguard.isDeviceSecure) "Use device PIN or password" else "Cancel")
-        }
-        prompt.authenticate(promptInfo.build())
+            .setNegativeButtonText(
+                if (keyguard.isDeviceSecure) "Use device PIN, pattern or password" else "Cancel"
+            )
+        prompt.authenticate(promptInfo.build(), preparedAuthentication.cryptoObject)
         render()
     }
 
@@ -891,13 +1166,25 @@ class MainActivity : FragmentActivity() {
             details.text = "Android could not open device credential verification."
             return
         }
-        startActivityForResult(credentialIntent, REQUEST_DEVICE_CREDENTIAL)
+        try {
+            startActivityForResult(credentialIntent, REQUEST_DEVICE_CREDENTIAL)
+        } catch (error: Exception) {
+            autoAuthenticationRequested = false
+            details.text = "Android could not launch device credential verification. The alarm remains active. Open Android screen-lock settings and try owner verification again."
+            LocalTamperHistory.record(
+                this, "device_credential_launch_failed",
+                error.javaClass.simpleName + ": " + error.message
+            )
+            render()
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_DEVICE_CREDENTIAL) {
-            if (resultCode == RESULT_OK) completeOwnerAuthentication()
+            if (resultCode == RESULT_OK) {
+                OwnerAuthenticationProof.fromKeyguardResult(this, resultCode)?.let(::completeOwnerAuthentication)
+            }
             else {
                 autoAuthenticationRequested = false
                 details.text = "Device authentication dismissed or unsuccessful. The alarm remains active; owner verification will be presented again."
@@ -906,14 +1193,49 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    private fun completeOwnerAuthentication() {
-        val next = OwnerAuthenticationCoordinator.complete(this, "in_app_authentication")
+    private fun completeOwnerAuthentication(proof: OwnerAuthenticationProof) {
+        val next = OwnerAuthenticationCoordinator.complete(this, proof)
         if (next != null) {
             autoAuthenticationRequested = false
             details.text = if (next.mode == ProtectionMode.ARMED) {
                 "Owner authenticated. Alarm stopped. Protection re-armed because the charger is connected."
             } else {
                 "Owner authenticated. Alarm stopped. Protection remains disarmed until the charger is reconnected."
+            }
+            val settingsRecovered = !ConfigurationBackup.isRestoreOrRecoveryInProgress() &&
+                ConfigurationBackup.recoverPendingRestore(this)
+            if (settingsRecovered) {
+                if (next.mode == ProtectionMode.DISARMED) {
+                    ManagedProtectionController.startIfConfigured(this)
+                }
+                val authCameraEvidenceEnabled = CameraEvidenceCapture.isEnabled(this)
+                val authCameraPermissionGranted = checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                when {
+                    authCameraEvidenceEnabled && authCameraPermissionGranted ->
+                        details.append(" Front-camera evidence capture is starting.")
+                    authCameraEvidenceEnabled ->
+                        details.append(" Front-camera evidence is enabled, but CAMERA permission is missing; no photo was captured.")
+                    else ->
+                        details.append(" Front-camera evidence is OFF in Settings; no photo was captured.")
+                }
+                // Optional photo evidence runs only after a fresh successful proof and while this Activity is visible.
+                runCatching { CameraEvidenceCapture.captureAfterSuccessfulAuthentication(this) }
+                    .onFailure {
+                        LocalEvidenceVault.recordAsync(this, "camera_evidence_capture_failed", "Optional camera evidence failed safely: ${it.javaClass.simpleName}")
+                        LocalTamperHistory.record(this, "camera_evidence_capture_failed", "Optional camera evidence failed safely: ${it.javaClass.simpleName}")
+                    }
+            } else {
+                details.append(" Optional camera evidence was skipped while interrupted settings recovery is pending.")
+            }
+            // Active-alarm recovery bypasses the first-run notice so authentication is never
+            // blocked. Once the owner has disarmed the alarm, require acknowledgement before
+            // returning to normal dashboard use.
+            val privacyDecision = SafePreferences.string(
+                getSharedPreferences(PRIVACY_NOTICE_PREFS, MODE_PRIVATE), "decision", null
+            )
+            if (privacyDecision != "acknowledged") {
+                showPrivacyScreen()
+                return
             }
         } else {
             syncProtectionMonitor(ProtectionStore(this).read())
@@ -924,6 +1246,7 @@ class MainActivity : FragmentActivity() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
     private fun matchWrap() = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
     private fun space(height: Int) = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dp(height)) }
+    private fun horizontalSpace(width: Int) = View(this).apply { layoutParams = LinearLayout.LayoutParams(dp(width), 1) }
 
     private fun column() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
@@ -955,6 +1278,24 @@ class MainActivity : FragmentActivity() {
         setOnClickListener { action() }
     }
 
+    private fun navigationTab(value: String, description: String, action: () -> Unit) = MaterialButton(this).apply {
+        text = value
+        contentDescription = "Open $description"
+        isAllCaps = false
+        cornerRadius = dp(13)
+        minHeight = dp(48)
+        minWidth = dp(48)
+        insetTop = 0
+        insetBottom = 0
+        setPadding(dp(11), 0, dp(11), 0)
+        setTextSize(12f)
+        strokeWidth = dp(1)
+        strokeColor = android.content.res.ColorStateList.valueOf(getColor(R.color.tas_primary))
+        backgroundTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.tas_surface))
+        setTextColor(getColor(R.color.tas_text))
+        setOnClickListener { action() }
+    }
+
     private fun outlinedButton(value: String, action: () -> Unit) = MaterialButton(this).apply {
         text = value
         isAllCaps = false
@@ -971,13 +1312,14 @@ class MainActivity : FragmentActivity() {
         text = value
         isAllCaps = false
         cornerRadius = dp(14)
-        minHeight = dp(46)
+        minHeight = dp(48)
         backgroundTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.tas_surface_variant))
         setTextColor(getColor(R.color.tas_text))
         setOnClickListener { action() }
     }
 
     companion object {
+        const val PRIVACY_NOTICE_PREFS = "privacy_notice_v9"
         const val ALARM_DISPLAY_PREFS = "alarm_display_settings_v1"
         const val KEY_SHOW_ALARM_SCREEN_OVER_LOCKSCREEN = "show_alarm_screen_over_lockscreen"
         private const val REQUEST_DEVICE_CREDENTIAL = 4102

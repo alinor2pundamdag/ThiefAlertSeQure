@@ -1,8 +1,10 @@
 # APK installation and update safety
 
-> **Official development baseline: v1.1.3 (versionCode 5).** v1.1.3 carries forward the completed v1.1.2 protection, alarm, authentication, privacy, settings, event-history, and optional Device Owner functionality, with the synchronized rear-LED flashlight alert added. The flashlight is the intended functional addition; it does not replace or remove the established v1.1.2 features.
+> **Current Batch Four candidate (18 November 2026):** branch `work/batch-4-implementation`, PR #8 open/unmerged, versionName `1.1.5_Developer_Alinor`, versionCode `7`. The current CI package is a side-by-side debug APK (`com.thiefalertsequre.app.v114test`, versionName `1.1.5-test`). This candidate is not a production release; do not treat historical signing/device records below as verification of this exact head.
 
-> **Signing migration:** the original v1.1.2 debug private key was not found in repository branches or available CI artifacts. A new owner-controlled release keystore has now been generated and pinned as the v1.1.3 signing baseline. It cannot update an already-installed v1.1.2 APK signed by the old certificate. Keep v1.1.2 installed until the new release-signed v1.1.3 APK is ready and an explicitly approved, backed-up migration is performed.
+> **Historical development baseline: v1.1.3 (versionCode 5).** This paragraph records the predecessor release and is superseded by the current Batch Four candidate snapshot above.
+
+> **Historical signing migration record:** the original v1.1.2 debug private key was not found in repository branches or available CI artifacts. A new owner-controlled release keystore has now been generated and pinned as the v1.1.3 signing baseline. It cannot update an already-installed v1.1.2 APK signed by the old certificate. Keep v1.1.2 installed until the new release-signed v1.1.3 APK is ready and an explicitly approved, backed-up migration is performed.
 
 
 ## Fixed application identity
@@ -10,9 +12,9 @@
 Every official build must keep this application identity unchanged:
 
 - Application ID: `com.thiefalertsequre.app`
-- Current development version: `1.1.3`
-- Current version code: `5`
-- Branch and pull-request CI output: debug-only side-by-side test APK with application ID `com.thiefalertsequre.app.v113test`. It cannot replace the production package. Official release APKs use `com.thiefalertsequre.app` and are built only by the tag-triggered workflow after all four signing secrets are verified.
+- Current development candidate version: `1.1.5_Developer_Alinor`
+- Current candidate version code: `7`
+- Branch and pull-request CI output: debug-only side-by-side test APK with application ID `com.thiefalertsequre.app.v114test`. It cannot replace the production package. Official release APKs use `com.thiefalertsequre.app` and are built only by the tag-triggered workflow after all four signing secrets are verified.
 - Minimum Android: API 26
 
 Do not change `applicationId`, add an `applicationIdSuffix`, or reuse a lower version code for an update. The display label and launcher icon can change without changing the package identity.
@@ -114,7 +116,7 @@ Keep the app's protection monitor enabled. In HONOR Settings, retain the manuall
 7. Unlock Android normally. Confirm this alone does not stop the alarm. Open the app/notification and complete its explicit Android device-credential or BIOMETRIC_STRONG prompt. Confirm the alarm stops only after that successful prompt.
 8. Confirm the previous alarm volume is restored after successful authentication.
 9. Repeat the countdown while the app is backgrounded and the screen is off. Repeat with another app in the foreground.
-10. With the camera flash alert enabled (default), confirm the LED stays OFF while ARMED and during the countdown. After ALARM_TRIGGERED, confirm the rear LED pulses slowly with the audio. Reconnect after trigger and unlock Android normally; neither action may stop the alarm or LED. Complete the app's correct PIN/biometric prompt and confirm audio and LED stop together. Incorrect or cancelled authentication must leave both active. Repeat with the flash alert disabled; audio must still work. Confirm no camera permission prompt appears. If another app takes camera/torch control, confirm the audio alarm remains active even if the LED is interrupted.
+10. With the camera flash alert enabled (default), confirm the LED stays OFF while ARMED and during the countdown. After ALARM_TRIGGERED, confirm the rear LED pulses slowly with the audio. Reconnect after trigger and unlock Android normally; neither action may stop the alarm or LED. Complete the app's correct PIN/biometric prompt and confirm audio and LED stop together. Incorrect or cancelled authentication must leave both active. Repeat with the flash alert disabled; audio must still work. Confirm the flash alert alone does not request CAMERA permission. The separate front-camera photo-evidence feature is OFF by default and requests CAMERA permission only after explicit Settings opt-in; it captures only after successful owner authentication while the app is visible. If another app takes camera/torch control, confirm the audio alarm remains active even if the LED is interrupted.
 11. Reboot during a countdown. After first unlock, confirm connected power returns to ARMED; confirmed disconnected power receives a fresh 10-second grace period; unknown power waits for a reliable sample.
 12. Reboot while ALARM_TRIGGERED. After first unlock, confirm the latched alarm recovery notification/service resumes where Android permits it. Direct-Boot protection before first unlock is not supported.
 13. Review Settings status after returning from Android settings. Confirm the app reports actual notification, exact-alarm, battery-optimization, Device Admin and full-screen-intent access rather than assuming a setting was granted.
