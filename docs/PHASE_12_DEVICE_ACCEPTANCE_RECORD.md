@@ -2,7 +2,7 @@
 
 **Project:** ThiefAlertSeQure  
 **Candidate branch:** `work/batch-4-implementation`  
-**Current candidate commit:** `e6cd3f2e6043f0e3de97027595c026ff4cd3eab2` (exact PR head; software CI passed, physical testing not run)  
+**Current code-bearing candidate commit:** `5e850fc4a444a1e36541890ca022a745f3be021a` (Android CI and CodeQL passed; physical testing not run)  
 **Current build:** `1.1.5-test` / versionCode `7`  
 **Development package:** `com.thiefalertsequre.app.v114test`  
 **Status:** **NOT TESTED — physical-device acceptance remains pending**
@@ -19,7 +19,7 @@ This document is a blank record for real physical-device execution. CI, JVM test
 | Build fingerprint | NOT RECORDED |
 | Region / carrier (if relevant) | NOT RECORDED |
 | App package / version / versionCode | `com.thiefalertsequre.app.v114test` / `1.1.5-test` / `7` |
-| Tested commit | NOT TESTED — candidate source head `e6cd3f2e6043f0e3de97027595c026ff4cd3eab2` |
+| Tested commit | NOT TESTED — candidate source head `5e850fc4a444a1e36541890ca022a745f3be021a` |
 | Test date / local timezone | NOT RECORDED |
 | Tester | NOT RECORDED |
 | Initial battery / power mode | NOT RECORDED |

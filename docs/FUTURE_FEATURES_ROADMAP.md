@@ -51,22 +51,32 @@ Implementation status: in progress on the development branch; release version un
 ## Other small future maintenance features
 
 ### D1 — Manual Diagnostic Snapshot
+
+**Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 - User-triggered local health screen showing app/device version, protection state, relevant permission status, and component health.
 - No continuous polling, analytics, or network upload.
 
 ### D2 — Exportable Debug Report
+
+**Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 - Owner previews and explicitly exports a redacted report containing timestamps, versions, component status, and non-sensitive error codes.
 - No automatic email, cloud upload, or telemetry.
 
 ### D3 — Permission and Battery-Restriction Guidance
+
+**Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 - Explain only the permission or system restriction relevant to a feature.
 - Link to the appropriate Android settings screen when supported; never silently change settings.
 
 ### D4 — Safe Recovery for Verified Failures
+
+**Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 - Add a bounded recovery action only after a documented, reproducible failure is found.
 - Never clear protection state, interrupt a countdown/alarm, or create restart loops.
 
 ### D5 — Update Integrity Status
+
+**Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 - Show installed version and the result of package, version, digest, and signer checks.
 - Never install or downgrade automatically.
 

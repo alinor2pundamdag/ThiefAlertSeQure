@@ -1,4 +1,4 @@
-> **Current verified Batch Four candidate (21 November 2026):** `work/batch-4-implementation`, v1.1.5 code 7, PR #8 open/draft/unmerged, code-bearing commit `c64490788185fe2f9390cf21a87de003f4a1b430`; latest documentation-only PR head `e6cd3f2e6043f0e3de97027595c026ff4cd3eab2`. Android CI #44860111389 / CodeQL #44860111390 passed on the code-bearing commit. The latest PR head independently passed Android CI [#44861309604](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44861309604) and CodeQL [#44861309552](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44861309552). The CI APK is a debug-signed development artifact only; minified release metadata passed, but the release APK is unsigned without permanent production secrets. No instrumentation/emulator/physical-device test is claimed. Phase 12 physical acceptance remains 0/25 PASS / 25/25 NOT TESTED. The 11/11 owner-reported handset scenarios elsewhere in this document apply to v1.1.3 only.
+> **Current verified Batch Four candidate (24 November 2026):** `work/batch-4-implementation`, v1.1.5 code 7, PR #8 open/draft/unmerged, latest code-bearing commit `5e850fc4a444a1e36541890ca022a745f3be021a`. Android CI #45304517153 and CodeQL #45304517314 passed. The development artifact is debug-signed only; the minified release APK metadata passed but the APK is unsigned in PR CI. Production signing availability and CodeQL alert #8 closure remain unverified. Phase 12 physical acceptance remains 0/25 PASS / 25/25 NOT TESTED; no instrumentation/emulator/physical-device test is claimed. The 11/11 owner-reported handset scenarios elsewhere in this document apply to v1.1.3 only.
 
 > Cross-feature corrections include A2 deadline invalidation after authenticated disarm/package replacement, emergency protection-state snapshots, non-blocking alarm recovery, dedicated flash timing workers, SafePreferences-only legacy Gallery index reads, explicit OS backup/device-transfer exclusions, API guards, and redacted diagnostics. Filament 1.80.1/1.81.0 require compileSdk 37; the approved compileSdk 36 / AGP 8.10.1 baseline therefore remains on Filament 1.75.1. Revisit the newer upstream swap-chain fix only with an approved API-37 toolchain migration.
 
@@ -59,7 +59,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 - Only the result of the app-launched Android device-credential confirmation activity or a successful BIOMETRIC_STRONG prompt clears ALARM_TRIGGERED through one shared coordinator. `ACTION_USER_PRESENT` and keyguard locked-to-unlocked polling are not proof of credential entry: trusted-unlock flows can dismiss the keyguard without a fresh PIN or biometric.
 
 ## Audio and lockscreen
-- Packaged Ogg Opus alarm asset is played in a loop through MediaPlayer. If selected and packaged audio both fail, repeating vibration is the fallback; there is no ToneGenerator implementation.
+- The packaged Ogg Opus default and owner-selected audio use MediaPlayer; five generated built-in presets use ToneGenerator. The complete built-in choice set is six entries (packaged default plus five generated presets). If selected and packaged audio both fail, repeating vibration is the fallback.
 - Audio uses USAGE_ALARM and requests maximum available alarm-stream volume.
 - Prior alarm volume is saved and restored after successful disarm. If service is destroyed while alarm remains latched, it does not restore volume prematurely. Corrupt saved-volume metadata is removed and reported; the original value cannot be reconstructed from a malformed preference.
 - While AlarmService is active, the alarm stream maximum is reasserted every 500 ms; this is best-effort volume control, not hardware-key interception.
@@ -191,3 +191,11 @@ No failure details were supplied. These results clear the reported HONOR 200 Pro
 - The uploaded debug artifact is not production-signed. Permanent signing-secret availability and a production-signed APK remain **NOT VERIFIED**.
 - Branch comparison: 531 ahead / 0 behind, 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged.
 - No instrumentation, emulator or physical-device test was performed.
+
+
+## Distribution-channel policy review — 24 November 2026
+
+- The current updater checks GitHub Releases and launches the Android package installer using `REQUEST_INSTALL_PACKAGES`. This is a direct APK/sideload update path.
+- Google Play policy does not permit an ordinary app to use `REQUEST_INSTALL_PACKAGES` for self-updating; the stated exception is qualifying enterprise device-management use. If Google Play distribution is intended, replace the GitHub APK self-update path with Play-managed updates or a separate Play-compatible build before submission: https://support.google.com/googleplay/android-developer/answer/16559646
+- The app declares a `specialUse` foreground service for persistent user-enabled protection monitoring. A Play release requires the appropriate foreground-service declaration and justification; full-screen-intent and battery-optimization exemptions also require policy review and must remain user-controlled: https://support.google.com/googleplay/android-developer/answer/16559646
+- The distribution channel has not been selected in this audit. No Play-compliance claim is made.

@@ -19,7 +19,7 @@
 - Main, Settings, Bluetooth capability, Device Intelligence, Theme, and setup-status action buttons enforce at least 48dp minimum touch height.
 - All six app screens apply system-bar and display-cutout insets for edge-to-edge devices and reapply the saved/preview theme when returning to the screen.
 - Dark/light filters remain tappable, visibly indicate selection, and use 48dp minimum height.
-- All 16 palettes have JVM WCAG AA checks for primary/muted text on background and surface, button text on primary, primary accent on surface, and success/warning/danger status labels on surfaces.
+- All 120 curated and generated palettes have JVM WCAG AA checks for primary/muted text on background and surface, button text on primary, primary accent on surface, and success/warning/danger status labels on surfaces.
 - Trusted Bluetooth registry supports multiple locally registered accessories, per-device connection baselines, and independent 8-second disconnect grace timers.
 - Unregister confirmation states that only app trust is removed; Android pairing is not modified.
 - A2 alarm gates require enabled feature, trusted address, fresh per-device connection baseline, unchanged registry revision, continued disconnection, and ARMED protection state.
