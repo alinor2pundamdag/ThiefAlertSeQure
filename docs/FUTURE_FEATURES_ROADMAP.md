@@ -1,6 +1,6 @@
 # Future Features Roadmap
 
-Status: A1–A7 remain in the future-feature roadmap. A2 has been selected for implementation work now, but is not assigned to v1.1.4 or any other release. All release placement remains the owner's decision.
+Status (24 November 2026): A2 is implemented on the current PR #7/#8 development stack; release assignment and physical acceptance remain pending. A3 partially overlaps with owner-requested local location evidence, but a dedicated last-known-location view is not claimed. A1 and A4–A7 remain future features with no release assignment. D1–D5 have corresponding implementations in the current candidate.
 
 ## Scope decision
 
@@ -9,6 +9,8 @@ Keep future work small and independently testable. Add only features that solve 
 ## Proposed anti-theft features
 
 ### A1 — Smart Movement Anti-Theft Protection
+
+**Current status:** Core motion monitoring exists while ARMED; this separate manual movement mode remains future work.
 - Owner manually arms a movement sensor mode before leaving the phone unattended.
 - Detect a meaningful pickup or movement pattern using the accelerometer; use other sensors only when available and justified.
 - Start a configurable grace period, then use the existing authentication and alarm flow.
@@ -23,6 +25,8 @@ Implementation status: in progress on the development branch; release version un
 - No Bluetooth scanning when this feature is disabled.
 
 ### A3 — Last Known Location on Owner Request
+
+**Current status:** Owner-requested local location evidence exists; a dedicated last-known-location view while armed is not claimed, so this roadmap item remains partially implemented/deferred.
 - Let the owner explicitly save or view the phone's last known location while protection is armed.
 - Require clear location permission and visible user control; show timestamp and location accuracy.
 - Keep location local by default. Any remote access or cloud storage would need a separate security/privacy design and explicit approval.
@@ -53,10 +57,14 @@ Implementation status: in progress on the development branch; release version un
 ### D1 — Manual Diagnostic Snapshot
 
 **Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
+
+**Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 - User-triggered local health screen showing app/device version, protection state, relevant permission status, and component health.
 - No continuous polling, analytics, or network upload.
 
 ### D2 — Exportable Debug Report
+
+**Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 
 **Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 - Owner previews and explicitly exports a redacted report containing timestamps, versions, component status, and non-sensitive error codes.
@@ -65,16 +73,22 @@ Implementation status: in progress on the development branch; release version un
 ### D3 — Permission and Battery-Restriction Guidance
 
 **Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
+
+**Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 - Explain only the permission or system restriction relevant to a feature.
 - Link to the appropriate Android settings screen when supported; never silently change settings.
 
 ### D4 — Safe Recovery for Verified Failures
 
 **Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
+
+**Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 - Add a bounded recovery action only after a documented, reproducible failure is found.
 - Never clear protection state, interrupt a countdown/alarm, or create restart loops.
 
 ### D5 — Update Integrity Status
+
+**Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 
 **Current status:** Corresponding implementation exists in the current development candidate; no separate release assignment is made.
 - Show installed version and the result of package, version, digest, and signer checks.

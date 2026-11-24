@@ -3,10 +3,13 @@
 **Working branch:** `work/batch-4-implementation`  
 **Historical Batch Three baseline:** `work/phase-0-12-coding`  
 **Production identity:** `com.thiefalertsequre.app`  
-**Current candidate:** `1.1.5_Developer_Alinor` / versionCode `7`  
-**21 November verification:** Code-bearing commit `c64490788185fe2f9390cf21a87de003f4a1b430` passed Android CI #44860111389 and CodeQL #44860111390. The latest documentation-only PR head `e6cd3f2e6043f0e3de97027595c026ff4cd3eab2` also passed exact-head Android CI #44861309604 and CodeQL #44861309552. Unit tests, source/manifest/release contracts, debug/release lint, debug APK assembly, minified release metadata, package/version/signer verification and artifact upload passed. Phase 12 remains 0/25 PASS / 25/25 NOT TESTED; no instrumentation, emulator or physical-device test is claimed.
+**Current candidate:** `1.1.5_Developer_Alinor` / versionCode `7`
 
-This record distinguishes existing capabilities reused by Batch Four from the additions made in this branch. Software CI passed on code-bearing commit `c644907`; production signing and physical-device acceptance remain unverified.
+**24 November verification:** Latest code-bearing commit `5e850fc4a444a1e36541890ca022a745f3be021a` passed Android CI #45304517153 and CodeQL #45304517314. The run passed JVM unit tests, cross-feature source contracts, manifest/privacy checks, Android lint, debug APK assembly, minified release metadata, package/version/signer verification and artifact upload. Development artifact ID `14881036567`; archive SHA-256 `33127b9cf05c92bd9a5820bf983906cdc16244390d61200dd3ef1649c707f7ce`.
+
+Phase 12 remains 0/25 PASS / 25/25 NOT TESTED. No instrumentation, emulator or physical-device test is claimed. The minified release APK is unsigned in PR CI; production signing availability is not independently verified. No merge, tag, publication or production release is claimed.
+
+This record distinguishes existing capabilities reused by Batch Four from additions made in this branch. Full physical acceptance and a fresh line-by-line review of all production source remain open.
 
 ## Phase 14 — About, Version, Legal and Privacy
 

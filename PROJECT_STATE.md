@@ -17,7 +17,6 @@
 - This is a cross-chat requirements audit and targeted high-risk source review, not a claim that every line of all 89 production Kotlin files has received a fresh manual review.
 
 ---
----
 
 # ThiefAlertSeQure — Project State
 
