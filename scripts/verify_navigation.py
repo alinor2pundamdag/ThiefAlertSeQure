@@ -30,6 +30,8 @@ empty_click_value_pattern = re.compile(r"setOnClickListener\s*\{\s*Unit\s*\}")
 
 for path in sources:
     source = path.read_text(encoding="utf-8")
+    if r"\${" in source:
+        errors.append(f"{path.relative_to(ROOT)}: escaped Kotlin string template prevents interpolation")
     defined.update(class_pattern.findall(source))
     targets.update(target_pattern.findall(source))
     builders = len(builder_pattern.findall(source))
@@ -143,6 +145,28 @@ for required in (
         errors.append("SeismicGenesisIntroActivity missing original cinematic intro contract: " + required)
 if "Skip intro" in intro_activity or "Skip the introduction" in intro_activity:
     errors.append("SeismicGenesisIntroActivity must not contain an unrequested Skip Intro path")
+if not re.search(r"if\s*\(!use3d\)\s*\{\s*GenesisFractureCanvas\(", intro_activity, re.S):
+    errors.append("The 2D fracture canvas must be fallback-only; Filament-capable devices must use the 3D scene without a 2D effects overlay")
+for required in (
+    "Lifecycle.Event.ON_RESUME -> filamentView?.startRendering()",
+    "Lifecycle.Event.ON_PAUSE -> filamentView?.pauseRendering()",
+    "Lifecycle.Event.ON_DESTROY -> filamentView?.release()",
+    "onRelease = {",
+    "it.release()"
+):
+    if required not in intro_activity:
+        errors.append("Seismic Genesis native renderer lifecycle contract missing: " + required)
+for required in (
+    "val matrix = body.transformMatrix",
+    "val matrix = coreTransformMatrix",
+    "val matrix = shieldTransformMatrix",
+    "val rimMatrix = shieldRimTransformMatrix"
+):
+    if required not in renderer_activity:
+        errors.append("Genesis 3D renderer must reuse frame matrices: " + required)
+body_transform = re.search(r"private fun setBodyTransform\(.*?\n    }", renderer_activity, re.S)
+if body_transform and "FloatArray(16)" in body_transform.group(0):
+    errors.append("Genesis 3D body transforms must not allocate a new matrix every frame")
 if "id(\"org.jetbrains.kotlin.plugin.compose\")" not in (ROOT / "app" / "build.gradle.kts").read_text(encoding="utf-8"):
     errors.append("Seismic Genesis must use the requested Jetpack Compose implementation")
 
