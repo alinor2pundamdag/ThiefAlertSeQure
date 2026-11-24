@@ -101,7 +101,7 @@ The following requests were explicitly deferred by the owner on 17 November 2026
 
 - Active prevention/interruption of Android power-menu, shutdown or reboot actions. Existing code observes permitted power-transition signals; it does not prevent hardware shutdown.
 - Guaranteed protection execution while the device is powered off.
-- Automatic front-camera capture triggered by successful owner credential entry. Current camera evidence remains owner-initiated, opt-in and CAMERA-permission-gated; it is not automatic unlock-triggered capture.
+- Unconditional, non-opt-in, or background front-camera capture. The existing feature is explicitly enabled in Settings, requests CAMERA permission only after opt-in, and attempts one still only after successful owner authentication while the Activity is visible.
 - New camera/flashlight conflict-prevention behavior beyond existing separate controls.
 - Maximum/premium capability expansion outside the approved v1.1.5 scope.
 
