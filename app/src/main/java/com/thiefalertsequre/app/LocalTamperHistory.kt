@@ -98,10 +98,13 @@ object LocalTamperHistory {
         return HistoryRead(safeLegacy, true)
     }
 
-    private fun clearLegacyPlaintext(context: Context): Boolean {
+    private fun clearLegacyPlaintext(context: Context): Boolean = runCatching {
         val legacyPrefs = context.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE)
-        if (!legacyPrefs.contains(LEGACY_KEY_EVENTS)) return true
-        val removed = legacyPrefs.edit().remove(LEGACY_KEY_EVENTS).commit()
-        return removed && !legacyPrefs.contains(LEGACY_KEY_EVENTS)
-    }
+        if (!legacyPrefs.contains(LEGACY_KEY_EVENTS)) {
+            true
+        } else {
+            val removed = legacyPrefs.edit().remove(LEGACY_KEY_EVENTS).commit()
+            removed && !legacyPrefs.contains(LEGACY_KEY_EVENTS)
+        }
+    }.getOrDefault(false)
 }
