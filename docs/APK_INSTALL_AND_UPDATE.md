@@ -1,6 +1,6 @@
 # APK installation and update safety
 
-> **Current release candidate (24 November 2026):** branch `release/v1.1.5-candidate`, PR #9, code-bearing head `9ae3d15d9de909ab1a75e88f120ca7c9ff72b3c4`; documentation head `e2965418536aaacf71295ae8a1cc22623a8e8bdf`. Exact code-head Android CI and CodeQL push/PR runs passed. The downloadable CI artifact is a debug-only side-by-side APK (`com.thiefalertsequre.app.v114test`, versionName `1.1.5-test`), not a production installer. The minified production-variant APK passed metadata checks but is unsigned in PR CI. Production signing secrets and signed preflight are not currently verified; the candidate is not a production release.
+> **Current release candidate (24 November 2026):** branch `release/v1.1.5-candidate`, PR #9, code-bearing head `9ae3d15d9de909ab1a75e88f120ca7c9ff72b3c4`; initial runbook/status documentation commit `e2965418536aaacf71295ae8a1cc22623a8e8bdf` (followed by docs-only consistency commits). Exact code-head Android CI and CodeQL push/PR runs passed. The downloadable CI artifact is a debug-only side-by-side APK (`com.thiefalertsequre.app.v114test`, versionName `1.1.5-test`), not a production installer. The minified production-variant APK passed metadata checks but is unsigned in PR CI. Production signing secrets and signed preflight are not currently verified; the candidate is not a production release.
 
 > **Historical development baseline: v1.1.3 (versionCode 5).** This paragraph records the predecessor release and is superseded by the current Batch Four candidate snapshot above.
 
