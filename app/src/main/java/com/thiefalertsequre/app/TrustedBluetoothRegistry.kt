@@ -7,6 +7,17 @@ import java.security.MessageDigest
 
 data class TrustedBluetoothDevice(val address: String, val name: String)
 
+enum class BluetoothBaselineUpdateStatus {
+    COMMITTED, INVALID_ADDRESS, CORRUPT_STORE, COMMIT_FAILED
+}
+
+data class BluetoothBaselineUpdateResult(
+    val status: BluetoothBaselineUpdateStatus,
+    val hadBaseline: Boolean
+) {
+    val persisted: Boolean get() = status == BluetoothBaselineUpdateStatus.COMMITTED
+}
+
 /**
  * Local allow-list for A2. Android owns pairing; this registry only stores app trust.
  * MAC addresses, names and connection baselines are encrypted at rest with Android Keystore.
@@ -19,15 +30,18 @@ object TrustedBluetoothRegistry {
     private const val DEVICE_REVISION_PREFIX = "trusted_bluetooth_device_revision_v1_"
     private const val TAG = "TrustedBluetoothRegistry"
 
+    @Synchronized
     fun read(prefs: SharedPreferences): List<TrustedBluetoothDevice> =
         when (val result = readResult(prefs)) {
             is PreferenceRead.Value -> result.value
             is PreferenceRead.Corrupt -> emptyList()
         }
 
+    @Synchronized
     internal fun readResult(prefs: SharedPreferences): PreferenceRead<List<TrustedBluetoothDevice>> =
         readStrict(prefs)
 
+    @Synchronized
     private fun readStrict(prefs: SharedPreferences): PreferenceRead<List<TrustedBluetoothDevice>> {
         val raw = when (val stored = SafePreferences.readString(prefs, KEY_DEVICES, null)) {
             is PreferenceRead.Value -> stored.value
@@ -102,6 +116,7 @@ object TrustedBluetoothRegistry {
             PreferenceRead.Corrupt(KEY_DEVICES)
         }
     }
+    @Synchronized
     fun add(prefs: SharedPreferences, address: String, name: String): Boolean {
         if (!isValidAddress(address)) return false
         val normalizedAddress = address.trim().uppercase()
@@ -131,6 +146,7 @@ object TrustedBluetoothRegistry {
     }
 
     /** Removes only the app's trust relationship. Android pairing is never modified. */
+    @Synchronized
     fun remove(prefs: SharedPreferences, address: String): Boolean {
         if (!isValidAddress(address)) return false
         val normalizedAddress = address.trim().uppercase()
@@ -165,12 +181,14 @@ object TrustedBluetoothRegistry {
         return edit.commit()
     }
 
+    @Synchronized
     fun isTrusted(prefs: SharedPreferences, address: String): Boolean =
         isValidAddress(address) && when (val stored = readStrict(prefs)) {
             is PreferenceRead.Value -> stored.value.any { it.address.equals(address.trim(), ignoreCase = true) }
             is PreferenceRead.Corrupt -> false
         }
 
+    @Synchronized
     fun revision(prefs: SharedPreferences): Long =
         when (val stored = SafePreferences.readLong(prefs, KEY_REVISION, 0L)) {
             is PreferenceRead.Value -> stored.value
@@ -178,6 +196,7 @@ object TrustedBluetoothRegistry {
         }
 
     /** Per-address generation prevents unrelated registry edits from canceling another device's timer. */
+    @Synchronized
     fun deviceRevision(prefs: SharedPreferences, address: String): Long {
         val key = deviceRevisionKey(address)
         if (prefs.contains(key)) {
@@ -228,28 +247,55 @@ object TrustedBluetoothRegistry {
         check(edit.commit()) { "Could not securely migrate trusted-device revision keys." }
     }
 
+    @Synchronized
     fun isBaselineConnected(prefs: SharedPreferences, address: String): Boolean =
         isValidAddress(address) && baselineAddresses(prefs).any { it.equals(address.trim(), ignoreCase = true) }
 
-    fun markConnected(prefs: SharedPreferences, address: String, connected: Boolean): Boolean {
-        if (!isValidAddress(address)) return false
+    @Synchronized
+    fun markConnected(
+        prefs: SharedPreferences,
+        address: String,
+        connected: Boolean
+    ): BluetoothBaselineUpdateResult {
+        if (!isValidAddress(address)) {
+            return BluetoothBaselineUpdateResult(BluetoothBaselineUpdateStatus.INVALID_ADDRESS, false)
+        }
         val normalizedAddress = address.trim().uppercase()
         val old = when (val stored = readBaselineAddresses(prefs)) {
             is PreferenceRead.Value -> stored.value
-            is PreferenceRead.Corrupt -> return false
+            is PreferenceRead.Corrupt -> {
+                return BluetoothBaselineUpdateResult(BluetoothBaselineUpdateStatus.CORRUPT_STORE, false)
+            }
         }
         val hadBaseline = old.any { it.equals(normalizedAddress, ignoreCase = true) }
         val updated = old.filterNot { it.equals(normalizedAddress, ignoreCase = true) }.toMutableSet()
         if (connected && isTrusted(prefs, normalizedAddress)) updated.add(normalizedAddress)
-        val committed = runCatching {
-            val encrypted = LocalPreferenceCipher.encrypt(KEY_BASELINES, updated.joinToString("\n"))
-            prefs.edit().putString(KEY_BASELINES, encrypted).commit()
+        val encrypted = runCatching {
+            LocalPreferenceCipher.encrypt(KEY_BASELINES, updated.joinToString("\n"))
         }.onFailure {
-            Log.e(TAG, "Could not encrypt or commit Bluetooth connection baseline; existing source retained", it)
-        }.getOrDefault(false)
-        return committed && hadBaseline
+            Log.e(TAG, "Could not encrypt Bluetooth connection baseline; existing source retained", it)
+        }.getOrElse {
+            return BluetoothBaselineUpdateResult(BluetoothBaselineUpdateStatus.COMMIT_FAILED, hadBaseline)
+        }
+        var committed = false
+        for (attempt in 1..2) {
+            committed = runCatching {
+                prefs.edit().putString(KEY_BASELINES, encrypted).commit()
+            }.onFailure {
+                Log.e(TAG, "Bluetooth baseline commit attempt $attempt failed; source retained where possible", it)
+            }.getOrDefault(false)
+            if (committed) break
+        }
+        if (!committed) {
+            Log.e(TAG, "Bluetooth baseline commit failed after one retry; A2 disconnect scheduling must fail closed")
+        }
+        return BluetoothBaselineUpdateResult(
+            if (committed) BluetoothBaselineUpdateStatus.COMMITTED else BluetoothBaselineUpdateStatus.COMMIT_FAILED,
+            hadBaseline
+        )
     }
 
+    @Synchronized
     fun clearBaselines(prefs: SharedPreferences) {
         when (val baseline = readBaselineAddresses(prefs)) {
             is PreferenceRead.Value -> Unit
@@ -259,11 +305,15 @@ object TrustedBluetoothRegistry {
             is PreferenceRead.Value -> stored.value + 1L
             is PreferenceRead.Corrupt -> throw IllegalStateException("Corrupt Bluetooth revision retained; refusing to overwrite it.")
         }
-        check(prefs.edit()
-            .putString(KEY_BASELINES, LocalPreferenceCipher.encrypt(KEY_BASELINES, ""))
+        val encrypted = LocalPreferenceCipher.encrypt(KEY_BASELINES, "")
+        fun commitReset(): Boolean = prefs.edit()
+            .putString(KEY_BASELINES, encrypted)
             .putBoolean(ProtectionMonitorService.KEY_BT_BASELINE_CONNECTED, false)
             .putLong(KEY_REVISION, nextRevision)
-            .commit()) { "Could not securely clear trusted Bluetooth baselines." }
+            .commit()
+        var saved = runCatching { commitReset() }.getOrDefault(false)
+        if (!saved) saved = runCatching { commitReset() }.getOrDefault(false)
+        check(saved) { "Could not securely clear trusted Bluetooth baselines after retry." }
     }
 
     private fun baselineAddresses(prefs: SharedPreferences): Set<String> =
@@ -272,6 +322,7 @@ object TrustedBluetoothRegistry {
             is PreferenceRead.Corrupt -> emptySet()
         }
 
+    @Synchronized
     private fun readBaselineAddresses(prefs: SharedPreferences): PreferenceRead<Set<String>> {
         val raw = when (val stored = SafePreferences.readString(prefs, KEY_BASELINES, null)) {
             is PreferenceRead.Value -> stored.value

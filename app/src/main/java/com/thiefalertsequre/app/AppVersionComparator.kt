@@ -7,10 +7,13 @@ internal object AppVersionComparator {
         require(versionPattern.matches(left) && versionPattern.matches(right)) {
             "Versions must contain two to four numeric components."
         }
-        val a = left.split(".").map { it.toInt() }
-        val b = right.split(".").map { it.toInt() }
+        val a = left.split(".")
+        val b = right.split(".")
         for (index in 0 until maxOf(a.size, b.size)) {
-            val comparison = (a.getOrElse(index) { 0 }).compareTo(b.getOrElse(index) { 0 })
+            val leftPart = a.getOrElse(index) { "0" }.trimStart('0').ifEmpty { "0" }
+            val rightPart = b.getOrElse(index) { "0" }.trimStart('0').ifEmpty { "0" }
+            val comparison = leftPart.length.compareTo(rightPart.length).takeIf { it != 0 }
+                ?: leftPart.compareTo(rightPart)
             if (comparison != 0) return comparison
         }
         return 0

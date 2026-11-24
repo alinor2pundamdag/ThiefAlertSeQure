@@ -29,7 +29,18 @@ object PowerTransitionCoordinator {
 
     internal fun acceptsPowerConnectedEvent(liveConnected: Boolean?): Boolean = liveConnected == true
 
+    private fun configurationReady(context: Context): Boolean {
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress()) return false
+        if (ConfigurationBackup.recoverPendingRestore(context)) return true
+        LocalTamperHistory.record(
+            context, "configuration_restore_recovery_pending",
+            "Charger transition was deferred because an interrupted settings restore could not be recovered"
+        )
+        return false
+    }
+
     fun initializeBaseline(context: Context, forceBootReconciliation: Boolean = false) = synchronized(lock) {
+        if (!configurationReady(context)) return@synchronized
         initializeBaselineLocked(context, forceBootReconciliation)
     }
 
@@ -126,28 +137,43 @@ object PowerTransitionCoordinator {
         }
     }
 
-    /** Establish a fresh non-transition baseline when the owner re-enables monitoring. */
+    /** Establish a fresh non-transition baseline only inside an atomic DISARMED-state transaction. */
     fun resetBaselineToCurrentPower(context: Context, reason: String) = synchronized(lock) {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (!configurationReady(context)) return@synchronized
         val store = ProtectionStore(context)
-        val currentState = store.read()
-        if (currentState.mode == ProtectionMode.ALARM_TRIGGERED) {
-            LocalTamperHistory.record(context, "power_baseline_reset_rejected", "$reason; active alarm remains latched")
-            return@synchronized
+        val reset = store.runIfDisarmed {
+            check(PowerTransitionRecoveryPolicy.canResetBaseline(store.read().mode))
+            resetBaselineToCurrentPowerWhileDisarmed(context, reason, store)
         }
+        if (reset == null) {
+            val mode = store.read().mode
+            LocalTamperHistory.record(
+                context,
+                "power_baseline_reset_rejected",
+                "$reason; protection mode $mode is active and was preserved"
+            )
+        }
+    }
 
+    /**
+     * Caller holds both the coordinator lock and ProtectionStore's DISARMED
+     * transaction lock. Alarm deadlines and charger transitions cannot change
+     * protection mode between the safety check and baseline/state persistence.
+     */
+    private fun resetBaselineToCurrentPowerWhileDisarmed(
+        context: Context,
+        reason: String,
+        store: ProtectionStore
+    ) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val connected = ExternalPowerState.readConnected(context)
         val generation = SafePreferences.long(prefs, GENERATION, 0L) + 1L
         if (connected == null) {
-            // Preserve an already-valid countdown; clearing KNOWN would make
-            // first-run migration discard it on the monitor's next startup.
-            val edit = prefs.edit()
-            if (currentState.mode != ProtectionMode.COUNTDOWN) {
-                edit.putBoolean(KNOWN, false)
-                    .putBoolean(CONNECTED, false)
-                    .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
-            }
-            val saved = edit.putLong(GENERATION, generation)
+            val saved = prefs.edit()
+                .putBoolean(KNOWN, false)
+                .putBoolean(CONNECTED, false)
+                .putInt(BASELINE_BOOT_COUNT, ProtectionClock.bootCount(context))
+                .putLong(GENERATION, generation)
                 .putBoolean(PENDING_DISCONNECT, false)
                 .remove(PENDING_EPOCH_MS)
                 .remove(PENDING_ELAPSED_MS)
@@ -155,23 +181,23 @@ object PowerTransitionCoordinator {
                 .remove(PENDING_GENERATION)
                 .commit()
             if (!saved) {
-                LocalTamperHistory.record(context, "power_baseline_unknown_persist_failed", "$reason; prior baseline retained because unknown state could not be persisted")
+                LocalTamperHistory.record(context, "power_baseline_reset_persist_failed", "$reason; power state unknown and baseline cleanup could not be committed")
             } else {
-                LocalTamperHistory.record(context, "power_baseline_unknown", "$reason; no new transition accepted until a reliable power state is available")
+                LocalTamperHistory.record(context, "power_baseline_reset_unknown", "$reason; live power state unknown; protection remains DISARMED")
             }
-            return@synchronized
+            return
         }
 
         if (!connected) {
-            // Disarm durably before changing the baseline. A failed state commit
-            // must never leave an ARMED state paired with a disconnected baseline.
+            // State is locked DISARMED; record the disconnected baseline without
+            // creating a countdown. A later confirmed connect may arm protection.
             val disarm = store.updatePersisted { current ->
                 if (current.mode == ProtectionMode.ALARM_TRIGGERED) current
                 else ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
             }
             if (!disarm.persisted || disarm.state.mode == ProtectionMode.ALARM_TRIGGERED) {
                 LocalTamperHistory.record(context, "power_baseline_reset_state_failed", "$reason; protection state was not durably disarmed")
-                return@synchronized
+                return
             }
             val baselineSaved = prefs.edit()
                 .putBoolean(KNOWN, true)
@@ -193,7 +219,7 @@ object PowerTransitionCoordinator {
                 context, "power_baseline_reset",
                 "$reason; disconnected state recorded without creating a countdown; protection remains DISARMED until a new connect event"
             )
-            return@synchronized
+            return
         }
 
         confirmConnectedAndArmLocked(context, reason)
@@ -263,6 +289,7 @@ object PowerTransitionCoordinator {
 
     fun onPowerConnected(context: Context): ProtectionState {
         val appContext = context.applicationContext
+        if (!configurationReady(appContext)) return ProtectionStore(appContext).read()
         // Stop as soon as three consecutive live samples confirm the event.
         // The original OS event timestamp is captured by the receiver before this
         // sampling window, so confirmation time never extends the 10-second grace.
@@ -293,6 +320,7 @@ object PowerTransitionCoordinator {
 
     /** Used only after a live connected-state confirmation, including post-auth recovery. */
     fun confirmConnectedAndArm(context: Context, reason: String): ProtectionState = synchronized(lock) {
+        if (!configurationReady(context)) return@synchronized ProtectionStore(context).read()
         confirmConnectedAndArmLocked(context, reason)
     }
 
@@ -317,16 +345,29 @@ object PowerTransitionCoordinator {
             return ProtectionStore(context).read()
         }
 
-        val monitorEnabled = SafePreferences.boolean(
-            context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE),
-            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
-        )
+        val monitorPrefs = context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE)
+        var monitorEnabled = false
+        var monitorRequired = false
+        var preferenceRepairFailed = false
         val update = ProtectionStore(context).updatePersisted { current ->
+            // Read the owner preference inside the same ProtectionStore lock as
+            // the state transition. Active ARMED/COUNTDOWN state always wins over
+            // a stale OFF preference; an OFF preference only prevents arming from DISARMED.
+            monitorEnabled = SafePreferences.boolean(
+                monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+            )
+            val activeProtection = current.mode == ProtectionMode.ARMED ||
+                current.mode == ProtectionMode.COUNTDOWN
+            monitorRequired = monitorEnabled || activeProtection
+            if (activeProtection && !monitorEnabled) {
+                preferenceRepairFailed = !monitorPrefs.edit()
+                    .putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
+            }
             when {
                 current.mode == ProtectionMode.ALARM_TRIGGERED -> current
-                !monitorEnabled -> ProtectionEngine.disableMonitoring(current, System.currentTimeMillis())
-                current.mode == ProtectionMode.ARMED -> current
-                else -> ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
+                ProtectionMonitorPolicy.shouldArmOnConfirmedConnection(monitorEnabled, current.mode) ->
+                    ProtectionEngine.chargerConnected(current, System.currentTimeMillis())
+                else -> current
             }
         }
         if (!update.persisted) {
@@ -338,9 +379,18 @@ object PowerTransitionCoordinator {
         }
 
         val state = update.state
+        if (preferenceRepairFailed) {
+            LocalTamperHistory.record(
+                context, "active_monitor_preference_repair_failed",
+                "A confirmed charger connection preserved active protection, but the monitor-enabled preference could not be restored"
+            )
+        }
         if (state.mode != ProtectionMode.ALARM_TRIGGERED) {
             AlarmScheduler.cancel(context)
-            if (monitorEnabled) notifyMonitorStateChanged(context)
+            if (monitorRequired) {
+                A2BluetoothReceiverController.sync(context)
+                notifyMonitorStateChanged(context)
+            }
         }
         LocalTamperHistory.record(context, "charger_connected_confirmed", reason)
         return state
@@ -358,6 +408,7 @@ object PowerTransitionCoordinator {
         eventBootCount: Int = ProtectionClock.bootCount(context)
     ): ProtectionState {
         val appContext = context.applicationContext
+        if (!configurationReady(appContext)) return ProtectionStore(appContext).read()
         val candidate = synchronized(lock) {
             val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val currentBoot = ProtectionClock.bootCount(appContext)
@@ -422,6 +473,7 @@ object PowerTransitionCoordinator {
      */
     fun recoverPendingDisconnectCandidate(context: Context): ProtectionState {
         val appContext = context.applicationContext
+        if (!configurationReady(appContext)) return ProtectionStore(appContext).read()
         val candidate = synchronized(lock) {
             val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             if (!SafePreferences.boolean(prefs, PENDING_DISCONNECT, false)) return@synchronized null
@@ -532,7 +584,8 @@ object PowerTransitionCoordinator {
                 ) {
                     clearPendingDisconnectLocked(context, prefs)
                 } else {
-                    LocalTamperHistory.record(context, "charger_countdown_schedule_pending", "Existing countdown remains durable; pending unplug provenance retained for retry")
+                    AlarmScheduler.scheduleRetry(context, 1_000L)
+                    LocalTamperHistory.record(context, "charger_countdown_schedule_pending", "Existing countdown remains durable; pending unplug provenance retained and a one-second scheduler retry requested")
                     notifyMonitorStateChanged(context)
                 }
                 return@synchronized current
@@ -543,13 +596,33 @@ object PowerTransitionCoordinator {
                 return@synchronized current
             }
 
+            val monitorPrefs = context.getSharedPreferences(
+                ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
+            )
+            var preferenceRepairFailed = false
             val update = store.updatePersisted { old ->
-                if (old.mode == ProtectionMode.ARMED) ProtectionEngine.chargerDisconnected(
-                    old,
-                    candidate.eventEpochMs,
-                    candidate.eventElapsedRealtimeMs,
-                    candidate.eventBootCount
-                ) else old
+                if (old.mode == ProtectionMode.ARMED) {
+                    if (!SafePreferences.boolean(
+                            monitorPrefs, ProtectionMonitorService.KEY_ENABLED,
+                            ProtectionMonitorPolicy.DEFAULT_ENABLED
+                        )
+                    ) {
+                        preferenceRepairFailed = !monitorPrefs.edit()
+                            .putBoolean(ProtectionMonitorService.KEY_ENABLED, true).commit()
+                    }
+                    ProtectionEngine.chargerDisconnected(
+                        old,
+                        candidate.eventEpochMs,
+                        candidate.eventElapsedRealtimeMs,
+                        candidate.eventBootCount
+                    )
+                } else old
+            }
+            if (preferenceRepairFailed) {
+                LocalTamperHistory.record(
+                    context, "active_monitor_preference_repair_failed",
+                    "A confirmed charger disconnect preserved the countdown, but the monitor-enabled preference could not be restored"
+                )
             }
             val next = update.state
             if (!update.persisted) {
@@ -557,6 +630,7 @@ object PowerTransitionCoordinator {
                 return@synchronized next
             }
             if (next.mode == ProtectionMode.COUNTDOWN) {
+                A2BluetoothReceiverController.sync(context)
                 if (AlarmScheduler.schedule(
                         context, next.deadlineEpochMs, next.deadlineElapsedRealtimeMs, next.bootCount
                     )
@@ -565,7 +639,8 @@ object PowerTransitionCoordinator {
                     LocalTamperHistory.record(context, "charger_countdown_started", "OS unplug event confirmed by stable live-state samples; recovered candidates retain their original event time")
                     notifyMonitorStateChanged(context)
                 } else {
-                    LocalTamperHistory.record(context, "charger_countdown_schedule_pending", "Countdown state is durable but alarm scheduling failed; pending unplug provenance retained for recovery")
+                    AlarmScheduler.scheduleRetry(context, 1_000L)
+                    LocalTamperHistory.record(context, "charger_countdown_schedule_pending", "Countdown state is durable but alarm scheduling failed; pending unplug provenance retained and a one-second scheduler retry requested")
                     notifyMonitorStateChanged(context)
                 }
             } else if (next.mode != ProtectionMode.ARMED) {

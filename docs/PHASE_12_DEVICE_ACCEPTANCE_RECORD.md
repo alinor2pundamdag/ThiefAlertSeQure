@@ -1,11 +1,11 @@
 # Phase 12 — Physical-device acceptance record
 
 **Project:** ThiefAlertSeQure  
-**Candidate branch:** `work/phase-0-12-coding`  
-**Current candidate commit:** `475c1fa00b8c30c1280f77053d83eb91c0db7f64`  
-**Current build:** `1.1.4-test` / versionCode `6`  
+**Candidate branch:** `work/batch-4-implementation`  
+**Current code-bearing candidate commit:** `5e850fc4a444a1e36541890ca022a745f3be021a` (Android CI and CodeQL passed; physical testing not run)  
+**Current build:** `1.1.5-test` / versionCode `7`  
 **Development package:** `com.thiefalertsequre.app.v114test`  
-**Status:** **NOT TESTED — preparation only**
+**Status:** **NOT TESTED — physical-device acceptance remains pending**
 
 This document is a blank record for real physical-device execution. CI, JVM tests, source checks, and emulator results do not count as physical acceptance. No result may be marked PASS until it is observed on the named device and build.
 
@@ -18,8 +18,8 @@ This document is a blank record for real physical-device execution. CI, JVM test
 | OEM OS / MagicOS version | NOT RECORDED |
 | Build fingerprint | NOT RECORDED |
 | Region / carrier (if relevant) | NOT RECORDED |
-| App package / version / versionCode | `com.thiefalertsequre.app.v114test` / `1.1.4-test` / `6` |
-| Tested commit | `475c1fa00b8c30c1280f77053d83eb91c0db7f64` |
+| App package / version / versionCode | `com.thiefalertsequre.app.v114test` / `1.1.5-test` / `7` |
+| Tested commit | NOT TESTED — candidate source head `5e850fc4a444a1e36541890ca022a745f3be021a` |
 | Test date / local timezone | NOT RECORDED |
 | Tester | NOT RECORDED |
 | Initial battery / power mode | NOT RECORDED |

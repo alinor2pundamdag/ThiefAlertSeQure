@@ -19,10 +19,11 @@ object A2DisconnectPolicy {
         // elapsedRealtime must move forward within the same boot. Boot count
         // alone must not legitimize a corrupt or future-dated persisted event.
         if (eventElapsedRealtimeMs <= 0L || currentElapsedRealtimeMs < eventElapsedRealtimeMs) return false
-        if (storedBootCount >= 0 || currentBootCount >= 0) {
-            return storedBootCount >= 0 && currentBootCount >= 0 && storedBootCount == currentBootCount
-        }
-        return true
+        // Elapsed realtime alone cannot prove boot identity: after a reboot,
+        // the new uptime may already exceed the old event's uptime. Persisted
+        // deadlines therefore require a matching, readable BOOT_COUNT.
+        return storedBootCount >= 0 && currentBootCount >= 0 &&
+            storedBootCount == currentBootCount
     }
 
     fun shouldStartGracePeriod(
@@ -42,6 +43,28 @@ object A2DisconnectPolicy {
         capturedDeviceRevision >= 0L && currentDeviceRevision >= 0L &&
         capturedMonitorRevision == currentMonitorRevision &&
         capturedDeviceRevision == currentDeviceRevision
+
+    /** A durable owner-auth timestamp invalidates any older A2 grace event. */
+    fun isAfterLastInvalidation(
+        eventElapsedRealtimeMs: Long,
+        eventBootCount: Int,
+        lastInvalidationElapsedRealtimeMs: Long,
+        lastInvalidationBootCount: Int
+    ): Boolean {
+        if (eventElapsedRealtimeMs <= 0L || lastInvalidationElapsedRealtimeMs < 0L) return false
+        if (lastInvalidationElapsedRealtimeMs == 0L) return lastInvalidationBootCount == -1
+        if (eventBootCount < 0 && lastInvalidationBootCount < 0) {
+            // In-process grace timers can still prove ordering on the same live process.
+            // Durable AlarmManager paths independently require a known matching boot count.
+            return eventElapsedRealtimeMs > lastInvalidationElapsedRealtimeMs
+        }
+        if (eventBootCount < 0 || lastInvalidationBootCount < 0) return false
+        return when {
+            eventBootCount > lastInvalidationBootCount -> true
+            eventBootCount < lastInvalidationBootCount -> false
+            else -> eventElapsedRealtimeMs > lastInvalidationElapsedRealtimeMs
+        }
+    }
 
     fun shouldTriggerAlarm(
         alertEnabled: Boolean,

@@ -24,8 +24,7 @@ internal object OwnerAuthenticationCoordinator {
         val authenticated = store.disarmAfterOwnerAuthentication(System.currentTimeMillis()) ?: return null
         if (authenticated.mode != ProtectionMode.DISARMED) return null
 
-        AlarmRecoveryCoordinator.onAlarmDisarmed(appContext)
-        store.resetAuthenticationFailures()
+        // Stop the audible alarm and restore its volume before non-critical recovery cleanup.
         appContext.stopService(Intent(appContext, AlarmService::class.java))
         val volumeRestored = runCatching {
             AlarmVolumeController.restore(
@@ -40,12 +39,45 @@ internal object OwnerAuthenticationCoordinator {
             )
         }
 
-        // Rebuild the charger baseline only after verified owner authentication.
-        // A connected cable returns to ARMED; a disconnected cable remains DISARMED
-        // until a new, genuine connect-then-disconnect sequence is observed.
+        AlarmRecoveryCoordinator.onAlarmDisarmed(appContext)
+        store.resetAuthenticationFailures()
         val monitorPrefs = appContext.getSharedPreferences(
             ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
         )
+        val a2AlertsEnabled = SafePreferences.boolean(
+            monitorPrefs, ProtectionMonitorService.KEY_BT_ALERT_ENABLED, false
+        )
+        val a2DeadlinesCleared = runCatching {
+            A2DisconnectScheduler.clearAll(appContext)
+        }.getOrDefault(false)
+        if (!a2DeadlinesCleared && a2AlertsEnabled) {
+            LocalTamperHistory.record(
+                appContext, "a2_owner_recovery_deadline_cleanup_failed",
+                "Old trusted-device deadlines could not be removed; the durable authenticated-disarm timestamp invalidates any pre-authentication event"
+            )
+            ProtectionMonitorRecoveryNotice.show(
+                appContext,
+                "Old trusted-device deadlines could not be removed. They are invalidated by the authenticated recovery marker; review Bluetooth monitoring status."
+            )
+        }
+
+        if (ConfigurationBackup.isRestoreOrRecoveryInProgress() ||
+            !ConfigurationBackup.recoverPendingRestore(appContext)
+        ) {
+            LocalTamperHistory.record(
+                appContext, "configuration_restore_recovery_pending",
+                "Alarm was disarmed after valid owner authentication, but monitoring restart was deferred until interrupted settings recovery completes"
+            )
+            ProtectionMonitorRecoveryNotice.show(
+                appContext, "Alarm disarmed. Monitoring will resume after interrupted settings recovery is completed."
+            )
+            appContext.stopService(Intent(appContext, ProtectionMonitorService::class.java))
+            return authenticated
+        }
+
+        // Rebuild the charger baseline only after verified owner authentication.
+        // A connected cable returns to ARMED; a disconnected cable remains DISARMED
+        // until a new, genuine connect-then-disconnect sequence is observed.
         val monitorEnabled = SafePreferences.boolean(
             monitorPrefs, ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
@@ -71,6 +103,10 @@ internal object OwnerAuthenticationCoordinator {
                     it.javaClass.simpleName + ": " + it.message
                 )
                 monitorPrefs.edit().putBoolean(ProtectionMonitorService.KEY_RUNNING, false).apply()
+                ProtectionMonitorRecoveryNotice.show(
+                    appContext,
+                    "Protection was re-armed after owner authentication, but Android rejected background monitoring startup. Open the app to restore monitoring."
+                )
             }
         } else {
             appContext.stopService(Intent(appContext, ProtectionMonitorService::class.java))

@@ -1,6 +1,8 @@
-# v1.1.4 UX/UI and interaction audit
+# ThiefAlertSeQure UX/UI and interaction audit
 
-**Current status (2026-11-17):** Source-level UX/UI implementation and static navigation/theme/dialog checks are recorded. Exact head `475c1fa00b8c30c1280f77053d83eb91c0db7f64` passed [Android CI run 43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535) and [CodeQL run 43950015623](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623). Instrumentation is not compiled or executed and no emulator matrix runs. The uploaded debug APK is development-only. Physical-device acceptance for this v1.1.4 candidate remains NOT TESTED; subsequent commits require new exact-head CI.
+**Current v1.1.5 UX/UI verification (24 November 2026):** Code-bearing commit `5e850fc4a444a1e36541890ca022a745f3be021a` passed Android CI #45304517153 and CodeQL #45304517314. All 120 curated/generated palettes have JVM contrast checks. Seven ordinary view-based screens use the shared system-bar/cutout inset helper; ThemeRuntime now uses WindowCompat for icon appearance and keeps legacy bar colors only below API 35. Seismic Genesis remains intentionally full-bleed. Physical font-scaling, TalkBack, gesture-navigation and OEM visual acceptance remains unperformed. Phase 12 remains 0/25 PASS and 25/25 NOT TESTED. No instrumentation or emulator matrix is run under the owner-directed policy.
+
+**Historical v1.1.4 status (2026-11-17):** Source-level UX/UI implementation and static navigation/theme/dialog checks were recorded. Exact head `475c1fa00b8c30c1280f77053d83eb91c0db7f64` passed [Android CI run 43950015535](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015535) and [CodeQL run 43950015623](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/43950015623). Instrumentation was not compiled or executed and no emulator matrix ran. The uploaded debug APK was development-only. Those results do not verify the current v1.1.5 candidate.
 
 ## Historical verification baseline (not current-head evidence)
 - Branch: `work/phase-0-12-coding`
@@ -17,7 +19,7 @@
 - Main, Settings, Bluetooth capability, Device Intelligence, Theme, and setup-status action buttons enforce at least 48dp minimum touch height.
 - All six app screens apply system-bar and display-cutout insets for edge-to-edge devices and reapply the saved/preview theme when returning to the screen.
 - Dark/light filters remain tappable, visibly indicate selection, and use 48dp minimum height.
-- All 16 palettes have JVM WCAG AA checks for primary/muted text on background and surface, button text on primary, primary accent on surface, and success/warning/danger status labels on surfaces.
+- All 120 curated and generated palettes have JVM WCAG AA checks for primary/muted text on background and surface, button text on primary, primary accent on surface, and success/warning/danger status labels on surfaces.
 - Trusted Bluetooth registry supports multiple locally registered accessories, per-device connection baselines, and independent 8-second disconnect grace timers.
 - Unregister confirmation states that only app trust is removed; Android pairing is not modified.
 - A2 alarm gates require enabled feature, trusted address, fresh per-device connection baseline, unchanged registry revision, continued disconnection, and ARMED protection state.
@@ -53,7 +55,7 @@
 - Verify OEM background restrictions do not suppress the monitor or delay alarm delivery on the target device.
 - Repeat charger countdown, reconnect, alarm latch, audio/flashlight, and owner-authentication recovery tests on the target device; JVM tests do not substitute for Android hardware/system behavior.
 
-## Physical-device checklist — pending (owner has not tested this v1.1.4 development build)
+## Physical-device checklist — pending (owner has not tested this v1.1.5 development build)
 - HONOR 200 Pro: Android version, permission flows, Bluetooth adapter off/on, paired accessory connect/disconnect.
 - Confirm A2 8-second behavior, reconnect cancellation, and independent monitoring of two trusted accessories.
 - Confirm unregister does not remove Android pairing.

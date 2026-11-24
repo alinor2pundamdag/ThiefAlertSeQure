@@ -21,6 +21,16 @@ import javax.crypto.spec.SecretKeySpec
  * Owner policy snapshots, Bluetooth identities, permission grants, custom audio
  * content URIs, and the separate evidence vault.
  */
+internal object ConfigurationBackupPolicy {
+    fun canRestore(mode: ProtectionMode): Boolean = mode == ProtectionMode.DISARMED
+
+    fun requireSafeRestoreMode(mode: ProtectionMode) {
+        require(canRestore(mode)) {
+            "Configuration restore is blocked while protection is armed, counting down, or latched. Disarm protection first."
+        }
+    }
+}
+
 internal object ConfigurationBackup {
     private val MAGIC = byteArrayOf(0x54, 0x41, 0x53, 0x43, 0x46, 0x31) // TASCF1
     private val AAD = "ThiefAlertSeQure configuration backup v1".toByteArray(Charsets.UTF_8)
@@ -30,6 +40,14 @@ internal object ConfigurationBackup {
     private const val SALT_BYTES = 16
     private const val IV_BYTES = 12
     private const val MAX_BACKUP_BYTES = 128_000
+    private const val JOURNAL_PREFS = "configuration_restore_journal_v1"
+    private const val JOURNAL_PREVIOUS = "previous_snapshot"
+    private const val JOURNAL_PHASE = "phase"
+    private const val JOURNAL_APPLYING = "applying"
+    private const val JOURNAL_COMMITTED = "committed"
+    @Volatile private var restoreOrRecoveryInProgress = false
+
+    fun isRestoreOrRecoveryInProgress(): Boolean = restoreOrRecoveryInProgress
 
     private data class Definition(
         val file: String,
@@ -67,40 +85,118 @@ internal object ConfigurationBackup {
             (listOf(AlarmTonePreset.DEFAULT_AUDIO) + AlarmTonePreset.builtIns).map { it.name }.toSet()),
         Definition("tas_theme_preferences_v1", "selected_theme_id", "string", ThemeStore.DEFAULT_ID,
             ThemeStore.all.map { it.id }.toSet()),
-        Definition("alarm_display_settings_v1", "show_alarm_screen_over_lockscreen", "boolean", false)
+        Definition("alarm_display_settings_v1", "show_alarm_screen_over_lockscreen", "boolean", false),
+        Definition("camera_evidence_settings", "encrypt_new_photos", "boolean", false)
     )
 
+    @Synchronized
     fun encrypt(context: Context, password: CharArray): ByteArray {
         try {
             require(password.size >= 12) { "Configuration backup password must contain at least 12 characters." }
-            val payload = snapshot(context).toString().toByteArray(Charsets.UTF_8)
+            require(recoverPendingRestore(context)) {
+                "An earlier configuration restore is still awaiting recovery. Resolve it before creating another backup."
+            }
+            val payload = ProtectionStore(context).runIfDisarmed {
+                snapshot(context).toString().toByteArray(Charsets.UTF_8)
+            } ?: throw IllegalStateException(
+                "Configuration backup is available only while protection is DISARMED."
+            )
             return encryptPayload(payload, password)
         } finally {
             password.fill('\u0000')
         }
     }
 
+    @Synchronized
     fun decryptAndRestore(context: Context, bytes: ByteArray, password: CharArray): Int {
+        val previousProgress = restoreOrRecoveryInProgress
+        restoreOrRecoveryInProgress = true
         try {
             require(password.size >= 12) { "Configuration backup password must contain at least 12 characters." }
-            require(ProtectionStore(context).read().mode != ProtectionMode.ALARM_TRIGGERED) {
-                "Configuration restore is blocked while protection is latched. Complete fresh owner authentication first."
-            }
+            ConfigurationBackupPolicy.requireSafeRestoreMode(ProtectionStore(context).read().mode)
             val payload = decryptPayload(bytes, password)
             val imported = parse(payload)
-            // Validate current values before changing any settings and retain a rollback snapshot.
-            val previous = parse(snapshot(context).toString().toByteArray(Charsets.UTF_8))
-            if (!apply(context, imported)) {
-                if (!apply(context, previous)) {
-                    throw IllegalStateException("Configuration restore failed and automatic rollback was incomplete. Do not restart the app until settings are reviewed.")
-                }
-                throw IllegalStateException("Android did not confirm every configuration write. Previous settings were restored.")
+            require(recoverPendingRestore(context)) {
+                "An earlier configuration restore is still awaiting recovery. Resolve it before importing another backup."
             }
-            return imported.size
+            val restoredCount = ProtectionStore(context).runIfDisarmed {
+                // The durable journal is committed before the first preference file
+                // changes. Application startup rolls back an interrupted transaction.
+                val previousJson = snapshot(context).toString()
+                val previous = parse(previousJson.toByteArray(Charsets.UTF_8))
+                val journal = context.getSharedPreferences(JOURNAL_PREFS, Context.MODE_PRIVATE)
+                check(journal.edit()
+                    .putString(JOURNAL_PREVIOUS, previousJson)
+                    .putString(JOURNAL_PHASE, JOURNAL_APPLYING)
+                    .commit()
+                ) { "Could not create the configuration restore recovery journal; no settings were changed." }
+
+                if (!apply(context, imported)) {
+                    if (!apply(context, previous)) {
+                        throw IllegalStateException("Configuration restore failed and rollback is pending. Keep the app installed and retry recovery.")
+                    }
+                    check(clearRestoreJournal(journal)) {
+                        "Previous settings were restored, but the recovery journal could not be cleared. Startup recovery will retry."
+                    }
+                    throw IllegalStateException("Android did not confirm every configuration write. Previous settings were restored.")
+                }
+
+                if (!journal.edit().putString(JOURNAL_PHASE, JOURNAL_COMMITTED).commit()) {
+                    if (!apply(context, previous)) {
+                        throw IllegalStateException("Configuration restore commit marker failed and rollback is pending. Keep the app installed and retry recovery.")
+                    }
+                    check(clearRestoreJournal(journal)) {
+                        "Previous settings were restored, but the recovery journal could not be cleared. Startup recovery will retry."
+                    }
+                    throw IllegalStateException("The configuration restore could not be finalized. Previous settings were restored.")
+                }
+                // If journal cleanup fails after COMMITTED, startup safely clears
+                // the committed journal without rolling back the restored settings.
+                clearRestoreJournal(journal)
+                imported.size
+            } ?: throw IllegalStateException(
+                "Protection became active before the configuration restore could commit. No settings were changed."
+            )
+            return restoredCount
         } finally {
             password.fill('\u0000')
+            restoreOrRecoveryInProgress = previousProgress
         }
     }
+
+    /** Recover an interrupted multi-file restore before any app feature consumes settings. */
+    @Synchronized
+    fun recoverPendingRestore(context: Context): Boolean {
+        val previousProgress = restoreOrRecoveryInProgress
+        restoreOrRecoveryInProgress = true
+        try {
+        val journal = context.applicationContext.getSharedPreferences(JOURNAL_PREFS, Context.MODE_PRIVATE)
+        val previousJson = when (val read = SafePreferences.readString(journal, JOURNAL_PREVIOUS, null)) {
+            is PreferenceRead.Value -> read.value
+            is PreferenceRead.Corrupt -> return false
+        }
+        if (previousJson == null) {
+            // The snapshot and phase are committed together. A phase without its
+            // rollback snapshot indicates corruption; never silently discard it.
+            return !journal.contains(JOURNAL_PHASE)
+        }
+        val phase = when (val read = SafePreferences.readString(journal, JOURNAL_PHASE, JOURNAL_APPLYING)) {
+            is PreferenceRead.Value -> read.value
+            is PreferenceRead.Corrupt -> return false
+        }
+        if (phase == JOURNAL_COMMITTED) return clearRestoreJournal(journal)
+        if (phase != JOURNAL_APPLYING) return false
+        return runCatching {
+            val previous = parse(previousJson.toByteArray(Charsets.UTF_8))
+            apply(context.applicationContext, previous) && clearRestoreJournal(journal)
+        }.getOrDefault(false)
+        } finally {
+            restoreOrRecoveryInProgress = previousProgress
+        }
+    }
+
+    private fun clearRestoreJournal(journal: SharedPreferences): Boolean =
+        journal.edit().remove(JOURNAL_PREVIOUS).remove(JOURNAL_PHASE).commit()
 
     private fun snapshot(context: Context): JSONObject {
         val array = JSONArray()
@@ -115,36 +211,43 @@ internal object ConfigurationBackup {
                 put("value", value)
             })
         }
-        return JSONObject().put("schema", 1).put("settings", array)
+        return JSONObject().put("schema", 2).put("settings", array)
     }
 
     private fun readValue(prefs: SharedPreferences, definition: Definition): Any =
         when (definition.type) {
             "boolean" -> when (val read = SafePreferences.readBoolean(prefs, definition.key, definition.defaultValue as Boolean)) {
                 is PreferenceRead.Value -> read.value
-                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '\${definition.key}'.")
+                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '${definition.key}'.")
             }
             "int" -> when (val read = SafePreferences.readInt(prefs, definition.key, definition.defaultValue as Int)) {
                 is PreferenceRead.Value -> read.value
-                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '\${definition.key}'.")
+                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '${definition.key}'.")
             }
             "long" -> when (val read = SafePreferences.readLong(prefs, definition.key, definition.defaultValue as Long)) {
                 is PreferenceRead.Value -> read.value
-                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '\${definition.key}'.")
+                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '${definition.key}'.")
             }
             "string" -> when (val read = SafePreferences.readString(prefs, definition.key, definition.defaultValue as String)) {
                 is PreferenceRead.Value -> read.value ?: definition.defaultValue
-                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '\${definition.key}'.")
+                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '${definition.key}'.")
             }
             else -> throw IllegalStateException("Unsupported configuration type.")
         }
 
     private fun parse(payload: ByteArray): List<Entry> {
         val root = JSONObject(String(payload, Charsets.UTF_8))
-        require(root.getInt("schema") == 1) { "Configuration backup version is not supported." }
+        val schema = root.getInt("schema")
+        require(schema == 1 || schema == 2) { "Configuration backup version is not supported." }
+        // Schema 1 predates the camera-evidence storage preference. Preserve the
+        // current value when restoring an older backup instead of silently changing
+        // the owner's photo privacy mode.
+        val expectedDefinitions = if (schema == 1) {
+            definitions.filterNot { it.file == "camera_evidence_settings" && it.key == "encrypt_new_photos" }
+        } else definitions
         val array = root.getJSONArray("settings")
-        require(array.length() == definitions.size) { "Configuration backup is incomplete or contains unexpected settings." }
-        val definitionMap = definitions.associateBy { it.file to it.key }
+        require(array.length() == expectedDefinitions.size) { "Configuration backup is incomplete or contains unexpected settings." }
+        val definitionMap = expectedDefinitions.associateBy { it.file to it.key }
         val seen = mutableSetOf<Pair<String, String>>()
         return buildList {
             for (index in 0 until array.length()) {
@@ -167,7 +270,7 @@ internal object ConfigurationBackup {
                 validate(definition, value)
                 add(Entry(definition, value))
             }
-        }.also { require(it.size == definitions.size) { "Configuration backup is missing settings." } }
+        }.also { require(it.size == expectedDefinitions.size) { "Configuration backup is missing settings." } }
     }
 
     private fun validate(definition: Definition, value: Any) {
@@ -176,18 +279,18 @@ internal object ConfigurationBackup {
             "int" -> {
                 require(value is Int) { "Invalid integer setting." }
                 require(value.toLong() in (definition.minimum ?: Int.MIN_VALUE.toLong())..(definition.maximum ?: Int.MAX_VALUE.toLong())) {
-                    "Configuration value '\${definition.key}' is outside its supported range."
+                    "Configuration value '${definition.key}' is outside its supported range."
                 }
             }
             "long" -> {
                 require(value is Long) { "Invalid long setting." }
                 require(value in (definition.minimum ?: Long.MIN_VALUE)..(definition.maximum ?: Long.MAX_VALUE)) {
-                    "Configuration value '\${definition.key}' is outside its supported range."
+                    "Configuration value '${definition.key}' is outside its supported range."
                 }
             }
             "string" -> {
                 require(value is String && value in definition.allowedStrings.orEmpty()) {
-                    "Configuration value '\${definition.key}' is not recognized."
+                    "Configuration value '${definition.key}' is not recognized."
                 }
             }
         }

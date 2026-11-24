@@ -1,3 +1,7 @@
+> **Current verified Batch Four candidate (24 November 2026):** `work/batch-4-implementation`, v1.1.5 code 7, PR #8 open/draft/unmerged, latest code-bearing commit `5e850fc4a444a1e36541890ca022a745f3be021a`. Android CI #45304517153 and CodeQL #45304517314 passed. The development artifact is debug-signed only; the minified release APK metadata passed but the APK is unsigned in PR CI. Production signing availability and CodeQL alert #8 closure remain unverified. Phase 12 physical acceptance remains 0/25 PASS / 25/25 NOT TESTED; no instrumentation/emulator/physical-device test is claimed. The 11/11 owner-reported handset scenarios elsewhere in this document apply to v1.1.3 only.
+
+> Cross-feature corrections include A2 deadline invalidation after authenticated disarm/package replacement, emergency protection-state snapshots, non-blocking alarm recovery, dedicated flash timing workers, SafePreferences-only legacy Gallery index reads, explicit OS backup/device-transfer exclusions, API guards, and redacted diagnostics. Filament 1.80.1/1.81.0 require compileSdk 37; the approved compileSdk 36 / AGP 8.10.1 baseline therefore remains on Filament 1.75.1. Revisit the newer upstream swap-chain fix only with an approved API-37 toolchain migration.
+
 <div align="right">
   <a href="../README.md"><img src="../ThiefAlertSeQureIcon.jpg" alt="ThiefAlertSeQure icon" width="64" /></a>
 </div>
@@ -55,7 +59,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 - Only the result of the app-launched Android device-credential confirmation activity or a successful BIOMETRIC_STRONG prompt clears ALARM_TRIGGERED through one shared coordinator. `ACTION_USER_PRESENT` and keyguard locked-to-unlocked polling are not proof of credential entry: trusted-unlock flows can dismiss the keyguard without a fresh PIN or biometric.
 
 ## Audio and lockscreen
-- Packaged Ogg Opus alarm asset is played in a loop through MediaPlayer. If selected and packaged audio both fail, repeating vibration is the fallback; there is no ToneGenerator implementation.
+- The packaged Ogg Opus default and owner-selected audio use MediaPlayer; five generated built-in presets use ToneGenerator. The complete built-in choice set is six entries (packaged default plus five generated presets). If selected and packaged audio both fail, repeating vibration is the fallback.
 - Audio uses USAGE_ALARM and requests maximum available alarm-stream volume.
 - Prior alarm volume is saved and restored after successful disarm. If service is destroyed while alarm remains latched, it does not restore volume prematurely. Corrupt saved-volume metadata is removed and reported; the original value cannot be reconstructed from a malformed preference.
 - While AlarmService is active, the alarm stream maximum is reasserted every 500 ms; this is best-effort volume control, not hardware-key interception.
@@ -65,7 +69,7 @@ Protect against casual charger removal and ordinary user-level interference. Sta
 
 ## Visual alarm flashlight
 - AlarmService starts the optional LED output only after ProtectionStore confirms ALARM_TRIGGERED; countdown and ARMED states never pulse the LED.
-- The alarm flashlight uses CameraManager.setTorchMode without CAMERA permission or a camera capture session. Separately, optional front-camera photo evidence requests CAMERA permission only after explicit owner opt-in; it captures one still only after successful owner authentication while the authentication Activity is visible. Photos are Android Keystore AES-GCM encrypted, bounded to 20 images / 30 days / 2 MiB each, and individually viewable/exportable/deletable. No camera foreground-service type, background camera capture, video, microphone capture or cloud upload is used.
+- The alarm flashlight uses CameraManager.setTorchMode without CAMERA permission or a camera capture session. Separately, optional front-camera photo evidence requests CAMERA permission only after explicit owner opt-in; it captures one still only after successful owner authentication while the authentication Activity is visible. New photos are unencrypted Gallery JPEGs by default in the app-owned Pictures/ThiefAlertSeQure folder; Settings can enable Android Keystore AES-GCM encryption for future captures. Existing photos are not converted when the setting changes. Both stores are bounded to 20 images / 30 days / 2 MiB each; encrypted-vault photos are individually viewable/exportable/deletable, while Gallery photos are managed through Gallery and the app's scoped delete action. No camera foreground-service type, background camera capture, video, microphone capture or cloud upload is used.
 - Flash hardware is declared optional in the manifest so Play does not require a flash unit for installation. Audio alarm remains the primary output and is not gated by flash availability.
 - The default pulse is 700 ms on / 700 ms off (about 0.71 cycles per second), not a rapid strobe. Photosensitive users can disable it in Settings.
 - Torch access is best-effort: camera contention, an unavailable camera service, thermal management, OEM policy or process termination can stop light output. stopAlarm() explicitly turns the torch off on authenticated disarm and service teardown. Android also may turn it off when the client exits.
@@ -93,7 +97,7 @@ Android 15+ prohibits a BOOT_COMPLETED receiver from directly starting a mediaPl
 - Biometric availability depends on hardware, enrollment and Android strength classification.
 - Device Owner APIs and restrictions depend on Android version, provisioning state and OEM build.
 - HONOR/MagicOS, Xiaomi/HyperOS, Samsung/One UI and other OEM battery managers may require user-side background/autostart configuration. No universal public API disables all OEM power management.
-- Optional flash and front-camera hardware are declared non-required. Torch control does not request CAMERA permission. The separate photo-evidence feature requires explicit owner opt-in and runtime CAMERA permission, and runs only after successful owner authentication while the app is visible; no camera foreground-service type is declared.
+- Optional flash and front-camera hardware are declared non-required. Torch control does not request CAMERA permission. The separate photo-evidence feature requires explicit owner opt-in and runtime CAMERA permission, and runs only after successful owner authentication while the app is visible. Gallery mode additionally requests READ/WRITE external-storage permission only on API 26–28; Android 10+ uses app-owned MediaStore without broad media permissions. No camera foreground-service type is declared.
 
 ## Source-review correction — 11 November 2026
 
@@ -187,3 +191,11 @@ No failure details were supplied. These results clear the reported HONOR 200 Pro
 - The uploaded debug artifact is not production-signed. Permanent signing-secret availability and a production-signed APK remain **NOT VERIFIED**.
 - Branch comparison: 531 ahead / 0 behind, 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged.
 - No instrumentation, emulator or physical-device test was performed.
+
+
+## Distribution-channel policy review — 24 November 2026
+
+- The current updater checks GitHub Releases and launches the Android package installer using `REQUEST_INSTALL_PACKAGES`. This is a direct APK/sideload update path.
+- Google Play policy does not permit an ordinary app to use `REQUEST_INSTALL_PACKAGES` for self-updating; the stated exception is qualifying enterprise device-management use. If Google Play distribution is intended, replace the GitHub APK self-update path with Play-managed updates or a separate Play-compatible build before submission: https://support.google.com/googleplay/android-developer/answer/16559646
+- The app declares a `specialUse` foreground service for persistent user-enabled protection monitoring. A Play release requires the appropriate foreground-service declaration and justification; full-screen-intent and battery-optimization exemptions also require policy review and must remain user-controlled: https://support.google.com/googleplay/android-developer/answer/16559646
+- The distribution channel has not been selected in this audit. No Play-compliance claim is made.

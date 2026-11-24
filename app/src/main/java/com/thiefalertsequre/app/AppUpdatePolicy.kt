@@ -28,6 +28,13 @@ internal object AppUpdatePolicy {
         }
     }
 
+    /**
+     * Accept historical numeric release tags and the permanent owner-approved
+     * developer suffix used by all new official releases.
+     */
+    fun isValidReleaseTag(tag: String): Boolean =
+        tag.matches(Regex("^v[0-9]+(\\.[0-9]+){1,3}(_Developer_Alinor)?$"))
+
     fun isNewerVersionCode(installedVersionCode: Long, candidateVersionCode: Long): Boolean =
         candidateVersionCode > installedVersionCode
 

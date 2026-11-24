@@ -16,6 +16,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -26,13 +27,20 @@ class AlarmService : Service() {
     private var player: MediaPlayer? = null
     private var secondaryPlayer: MediaPlayer? = null
     private var toneController: AlarmToneController? = null
+    private var toneWakeLock: android.os.PowerManager.WakeLock? = null
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var vibrator: Vibrator? = null
     private var hapticsActive = false
     private var activeHapticPattern: AlarmHapticPattern? = null
     private var flashController: AlarmFlashController? = null
-    private var thermalFlashSuppressed = false
+    // Torch pulses run on a dedicated worker so UI/audio-volume work on the main
+    // looper cannot turn the configured background/lock-screen pattern steady.
+    private var flashThread: HandlerThread? = null
+    private var flashHandler: Handler? = null
+    // API 29+ must remain fail-closed if thermal controller construction or
+    // initial status lookup fails. API 26–28 has no public thermal listener.
+    private var thermalFlashSuppressed = Build.VERSION.SDK_INT >= 29
     private var thermalFlashController: ThermalFlashController? = null
     private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { change ->
         val label = when (change) {
@@ -56,6 +64,16 @@ class AlarmService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        flashThread = runCatching {
+            HandlerThread("ThiefAlertSeQure-AlarmFlash").apply { start() }
+        }.getOrNull()
+        flashHandler = flashThread?.let { runCatching { Handler(it.looper) }.getOrNull() }
+        if (flashHandler == null) {
+            LocalTamperHistory.record(
+                this, "alarm_flash_worker_unavailable",
+                "Dedicated torch timing thread could not start; audio alarm remains independent"
+            )
+        }
         if (Build.VERSION.SDK_INT >= 29) {
             thermalFlashController = runCatching {
                 ThermalFlashController(this) { suppressFlash ->
@@ -96,24 +114,39 @@ class AlarmService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        // The primary alarm now owns audio output; stop the monitor's independent
+        // battery-threshold player on every alarm-service entry path.
+        runCatching { stopService(Intent(this, ProtectionMonitorService::class.java)) }
         try {
-            // Promote immediately before locking the device; lockNow() may
-            // turn the display off and must not delay the FGS startup deadline.
+            // Promote immediately, then start primary audio before any optional
+            // UI, telemetry, or Device Owner work.
             startForeground(NOTIFICATION_ID, notification())
-            BatchThreeUiBridge.refresh(this)
-            AlarmRecoveryCoordinator.onServiceStarted(this)
-            val alarmStartedAt = ProtectionStore(this).read().changedAtEpochMs
-            lockDeviceIfAdminEnabled(alarmStartedAt)
-            LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active; device-lock request issued")
+            if (player == null && toneController == null) startAlarmAudio()
         } catch (error: Exception) {
-            LocalTamperHistory.record(this, "alarm_service_start_failed", error.javaClass.simpleName + ": " + error.message)
-            AlarmRecoveryCoordinator.onStartFailure(
-                this, "Android refused to keep the alarm foreground service running"
-            )
+            runCatching {
+                LocalTamperHistory.record(this, "alarm_service_start_failed", error.javaClass.simpleName + ": " + error.message)
+            }
+            runCatching {
+                AlarmRecoveryCoordinator.onStartFailure(
+                    this, "Android refused to keep the alarm foreground service running"
+                )
+            }
             stopSelf()
             return START_NOT_STICKY
         }
-        if (player == null && toneController == null) startAlarmAudio()
+        // Secondary integrations are isolated: their failures must never stop
+        // the already-running primary alarm output.
+        runCatching { BatchThreeUiBridge.refresh(this) }.onFailure {
+            runCatching { LocalTamperHistory.record(this, "alarm_dashboard_refresh_failed", it.javaClass.simpleName + ": " + it.message) }
+        }
+        runCatching { AlarmRecoveryCoordinator.onServiceStarted(this) }.onFailure {
+            runCatching { LocalTamperHistory.record(this, "alarm_recovery_state_clear_failed", it.javaClass.simpleName + ": " + it.message) }
+        }
+        val alarmStartedAt = runCatching { ProtectionStore(this).read().changedAtEpochMs }.getOrDefault(0L)
+        lockDeviceIfAdminEnabled(alarmStartedAt)
+        runCatching {
+            LocalTamperHistory.record(this, "alarm_service_started", "Foreground notification active; primary alarm output requested; device-lock request issued")
+        }
         syncAlarmFlash()
         syncSecondaryAlarm()
         syncAlarmHaptics()
@@ -128,8 +161,14 @@ class AlarmService : Service() {
      * Failure to access a flash unit never blocks or stops alarm audio.
      */
     private fun syncAlarmFlash() {
+        val handler = flashHandler
+        if (handler == null) {
+            flashController?.stop()
+            flashController = null
+            return
+        }
         if (!thermalFlashSuppressed && AlarmFlashSettings.isEnabled(this) && AlarmFlashSettings.shouldRun(ProtectionStore(this).read().mode)) {
-            val controller = flashController ?: AlarmFlashController(this, volumeHandler) { event, detail ->
+            val controller = flashController ?: AlarmFlashController(this, handler) { event, detail ->
                 LocalTamperHistory.record(this, event, detail)
             }.also { flashController = it }
             controller.start()
@@ -228,11 +267,31 @@ class AlarmService : Service() {
         }
     }
 
+    private fun acquireToneWakeLock(): Boolean = runCatching {
+        val lock = toneWakeLock ?: getSystemService(android.os.PowerManager::class.java)
+            .newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "$packageName:AlarmToneController")
+            .apply { setReferenceCounted(false) }
+            .also { toneWakeLock = it }
+        if (!lock.isHeld) lock.acquire()
+        true
+    }.getOrDefault(false)
+
+    private fun releaseToneWakeLock() {
+        val lock = toneWakeLock
+        toneWakeLock = null
+        runCatching {
+            if (lock?.isHeld == true) lock.release()
+        }.onFailure {
+            LocalTamperHistory.record(this, "alarm_tone_wake_lock_release_failed", it.javaClass.simpleName + ": " + it.message)
+        }
+    }
+
     private fun handleTonePresetFailure(error: Throwable) {
         LocalTamperHistory.record(this, "alarm_tone_preset_failed", error.javaClass.simpleName + ": " + error.message)
         volumeHandler.post {
             toneController?.stop()
             toneController = null
+            releaseToneWakeLock()
             if (ProtectionStore(this).read().mode == ProtectionMode.ALARM_TRIGGERED && player == null) {
                 val defaultUri = Uri.parse("android.resource://$packageName/${R.raw.default_alarm}")
                 startAlarmAudio(defaultUri, true, defaultUri)
@@ -250,12 +309,17 @@ class AlarmService : Service() {
                     handleTonePresetFailure(error)
                 }
                 requestToneAudioFocus()
-                toneController = controller
-                if (controller.start()) {
-                    LocalTamperHistory.record(this, "alarm_tone_preset_started", "Built-in alarm tone preset active: ${preset.name}")
-                    return
+                if (acquireToneWakeLock()) {
+                    toneController = controller
+                    if (controller.start()) {
+                        LocalTamperHistory.record(this, "alarm_tone_preset_started", "Built-in alarm tone preset active: ${preset.name}")
+                        return
+                    }
+                    toneController = null
+                    releaseToneWakeLock()
+                } else {
+                    LocalTamperHistory.record(this, "alarm_tone_wake_lock_unavailable", "Generated tone was skipped; the packaged MediaPlayer alarm fallback will be used")
                 }
-                toneController = null
             }
         }
         startAlarmAudio(selectedUri ?: defaultUri, selectedUri == null, defaultUri)
@@ -404,7 +468,8 @@ class AlarmService : Service() {
             getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
         val builder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_notification_shield)
-            .setLargeIcon(android.graphics.BitmapFactory.decodeResource(resources, R.drawable.app_logo))
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .setOnlyAlertOnce(true)
             .setContentTitle("ThiefAlertSeQure — Alarm active")
             .setContentText("Open to authenticate with your device lock or supported biometric.")
             .setStyle(NotificationCompat.BigTextStyle().bigText(
@@ -471,6 +536,9 @@ class AlarmService : Service() {
 
     private fun stopAlarm() {
         stopSecondaryAlarm()
+        toneController?.stop()
+        toneController = null
+        releaseToneWakeLock()
         flashController?.stop()
         flashController = null
         runCatching { player?.stop() }
@@ -513,6 +581,10 @@ class AlarmService : Service() {
         }
         thermalFlashController = null
         stopAlarm()
+        flashHandler?.removeCallbacksAndMessages(null)
+        flashThread?.quitSafely()
+        flashHandler = null
+        flashThread = null
         BatchThreeUiBridge.refresh(this)
         super.onDestroy()
     }

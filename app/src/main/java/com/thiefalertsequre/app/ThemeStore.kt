@@ -1,6 +1,7 @@
 package com.thiefalertsequre.app
 import android.app.Activity
 import android.content.Context
+import android.os.Build
 import android.content.res.ColorStateList
 import android.graphics.drawable.ColorDrawable
 import android.view.View
@@ -9,6 +10,7 @@ import android.widget.TextView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.WindowCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 data class ThemePalette(val id:String,val name:String,val mode:String,val primary:Int,val onPrimary:Int,val background:Int,val surface:Int,val variant:Int,val text:Int,val muted:Int,val success:Int,val warning:Int,val danger:Int)
@@ -86,9 +88,14 @@ object ThemeStore {
 }
 object ThemeRuntime {
  fun apply(a:Activity,root:View,id:String=ThemeStore.selected(a)){
-  val p=ThemeStore.get(a,id); a.window.statusBarColor=p.background; a.window.navigationBarColor=p.background
-  @Suppress("DEPRECATION") run { a.window.decorView.systemUiVisibility=if(p.mode=="Light") View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0 }
+  val p=ThemeStore.get(a,id)
   val decor=a.window.decorView
+  applyLegacySystemBarColors(a,p)
+  val systemBars=WindowCompat.getInsetsController(a.window,decor)
+  systemBars.isAppearanceLightStatusBars = p.mode=="Light"
+  systemBars.isAppearanceLightNavigationBars = p.mode=="Light"
+  // On Android 15+, transparent system bars reveal the edge-to-edge window background.
+  decor.setBackgroundColor(p.background)
   val previousId=decor.tag as? String ?: ThemeStore.DEFAULT_ID
   val previous=ThemeStore.get(a,previousId)
   val old=mapOf(previous.primary to p.primary,previous.onPrimary to p.onPrimary,previous.background to p.background,previous.surface to p.surface,previous.variant to p.variant,previous.text to p.text,previous.muted to p.muted,previous.success to p.success,previous.warning to p.warning,previous.danger to p.danger)
@@ -108,6 +115,14 @@ object ThemeRuntime {
   walk(root); root.background=AppearanceStudioStore.backgroundDrawable(a,p); decor.tag=id
  }
 
+
+ @Suppress("DEPRECATION")
+ private fun applyLegacySystemBarColors(activity:Activity,palette:ThemePalette){
+  if(Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM){
+   activity.window.statusBarColor=palette.background
+   activity.window.navigationBarColor=palette.background
+  }
+ }
  fun applyDialog(activity:Activity,dialog:AlertDialog){
   val p=ThemeStore.get(activity)
   val density=activity.resources.displayMetrics.density

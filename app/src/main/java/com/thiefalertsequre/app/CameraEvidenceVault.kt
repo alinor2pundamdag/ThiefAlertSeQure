@@ -34,12 +34,15 @@ internal object CameraEvidenceVault {
     )
 
     @Synchronized
-    fun save(context: Context, jpeg: ByteArray): Entry? {
+    fun save(
+        context: Context,
+        jpeg: ByteArray,
+        timestampEpochMs: Long = System.currentTimeMillis()
+    ): Entry? {
         if (!CameraEvidencePolicy.isValidImageSize(jpeg.size)) return null
         val app = context.applicationContext
-        val entries = readIndex(app) ?: return null
         val now = System.currentTimeMillis()
-        val retained = entries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
+        if (!CameraEvidencePolicy.isRetained(timestampEpochMs, now)) return null
         val id = UUID.randomUUID().toString()
         val directory = evidenceDirectory(app)
         val file = directory.resolve("$id.aesgcm")
@@ -58,13 +61,100 @@ internal object CameraEvidenceVault {
             file.delete()
             return null
         }
-        val entry = Entry(id, now, sha256(jpeg), jpeg.size)
-        val next = (retained + entry).takeLast(CameraEvidencePolicy.MAX_IMAGES)
-        if (!writeIndex(app, next)) {
+        val entry = Entry(id, timestampEpochMs, sha256(jpeg), jpeg.size)
+        val disarmedCommit = ProtectionStore(app).runIfDisarmed {
+            synchronized(this) {
+                val currentEntries = readIndex(app) ?: return@synchronized false
+                val retained = currentEntries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
+                val next = (retained + entry)
+                    .sortedBy { it.timestampEpochMs }
+                    .takeLast(CameraEvidencePolicy.MAX_IMAGES)
+                if (next.none { it.id == id }) return@synchronized false
+                if (!writeIndex(app, next)) return@synchronized false
+                // Retention eviction and orphan cleanup are destructive; keep them
+                // inside the same DISARMED state lock as the index commit.
+                removeUnreferencedFiles(app, next)
+                true
+            }
+        }
+        val committed = when (disarmedCommit) {
+            true -> true
+            false -> false
+            null -> ProtectionStore(app).runIfProtectionActive { currentState ->
+                // A connected charger may immediately re-arm protection after
+                // successful owner authentication. Preserve that just-captured
+                // evidence only in ARMED; never write a photo during COUNTDOWN
+                // or a newly latched ALARM_TRIGGERED state.
+                if (!CameraEvidencePolicy.canPersistPhoto(currentState.mode)) return@runIfProtectionActive false
+                synchronized(this) {
+                    val currentEntries = readIndex(app) ?: return@synchronized false
+                    if (currentEntries.size >= CameraEvidencePolicy.MAX_IMAGES) return@synchronized false
+                    val next = (currentEntries + entry)
+                        .sortedBy { it.timestampEpochMs }
+                        .takeLast(CameraEvidencePolicy.MAX_IMAGES)
+                    if (next.none { it.id == id }) return@synchronized false
+                    writeIndex(app, next)
+                }
+            } == true
+        }
+        if (!committed) {
             file.delete()
             return null
         }
-        removeUnreferencedFiles(app, next)
+        return entry
+    }
+
+    @Synchronized
+    /**
+     * Migration-only write: never evicts a non-expired existing photo if another
+     * capture consumes the last free slot while Gallery migration is running.
+     */
+    fun saveForMigration(
+        context: Context,
+        jpeg: ByteArray,
+        timestampEpochMs: Long
+    ): Entry? {
+        if (!CameraEvidencePolicy.isValidImageSize(jpeg.size)) return null
+        val app = context.applicationContext
+        val now = System.currentTimeMillis()
+        if (!CameraEvidencePolicy.isRetained(timestampEpochMs, now)) return null
+        val id = UUID.randomUUID().toString()
+        val directory = evidenceDirectory(app)
+        val file = directory.resolve("$id.aesgcm")
+        val temp = directory.resolve("$id.tmp")
+        val encrypted = runCatching { encrypt(id, jpeg) }.getOrNull() ?: return null
+        val written = runCatching {
+            FileOutputStream(temp).use { output ->
+                output.write(encrypted)
+                output.fd.sync()
+            }
+            if (!temp.renameTo(file)) throw IllegalStateException("Atomic evidence-file publish failed")
+            true
+        }.getOrDefault(false)
+        if (!written) {
+            temp.delete()
+            file.delete()
+            return null
+        }
+
+        val entry = Entry(id, timestampEpochMs, sha256(jpeg), jpeg.size)
+        val committed = ProtectionStore(app).runIfDisarmed {
+            synchronized(this) {
+                val current = readIndex(app) ?: return@synchronized false
+                val retained = current.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
+                if (retained.size >= CameraEvidencePolicy.MAX_IMAGES) return@synchronized false
+                val next = (retained + entry)
+                    .sortedBy { it.timestampEpochMs }
+                    .takeLast(CameraEvidencePolicy.MAX_IMAGES)
+                if (next.none { it.id == id } || !writeIndex(app, next)) return@synchronized false
+                removeUnreferencedFiles(app, next)
+                true
+            }
+        }
+        if (committed != true) {
+            file.delete()
+            return null
+        }
         return entry
     }
 
@@ -73,18 +163,25 @@ internal object CameraEvidenceVault {
         val app = context.applicationContext
         pruneExpired(app)
         val now = System.currentTimeMillis()
-        return (readIndex(app) ?: emptyList())
-            .filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
-            .takeLast(CameraEvidencePolicy.MAX_IMAGES)
-            .asReversed()
+        return synchronized(this) {
+            (readIndex(app) ?: emptyList())
+                .filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
+                .takeLast(CameraEvidencePolicy.MAX_IMAGES)
+                .asReversed()
+        }
     }
 
-    fun read(context: Context, id: String): ByteArray? {
+    @Synchronized
+    fun read(context: Context, id: String): ByteArray? =
+        readEntry(context.applicationContext, id, enforceRetention = true)
+
+    private fun readEntry(context: Context, id: String, enforceRetention: Boolean): ByteArray? {
         if (!isSafeId(id)) return null
-        val app = context.applicationContext
-        val entry = (readIndex(app) ?: return null).firstOrNull { it.id == id } ?: return null
-        if (!CameraEvidencePolicy.isRetained(entry.timestampEpochMs, System.currentTimeMillis())) return null
-        val encryptedFile = evidenceDirectory(app).resolve("$id.aesgcm")
+        val entry = (readIndex(context) ?: return null).firstOrNull { it.id == id } ?: return null
+        if (enforceRetention &&
+            !CameraEvidencePolicy.isRetained(entry.timestampEpochMs, System.currentTimeMillis())
+        ) return null
+        val encryptedFile = evidenceDirectory(context).resolve("$id.aesgcm")
         if (!encryptedFile.isFile || encryptedFile.length() > CameraEvidencePolicy.MAX_IMAGE_BYTES + 64L) return null
         val encrypted = runCatching { encryptedFile.readBytes() }.getOrNull() ?: return null
         val plaintext = runCatching { decrypt(id, encrypted) }.getOrNull() ?: return null
@@ -98,53 +195,67 @@ internal object CameraEvidenceVault {
     fun delete(context: Context, id: String): Boolean {
         if (!isSafeId(id)) return false
         val app = context.applicationContext
-        val entries = readIndex(app) ?: return false
-        if (entries.none { it.id == id }) return false
-        val next = entries.filterNot { it.id == id }
-        if (!writeIndex(app, next)) return false
-        val file = evidenceDirectory(app).resolve("$id.aesgcm")
-        val deleted = file.delete() || !file.exists()
-        if (deleted && next.isEmpty()) {
-            runCatching {
-                synchronized(keyLock) {
-                    KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
+        val deleted = ProtectionStore(app).runIfDisarmed {
+            val entries = readIndex(app) ?: return@runIfDisarmed false
+            if (entries.none { it.id == id }) return@runIfDisarmed false
+            val next = entries.filterNot { it.id == id }
+            val file = evidenceDirectory(app).resolve("$id.aesgcm")
+            // Commit the new index before deleting ciphertext. If the index commit
+            // fails, the original photo and its key remain fully discoverable.
+            if (!writeIndex(app, next)) return@runIfDisarmed false
+            val fileDeleted = file.delete() || !file.exists()
+            if (!fileDeleted) {
+                // Restore the original index so a failed file deletion never hides
+                // an encrypted photo from the owner's archive.
+                if (!writeIndex(app, entries)) {
+                    android.util.Log.e("CameraEvidenceVault", "Photo deletion failed and the original index could not be restored; encrypted file retained")
                 }
+                return@runIfDisarmed false
             }
+            if (next.isEmpty() && !deleteKeyIfPresent()) return@runIfDisarmed false
+            true
         }
-        return deleted
+        return deleted == true
     }
 
     @Synchronized
     fun deleteAll(context: Context): Boolean {
         val app = context.applicationContext
-        val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (!prefs.edit().remove(KEY_INDEX).commit()) return false
-        val files = evidenceDirectory(app).listFiles().orEmpty()
-        files.forEach { file -> runCatching { file.delete() } }
-        val allDeleted = files.none { it.exists() }
-        if (allDeleted) {
-            runCatching {
-                synchronized(keyLock) {
-                    KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
-                }
+        val deleted = ProtectionStore(app).runIfDisarmed {
+            val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            // Keep the encrypted index until every ciphertext/temp file is gone.
+            // A failed delete therefore remains discoverable and can be retried.
+            val files = evidenceDirectory(app).listFiles() ?: return@runIfDisarmed false
+            val allDeleted = files.all { file ->
+                runCatching { file.delete() || !file.exists() }.getOrDefault(false)
             }
+            if (!allDeleted) return@runIfDisarmed false
+            // Remove the now-empty index before deleting the key. If the index
+            // commit fails, the Keystore key remains available for a safe retry.
+            var indexRemoved = prefs.edit().remove(KEY_INDEX).commit()
+            if (!indexRemoved) indexRemoved = prefs.edit().remove(KEY_INDEX).commit()
+            if (!indexRemoved) return@runIfDisarmed false
+            if (!deleteKeyIfPresent()) return@runIfDisarmed false
+            true
         }
-        return allDeleted
+        return deleted == true
     }
 
     @Synchronized
     fun verifyIntegrity(context: Context): Boolean {
         val app = context.applicationContext
-        pruneExpired(app)
+        // Integrity scans are read-only even while protection is active. Expired
+        // evidence is still decrypted and checked, but retention cleanup waits for
+        // a DISARMED owner session.
         val entries = readIndex(app) ?: return false
-        val directoryFiles = evidenceDirectory(app).listFiles().orEmpty()
-        val temporaryFiles = directoryFiles.filter { it.name.endsWith(".tmp") }
-        val tempCleanupSucceeded = temporaryFiles.all { it.delete() || !it.exists() }
+        val directoryFiles = evidenceDirectory(app).listFiles() ?: return false
+        val noInterruptedWrites = directoryFiles.none { it.name.endsWith(".tmp") }
         val indexedFiles = entries.map { "${it.id}.aesgcm" }.toSet()
         val actualFiles = directoryFiles
             .filter { it.name.endsWith(".aesgcm") }
             .map { it.name }.toSet()
-        return tempCleanupSucceeded && indexedFiles == actualFiles && entries.all { read(app, it.id) != null }
+        return noInterruptedWrites && indexedFiles == actualFiles &&
+            entries.all { readEntry(app, it.id, enforceRetention = false) != null }
     }
 
     private fun readIndex(context: Context): List<Entry>? {
@@ -184,11 +295,19 @@ internal object CameraEvidenceVault {
                 })
             }
         }.toString()
-        return runCatching {
-            val encrypted = LocalPreferenceCipher.encrypt(INDEX_PURPOSE, encoded)
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit().putString(KEY_INDEX, encrypted).commit()
+        val encrypted = runCatching {
+            LocalPreferenceCipher.encrypt(INDEX_PURPOSE, encoded)
+        }.getOrNull() ?: return false
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        var saved = runCatching {
+            prefs.edit().putString(KEY_INDEX, encrypted).commit()
         }.getOrDefault(false)
+        if (!saved) {
+            saved = runCatching {
+                prefs.edit().putString(KEY_INDEX, encrypted).commit()
+            }.getOrDefault(false)
+        }
+        return saved
     }
 
     private fun encrypt(id: String, plaintext: ByteArray): ByteArray {
@@ -236,6 +355,14 @@ internal object CameraEvidenceVault {
         }
     }
 
+    private fun deleteKeyIfPresent(): Boolean = runCatching {
+        synchronized(keyLock) {
+            val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            if (keyStore.containsAlias(KEY_ALIAS)) keyStore.deleteEntry(KEY_ALIAS)
+            !keyStore.containsAlias(KEY_ALIAS)
+        }
+    }.getOrDefault(false)
+
     private fun getExistingKey(): SecretKey = synchronized(keyLock) {
         val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         keyStore.getKey(KEY_ALIAS, null) as? SecretKey
@@ -243,18 +370,26 @@ internal object CameraEvidenceVault {
     }
 
     private fun pruneExpired(context: Context) {
-        val entries = readIndex(context) ?: return
-        val now = System.currentTimeMillis()
-        val retained = entries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
-        val indexReady = retained.size == entries.size || writeIndex(context, retained)
-        if (indexReady) {
-            removeUnreferencedFiles(context, retained)
-            val noPhotoFilesRemain = evidenceDirectory(context).listFiles().orEmpty()
-                .none { it.name.endsWith(".aesgcm") || it.name.endsWith(".tmp") }
-            if (retained.isEmpty() && noPhotoFilesRemain) {
-                runCatching {
-                    synchronized(keyLock) {
-                        KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
+        // This is called from the synchronized entries() path; lock order is
+        // consistently vault monitor -> ProtectionStore state lock across vault mutations.
+        ProtectionStore(context).runIfDisarmed {
+            synchronized(this) {
+                val entries = readIndex(context) ?: return@synchronized
+                val now = System.currentTimeMillis()
+                val retained = entries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
+                val indexReady = retained.size == entries.size || writeIndex(context, retained)
+                if (indexReady) {
+                    removeUnreferencedFiles(context, retained)
+                    val remainingFiles = evidenceDirectory(context).listFiles() ?: return@synchronized
+                    val noPhotoFilesRemain = remainingFiles.none {
+                        it.name.endsWith(".aesgcm") || it.name.endsWith(".tmp")
+                    }
+                    if (retained.isEmpty() && noPhotoFilesRemain) {
+                        runCatching {
+                            synchronized(keyLock) {
+                                KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
+                            }
+                        }
                     }
                 }
             }

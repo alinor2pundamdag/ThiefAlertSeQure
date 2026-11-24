@@ -19,17 +19,29 @@ object LocalTamperHistory {
         val safeDetail = LocalTamperHistoryPolicy.sanitizeDetail(detail)
         val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
         val line = "$stamp | $safeEvent" + if (safeDetail.isBlank()) "" else " | $safeDetail"
-        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = runCatching {
+            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        }.getOrElse {
+            // Keep the independent encrypted archive writable even if the
+            // convenience history preference cannot be opened.
+            LocalEvidenceVault.recordAsync(context, safeEvent, safeDetail)
+            return
+        }
         val existing = when (val stored = SafePreferences.readString(prefs, KEY_EVENTS, "")) {
             is PreferenceRead.Value -> stored.value.orEmpty()
-            is PreferenceRead.Corrupt -> return
+            is PreferenceRead.Corrupt -> {
+                LocalEvidenceVault.recordAsync(context, safeEvent, safeDetail)
+                return
+            }
         }
         val next = LocalTamperHistoryPolicy.append(existing, line)
-        if (prefs.edit().putString(KEY_EVENTS, next).commit()) {
-            // The encrypted archive is secondary evidence; failure never changes
-            // the authoritative protection state or blocks alarm delivery.
-            LocalEvidenceVault.recordAsync(context, safeEvent, safeDetail)
+        val historySaved = runCatching { prefs.edit().putString(KEY_EVENTS, next).commit() }.getOrDefault(false)
+        if (!historySaved) {
+            android.util.Log.w("LocalTamperHistory", "Readable event history commit failed; encrypted evidence write will still be attempted")
         }
+        // The encrypted archive is independent of the convenience history log.
+        // A plaintext-history failure must not suppress secondary evidence.
+        LocalEvidenceVault.recordAsync(context, safeEvent, safeDetail)
     }
 
     fun read(context: Context, limit: Int = 100): List<String> =
@@ -43,10 +55,12 @@ object LocalTamperHistory {
             LocalTamperHistoryPolicy.newestFirst(value, limit)
         }
 
-    fun clear(context: Context): Boolean {
-        val historyCleared = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().remove(KEY_EVENTS).commit()
-        val evidenceCleared = LocalEvidenceVault.deleteAll(context)
-        return historyCleared && evidenceCleared
-    }
+    fun clear(context: Context): Boolean =
+        ProtectionStore(context).runIfDisarmed {
+            val historyPrefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val historyCleared = historyPrefs.edit().remove(KEY_EVENTS).commit()
+            if (!historyCleared) return@runIfDisarmed false
+            val evidenceCleared = LocalEvidenceVault.deleteAll(context)
+            historyCleared && evidenceCleared
+        } ?: false
 }

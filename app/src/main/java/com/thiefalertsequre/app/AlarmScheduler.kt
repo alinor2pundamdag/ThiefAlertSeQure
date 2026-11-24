@@ -12,6 +12,7 @@ object AlarmScheduler {
     private const val KEY_LAST_TOKEN = "last_token"
     private const val REQUEST_CODE = 1001
     private const val BOOT_RECONCILIATION_RETRY_MS = 5_000L
+    private val lock = Any()
 
     fun schedule(
         context: Context,
@@ -41,8 +42,17 @@ object AlarmScheduler {
         deadlineBootCount: Int,
         preferencesName: String,
         namespace: String?
-    ): Boolean {
-        if (deadlineEpochMs <= 0L) return false
+    ): Boolean = synchronized(lock) {
+        if (deadlineEpochMs <= 0L) return@synchronized false
+        // A stale worker must never replace the timer for a newer countdown.
+        // Isolated test schedulers intentionally use their own state fixture.
+        if (preferencesName == PREFS && namespace == null) {
+            val current = ProtectionStore(context).read()
+            if (!ProtectionEngine.isCurrentDeadline(
+                    current, deadlineEpochMs, deadlineElapsedRealtimeMs, deadlineBootCount
+                )
+            ) return@synchronized false
+        }
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val token = deadlineToken(deadlineEpochMs, deadlineElapsedRealtimeMs, deadlineBootCount)
         val currentBootCount = ProtectionClock.bootCount(context)
@@ -82,24 +92,15 @@ object AlarmScheduler {
 
     /** Schedules a bounded retry for an already-latched alarm recovery attempt. */
     fun scheduleRecoveryRetry(context: Context, delayMs: Long): Boolean {
-        val alarmManager = context.getSystemService(AlarmManager::class.java)
-        val exactAllowed = Build.VERSION.SDK_INT < 31 || runCatching {
-            alarmManager.canScheduleExactAlarms()
-        }.getOrDefault(false)
-        if (!exactAllowed) {
+        var exactScheduled = false
+        val scheduled = scheduleRecovery(context, delayMs) { exactScheduled = it }
+        if (scheduled && !exactScheduled) {
             LocalTamperHistory.record(
-                context, "alarm_recovery_exact_access_missing",
-                "Automatic foreground-service retry was not scheduled because exact-alarm access is unavailable"
-            )
-            return false
-        }
-        val token = "recovery"
-        val triggerAt = System.currentTimeMillis() + delayMs.coerceAtLeast(250L)
-        return replaceTokenAndSchedule(context, token) {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent(context, token)
+                context, "alarm_recovery_inexact_retry",
+                "Exact-alarm access is unavailable; an inexact allow-while-idle recovery retry was scheduled instead"
             )
         }
+        return scheduled
     }
 
     private fun scheduleRecovery(
@@ -135,15 +136,15 @@ object AlarmScheduler {
         return scheduled
     }
 
-    fun scheduleRetry(context: Context, delayMs: Long) {
+    fun scheduleRetry(context: Context, delayMs: Long) = synchronized(lock) {
         val state = ProtectionStore(context).read()
-        if (state.mode != ProtectionMode.COUNTDOWN || state.deadlineEpochMs <= 0L) return
+        if (state.mode != ProtectionMode.COUNTDOWN || state.deadlineEpochMs <= 0L) return@synchronized
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val token = deadlineToken(state.deadlineEpochMs, state.deadlineElapsedRealtimeMs, state.bootCount)
         val scheduled = replaceTokenAndSchedule(context, token) {
             alarmManager.setAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                System.currentTimeMillis() + delayMs.coerceAtLeast(250L),
+                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                android.os.SystemClock.elapsedRealtime() + delayMs.coerceAtLeast(250L),
                 pendingIntent(context, token)
             )
         }
@@ -171,14 +172,20 @@ object AlarmScheduler {
         preferencesName: String,
         namespace: String?,
         includeLegacy: Boolean
-    ) {
+    ) = synchronized(lock) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
         when (val stored = SafePreferences.readString(prefs, KEY_LAST_TOKEN, null)) {
             is PreferenceRead.Value -> {
-                stored.value?.let { alarmManager.cancel(pendingIntent(context, it, namespace)) }
-                if (!prefs.edit().remove(KEY_LAST_TOKEN).commit()) {
-                    LocalTamperHistory.record(context, "deadline_token_clear_failed", "Scheduled alarm token could not be removed from preferences")
+                // Remove the durable token before cancelling the OS callback.
+                // If persistence fails, leave the callback scheduled; its receiver
+                // revalidates the authoritative ProtectionStore state and deadline.
+                var cleared = prefs.edit().remove(KEY_LAST_TOKEN).commit()
+                if (!cleared) cleared = prefs.edit().remove(KEY_LAST_TOKEN).commit()
+                if (!cleared) {
+                    LocalTamperHistory.record(context, "deadline_token_clear_failed", "Scheduled alarm token could not be removed after one retry; OS callback was retained for safe state revalidation")
+                } else {
+                    stored.value?.let { alarmManager.cancel(pendingIntent(context, it, namespace)) }
                 }
             }
             is PreferenceRead.Corrupt -> LocalTamperHistory.record(
@@ -220,7 +227,7 @@ object AlarmScheduler {
         preferencesName: String,
         namespace: String?,
         schedule: () -> Unit
-    ): Boolean {
+    ): Boolean = synchronized(lock) {
         val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
         val previous = when (val stored = SafePreferences.readString(prefs, KEY_LAST_TOKEN, null)) {
             is PreferenceRead.Value -> stored.value
@@ -229,8 +236,10 @@ object AlarmScheduler {
                 return false
             }
         }
-        if (!prefs.edit().putString(KEY_LAST_TOKEN, token).commit()) {
-            LocalTamperHistory.record(context, "deadline_token_persist_failed", "Alarm token was not saved; previous alarm retained")
+        var tokenPersisted = prefs.edit().putString(KEY_LAST_TOKEN, token).commit()
+        if (!tokenPersisted) tokenPersisted = prefs.edit().putString(KEY_LAST_TOKEN, token).commit()
+        if (!tokenPersisted) {
+            LocalTamperHistory.record(context, "deadline_token_persist_failed", "Alarm token was not saved after one retry; previous alarm retained")
             return false
         }
         return try {
@@ -240,10 +249,15 @@ object AlarmScheduler {
             }
             true
         } catch (error: Exception) {
-            val restore = prefs.edit()
-            if (previous == null) restore.remove(KEY_LAST_TOKEN) else restore.putString(KEY_LAST_TOKEN, previous)
-            if (!restore.commit()) {
-                LocalTamperHistory.record(context, "deadline_token_restore_failed", "Failed scheduling left the alarm token in an uncertain state")
+            fun restorePreviousToken(): Boolean {
+                val restore = prefs.edit()
+                if (previous == null) restore.remove(KEY_LAST_TOKEN) else restore.putString(KEY_LAST_TOKEN, previous)
+                return restore.commit()
+            }
+            var restored = restorePreviousToken()
+            if (!restored) restored = restorePreviousToken()
+            if (!restored) {
+                LocalTamperHistory.record(context, "deadline_token_restore_failed", "Failed scheduling left the alarm token in an uncertain state after one retry")
             }
             LocalTamperHistory.record(context, "deadline_alarm_schedule_failed", error.javaClass.simpleName + ": " + error.message)
             false

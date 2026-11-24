@@ -131,15 +131,19 @@ object RootCapabilityInspector {
 
     /**
      * Read-only root diagnostics. Call only after ROOT_AUTHORIZED.
-     * Never changes controller configuration, power, pairing, or system properties.
+     * Uses only allowlisted adapter state/property/controller-node queries; never dumps paired-device data.
      */
     fun collectBluetoothDiagnostics(timeoutSeconds: Long = 8L): String {
         val suExecutable = findSuExecutable()
             ?: return "No executable su binary was found at a verified absolute path."
-        val process = ProcessBuilder(
-            suExecutable, "-c",
-            "dumpsys bluetooth_manager; echo '\\n--- Bluetooth system properties ---'; getprop | grep -i bluetooth; echo '\\n--- Bluetooth sysfs devices ---'; ls -la /sys/class/bluetooth 2>/dev/null"
-        ).redirectErrorStream(true).start()
+        val process = try {
+            ProcessBuilder(
+                suExecutable, "-c",
+                "echo 'Bluetooth adapter state (0=off, 1=on):'; settings get global bluetooth_on; echo '\\n--- Bluetooth stack library ---'; getprop ro.bluetooth.library_name; echo '\\n--- A2DP offload capability ---'; getprop ro.bluetooth.a2dp_offload.supported; echo '\\n--- Controller nodes ---'; ls -1 /sys/class/bluetooth 2>/dev/null"
+            ).redirectErrorStream(true).start()
+        } catch (error: Exception) {
+            return "Root Bluetooth diagnostics could not start: ${error.javaClass.simpleName}"
+        }
         val output = StringBuilder()
         val reader = Thread {
             runCatching {
@@ -170,7 +174,7 @@ object RootCapabilityInspector {
     }
     private fun waitForProcess(process: Process, timeoutSeconds: Long): Boolean {
         val waiter = Thread { runCatching { process.waitFor() } }.apply { isDaemon = true; start() }
-        waiter.join(TimeUnit.SECONDS.toMillis(timeoutSeconds))
+        waiter.join(TimeUnit.SECONDS.toMillis(timeoutSeconds.coerceIn(1L, 30L)))
         if (waiter.isAlive) {
             terminateProcess(process)
             waiter.join(500L)
@@ -181,6 +185,9 @@ object RootCapabilityInspector {
 
     private fun terminateProcess(process: Process) {
         runCatching { process.destroy() }
+        if (runCatching { process.isAlive }.getOrDefault(false)) {
+            runCatching { process.destroyForcibly() }
+        }
     }
 
 }

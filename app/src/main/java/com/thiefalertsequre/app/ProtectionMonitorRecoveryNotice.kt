@@ -49,6 +49,7 @@ object ProtectionMonitorRecoveryNotice {
                     "Android deferred or rejected background monitor startup. Open ThiefAlertSeQure to review permissions and restore charger and trusted-device monitoring. $reason"
                 ))
                 .setContentIntent(open)
+                .setOnlyAlertOnce(true)
                 .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .build()

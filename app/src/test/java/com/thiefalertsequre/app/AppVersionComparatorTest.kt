@@ -21,6 +21,14 @@ class AppVersionComparatorTest {
         assertEquals(1, AppVersionComparator.compare("2.0.0", "1.99.99").compareTo(0))
     }
 
+    @Test fun largeNumericComponentsDoNotOverflow() {
+        assertEquals(1, AppVersionComparator.compare("999999999999999999999.0", "999999999999999999998.9").compareTo(0))
+    }
+
+    @Test fun leadingZeroComponentsCompareNumerically() {
+        assertEquals(0, AppVersionComparator.compare("01.002.0003", "1.2.3"))
+    }
+
     @Test fun malformedVersionIsRejected() {
         assertThrows(IllegalArgumentException::class.java) {
             AppVersionComparator.compare("1.1.4-beta", "1.1.3")

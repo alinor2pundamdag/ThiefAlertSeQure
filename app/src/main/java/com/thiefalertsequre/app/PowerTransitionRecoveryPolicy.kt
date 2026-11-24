@@ -5,6 +5,9 @@ package com.thiefalertsequre.app
  * the same boot. BOOT_COUNT strengthens this check when Android exposes it.
  */
 internal object PowerTransitionRecoveryPolicy {
+    /** A baseline reset must never erase an armed or counting-down protection state. */
+    fun canResetBaseline(mode: ProtectionMode): Boolean = mode == ProtectionMode.DISARMED
+
     fun isCurrentCandidate(
         pending: Boolean,
         pendingGeneration: Long,
