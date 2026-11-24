@@ -37,8 +37,16 @@ internal object LegalDocumentViewer {
             setPadding(dp(16), dp(12), dp(16), dp(16))
             setLineSpacing(dp(3).toFloat(), 1f)
         }
+        val dialogHeight = minOf(
+            dp(520),
+            (activity.resources.displayMetrics.heightPixels * 0.65f).toInt()
+        ).coerceAtLeast(dp(180))
         val scroll = ScrollView(activity).apply {
             isFillViewport = false
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dialogHeight
+            )
             addView(body, ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
