@@ -75,10 +75,7 @@ object AppUpdateManager {
         }
 
         val tag = release.optString("tag_name")
-        require(tag.matches(Regex("^v[0-9]+(\\.[0-9]+){1,3}$"))) {
-            "The latest release tag has an invalid version format."
-        }
-        val remoteVersionName = tag.removePrefix("v")
+        val remoteVersionName = AppUpdatePolicy.versionNameFromReleaseTag(tag)
         // versionCode is Android's authoritative update ordering. Do not return
         // UpToDate merely because versionName is unchanged: hotfix releases may
         // legitimately keep the same display version while increasing versionCode.
