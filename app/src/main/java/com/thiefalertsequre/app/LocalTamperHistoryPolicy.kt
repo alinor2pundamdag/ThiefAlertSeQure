@@ -37,6 +37,18 @@ internal object LocalTamperHistoryPolicy {
         return safe.trim().take(180)
     }
 
+    /** Redacts previously persisted detail fields when older local history is read or appended. */
+    fun sanitizeStoredHistory(existing: String): String =
+        existing.lineSequence().joinToString("\n") { line ->
+            val firstSeparator = line.indexOf(" | ")
+            val detailSeparator = if (firstSeparator >= 0) line.indexOf(" | ", firstSeparator + 3) else -1
+            if (detailSeparator < 0) {
+                line
+            } else {
+                line.substring(0, detailSeparator + 3) + sanitizeDetail(line.substring(detailSeparator + 3))
+            }
+        }
+
     fun append(existing: String, entry: String, maxEvents: Int = MAX_EVENTS): String {
         require(maxEvents > 0) { "maxEvents must be positive" }
         val prior = existing.lineSequence().filter { it.isNotBlank() }.toList()
