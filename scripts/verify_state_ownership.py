@@ -30,11 +30,17 @@ receiver = (JAVA / "com/thiefalertsequre/app/PowerTransitionReceiver.kt").read_t
 for required in (
     "PowerTransitionQueuePolicy.createExecutor()",
     "MAX_PENDING_EVENTS = 4",
-    "ArrayBlockingQueue<Runnable>(queueCapacity)",
-    "executor.queue.offer(task, backpressureTimeoutMs, TimeUnit.MILLISECONDS)",
 ):
     if required not in receiver:
         errors.append("PowerTransitionReceiver missing bounded FIFO queue contract: " + required)
+
+bounded_executor = (JAVA / "com/thiefalertsequre/app/BoundedSerialExecutor.kt").read_text(encoding="utf-8")
+for required in (
+    "ArrayBlockingQueue<Runnable>(queueCapacity)",
+    "executor.queue.offer(task, backpressureTimeoutMs, TimeUnit.MILLISECONDS)",
+):
+    if required not in bounded_executor:
+        errors.append("BoundedSerialExecutor missing bounded queue contract: " + required)
 
 a2_receiver = (JAVA / "com/thiefalertsequre/app/A2BluetoothAclReceiver.kt").read_text(encoding="utf-8")
 for required in (
