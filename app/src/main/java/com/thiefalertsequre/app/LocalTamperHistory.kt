@@ -33,6 +33,7 @@ object LocalTamperHistory {
         }
     }
 
+    @Synchronized
     fun read(context: Context, limit: Int = 100): List<String> =
         run {
             val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -46,6 +47,7 @@ object LocalTamperHistory {
             LocalTamperHistoryPolicy.newestFirst(safeValue, limit)
         }
 
+    @Synchronized
     fun clear(context: Context): Boolean {
         val historyCleared = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().remove(KEY_EVENTS).commit()
