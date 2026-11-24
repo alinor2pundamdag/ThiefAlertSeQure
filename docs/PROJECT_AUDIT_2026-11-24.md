@@ -58,11 +58,11 @@ This is a cross-chat requirements audit plus targeted review of high-risk implem
 
 - Previous code-bearing commit `5e850fc4a444a1e36541890ca022a745f3be021a`: Android CI #45304517153 and CodeQL #45304517314 passed.
 - Stacked PR #8 head `168222ca04ea0e36776d4f343e6b82add2e07494`: Android CI #45306480219 and CodeQL #45306480377 passed.
-- Clean PR #9 head `56418b68e422ded696705fd4d07d76605151d19a`: Android CI [#45307869027](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45307869027) and CodeQL [#45307868989](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45307868989) passed.
+- Exact code-bearing PR #9 head `9ae3d15d9de909ab1a75e88f120ca7c9ff72b3c4`: Android CI push [#45311423677](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45311423677) and PR [#45311432586](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45311432586) passed; CodeQL push [#45311423737](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45311423737) and PR [#45311432532](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/45311432532) passed. The latest docs-only candidate head is `e2965418536aaacf71295ae8a1cc22623a8e8bdf` plus subsequent documentation reconciliations; no new workflow run was observed for these GitHub API documentation commits.
 - Clean-branch development artifact: ID `14881119651`, archive SHA-256 `3e34f8a8cfd5cef750a3ab31b265e4aeaaf37406bee70547d678b08ada424e99`; APK SHA-256 `c0de410c4f26616d7629fef7251991414d2feba3141527f05bfbf636bb5771d1`.
 - Debug package `com.thiefalertsequre.app.v114test`, versionCode `7`, versionName `1.1.5-test`, minSdk `26`; debug signer SHA-256 `be3def2cc431cb7000e025693cb9705496a71b90d22eda372140e5a03b562c17`.
 - Production identity metadata passed: `com.thiefalertsequre.app`, versionCode `7`, versionName `1.1.5_Developer_Alinor`, compileSdk/targetSdk `36`. The minified release APK is unsigned in PR CI; production signing-secret availability is not verified.
-- PR #7's CodeQL APK-installer review thread remains unresolved. A security reassessment reply was posted; PR #9 CodeQL passed with no new review threads. Alert closure is not inferred from workflow success.
+- PR #7's obsolete CodeQL APK-installer review thread was formally reassessed against PR #9 and resolved. PR #9 CodeQL reported no new alerts in changed code. The repository-wide CodeQL alert record #8 could not be independently read or dismissed; its active/closed status remains **NOT VERIFIED**. Thread resolution is not treated as alert dismissal.
 - Remaining non-fatal Android API deprecation warnings: own-service status inspection, display access, legacy Camera2 session overload, deprecated LocationListener override and legacy package-installer intent.
 
 ## Owner-deferred requests — no implementation GO
@@ -81,9 +81,9 @@ Do not implement or assign these features to a release without a separate explic
 
 | Gate | Status |
 |---|---|
-| Follow-up exact-head CodeQL | Passed (run #45309437222) |
-| Follow-up exact-head Android CI | Final minified APK verification/artifact upload running at audit time |
-| CodeQL alert #8 formal reassessment/closure | Unresolved / not verified |
+| Exact code-head CodeQL push / PR runs | Passed (#45311423737 / #45311432532 on `9ae3d15`) |
+| Exact code-head Android CI push / PR runs | Passed (#45311423677 / #45311432586 on `9ae3d15`); debug artifact uploaded; minified release APK metadata passed but PR artifact is not production-signed |
+| PR #7 installer review thread | Reassessed and resolved against PR #9; repository alert #8 active/closed state remains not verified |
 | Independent review of clean release PR | Pending |
 | Permanent production signing secrets and signed preflight | Not verified |
 | Phase 12 physical acceptance | Owner-operated after delivery; excluded from coding/merge gates |
@@ -99,4 +99,4 @@ The selected target is the existing GitHub Releases direct APK path. The current
 
 The current targetSdk 36 meets the published Play target-API requirement for new apps and updates as of 31 August 2026, but that alone does not establish Play policy approval.
 
-**Completion statement:** The software candidate is under clean release integration. Physical acceptance is reserved for the owner and is not a coding/merge blocker. Production signing, final CI, security reassessment and publication remain separate release operations. No merge, tag, publication or production release has been performed.
+**Completion statement (24 November 2026 update):** The candidate code and exact code-head automated CI/CodeQL checks are complete. The old PR #7 installer review thread was reassessed and resolved; repository-wide alert #8 dismissal remains unverified. Physical acceptance is reserved for the owner and is not a coding/CI/merge blocker. PR #9 formal approval, merge, production signing-secret verification by signed preflight, owner device acceptance after APK delivery, and tag/publication remain separate release operations. No merge, tag, publication or production release has been performed.
