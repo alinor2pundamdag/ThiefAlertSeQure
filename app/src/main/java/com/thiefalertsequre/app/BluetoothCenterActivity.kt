@@ -21,12 +21,17 @@ import androidx.core.content.ContextCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Dedicated, categorized Bluetooth capability center. Inspection is local and read-only. */
 class BluetoothCenterActivity : FragmentActivity() {
     private lateinit var root: LinearLayout
-    private val ioExecutor = Executors.newSingleThreadExecutor()
+    private val ioExecutor = BoundedSerialExecutor.create(
+        queueCapacity = 1,
+        backpressureTimeoutMs = 100L,
+        threadName = "bluetooth-center-diagnostics"
+    )
+    private val diagnosticsRunning = AtomicBoolean(false)
     private var enableAfterPermission = false
     private var stopRangingQuery: (() -> Unit)? = null
     private val connectPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -431,15 +436,43 @@ class BluetoothCenterActivity : FragmentActivity() {
             .setMessage("This runs 'su -c id' only after your confirmation. Your root manager may ask for approval. If authorized, the app reads Bluetooth service and system-property diagnostics. It will not change firmware, pairing, radio power, or system files.")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Continue") { _, _ ->
-                ioExecutor.execute {
-                    val report = RootCapabilityInspector.verifyRootAuthorization()
-                    val diagnostics = if (report.isRootAuthorized) RootCapabilityInspector.collectBluetoothDiagnostics() else report.detail
-                    val output = buildString {
-                        append("Root status: ${report.status}\n${report.detail}")
-                        if (report.indicators.isNotEmpty()) append("\n\nIndicators:\n${report.indicators.joinToString("\n")}")
-                        append("\n\nREAD-ONLY BLUETOOTH DIAGNOSTICS\n$diagnostics")
-                    }.take(24000)
-                    runOnUiThread { if (!isFinishing && !isDestroyed && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) showResult("Device diagnostics", output) }
+                if (!diagnosticsRunning.compareAndSet(false, true)) {
+                    showResult("Device diagnostics", "A read-only diagnostic request is already running.")
+                    return@setPositiveButton
+                }
+                try {
+                    ioExecutor.execute {
+                        try {
+                            val report = RootCapabilityInspector.verifyRootAuthorization()
+                            val diagnostics = if (report.isRootAuthorized) {
+                                RootCapabilityInspector.collectBluetoothDiagnostics()
+                            } else report.detail
+                            val output = buildString {
+                                append("Root status: " + report.status + "\n" + report.detail)
+                                if (report.indicators.isNotEmpty()) {
+                                    append("\n\nIndicators:\n")
+                                    append(report.indicators.joinToString("\n"))
+                                }
+                                append("\n\nREAD-ONLY BLUETOOTH DIAGNOSTICS\n" + diagnostics)
+                            }.take(24000)
+                            runOnUiThread {
+                                if (!isFinishing && !isDestroyed &&
+                                    lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                                ) showResult("Device diagnostics", output)
+                            }
+                        } catch (error: Exception) {
+                            runOnUiThread {
+                                if (!isFinishing && !isDestroyed &&
+                                    lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                                ) showResult("Device diagnostics failed", error.message ?: "The diagnostic could not be completed.")
+                            }
+                        } finally {
+                            diagnosticsRunning.set(false)
+                        }
+                    }
+                } catch (error: Exception) {
+                    diagnosticsRunning.set(false)
+                    showResult("Device diagnostics unavailable", "A diagnostic request is already queued or the background worker is shutting down.")
                 }
             }.showThemed(this)
     }

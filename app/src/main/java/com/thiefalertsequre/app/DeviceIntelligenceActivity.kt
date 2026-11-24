@@ -30,13 +30,18 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.util.Locale
 import org.json.JSONObject
-import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Read-only, on-device capability and readiness report. No hardware identifiers are collected. */
 class DeviceIntelligenceActivity : FragmentActivity() {
     private lateinit var root: LinearLayout
     private lateinit var rootStatusView: TextView
-    private val rootCheckExecutor = Executors.newSingleThreadExecutor()
+    private val rootCheckExecutor = BoundedSerialExecutor.create(
+        queueCapacity = 1,
+        backpressureTimeoutMs = 100L,
+        threadName = "device-intelligence-root-check"
+    )
+    private val rootCheckRunning = AtomicBoolean(false)
     private var rangingStatus: String? = null
     private var stopRangingQuery: (() -> Unit)? = null
     private val exportDiagnostics = registerForActivityResult(
@@ -543,35 +548,63 @@ class DeviceIntelligenceActivity : FragmentActivity() {
             .setMessage("This runs the read-only command su -c id. Your Magisk or other superuser manager may display an authorization prompt. The check does not modify files, settings, firmware, or protection behavior. Continue?")
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Run check") { _, _ ->
+                if (!rootCheckRunning.compareAndSet(false, true)) {
+                    rootStatusView.text = "ROOT ACCESS: CHECK ALREADY RUNNING…"
+                    return@setPositiveButton
+                }
                 rootStatusView.text = "ROOT ACCESS: CHECKING…"
-                rootCheckExecutor.execute {
-                    val report = RootCapabilityInspector.verifyRootAuthorization()
-                    runOnUiThread {
-                        if (isFinishing || isDestroyed || !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return@runOnUiThread
-                        val status = when (report.status) {
-                            RootCapabilityInspector.RootStatus.ROOT_AUTHORIZED -> "ROOT ACCESS GRANTED — UID 0 VERIFIED"
-                            RootCapabilityInspector.RootStatus.ROOT_NOT_AUTHORIZED -> "ROOT ACCESS DENIED / NOT GRANTED"
-                            RootCapabilityInspector.RootStatus.SU_NOT_AVAILABLE -> if (report.mayBeRooted) "POSSIBLE ROOT — SU NOT AVAILABLE" else "NO ROOT ACCESS DETECTED — SU NOT AVAILABLE (HIDDEN ROOT CANNOT BE RULED OUT)"
-                            RootCapabilityInspector.RootStatus.ROOT_INDICATORS_FOUND -> "POSSIBLE ROOT — AUTHORIZATION NOT VERIFIED"
-                            RootCapabilityInspector.RootStatus.NOT_INDICATED -> "NO ROOT INDICATORS — NOT PROOF OF NON-ROOT"
-                            RootCapabilityInspector.RootStatus.ROOT_CHECK_TIMED_OUT -> "ROOT CHECK TIMED OUT"
-                            RootCapabilityInspector.RootStatus.ROOT_CHECK_ERROR -> "ROOT CHECK ERROR"
+                try {
+                    rootCheckExecutor.execute {
+                        try {
+                            val report = RootCapabilityInspector.verifyRootAuthorization()
+                            runOnUiThread {
+                                if (isFinishing || isDestroyed ||
+                                    !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                                ) return@runOnUiThread
+                                val status = when (report.status) {
+                                    RootCapabilityInspector.RootStatus.ROOT_AUTHORIZED -> "ROOT ACCESS GRANTED — UID 0 VERIFIED"
+                                    RootCapabilityInspector.RootStatus.ROOT_NOT_AUTHORIZED -> "ROOT ACCESS DENIED / NOT GRANTED"
+                                    RootCapabilityInspector.RootStatus.SU_NOT_AVAILABLE -> if (report.mayBeRooted) "POSSIBLE ROOT — SU NOT AVAILABLE" else "NO ROOT ACCESS DETECTED — SU NOT AVAILABLE (HIDDEN ROOT CANNOT BE RULED OUT)"
+                                    RootCapabilityInspector.RootStatus.ROOT_INDICATORS_FOUND -> "POSSIBLE ROOT — AUTHORIZATION NOT VERIFIED"
+                                    RootCapabilityInspector.RootStatus.NOT_INDICATED -> "NO ROOT INDICATORS — NOT PROOF OF NON-ROOT"
+                                    RootCapabilityInspector.RootStatus.ROOT_CHECK_TIMED_OUT -> "ROOT CHECK TIMED OUT"
+                                    RootCapabilityInspector.RootStatus.ROOT_CHECK_ERROR -> "ROOT CHECK ERROR"
+                                }
+                                rootStatusView.text = status
+                                val color = if (report.isRootAuthorized) R.color.tas_primary else R.color.tas_warning
+                                rootStatusView.setTextColor(getColor(color))
+                                val details = buildString {
+                                    append(report.detail)
+                                    if (report.indicators.isNotEmpty()) {
+                                        append("\n\nPassive indicators:\n")
+                                        append(report.indicators.joinToString("\n"))
+                                    }
+                                    append("\n\nBuild tags: " + report.buildTags)
+                                    append("\n\nThis result describes root authorization available to this app at check time. Root-hiding tools can conceal indicators.")
+                                }
+                                MaterialAlertDialogBuilder(this)
+                                    .setTitle("Root status: " + report.status.name)
+                                    .setMessage(details)
+                                    .setPositiveButton("Close", null)
+                                    .showThemed(this)
+                            }
+                        } catch (error: Exception) {
+                            runOnUiThread {
+                                if (!isFinishing && !isDestroyed &&
+                                    lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+                                ) {
+                                    rootStatusView.text = "ROOT CHECK ERROR"
+                                    rootStatusView.setTextColor(getColor(R.color.tas_warning))
+                                }
+                            }
+                        } finally {
+                            rootCheckRunning.set(false)
                         }
-                        rootStatusView.text = status
-                        val color = if (report.isRootAuthorized) R.color.tas_primary else R.color.tas_warning
-                        rootStatusView.setTextColor(getColor(color))
-                        val details = buildString {
-                            append(report.detail)
-                            if (report.indicators.isNotEmpty()) append("\\n\\nPassive indicators:\\n${report.indicators.joinToString("\\n")}")
-                            append("\\n\\nBuild tags: ${report.buildTags}")
-                            append("\\n\\nThis result describes root authorization available to this app at check time. Root-hiding tools can conceal indicators.")
-                        }
-                        MaterialAlertDialogBuilder(this)
-                            .setTitle("Root status: ${report.status.name}")
-                            .setMessage(details)
-                            .setPositiveButton("Close", null)
-                            .showThemed(this)
                     }
+                } catch (error: Exception) {
+                    rootCheckRunning.set(false)
+                    rootStatusView.text = "ROOT CHECK BUSY"
+                    rootStatusView.setTextColor(getColor(R.color.tas_warning))
                 }
             }.showThemed(this)
     }
