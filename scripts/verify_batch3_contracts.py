@@ -32,7 +32,7 @@ checks = {
     "Android 14+ Quick Settings launch uses the PendingIntent overload":
         "Build.VERSION.SDK_INT >= 34" in tile and "startActivityAndCollapse(pending)" in tile,
     "widgets read the authoritative protection state and never mutate it":
-        "ProtectionStore(context.applicationContext).read()" in widgets
+        "val store = ProtectionStore(context)" in widgets\n        and "val state = store.read()" in widgets
         and "ProtectionStore(context).update" not in widgets
         and "updatePersisted" not in widgets,
     "widget taps only open the application":
