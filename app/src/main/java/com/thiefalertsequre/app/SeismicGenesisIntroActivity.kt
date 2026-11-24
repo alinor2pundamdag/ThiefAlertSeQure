@@ -402,11 +402,15 @@ private fun SeismicGenesisIntroContent(
                 )
             }
 
-            GenesisFractureCanvas(
-                progress = p,
-                use3d = use3d,
-                modifier = Modifier.fillMaxSize()
-            )
+            // The 2D fracture plate is a compatibility fallback only.
+            // Filament-capable devices render the fracture and debris in 3D.
+            if (!use3d) {
+                GenesisFractureCanvas(
+                    progress = p,
+                    use3d = false,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
             if (p < 0.43f) {
                 Image(
