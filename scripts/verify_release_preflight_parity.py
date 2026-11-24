@@ -23,6 +23,7 @@ required = [
     "verify_state_ownership.py",
     "verify_release_identity.py",
     "verify_legal_policy_contract.py",
+    "verify_packaged_legal_assets.py",
 ]
 missing_android = [script for script in required if f"scripts/{script}" not in android]
 missing_release = [script for script in required if f"scripts/{script}" not in release]
