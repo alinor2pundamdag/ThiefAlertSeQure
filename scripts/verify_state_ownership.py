@@ -51,7 +51,7 @@ for required in (
 ):
     if required not in a2_receiver:
         errors.append("A2BluetoothAclReceiver missing bounded receiver contract: " + required)
-if re.search(r"\bThread\s*\{, a2_receiver) or ".start()" in a2_receiver:
+if re.search(r"\bThread\s*\{", a2_receiver) or ".start()" in a2_receiver:
     errors.append("A2BluetoothAclReceiver must not create a raw thread per broadcast")
 
 if errors:
