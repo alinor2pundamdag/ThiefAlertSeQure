@@ -22,6 +22,7 @@ camera_vault = (APP / "CameraEvidenceVault.kt").read_text(encoding="utf-8")
 camera_policy = (APP / "CameraEvidencePolicy.kt").read_text(encoding="utf-8")
 camera_media = (APP / "CameraEvidenceMediaStore.kt").read_text(encoding="utf-8")
 settings = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
+auth = (APP / "OwnerAuthenticationCoordinator.kt").read_text(encoding="utf-8")
 
 trusted_registry = (APP / "TrustedBluetoothRegistry.kt").read_text(encoding="utf-8")
 device_intelligence = (APP / "DeviceIntelligenceActivity.kt").read_text(encoding="utf-8")
@@ -510,6 +511,21 @@ checks = {
         and "shouldRun(false, ProtectionMode.COUNTDOWN)" in (ROOT / "app/src/test/java/com/thiefalertsequre/app/ProtectionMonitorPolicyTest.kt").read_text(encoding="utf-8"),
     "charger countdown remains exactly ten seconds":
         "const val COUNTDOWN_MS = 10_000L" in engine,
+    "authenticated owner disarm stops every alarm output and restores volume":
+        "appContext.stopService(Intent(appContext, AlarmService::class.java))" in auth
+        and "private fun stopAlarm()" in alarm
+        and all(token in alarm for token in (
+            "stopSecondaryAlarm()",
+            "toneController?.stop()",
+            "releaseToneWakeLock()",
+            "flashController?.stop()",
+            "player?.stop()",
+            "player?.release()",
+            "vibrator?.cancel()",
+            "abandonAudioFocusRequest",
+            "AlarmVolumeController.restore"
+        ))
+        and "stopAlarm()" in alarm[alarm.index("override fun onDestroy()"):],
 }
 for description, passed in checks.items():
     if not passed:
