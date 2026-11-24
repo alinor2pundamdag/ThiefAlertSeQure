@@ -26,9 +26,9 @@ internal object LocalTamperHistoryPolicy {
             .replace(Regex("[\\p{Cc}\\p{Zl}\\p{Zp}]"), " ")
             .replace(Regex(" +"), " ")
             .trim()
-        safe = exceptionMessage.replace(safe) { "\${it.groupValues[1]}: [redacted]" }
+        safe = exceptionMessage.replace(safe) { it.groupValues[1] + ": [redacted]" }
         safe = bearerCredential.replace(safe, "Bearer [redacted]")
-        safe = credentialAssignment.replace(safe) { "\${it.groupValues[1]}=[redacted]" }
+        safe = credentialAssignment.replace(safe) { it.groupValues[1] + "=[redacted]" }
         safe = knownToken.replace(safe, "[redacted]")
         safe = jwt.replace(safe, "[redacted]")
         safe = uri.replace(safe, "[redacted-uri]")
