@@ -34,6 +34,40 @@ class LocalTamperHistoryPolicyTest {
     }
 
     @Test
+    fun exceptionMessagesAreRedactedButExceptionTypeRemainsUseful() {
+        assertEquals(
+            "IOException: [redacted]",
+            LocalTamperHistoryPolicy.sanitizeDetail("IOException: Failed to open /data/user/0/app/files/private.apk")
+        )
+    }
+
+    @Test
+    fun credentialAssignmentsBearerTokensAndJwtValuesAreRedacted() {
+        val safe = LocalTamperHistoryPolicy.sanitizeDetail(
+            "api_key=secret-value password=hunter2 Authorization: Bearer abc.def.ghi"
+        )
+        assertEquals(false, safe.contains("secret-value"))
+        assertEquals(false, safe.contains("hunter2"))
+        assertEquals(false, safe.contains("abc.def.ghi"))
+    }
+
+    @Test
+    fun uriPathsAndEmailAddressesAreRedacted() {
+        val safe = LocalTamperHistoryPolicy.sanitizeDetail(
+            "audio content://private.provider/document/secret file=/storage/emulated/0/Music/private.ogg owner=user@example.com"
+        )
+        assertEquals(false, safe.contains("content://"))
+        assertEquals(false, safe.contains("/storage/emulated"))
+        assertEquals(false, safe.contains("user@example.com"))
+    }
+
+    @Test
+    fun safeOperationalDetailsAndEvidenceHashesRemainReadable() {
+        val detail = "charger_countdown_started after 3 stable samples; sha256=" + "a".repeat(64)
+        assertEquals(detail, LocalTamperHistoryPolicy.sanitizeDetail(detail))
+    }
+
+    @Test
     fun eventAndDetailLengthsAreBounded() {
         assertEquals(48, LocalTamperHistoryPolicy.sanitizeEvent("x".repeat(80)).length)
         assertEquals(180, LocalTamperHistoryPolicy.sanitizeDetail("x".repeat(240)).length)
