@@ -34,6 +34,8 @@ import kotlin.math.min
 class SeismicGenesisIntroActivity : FragmentActivity() {
     private var animator: ValueAnimator? = null
     private var toneGenerator: ToneGenerator? = null
+    private var toneReleaseRunnable: Runnable? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var progress = 0f
     private var destroying = false
     private lateinit var artwork: GenesisCanvas
@@ -108,13 +110,18 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
             }
         }
         if (AppearanceStudioStore.audio(this)) runCatching {
-            toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 25).also {
-                it.startTone(ToneGenerator.TONE_PROP_ACK, 130)
-                Handler(Looper.getMainLooper()).postDelayed({
-                    runCatching { it.release() }
-                    if (toneGenerator === it) toneGenerator = null
-                }, 180L)
+            val generator = ToneGenerator(AudioManager.STREAM_MUSIC, 25)
+            toneGenerator = generator
+            generator.startTone(ToneGenerator.TONE_PROP_ACK, 130)
+            val release = Runnable {
+                if (toneGenerator === generator) {
+                    toneGenerator = null
+                    runCatching { generator.release() }
+                }
+                toneReleaseRunnable = null
             }
+            toneReleaseRunnable = release
+            mainHandler.postDelayed(release, 180L)
         }
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = INTRO_DURATION_MS
@@ -156,12 +163,33 @@ class SeismicGenesisIntroActivity : FragmentActivity() {
         finish()
     }
 
+    override fun onStart() {
+        super.onStart()
+        animator?.resume()
+    }
+
+    override fun onStop() {
+        // The intro must not finish or navigate while it is no longer visible.
+        animator?.pause()
+        releaseIntroAudio()
+        super.onStop()
+    }
+
+    private fun releaseIntroAudio() {
+        toneReleaseRunnable?.let(mainHandler::removeCallbacks)
+        toneReleaseRunnable = null
+        toneGenerator?.let { generator ->
+            toneGenerator = null
+            runCatching { generator.release() }
+        }
+    }
+
     override fun onDestroy() {
         destroying = true
         animator?.cancel()
         animator = null
-        runCatching { toneGenerator?.release() }
-        toneGenerator = null
+        releaseIntroAudio()
+        mainHandler.removeCallbacksAndMessages(null)
         super.onDestroy()
     }
 
