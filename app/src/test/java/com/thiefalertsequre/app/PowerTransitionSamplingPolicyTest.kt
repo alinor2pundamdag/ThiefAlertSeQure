@@ -4,6 +4,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.TimeUnit
 
 class PowerTransitionSamplingPolicyTest {
     @Test fun confirmsConnectAfterThreeConsecutiveSamplesWithoutWaitingForUnusedReads() {
@@ -52,6 +56,38 @@ class PowerTransitionSamplingPolicyTest {
         assertFalse(result.confirmed)
         assertEquals(5, result.sampleCount)
         assertEquals(false, result.lastObserved)
+    }
+
+    @Test fun powerTransitionExecutorUsesBoundedQueueAndExplicitTimedRejection() {
+        val workerStarted = CountDownLatch(1)
+        val releaseWorker = CountDownLatch(1)
+        val executor = PowerTransitionQueuePolicy.createExecutor(
+            queueCapacity = 1,
+            backpressureTimeoutMs = 50L
+        )
+
+        try {
+            assertTrue(executor.queue is ArrayBlockingQueue<*>)
+            assertEquals(1, executor.queue.remainingCapacity() + executor.queue.size)
+            executor.execute {
+                workerStarted.countDown()
+                releaseWorker.await(1, TimeUnit.SECONDS)
+            }
+            assertTrue(workerStarted.await(1, TimeUnit.SECONDS))
+            executor.execute { }
+            assertEquals(1, executor.queue.size)
+
+            var rejected = false
+            try {
+                executor.execute { }
+            } catch (_: RejectedExecutionException) {
+                rejected = true
+            }
+            assertTrue(rejected)
+        } finally {
+            releaseWorker.countDown()
+            executor.shutdownNow()
+        }
     }
 
     @Test fun unknownSamplesNeverCountAsConnectedOrDisconnectedConfirmation() {
