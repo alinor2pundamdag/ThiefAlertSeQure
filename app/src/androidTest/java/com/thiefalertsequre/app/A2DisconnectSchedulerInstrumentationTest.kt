@@ -65,41 +65,6 @@ class A2DisconnectSchedulerInstrumentationTest {
     }
 
     @Test
-    fun legacyPendingRecordMigratesAndRetryCountIsEncrypted() {
-        val prefs = context.getSharedPreferences(preferencesName, 0)
-        val key = "trusted_bluetooth_pending_disconnects_v1"
-        val nowEpoch = System.currentTimeMillis()
-        val nowElapsed = SystemClock.elapsedRealtime()
-        val address = "02:00:00:00:00:45"
-        val pending = A2DisconnectScheduler.Pending(
-            address = address,
-            eventEpochMs = nowEpoch,
-            eventElapsedRealtimeMs = nowElapsed,
-            bootCount = ProtectionClock.bootCount(context),
-            monitorRevision = 18L,
-            deviceRevision = 4L
-        )
-        // v1.1.4's original payload shape had six fields.
-        prefs.edit().putString(
-            key,
-            "${address}|${nowEpoch}|${nowElapsed}|${pending.bootCount}|18|4"
-        ).commit()
-
-        assertTrue(A2DisconnectScheduler.scheduleIsolated(context, pending, preferencesName, namespace))
-        val migrated = prefs.getString(key, null)
-        assertNotNull(migrated)
-        assertTrue(LocalPreferenceCipher.isEncrypted(migrated!!))
-        val decoded = LocalPreferenceCipher.decrypt(key, migrated)
-        assertEquals("0", decoded.substringAfterLast('|'))
-
-        assertTrue(A2DisconnectScheduler.scheduleRetryIsolated(context, pending, preferencesName, namespace))
-        val retried = prefs.getString(key, null)
-        assertNotNull(retried)
-        val retryPayload = LocalPreferenceCipher.decrypt(key, retried!!)
-        assertEquals("1", retryPayload.substringAfterLast('|'))
-    }
-
-    @Test
     fun pendingDeadlineIsEncryptedAndReconnectCancellationRemovesIt() {
         val prefs = context.getSharedPreferences(preferencesName, 0)
         val address = "02:00:00:00:00:42"

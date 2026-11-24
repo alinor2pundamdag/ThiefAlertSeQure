@@ -44,13 +44,6 @@ internal object A2DisconnectScheduler {
     fun scheduleRetry(context: Context, pending: Pending): Boolean =
         scheduleRetryInternal(context, pending, ProtectionMonitorService.PREFS, null)
 
-    internal fun scheduleRetryIsolated(
-        context: Context,
-        pending: Pending,
-        preferencesName: String,
-        namespace: String
-    ): Boolean = scheduleRetryInternal(context, pending, preferencesName, namespace)
-
     private fun scheduleRetryInternal(
         context: Context,
         pending: Pending,
