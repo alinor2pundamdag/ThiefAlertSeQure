@@ -19,8 +19,10 @@ checks = {
     "existing encrypted history retries legacy plaintext cleanup before becoming healthy":
         "if (!clearLegacyPlaintext(context)) return HistoryRead(\"\", false)" in source,
     "first-use migration writes encrypted data before deleting legacy plaintext":
-        source.index("if (!prefs.edit().putString(KEY_EVENTS, encrypted).commit()) return HistoryRead(\"\", false)")
-        < source.index("if (!clearLegacyPlaintext(context)) return HistoryRead(\"\", false)"),
+        (lambda migration: migration.index("if (!prefs.edit().putString(KEY_EVENTS, encrypted).commit()) return HistoryRead(\"\", false)")
+         < migration.index("if (!clearLegacyPlaintext(context)) return HistoryRead(\"\", false)"))(
+            source.split("First-use migration from v1 plaintext SharedPreferences.", 1)[1]
+        ),
     "legacy cleanup checks the synchronous commit result":
         "val removed = legacyPrefs.edit().remove(LEGACY_KEY_EVENTS).commit()" in source,
     "legacy cleanup verifies the plaintext key is actually absent":
