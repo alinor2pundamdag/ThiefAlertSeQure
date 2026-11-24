@@ -868,6 +868,7 @@ class SettingsActivity : FragmentActivity() {
 
             val installIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
                 // codeql[java/android/arbitrary-apk-installation]
+
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 putExtra(Intent.EXTRA_RETURN_RESULT, true)
@@ -876,6 +877,7 @@ class SettingsActivity : FragmentActivity() {
 
             val installerFallback = Intent(Intent.ACTION_VIEW).apply {
                 // codeql[java/android/arbitrary-apk-installation]
+
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
