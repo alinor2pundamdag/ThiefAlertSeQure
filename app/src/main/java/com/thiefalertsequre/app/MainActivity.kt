@@ -86,9 +86,9 @@ class MainActivity : FragmentActivity() {
         applyAlarmWindowPolicy()
 
         val privacyDecision = SafePreferences.string(getSharedPreferences("privacy_notice_v5", MODE_PRIVATE), "decision", null)
-        // Require acknowledgement of this updated notice on every existing
-        // install once; it now discloses the optional alarm flashlight and its safety toggle.
-        if (privacyDecision != "acknowledged") {
+        val termsDecision = SafePreferences.string(getSharedPreferences("terms_notice_v1", MODE_PRIVATE), "decision", null)
+        // Versioned acknowledgements are local and must be renewed when either policy version changes.
+        if (privacyDecision != "acknowledged" || termsDecision != "acknowledged") {
             showPrivacyScreen()
             return
         }
@@ -140,18 +140,30 @@ class MainActivity : FragmentActivity() {
             14f, getColor(R.color.tas_muted), false
         ), matchWrap())
         body.addView(space(16))
+        body.addView(label("Terms of use and platform limitations", 18f, getColor(R.color.tas_text), true), matchWrap())
+        body.addView(space(8))
+        body.addView(label(
+            "Use this app only on a device you own or are authorized to manage. The app provides local monitoring, alerts and deterrence, not a guarantee against theft, loss or compromise. Android and the device manufacturer control background execution, notifications, alarms, Bluetooth, camera/flash hardware, power-menu behavior and managed-device policy. No ordinary app can guarantee resistance to force-stop, uninstall, physical shutdown, battery removal, recovery or bootloader operations, or every OEM restriction. Device Owner / Lock Task mode requires separate authorized provisioning and can restrict device functions; keep a recovery path. Optional evidence and exported backups are your responsibility to protect. Android displays the final confirmation for official APK installation.",
+            14f, getColor(R.color.tas_muted), false
+        ), matchWrap())
+        body.addView(space(16))
         body.addView(label("Acknowledgement", 18f, getColor(R.color.tas_text), true), matchWrap())
         body.addView(space(6))
         body.addView(label(
-            "Review this notice before continuing. Tapping the button below records that you have acknowledged local event evidence, optional owner-requested location, optional front-camera photo evidence after successful owner authentication, password-protected backup, alarm behavior, optional flashlight alert, and Android platform limitations. You can review this notice again later in Settings.",
+            "Review both documents before continuing. Tapping the button below records local acknowledgement of Privacy Notice version 5 and Terms version 1, including local event evidence, optional owner-requested location, optional front-camera photo evidence, password-protected backup, alarm behavior, optional flashlight alert, Android platform limitations, and your responsibility to protect exported files. You can review them again from About and Settings.",
             13f, getColor(R.color.tas_muted), false
         ), matchWrap())
         notice.addView(body)
         root.addView(notice, matchWrap())
         root.addView(space(22))
         root.addView(button("I understand & continue") {
+            val acceptedAt = System.currentTimeMillis()
             getSharedPreferences("privacy_notice_v5", MODE_PRIVATE).edit()
-                .putString("decision", "acknowledged").putLong("decision_at", System.currentTimeMillis()).apply()
+                .putString("decision", "acknowledged").putInt("version", 5)
+                .putLong("decision_at", acceptedAt).apply()
+            getSharedPreferences("terms_notice_v1", MODE_PRIVATE).edit()
+                .putString("decision", "acknowledged").putInt("version", 1)
+                .putLong("decision_at", acceptedAt).apply()
             buildDashboard()
         }, matchWrap())
         root.addView(space(16))

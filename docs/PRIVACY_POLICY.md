@@ -23,6 +23,7 @@ The app stores only the operational information needed to provide its functions:
 - The user's privacy-notice choice and the time it was recorded.
 - The previous alarm-stream volume while an alarm is active, so it can be restored after successful disarm.
 - A bounded local protection event history (up to 100 entries), which the owner can review or export as CSV.
+- A separate AES-GCM encrypted local event timeline (up to 100 events). It stores local timestamps with timezone offsets, event codes and sanitized/redacted details. Viewing requires a successful enrolled strong biometric or the Android device PIN, pattern or password; the viewer supports local search/category filters and owner-initiated CSV export. The timeline is not uploaded.
 - A separate AES-GCM encrypted local evidence metadata vault (up to 100 records, 30-day retention). It stores app-observed event metadata and only cached/current location results explicitly requested by the owner. Owner-initiated metadata backup files are encrypted with a separate password-derived AES-GCM key; the backup password is not stored.
 - A separate Android Keystore AES-GCM encrypted front-camera photo vault, only when the owner explicitly enables it and grants CAMERA permission. One front-camera still is captured only after successful Android owner authentication that disarms a latched alarm while the app is visible. The vault retains at most 20 photos for 30 days, with a 2 MiB per-photo limit; each photo has a SHA-256 integrity record and can be viewed, exported individually, or deleted by the owner.
 - Monitor preferences such as enablement, motion sensitivity and optional battery-alert threshold.
@@ -67,7 +68,7 @@ Operational preferences remain in the app's private storage until changed by the
 
 ## 7. User choice
 
-The first-launch notice explains local data handling, alarm behavior, optional flashlight behavior, explicitly owner-requested location snapshots, the separate opt-in front-camera evidence feature, and platform limitations. The optional local ranging capability check is available separately in Device Intelligence and does not request an additional permission. The owner acknowledges the notice with “I understand & continue”; that acknowledgement is stored locally. The notice can be reviewed again from Settings.
+The first-launch notice explains local data handling, alarm behavior, optional flashlight behavior, explicitly owner-requested location snapshots, the separate opt-in front-camera evidence feature, and platform limitations. Privacy Notice version 5 and Terms version 1 are acknowledged separately in versioned app-private preferences with local timestamps. A material change must increment the relevant versioned key so the next launch requires renewed acknowledgement. The privacy notice can be reviewed again from Settings; Terms can be reviewed and acknowledged again from About.
 
 ## 8. Limitations
 

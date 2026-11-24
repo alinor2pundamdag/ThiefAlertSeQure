@@ -137,7 +137,7 @@ class AboutActivity : FragmentActivity() {
 
         addSection("PRIVACY, TERMS AND OWNER CHOICE", "Review the current in-app notice and the limitations before enabling optional capabilities.")
         root.addView(text(
-            "Privacy notice version: 5. Acknowledgement is stored locally. The first-launch flow requires acknowledgement of the current notice version; reviewing the notice again from Settings resets that acknowledgement. Material changes to data practices must ship with an updated notice version and a new acknowledgement.",
+            "Privacy Notice version 5 • Terms version 1. Acknowledgements and timestamps are stored locally. First launch requires both current versions. Reviewing the privacy notice from Settings resets its acknowledgement; the Terms dialog records its own acknowledgement. For a material policy change, increment the corresponding versioned preference key so the app requires fresh acknowledgement.",
             13f, R.color.tas_muted
         ))
         root.addView(space(10))
@@ -316,7 +316,15 @@ class AboutActivity : FragmentActivity() {
                     "Optional location and camera evidence are owner-initiated and locally stored. Review the Privacy Notice for the exact capture, retention, export and deletion rules. Protect exported files and backup passwords; anyone with access to an exported file and its password may be able to read its contents.\n\n" +
                     "Official updates are checked only when you initiate the check. Android displays the final installation confirmation. Do not install modified or unofficial packages as official updates."
             )
-            .setPositiveButton("Close", null)
+            .setNegativeButton("Close", null)
+            .setPositiveButton("I acknowledge") { _, _ ->
+                val acceptedAt = System.currentTimeMillis()
+                getSharedPreferences("terms_notice_v1", MODE_PRIVATE).edit()
+                    .putString("decision", "acknowledged")
+                    .putInt("version", 1)
+                    .putLong("decision_at", acceptedAt)
+                    .apply()
+            }
             .showThemed(this)
     }
 

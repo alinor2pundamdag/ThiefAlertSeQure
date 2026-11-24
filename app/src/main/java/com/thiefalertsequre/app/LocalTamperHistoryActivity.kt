@@ -36,6 +36,8 @@ class LocalTamperHistoryActivity : FragmentActivity() {
     private var authenticatedUntilElapsedMs = 0L
     private var biometricPrompt: BiometricPrompt? = null
     private var authenticationRequested = false
+    private var waitingForSecureLockSetup = false
+    private val filterButtons = linkedMapOf<String, MaterialButton>()
 
     private val exportDocument = registerForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         if (uri != null) exportCsv(uri)
@@ -58,7 +60,11 @@ class LocalTamperHistoryActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (authenticatedUntilElapsedMs > 0L && SystemClock.elapsedRealtime() >= authenticatedUntilElapsedMs) {
+        if (waitingForSecureLockSetup && getSystemService(KeyguardManager::class.java).isDeviceSecure) {
+            waitingForSecureLockSetup = false
+            authenticationRequested = false
+            renderLocked("Secure Android screen lock detected. Verify your identity to open the history.")
+        } else if (authenticatedUntilElapsedMs > 0L && SystemClock.elapsedRealtime() >= authenticatedUntilElapsedMs) {
             authenticatedUntilElapsedMs = 0L
             renderLocked("The two-minute history access session expired. Authenticate again to continue.")
         } else if (::root.isInitialized) {
@@ -71,9 +77,11 @@ class LocalTamperHistoryActivity : FragmentActivity() {
         authenticationRequested = true
         val keyguard = getSystemService(KeyguardManager::class.java)
         if (!keyguard.isDeviceSecure) {
+            waitingForSecureLockSetup = true
             renderLocked("Set a secure Android PIN, pattern or password before opening private event history.")
             return
         }
+        waitingForSecureLockSetup = false
         val biometricAvailable = BiometricManager.from(this)
             .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
         if (!biometricAvailable) {
@@ -211,14 +219,31 @@ class LocalTamperHistoryActivity : FragmentActivity() {
         root.addView(space(8))
         val filterScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
         val filterRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        filterButtons.clear()
         listOf(
             "all" to "All", "power" to "Power", "bluetooth" to "Bluetooth",
             "alarm" to "Alarm", "authentication" to "Authentication", "evidence" to "Evidence", "system" to "System"
         ).forEach { (key, label) ->
-            filterRow.addView(button(if (activeCategory == key) "✓ $label" else label) {
+            val filterButton = button(if (activeCategory == key) "✓ $label" else label) {
                 activeCategory = key
+                filterButtons.forEach { (filterKey, item) ->
+                    val filterLabel = when (filterKey) {
+                        "all" -> "All"
+                        "power" -> "Power"
+                        "bluetooth" -> "Bluetooth"
+                        "alarm" -> "Alarm"
+                        "authentication" -> "Authentication"
+                        "evidence" -> "Evidence"
+                        else -> "System"
+                    }
+                    item.text = if (filterKey == activeCategory) "✓ $filterLabel" else filterLabel
+                    item.isSelected = filterKey == activeCategory
+                }
                 renderRows(history, evidence, historyHealthy, evidenceHealthy)
-            })
+            }
+            filterButton.isSelected = key == activeCategory
+            filterButtons[key] = filterButton
+            filterRow.addView(filterButton)
             filterRow.addView(spaceHorizontal(6))
         }
         filterScroll.addView(filterRow)

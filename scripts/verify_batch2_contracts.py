@@ -178,6 +178,10 @@ checks = {
         and "VERSION HISTORY" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
         and "Terms of Use & Platform Limitations" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
         and "FEATURE CATALOG" in (APP / "AboutActivity.kt").read_text(encoding="utf-8"),
+    "Privacy Notice and Terms acknowledgements are versioned and timestamped":
+        "terms_notice_v1" in dashboard and 'putInt("version", 1)' in dashboard
+        and "decision_at" in dashboard
+        and 'setPositiveButton("I acknowledge")' in (APP / "AboutActivity.kt").read_text(encoding="utf-8"),
     "dashboard tab selection persists and restores a visible selected state":
         "dashboard_navigation_v1" in dashboard and "selected_tab" in dashboard
         and "refreshNavigationSelection()" in dashboard and "tab.isSelected = active" in dashboard
