@@ -218,19 +218,19 @@ internal object ConfigurationBackup {
         when (definition.type) {
             "boolean" -> when (val read = SafePreferences.readBoolean(prefs, definition.key, definition.defaultValue as Boolean)) {
                 is PreferenceRead.Value -> read.value
-                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '\${definition.key}'.")
+                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '${definition.key}'.")
             }
             "int" -> when (val read = SafePreferences.readInt(prefs, definition.key, definition.defaultValue as Int)) {
                 is PreferenceRead.Value -> read.value
-                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '\${definition.key}'.")
+                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '${definition.key}'.")
             }
             "long" -> when (val read = SafePreferences.readLong(prefs, definition.key, definition.defaultValue as Long)) {
                 is PreferenceRead.Value -> read.value
-                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '\${definition.key}'.")
+                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '${definition.key}'.")
             }
             "string" -> when (val read = SafePreferences.readString(prefs, definition.key, definition.defaultValue as String)) {
                 is PreferenceRead.Value -> read.value ?: definition.defaultValue
-                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '\${definition.key}'.")
+                is PreferenceRead.Corrupt -> throw IllegalStateException("Cannot back up corrupted setting '${definition.key}'.")
             }
             else -> throw IllegalStateException("Unsupported configuration type.")
         }
@@ -279,18 +279,18 @@ internal object ConfigurationBackup {
             "int" -> {
                 require(value is Int) { "Invalid integer setting." }
                 require(value.toLong() in (definition.minimum ?: Int.MIN_VALUE.toLong())..(definition.maximum ?: Int.MAX_VALUE.toLong())) {
-                    "Configuration value '\${definition.key}' is outside its supported range."
+                    "Configuration value '${definition.key}' is outside its supported range."
                 }
             }
             "long" -> {
                 require(value is Long) { "Invalid long setting." }
                 require(value in (definition.minimum ?: Long.MIN_VALUE)..(definition.maximum ?: Long.MAX_VALUE)) {
-                    "Configuration value '\${definition.key}' is outside its supported range."
+                    "Configuration value '${definition.key}' is outside its supported range."
                 }
             }
             "string" -> {
                 require(value is String && value in definition.allowedStrings.orEmpty()) {
-                    "Configuration value '\${definition.key}' is not recognized."
+                    "Configuration value '${definition.key}' is not recognized."
                 }
             }
         }
