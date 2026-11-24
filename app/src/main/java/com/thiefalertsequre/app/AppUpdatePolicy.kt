@@ -1,5 +1,7 @@
 package com.thiefalertsequre.app
 
+import java.net.URL
+
 /** Immutable release identity and pure validation rules shared by updater tests. */
 internal object AppUpdatePolicy {
     const val EXPECTED_PACKAGE = "com.thiefalertsequre.app"
@@ -43,6 +45,16 @@ internal object AppUpdatePolicy {
             "The APK version code is not newer than the installed version."
         }
     }
+
+    fun isAllowedHttpsUrl(address: String): Boolean = runCatching {
+        val url = URL(address)
+        url.protocol.equals("https", ignoreCase = true) &&
+            url.host.isNotBlank() &&
+            listOf("api.github.com", "github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com")
+                .any { it.equals(url.host, ignoreCase = true) } &&
+            (url.port == -1 || url.port == 443) &&
+            url.userInfo == null
+    }.getOrDefault(false)
 
     fun hasOfficialSigner(signerSha256Digests: List<String>): Boolean =
         signerSha256Digests.size == 1 &&
