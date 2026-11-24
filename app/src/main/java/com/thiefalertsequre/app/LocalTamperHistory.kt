@@ -29,8 +29,8 @@ object LocalTamperHistory {
         val next = LocalTamperHistoryPolicy.append(current.value, line)
         val encrypted = runCatching { LocalPreferenceCipher.encrypt(PURPOSE, next) }.getOrNull() ?: return false
         if (!prefs.edit().putString(KEY_EVENTS, encrypted).commit()) return false
-        // Remove legacy plaintext only after the encrypted replacement is durable.
-        app.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE).edit().remove(LEGACY_KEY_EVENTS).commit()
+        // Never report success while a legacy plaintext copy remains on disk.
+        if (!clearLegacyPlaintext(app)) return false
         if (writeEvidenceArchive) LocalEvidenceVault.recordAsync(context, safeEvent, safeDetail)
         return true
     }
@@ -73,6 +73,9 @@ object LocalTamperHistory {
                 if (raw != null) {
                     val plaintext = runCatching { LocalPreferenceCipher.decrypt(PURPOSE, raw) }.getOrNull()
                         ?: return HistoryRead("", false)
+                    // Older builds may have left a plaintext copy if migration cleanup failed.
+                    // Retry cleanup before exposing decrypted history or recording more events.
+                    if (!clearLegacyPlaintext(context)) return HistoryRead("", false)
                     return HistoryRead(LocalTamperHistoryPolicy.sanitizeStoredHistory(plaintext), true)
                 }
             }
@@ -89,7 +92,16 @@ object LocalTamperHistory {
                 ?: return HistoryRead("", false)
             if (!prefs.edit().putString(KEY_EVENTS, encrypted).commit()) return HistoryRead("", false)
         }
-        legacyPrefs.edit().remove(LEGACY_KEY_EVENTS).commit()
+        // The encrypted replacement is durable before plaintext deletion is attempted.
+        // A failed removal keeps the history locked; a later read retries this migration.
+        if (!clearLegacyPlaintext(context)) return HistoryRead("", false)
         return HistoryRead(safeLegacy, true)
+    }
+
+    private fun clearLegacyPlaintext(context: Context): Boolean {
+        val legacyPrefs = context.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE)
+        if (!legacyPrefs.contains(LEGACY_KEY_EVENTS)) return true
+        val removed = legacyPrefs.edit().remove(LEGACY_KEY_EVENTS).commit()
+        return removed && !legacyPrefs.contains(LEGACY_KEY_EVENTS)
     }
 }
