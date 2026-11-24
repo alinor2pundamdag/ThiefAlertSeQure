@@ -192,7 +192,8 @@ checks = {
         and "PolicyAcknowledgementPolicy.TERMS_VERSION" in dashboard
         and "decision_at" in dashboard
         and '.commit()' in dashboard
-        and 'setPositiveButton("I acknowledge")' in (APP / "AboutActivity.kt").read_text(encoding="utf-8"),
+        and 'acknowledgeLabel = "I acknowledge"' in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
+        and "setPositiveButton(acknowledgeLabel)" in (APP / "LegalDocumentViewer.kt").read_text(encoding="utf-8"),
     "policy acknowledgement versions are centralized and stale acknowledgements are rejected":
         "PRIVACY_VERSION" in (APP / "PolicyAcknowledgementPolicy.kt").read_text(encoding="utf-8")
         and "TERMS_VERSION" in (APP / "PolicyAcknowledgementPolicy.kt").read_text(encoding="utf-8")
