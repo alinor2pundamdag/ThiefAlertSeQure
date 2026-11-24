@@ -44,6 +44,8 @@ class MainActivity : FragmentActivity() {
     private var biometricPrompt: BiometricPrompt? = null
     private var autoAuthenticationRequested = false
     private var lastBatchThreeRefreshAt = 0L
+    private val navigationTabs = linkedMapOf<String, MaterialButton>()
+    private val navigationDescriptions = linkedMapOf<String, String>()
 
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -227,38 +229,40 @@ class MainActivity : FragmentActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        fun addTab(label: String, description: String, action: () -> Unit) {
-            navigationRow.addView(navigationTab(label, description, action))
+        navigationTabs.clear()
+        navigationDescriptions.clear()
+        fun addTab(label: String, description: String, key: String, action: () -> Unit) {
+            navigationRow.addView(navigationTab(label, description, key, action))
             navigationRow.addView(horizontalSpace(5))
         }
-        addTab("Bluetooth", "Bluetooth Settings") {
+        addTab("Bluetooth", "Bluetooth Settings", "bluetooth") {
             startActivity(Intent(this, BluetoothCenterActivity::class.java))
         }
-        addTab("Hardening", "Device Hardening and Reliability") {
+        addTab("Hardening", "Device Hardening and Reliability", "hardening") {
             hardeningAnchor?.let { scroll.smoothScrollTo(0, it.top) }
         }
-        addTab("Sounds / Flash", "Sounds and Flash Alert") {
+        addTab("Sounds / Flash", "Sounds and Flash Alert", "sounds_flash") {
             startActivity(Intent(this, SettingsActivity::class.java)
                 .putExtra(SettingsActivity.EXTRA_SECTION, SettingsActivity.SECTION_SOUNDS_FLASH))
         }
-        addTab("Auth / Evidence", "Authentication Evidence") {
+        addTab("Auth / Evidence", "Authentication Evidence", "authentication_evidence") {
             authenticationEvidenceAnchor?.let { scroll.smoothScrollTo(0, it.top) }
         }
-        addTab("Device Info", "Device Intelligence") {
+        addTab("Device Info", "Device Intelligence", "device_intelligence") {
             startActivity(Intent(this, DeviceIntelligenceActivity::class.java))
         }
-        addTab("Appearance", "Appearance Studio") {
+        addTab("Appearance", "Appearance Studio", "appearance") {
             startActivity(Intent(this, ThemeActivity::class.java))
         }
-        addTab("Tamper History", "Local Tamper History") {
+        addTab("Tamper History", "Local Tamper History", "tamper_history") {
             startActivity(Intent(this, SettingsActivity::class.java)
                 .putExtra(SettingsActivity.EXTRA_SECTION, SettingsActivity.SECTION_TAMPER_HISTORY))
         }
-        addTab("More", "More Settings") {
+        addTab("More", "More Settings", "more") {
             startActivity(Intent(this, SettingsActivity::class.java)
                 .putExtra(SettingsActivity.EXTRA_SECTION, SettingsActivity.SECTION_MORE))
         }
-        addTab("About", "About ThiefAlertSeQure") {
+        addTab("About", "About ThiefAlertSeQure", "about") {
             startActivity(Intent(this, AboutActivity::class.java))
         }
         navigationScroll.addView(navigationRow)
@@ -381,6 +385,7 @@ class MainActivity : FragmentActivity() {
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
         ThemeRuntime.apply(this, scroll)
+        refreshNavigationSelection()
         setupSummary.text = SetupStatusSnapshot.read(this).dashboardSummary()
         reconcileCharging()
         render()
@@ -404,6 +409,7 @@ class MainActivity : FragmentActivity() {
         ThemeRuntime.apply(this, window.decorView)
         if (::setupSummary.isInitialized) setupSummary.text = SetupStatusSnapshot.read(this).dashboardSummary()
         render()
+        refreshNavigationSelection()
         launchAutomaticOwnerAuthenticationIfNeeded()
         status.removeCallbacks(ticker)
         status.post(ticker)
@@ -1132,9 +1138,10 @@ class MainActivity : FragmentActivity() {
         setOnClickListener { action() }
     }
 
-    private fun navigationTab(value: String, description: String, action: () -> Unit) = MaterialButton(this).apply {
-        text = value
-        contentDescription = "Open $description"
+    private fun navigationTab(value: String, description: String, key: String, action: () -> Unit) = MaterialButton(this).apply {
+        tag = value
+        navigationTabs[key] = this
+        navigationDescriptions[key] = description
         isAllCaps = false
         cornerRadius = dp(13)
         minHeight = dp(48)
@@ -1143,11 +1150,33 @@ class MainActivity : FragmentActivity() {
         insetBottom = 0
         setPadding(dp(11), 0, dp(11), 0)
         setTextSize(12f)
-        strokeWidth = dp(1)
         strokeColor = android.content.res.ColorStateList.valueOf(getColor(R.color.tas_primary))
-        backgroundTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.tas_surface))
-        setTextColor(getColor(R.color.tas_text))
-        setOnClickListener { action() }
+        setOnClickListener {
+            getSharedPreferences("dashboard_navigation_v1", MODE_PRIVATE).edit()
+                .putString("selected_tab", key).apply()
+            refreshNavigationSelection()
+            action()
+        }
+    }
+
+    private fun refreshNavigationSelection() {
+        val selected = SafePreferences.string(
+            getSharedPreferences("dashboard_navigation_v1", MODE_PRIVATE),
+            "selected_tab",
+            "bluetooth"
+        ) ?: "bluetooth"
+        navigationTabs.forEach { (key, tab) ->
+            val active = key == selected
+            tab.text = (if (active) "● " else "") + (tab.tag as? String).orEmpty()
+            tab.isSelected = active
+            tab.contentDescription = "Open ${navigationDescriptions[key].orEmpty()}" +
+                if (active) ", selected" else ""
+            tab.strokeWidth = dp(if (active) 2 else 1)
+            tab.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                getColor(if (active) R.color.tas_surface_variant else R.color.tas_surface)
+            )
+            tab.setTextColor(getColor(if (active) R.color.tas_primary else R.color.tas_text))
+        }
     }
 
     private fun outlinedButton(value: String, action: () -> Unit) = MaterialButton(this).apply {

@@ -141,7 +141,7 @@ class AboutActivity : FragmentActivity() {
             13f, R.color.tas_muted
         ))
         root.addView(space(10))
-        root.addView(button("Privacy Notice & Data Controls") {
+        root.addView(button("Privacy & Data") {
             startActivity(Intent(this, SettingsActivity::class.java)
                 .putExtra(SettingsActivity.EXTRA_SECTION, SettingsActivity.SECTION_PRIVACY))
         })

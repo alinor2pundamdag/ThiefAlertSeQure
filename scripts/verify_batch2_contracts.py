@@ -165,6 +165,10 @@ checks = {
         "SECTION_SOUNDS_FLASH" in dashboard and "SECTION_TAMPER_HISTORY" in dashboard
         and "SECTION_MORE" in dashboard and "sectionAnchors[section]" in settings
         and "scroll.smoothScrollTo(0, target.top)" in settings,
+    "dashboard tab selection persists and restores a visible selected state":
+        "dashboard_navigation_v1" in dashboard and "selected_tab" in dashboard
+        and "refreshNavigationSelection()" in dashboard and "tab.isSelected = active" in dashboard
+        and 'tab.text = (if (active) "● " else "")' in dashboard,
     "About screen exposes app identity and privacy destinations":
         "class AboutActivity" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
         and "Privacy & Data" in (APP / "AboutActivity.kt").read_text(encoding="utf-8")
