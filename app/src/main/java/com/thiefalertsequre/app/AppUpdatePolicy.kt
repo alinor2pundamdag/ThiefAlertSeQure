@@ -6,6 +6,16 @@ internal object AppUpdatePolicy {
     const val EXPECTED_CERT_SHA256 =
         "9f4aa14a6c6fbca0dc10c7806858de9f050447953b93c5c99c6e6ea85f540b64"
 
+    private val officialReleaseTagPattern =
+        Regex("^v([0-9]+(?:\\.[0-9]+){1,3}(?:_Developer_Alinor)?)$")
+
+    /** Maps an official tag to the exact Android versionName carried by its APK. */
+    fun versionNameFromReleaseTag(tag: String): String {
+        val match = officialReleaseTagPattern.matchEntire(tag)
+        requireNotNull(match) { "The official release tag has an invalid version format." }
+        return match.groupValues[1]
+    }
+
     fun requireInstalledPackage(installedPackage: String) {
         require(installedPackage == EXPECTED_PACKAGE) {
             "In-app updates are supported only for the official production package."
