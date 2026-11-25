@@ -31,6 +31,8 @@ for test_name in ("adapterCertificationRequiresExactModelApiAndFirmwareFingerpri
                   "factoryCannotBorrowAnotherCertificationAdapterId",
                   "adapterIdGetterFailureIsContainedAndFailsClosed"):
     assert test_name in test_source, f"Missing bypass registry regression test: {test_name}"
+for test_name in ("certificationRejectsUnknownCaseVariantsAndWildcardIdentities",):
+    assert test_name in tests.read_text(encoding="utf-8"), f"Missing strict identity regression: {test_name}"
 for permission in ("android.permission.WRITE_SECURE_SETTINGS",
                    "android.permission.DEVICE_POWER","android.permission.BATTERY_STATS"):
     assert permission not in manifest,f"Unexpected privileged permission: {permission}"
