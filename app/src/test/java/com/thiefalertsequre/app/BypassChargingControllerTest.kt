@@ -51,6 +51,29 @@ class BypassChargingControllerTest {
         assertEquals(BypassChargingMode.DISABLED,result.mode)
     }
 
+    @Test fun unsupportedFirstAdapterDoesNotMaskLaterSupportedAdapter() {
+        val unsupported=Fake(BypassChargingProbe(BypassChargingSupport.UNSUPPORTED,BypassChargingAuthorization.UNAVAILABLE,"not this model"),false)
+        val supportedAdapter=Fake(supported,false)
+        val result=BypassChargingController(listOf(unsupported,supportedAdapter)).setEnabled(true)
+        assertEquals(BypassChargingStatus.ENABLED_VERIFIED,result.status)
+        assertEquals("test-adapter",result.providerId)
+        assertEquals(0,unsupported.commands)
+        assertEquals(1,supportedAdapter.commands)
+    }
+
+    @Test fun failedProbeDoesNotMaskLaterSupportedAdapter() {
+        val broken=object:BypassChargingAdapter {
+            override val id="broken"
+            override fun probe():BypassChargingProbe=error("OEM service unavailable")
+            override fun setEnabled(enabled:Boolean)=error("must not be called")
+            override fun readEnabled():Boolean?=null
+        }
+        val supportedAdapter=Fake(supported,false)
+        val result=BypassChargingController(listOf(broken,supportedAdapter)).inspect()
+        assertEquals(BypassChargingStatus.DISABLED_VERIFIED,result.status)
+        assertEquals("test-adapter",result.providerId)
+    }
+
     @Test fun honorGuidanceDoesNotClaimThirdPartyControl() {
         val guidance=BypassChargingGuidance.instructions(BypassChargingDevice("HONOR","HONOR","200 Pro",36))
         assertTrue(guidance.contains("More battery settings"))
