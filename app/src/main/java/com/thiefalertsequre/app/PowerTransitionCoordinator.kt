@@ -234,7 +234,11 @@ object PowerTransitionCoordinator {
                 )
                 return
             }
-            val attempts = SafePreferences.int(prefs, PENDING_RETRY_COUNT, 0).coerceIn(0, 100)
+            val attempts = when (val retryRead = SafePreferences.readInt(prefs, PENDING_RETRY_COUNT, 0)) {
+                is PreferenceRead.Value -> retryRead.value.coerceIn(0, 100)
+                // A corrupt retry counter must not reset to a rapid retry loop.
+                is PreferenceRead.Corrupt -> 100
+            }
             val delayMs = PowerTransitionRecoveryPolicy.nextUnknownRetryDelayMs(attempts)
             if (!prefs.edit().putInt(PENDING_RETRY_COUNT, attempts + 1).commit()) {
                 LocalTamperHistory.record(
