@@ -40,6 +40,44 @@ class BypassChargingControllerTest {
         assertTrue(BypassChargingAdapterRegistry.resolve(device, listOf(registration, registration)).isEmpty())
     }
 
+    @Test fun factoryCannotBorrowAnotherCertificationAdapterId() {
+        val exact = BypassChargingCertification(
+            "certified-adapter", "HONOR", "HONOR", "ELP-NX9", 36, 36,
+            setOf("honor/elp-nx9/build:1.0/release-keys")
+        )
+        val device = BypassChargingDevice(
+            "HONOR", "HONOR", "ELP-NX9", 36,
+            "honor/elp-nx9/build:1.0/release-keys"
+        )
+        val wrongAdapter = object : BypassChargingAdapter {
+            override val id = "different-certified-adapter"
+            override fun probe() = supported
+            override fun setEnabled(enabled: Boolean) = true
+            override fun readEnabled(): Boolean? = false
+        }
+        val registration = BypassChargingAdapterRegistration(exact) { wrongAdapter }
+        assertTrue(BypassChargingAdapterRegistry.resolve(device, listOf(registration)).isEmpty())
+    }
+
+    @Test fun adapterIdGetterFailureIsContainedAndFailsClosed() {
+        val exact = BypassChargingCertification(
+            "certified-adapter", "HONOR", "HONOR", "ELP-NX9", 36, 36,
+            setOf("honor/elp-nx9/build:1.0/release-keys")
+        )
+        val device = BypassChargingDevice(
+            "HONOR", "HONOR", "ELP-NX9", 36,
+            "honor/elp-nx9/build:1.0/release-keys"
+        )
+        val broken = object : BypassChargingAdapter {
+            override val id: String get() = error("adapter identity unavailable")
+            override fun probe() = supported
+            override fun setEnabled(enabled: Boolean) = false
+            override fun readEnabled(): Boolean? = null
+        }
+        val registration = BypassChargingAdapterRegistration(exact) { broken }
+        assertTrue(BypassChargingAdapterRegistry.resolve(device, listOf(registration)).isEmpty())
+    }
+
     @Test fun noAdapterFailsClosed() {
         val result=BypassChargingController(emptyList()) { 123L }.inspect()
         assertEquals(BypassChargingStatus.OEM_INTERFACE_UNAVAILABLE,result.status)
