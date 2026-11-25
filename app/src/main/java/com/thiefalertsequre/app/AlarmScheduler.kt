@@ -135,6 +135,32 @@ object AlarmScheduler {
         return scheduled
     }
 
+    /** Inexact, backoff-limited revalidation for a durable unplug candidate. */
+    fun schedulePowerReconciliationRetry(context: Context, delayMs: Long): Boolean {
+        val alarmManager = context.getSystemService(AlarmManager::class.java)
+        val token = "power-reconcile"
+        val triggerAt = System.currentTimeMillis() + delayMs.coerceAtLeast(5_000L)
+        return replaceTokenAndSchedule(context, token) {
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent(context, token)
+            )
+        }
+    }
+
+    /** Cancel only the power-reconciliation token; never cancel a countdown/alarm token. */
+    fun cancelPowerReconciliationRetry(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val token = when (val stored = SafePreferences.readString(prefs, KEY_LAST_TOKEN, null)) {
+            is PreferenceRead.Value -> stored.value
+            is PreferenceRead.Corrupt -> return
+        }
+        if (token != "power-reconcile") return
+        context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context, token))
+        if (!prefs.edit().remove(KEY_LAST_TOKEN).commit()) {
+            LocalTamperHistory.record(context, "power_reconcile_token_clear_failed", "Consumed power retry token could not be cleared")
+        }
+    }
+
     fun scheduleRetry(context: Context, delayMs: Long) {
         val state = ProtectionStore(context).read()
         if (state.mode != ProtectionMode.COUNTDOWN || state.deadlineEpochMs <= 0L) return
