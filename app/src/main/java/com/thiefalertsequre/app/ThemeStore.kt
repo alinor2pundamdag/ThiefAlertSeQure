@@ -132,10 +132,18 @@ internal object ThemeColorMapping {
         return ColorStateList(states, mapped)
     }
 
-    /** Map a color by its source palette role; source roles are unique per palette. */
+    /** Map a color by its source palette role while preserving state-applied alpha. */
     fun remap(color: Int, source: ThemePalette, target: ThemePalette): Int {
         if (source.id == target.id) return color
-        return colors(source, target)[color] ?: color
+        val mapping = colors(source, target)
+        mapping[color]?.let { return it }
+        // Android widget state lists often apply alpha to disabled text or
+        // controls. Match the source role by RGB and retain that state alpha.
+        val sourceRgb = color and 0x00ffffff
+        val sourceRole = paletteColors(source).firstOrNull { (it and 0x00ffffff) == sourceRgb }
+            ?: return color
+        val targetRole = mapping[sourceRole] ?: return color
+        return (color and 0xff000000.toInt()) or (targetRole and 0x00ffffff)
     }
 }
 
