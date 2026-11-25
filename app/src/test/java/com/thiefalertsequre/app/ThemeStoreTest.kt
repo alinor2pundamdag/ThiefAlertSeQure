@@ -28,6 +28,41 @@ class ThemeStoreTest {
         assertEquals(60, ThemeStore.all.count { it.mode == "Light" })
     }
 
+    @Test fun defaultResourceColorsMapIntoEveryTheme() {
+        val source = ThemeStore.get(ThemeStore.DEFAULT_ID)
+        ThemeStore.all.forEach { target ->
+            val mapping = ThemeColorMapping.colors(source, target)
+            assertEquals(target.primary, mapping[source.primary])
+            assertEquals(target.onPrimary, mapping[source.onPrimary])
+            assertEquals(target.background, mapping[source.background])
+            assertEquals(target.surface, mapping[source.surface])
+            assertEquals(target.variant, mapping[source.variant])
+            assertEquals(target.text, mapping[source.text])
+            assertEquals(target.muted, mapping[source.muted])
+            assertEquals(target.success, mapping[source.success])
+            assertEquals(target.warning, mapping[source.warning])
+            assertEquals(target.danger, mapping[source.danger])
+        }
+    }
+
+    @Test fun previouslyAppliedPaletteCanTransitionToEveryTheme() {
+        val source = ThemeStore.get("ocean")
+        ThemeStore.all.forEach { target ->
+            val mapping = ThemeColorMapping.colors(source, target)
+            assertEquals(target.primary, mapping[source.primary])
+            assertEquals(target.text, mapping[source.text])
+            assertEquals(target.background, mapping[source.background])
+        }
+    }
+
+    @Test fun destinationPaletteColorsAreNotRemappedAgain() {
+        ThemeStore.all.forEach { palette ->
+            ThemeColorMapping.paletteColors(palette).forEach { color ->
+                assertEquals(color, ThemeColorMapping.remap(color, ThemeStore.get(ThemeStore.DEFAULT_ID), palette))
+            }
+        }
+    }
+
     @Test fun invalidIdsAreRejected() {
         assertFalse(ThemeStore.valid("not-a-theme"))
         assertFalse(ThemeStore.valid(null))
