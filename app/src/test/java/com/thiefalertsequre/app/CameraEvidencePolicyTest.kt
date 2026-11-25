@@ -33,5 +33,4 @@ class CameraEvidencePolicyTest {
         assertFalse(CameraEvidencePolicy.isWithinStorageBudget(1, CameraEvidencePolicy.MAX_TOTAL_STORAGE_BYTES + 1L))
         assertFalse(CameraEvidencePolicy.isWithinStorageBudget(-1, 0L))
     }
-    }
 }
