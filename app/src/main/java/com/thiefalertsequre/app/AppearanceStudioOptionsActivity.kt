@@ -127,7 +127,7 @@ class AppearanceStudioOptionsActivity : FragmentActivity() {
         }, params(18))
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
-        ThemeRuntime.apply(this, scroll, palette.id, palette.id)
+        ThemeRuntime.apply(this, scroll, palette.id)
     }
 
     private fun choiceButton(title: String, choices: List<String>, onChoice: (Int) -> Unit) {
