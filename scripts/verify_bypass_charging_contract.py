@@ -11,8 +11,12 @@ tests=ROOT/"app/src/test/java/com/thiefalertsequre/app/BypassChargingControllerT
 for token in ("interface BypassChargingAdapter","adapter.readEnabled()",
               "BypassChargingStatus.STATE_UNVERIFIED","BypassChargingStatus.ACTIVATION_FAILED",
               "firmwareFingerprint: String","firmwareFingerprints: Set<String>",
-              "firmwareFingerprints.any { it == device.firmwareFingerprint }",
-              "firmwareFingerprints.none { it.isBlank() || it.contains(\"*\") }",
+              "firmwareFingerprints.any { it == deviceFingerprint }",
+              "firmwareFingerprints.none {", "it != it.trim()",
+              "it.equals(\"unknown\", ignoreCase = true)",
+              "deviceFingerprint == deviceFingerprint.trim()",
+              "!deviceFingerprint.contains(\"*\")", "isKnownIdentity(device.model)",
+              
               "duplicate certification is ambiguous","registeredId","actualId == registeredId",
               "return emptyList()"):
     assert token in controller,f"Missing fail-closed contract: {token}"
