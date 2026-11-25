@@ -104,9 +104,9 @@ internal object ThemeColorMapping {
         palette.warning, palette.danger
     )
 
-    /** Preserve colors already authored for the destination palette. */
+    /** Map a color by its source palette role; source roles are unique per palette. */
     fun remap(color: Int, source: ThemePalette, target: ThemePalette): Int {
-        if (color in paletteColors(target)) return color
+        if (source.id == target.id) return color
         return colors(source, target)[color] ?: color
     }
 }
