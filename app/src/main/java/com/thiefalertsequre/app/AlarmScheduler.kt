@@ -139,10 +139,12 @@ object AlarmScheduler {
     fun schedulePowerReconciliationRetry(context: Context, delayMs: Long): Boolean {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val token = "power-reconcile"
-        val triggerAt = System.currentTimeMillis() + delayMs.coerceAtLeast(5_000L)
+        // Same-boot candidate retry uses monotonic time so a user clock change
+        // cannot accelerate or stall this revalidation alarm.
+        val triggerAt = ProtectionClock.elapsedRealtime() + delayMs.coerceAtLeast(5_000L)
         return replaceTokenAndSchedule(context, token) {
             alarmManager.setAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent(context, token)
+                AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pendingIntent(context, token)
             )
         }
     }
