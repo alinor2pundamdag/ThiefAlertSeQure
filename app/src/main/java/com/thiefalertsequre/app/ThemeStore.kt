@@ -114,20 +114,48 @@ internal object ThemeColorMapping {
         target: ThemePalette
     ): ColorStateList {
         if (source.id == target.id) return colorStateList
+        // Preserve selector specs separately from real runtime state probes.
+        // Negative state IDs belong in specs, never in getColorForState inputs.
+        // Put compound states before general enabled/disabled selectors.
         val states = arrayOf(
-            intArrayOf(-android.R.attr.state_enabled),
             intArrayOf(android.R.attr.state_pressed, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_pressed, -android.R.attr.state_enabled),
             intArrayOf(android.R.attr.state_focused, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_focused, -android.R.attr.state_enabled),
             intArrayOf(android.R.attr.state_hovered, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_hovered, -android.R.attr.state_enabled),
             intArrayOf(android.R.attr.state_checked, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_checked, -android.R.attr.state_enabled),
             intArrayOf(android.R.attr.state_selected, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_selected, -android.R.attr.state_enabled),
             intArrayOf(android.R.attr.state_activated, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_activated, -android.R.attr.state_enabled),
+            intArrayOf(-android.R.attr.state_enabled),
             intArrayOf(android.R.attr.state_enabled),
             intArrayOf()
         )
+        val probes = arrayOf(
+            intArrayOf(android.R.attr.state_pressed, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_pressed),
+            intArrayOf(android.R.attr.state_focused, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_focused),
+            intArrayOf(android.R.attr.state_hovered, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_hovered),
+            intArrayOf(android.R.attr.state_checked, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_checked),
+            intArrayOf(android.R.attr.state_selected, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_selected),
+            intArrayOf(android.R.attr.state_activated, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_activated),
+            intArrayOf(),
+            intArrayOf(android.R.attr.state_enabled),
+            null
+        )
         val fallback = colorStateList.defaultColor
-        val mapped = states.map { state ->
-            remap(colorStateList.getColorForState(state, fallback), source, target)
+        val mapped = states.indices.map { index ->
+            val original = probes[index]?.let { colorStateList.getColorForState(it, fallback) }
+                ?: fallback
+            remap(original, source, target)
         }.toIntArray()
         return ColorStateList(states, mapped)
     }
