@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Allow Android-test source compilation, but prohibit emulator/instrumentation execution."""
+"""Prohibit Android instrumentation compilation/execution and all emulator/device test wiring."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +20,8 @@ forbidden_gradle = (
     "connectedCheck",
     "managedDeviceCheck",
     "instrumentationTestBuild",
+    "compileDebugAndroidTest",
+    "compileReleaseAndroidTest",
     "assembleAndroidTest",
     "assembleDebugAndroidTest",
     "assembleReleaseAndroidTest",
@@ -53,6 +55,8 @@ for workflow in workflows:
         "android-emulator-runner",
         "am instrument",
         "assembleReleaseAndroidTest",
+        "compileDebugAndroidTest",
+        "compileReleaseAndroidTest",
         "assembleDebugAndroidTest",
         "connectedAndroidTest",
         "connectedDebugAndroidTest",
@@ -65,6 +69,6 @@ for workflow in workflows:
             raise SystemExit(f"Instrumentation/emulator workflow wiring is forbidden: {workflow}: {token}")
 
 print(
-    "Verified: Android-test source compilation is allowed, but no instrumentation execution or emulator wiring "
+    "Verified: no Android instrumentation compilation/execution or emulator wiring "
     f"across {len(gradle_files)} Gradle configuration files and {len(workflows)} GitHub Actions workflows."
 )
