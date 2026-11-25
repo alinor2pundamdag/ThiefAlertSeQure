@@ -156,7 +156,11 @@ internal object CameraEvidenceCapture {
             val jpeg = try {
                 val buffer = image.planes.firstOrNull()?.buffer
                     ?: throw IllegalStateException("Camera returned no JPEG plane")
-                ByteArray(buffer.remaining()).also { buffer.get(it) }
+                val byteCount = buffer.remaining()
+                require(CameraEvidencePolicy.isValidSourceImageSize(byteCount)) {
+                    "Camera JPEG exceeds the bounded source-image limit"
+                }
+                ByteArray(byteCount).also { buffer.get(it) }
             } catch (error: Exception) {
                 image.close()
                 finish("camera_evidence_image_read_failed", error.javaClass.simpleName)
@@ -284,8 +288,25 @@ internal object CameraEvidenceCapture {
     }
 
     private fun boundJpeg(source: ByteArray): ByteArray? {
+        if (!CameraEvidencePolicy.isValidSourceImageSize(source.size)) return null
         if (CameraEvidencePolicy.isValidImageSize(source.size)) return source
-        val bitmap = runCatching { BitmapFactory.decodeByteArray(source, 0, source.size) }.getOrNull() ?: return null
+        // Inspect dimensions first, then decode with a power-of-two sample size.
+        // This prevents a large OEM JPEG from expanding into an unbounded bitmap
+        // on a low-memory device before the final 1280x720 resize.
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(source, 0, source.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sampleSize = 1
+        while (bounds.outWidth / sampleSize > PREFERRED_WIDTH ||
+            bounds.outHeight / sampleSize > PREFERRED_HEIGHT
+        ) {
+            sampleSize = (sampleSize * 2).coerceAtMost(1 shl 15)
+            if (sampleSize >= (1 shl 15)) break
+        }
+        val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        val bitmap = runCatching {
+            BitmapFactory.decodeByteArray(source, 0, source.size, decodeOptions)
+        }.getOrNull() ?: return null
         return try {
             val scale = minOf(
                 1f,
