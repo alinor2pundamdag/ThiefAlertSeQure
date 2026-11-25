@@ -17,6 +17,11 @@ if not gradle_files:
 
 workflows = sorted((ROOT / ".github/workflows").glob("*.yml"))
 forbidden_gradle = (
+    "testInstrumentationRunner",
+    "androidTestImplementation",
+    "androidTestApi",
+    "androidTestUtil",
+    "androidTestCompile",
     "connectedCheck",
     "managedDeviceCheck",
     "instrumentationTestBuild",
