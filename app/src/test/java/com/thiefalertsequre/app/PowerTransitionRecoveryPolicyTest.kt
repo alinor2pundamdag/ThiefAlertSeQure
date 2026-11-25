@@ -1,10 +1,21 @@
 package com.thiefalertsequre.app
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PowerTransitionRecoveryPolicyTest {
+    @Test fun inconclusivePowerRetryBackoffIsExponentialAndCapped() {
+        assertEquals(5_000L, PowerTransitionRecoveryPolicy.nextUnknownRetryDelayMs(0))
+        assertEquals(10_000L, PowerTransitionRecoveryPolicy.nextUnknownRetryDelayMs(1))
+        assertEquals(20_000L, PowerTransitionRecoveryPolicy.nextUnknownRetryDelayMs(2))
+        assertEquals(160_000L, PowerTransitionRecoveryPolicy.nextUnknownRetryDelayMs(5))
+        assertEquals(300_000L, PowerTransitionRecoveryPolicy.nextUnknownRetryDelayMs(6))
+        assertEquals(300_000L, PowerTransitionRecoveryPolicy.nextUnknownRetryDelayMs(100))
+        assertEquals(5_000L, PowerTransitionRecoveryPolicy.nextUnknownRetryDelayMs(-1))
+    }
+
     @Test fun pendingCandidateRequiresItsOwnCurrentGenerationAndDisconnectedBaseline() {
         assertTrue(PowerTransitionRecoveryPolicy.isCurrentCandidate(true, 8L, 8L, false))
         assertFalse(PowerTransitionRecoveryPolicy.isCurrentCandidate(false, 8L, 8L, false))
