@@ -167,12 +167,33 @@ internal object CameraEvidenceCapture {
                 return@setOnImageAvailableListener
             }
             image.close()
-            val boundedJpeg = boundJpeg(jpeg)
+            val boundedJpeg = try {
+                boundJpeg(jpeg)
+            } catch (error: Exception) {
+                null
+            }
             if (boundedJpeg == null) {
-                finish("camera_evidence_image_rejected", "JPEG could not be compressed below the 2 MiB evidence size limit")
+                jpeg.fill(0)
+                finish("camera_evidence_image_rejected", "JPEG could not be safely decoded and compressed below the 2 MiB evidence size limit")
                 return@setOnImageAvailableListener
             }
-            val entry = runCatching { CameraEvidenceVault.save(app, boundedJpeg) }.getOrNull()
+            // Avoid retaining the original camera buffer after producing a
+            // separate bounded image. If the source already met the vault
+            // limit, it is the same array and is cleared after encryption.
+            if (boundedJpeg !== jpeg) jpeg.fill(0)
+            if (finished.get() || !activityVisible.get() || !isActivityVisible(activity)) {
+                boundedJpeg.fill(0)
+                finish(
+                    "camera_evidence_activity_not_visible",
+                    "Front-camera evidence was discarded because the Activity stopped before encrypted commit"
+                )
+                return@setOnImageAvailableListener
+            }
+            val entry = try {
+                runCatching { CameraEvidenceVault.save(app, boundedJpeg) }.getOrNull()
+            } finally {
+                boundedJpeg.fill(0)
+            }
             if (entry == null) {
                 finish("camera_evidence_storage_failed", "Encrypted front-camera evidence could not be committed to local storage")
             } else {
