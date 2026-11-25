@@ -25,4 +25,13 @@ class CameraEvidencePolicyTest {
         assertFalse(CameraEvidencePolicy.isValidImageSize(0))
         assertFalse(CameraEvidencePolicy.isValidImageSize(CameraEvidencePolicy.MAX_IMAGE_BYTES + 1))
     }
+
+    @Test fun encryptedVaultBudgetAllowsOnlyBoundedStagingAndOrphans() {
+        assertTrue(CameraEvidencePolicy.isWithinStorageBudget(20, 20L * (2L * 1024L * 1024L + 64L)))
+        assertTrue(CameraEvidencePolicy.isWithinStorageBudget(21, CameraEvidencePolicy.MAX_TOTAL_STORAGE_BYTES))
+        assertFalse(CameraEvidencePolicy.isWithinStorageBudget(22, CameraEvidencePolicy.MAX_TOTAL_STORAGE_BYTES))
+        assertFalse(CameraEvidencePolicy.isWithinStorageBudget(1, CameraEvidencePolicy.MAX_TOTAL_STORAGE_BYTES + 1L))
+        assertFalse(CameraEvidencePolicy.isWithinStorageBudget(-1, 0L))
+    }
+    }
 }
