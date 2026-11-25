@@ -145,4 +145,11 @@ for forbidden in ("android.permission.RECORD_AUDIO", "android.permission.ACCESS_
     if forbidden in permissions:
         raise SystemExit("Evidence Vault must not add invasive/background permission: " + forbidden)
 
+preference_cipher = (APP / "LocalPreferenceCipher.kt").read_text(encoding="utf-8")
+configuration_backup = (APP / "ConfigurationBackup.kt").read_text(encoding="utf-8")
+evidence_backup = (APP / "EvidenceVaultBackup.kt").read_text(encoding="utf-8")
+assert "plaintextBytes.fill(0)" in preference_cipher and "plaintextBytes?.fill(0)" in preference_cipher, "Local preference plaintext buffers must be cleared"
+assert "payload.fill(0)" in configuration_backup and "salt.fill(0)" in configuration_backup and "encrypted.fill(0)" in configuration_backup, "Configuration backup crypto buffers must be cleared"
+assert "json.fill(0)" in evidence_backup and "plaintext?.fill(0)" in evidence_backup and "encrypted.fill(0)" in evidence_backup, "Evidence backup crypto buffers must be cleared"
+
 print("Verified: owner-requested location, explicit visible front-camera consent/capture, encrypted bounded local evidence, no microphone/background location, password-protected metadata backup, and matching privacy disclosures.")
