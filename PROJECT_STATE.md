@@ -2,7 +2,7 @@
 
 # ThiefAlertSeQure — Project State
 
-> **Current v1.1.4 implementation status (2026-11-25):** The controlling phase/diff/owner-test ledger is [V1.1.4 Implementation Completion Ledger](docs/V1.1.4_IMPLEMENTATION_COMPLETION_LEDGER.md). Active integration PR #10 is `release/v1.1.4-integration`, latest reviewed integration head `5b32c417c769388427d8f38efa7bf0f8e6d8eca3`, with 207 changed paths (206 original product files plus the completion ledger). Exact-head Android CI and CodeQL are pending after the latest workflow-policy correction; cancelled/queued runs are not passes. Do not use the stale FIXALL branch heads or historical percentages below as current completion evidence. PR #10 remains draft/open/unmerged; no release action is authorized.
+> **Current v1.1.4 implementation status (2026-11-25):** The controlling phase/diff/owner-test ledger is [V1.1.4 Implementation Completion Ledger](docs/V1.1.4_IMPLEMENTATION_COMPLETION_LEDGER.md). Active integration PR #10 is `release/v1.1.4-integration`, latest reviewed integration head `717484a0cfaaf875df51cf4b25f9c34f56ccc4da`, with 207 changed paths (206 original product files plus the completion ledger). Android CI and CodeQL were triggered on the latest head; cancelled attempts are being rerun and queued checks are not passes. Do not use the stale FIXALL branch heads or historical percentages below as current completion evidence. PR #10 remains draft/open/unmerged; no release action is authorized.
 
 ## Active FIXALL branch
 - Working branch: `work/phase-0-12-coding` (current coding branch; exact head recorded in the verification snapshot below)
