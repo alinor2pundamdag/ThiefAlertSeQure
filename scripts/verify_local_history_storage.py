@@ -32,8 +32,11 @@ checks = {
         and "}.getOrDefault(false)" in source,
     "cleanup failure leaves the history unhealthy rather than exposing plaintext":
         source.count('return HistoryRead("", false)') >= 3,
-    "explicit clear removes both encrypted and legacy history":
-        "remove(KEY_EVENTS).commit()" in source and "remove(LEGACY_KEY_EVENTS).commit()" in source,
+    "explicit clear removes legacy plaintext before current ciphertext":
+        "clearLegacyPlaintext(app)" in source
+        and "remove(KEY_EVENTS).commit()" in source
+        and source.index("clearLegacyPlaintext(app)", source.index("fun clear(context: Context)"))
+            < source.index("remove(KEY_EVENTS).commit()", source.index("fun clear(context: Context)")),
 }
 failed = [name for name, passed in checks.items() if not passed]
 for name, passed in checks.items():
