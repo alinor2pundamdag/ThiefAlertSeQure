@@ -207,9 +207,13 @@ object BypassChargingAdapterRegistry {
             return emptyList()
         }
         return matching.mapNotNull { registration ->
-            runCatching { registration.factory(device) }.getOrNull()
-        }.filter { adapter ->
-            adapter.id.isNotBlank() && matching.any { it.certification.adapterId == adapter.id }
+            val adapter = runCatching { registration.factory(device) }.getOrNull()
+                ?: return@mapNotNull null
+            // Bind the returned implementation to the exact certification that
+            // created it. A different registration's ID must never authorize it.
+            val registeredId = registration.certification.adapterId
+            val actualId = runCatching { adapter.id }.getOrNull()
+            adapter.takeIf { actualId.isNotBlank() && actualId == registeredId }
         }
     }
 }
