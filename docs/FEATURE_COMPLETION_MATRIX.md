@@ -8,6 +8,8 @@
 
 # ThiefAlertSeQure — Feature Completion Matrix
 
+> **Current authoritative implementation ledger (2026-11-25):** [V1.1.4 Implementation Completion Ledger](V1.1.4_IMPLEMENTATION_COMPLETION_LEDGER.md). PR #10 on `release/v1.1.4-integration` is the active integration candidate; its current source diff is 206 files. All old percentages, branch names, run IDs, and PR #7 snapshots below are historical and must not be used as current completion evidence. Exact-head Android CI and CodeQL are required after the final changes.
+
 > **Historical v1.1.4 feature-branch assessment:** [V1.1.4 Feature Implementation Status](V1.1.4_FEATURE_IMPLEMENTATION_STATUS.md). Its 94% figure is an estimate for the earlier audited branch only; it is not a completion percentage for the current FIXALL work branch.
 
 > **Current FIXALL status (2026-11-17):** The latest completed exact-head code/documentation snapshot `e97817903976689f02cba8bb485fc160a7122fd3` passed [Android CI #44010766603](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010766603) and [CodeQL #44010774991](https://github.com/alinor2pundamdag/ThiefAlertSeQure/actions/runs/44010774991). The Android workflow passed the 30-file JVM unit suite, instrumentation-disabled guard, source checks, lint, asset validation, APK build/metadata/signer checks and artifact upload. The current documentation reconciliation is a documentation-only follow-up and triggers fresh exact-head CI. Branch comparison after this single follow-up commit is 530 ahead / 0 behind `main`, with 131 changed paths (90 added, 41 modified, 0 deleted). PR #7 remains draft/open/unmerged. Alert #8 closure and permanent production signing-secret availability remain unverified. No merge, tag, publication or production release is claimed.
