@@ -40,6 +40,9 @@ internal object CameraEvidenceVault {
         val entries = readIndex(app) ?: return null
         val now = System.currentTimeMillis()
         val retained = entries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
+        // Reclaim prior failed-write or expired-file orphans before creating another image.
+        // If deletion fails, reject this capture rather than growing private storage unbounded.
+        if (!removeUnreferencedFiles(app, retained)) return null
         val id = UUID.randomUUID().toString()
         val directory = evidenceDirectory(app)
         val file = directory.resolve("$id.aesgcm")
@@ -64,6 +67,8 @@ internal object CameraEvidenceVault {
             file.delete()
             return null
         }
+        // The index is already committed; cleanup failure is detected by integrity checks
+        // and blocks the next capture until orphan removal succeeds.
         removeUnreferencedFiles(app, next)
         return entry
     }
@@ -137,14 +142,20 @@ internal object CameraEvidenceVault {
         val app = context.applicationContext
         pruneExpired(app)
         val entries = readIndex(app) ?: return false
-        val directoryFiles = evidenceDirectory(app).listFiles().orEmpty()
-        val temporaryFiles = directoryFiles.filter { it.name.endsWith(".tmp") }
-        val tempCleanupSucceeded = temporaryFiles.all { it.delete() || !it.exists() }
+        val cleanupSucceeded = removeUnreferencedFiles(app, entries)
+        val directoryFiles = evidenceDirectory(app).listFiles() ?: return false
         val indexedFiles = entries.map { "${it.id}.aesgcm" }.toSet()
-        val actualFiles = directoryFiles
-            .filter { it.name.endsWith(".aesgcm") }
-            .map { it.name }.toSet()
-        return tempCleanupSucceeded && indexedFiles == actualFiles && entries.all { read(app, it.id) != null }
+        val encryptedFiles = directoryFiles.filter { it.isFile && it.name.endsWith(".aesgcm") }
+        val actualFiles = encryptedFiles.map { it.name }.toSet()
+        val dataFiles = directoryFiles.filter { it.isFile && (it.name.endsWith(".aesgcm") || it.name.endsWith(".tmp")) }
+        val withinBudget = CameraEvidencePolicy.isWithinStorageBudget(
+            dataFiles.size, dataFiles.sumOf { it.length() }
+        ) && encryptedFiles.all {
+            it.length() <= CameraEvidencePolicy.MAX_IMAGE_BYTES +
+                CameraEvidencePolicy.MAX_ENCRYPTED_FILE_OVERHEAD_BYTES
+        }
+        return cleanupSucceeded && withinBudget && indexedFiles == actualFiles &&
+            entries.all { read(app, it.id) != null }
     }
 
     private fun readIndex(context: Context): List<Entry>? {
@@ -248,10 +259,10 @@ internal object CameraEvidenceVault {
         val retained = entries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
         val indexReady = retained.size == entries.size || writeIndex(context, retained)
         if (indexReady) {
-            removeUnreferencedFiles(context, retained)
+            val cleanupSucceeded = removeUnreferencedFiles(context, retained)
             val noPhotoFilesRemain = evidenceDirectory(context).listFiles().orEmpty()
                 .none { it.name.endsWith(".aesgcm") || it.name.endsWith(".tmp") }
-            if (retained.isEmpty() && noPhotoFilesRemain) {
+            if (retained.isEmpty() && cleanupSucceeded && noPhotoFilesRemain) {
                 runCatching {
                     synchronized(keyLock) {
                         KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KEY_ALIAS)
@@ -264,11 +275,34 @@ internal object CameraEvidenceVault {
     private fun evidenceDirectory(context: Context): File =
         File(context.filesDir, DIRECTORY).apply { if (!exists()) mkdirs() }
 
-    private fun removeUnreferencedFiles(context: Context, entries: List<Entry>) {
+    /**
+     * Deletes stale/orphaned files and confirms that the directory matches the
+     * encrypted index. Failed deletion is propagated so save() can fail closed.
+     */
+    private fun removeUnreferencedFiles(context: Context, entries: List<Entry>): Boolean {
+        val directory = evidenceDirectory(context)
+        val files = directory.listFiles() ?: return false
         val keep = entries.map { "${it.id}.aesgcm" }.toSet()
-        evidenceDirectory(context).listFiles()?.forEach { file ->
-            if (file.name !in keep) file.delete()
+        var cleanupSucceeded = true
+        files.forEach { file ->
+            if (file.name !in keep) {
+                if (file.isDirectory || (!file.delete() && file.exists())) cleanupSucceeded = false
+            }
         }
+        val remaining = directory.listFiles() ?: return false
+        val encryptedFiles = remaining.filter { it.isFile && it.name.endsWith(".aesgcm") }
+        val temporaryFiles = remaining.filter { it.isFile && it.name.endsWith(".tmp") }
+        val dataFiles = remaining.filter {
+            it.isFile && (it.name.endsWith(".aesgcm") || it.name.endsWith(".tmp"))
+        }
+        val actualNames = encryptedFiles.map { it.name }.toSet()
+        val bounded = CameraEvidencePolicy.isWithinStorageBudget(
+            dataFiles.size, dataFiles.sumOf { it.length() }
+        ) && encryptedFiles.all {
+            it.length() <= CameraEvidencePolicy.MAX_IMAGE_BYTES +
+                CameraEvidencePolicy.MAX_ENCRYPTED_FILE_OVERHEAD_BYTES
+        }
+        return cleanupSucceeded && temporaryFiles.isEmpty() && actualNames == keep && bounded
     }
 
     private fun isSafeId(id: String): Boolean =
