@@ -4,6 +4,42 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class BypassChargingControllerTest {
+    @Test fun adapterCertificationRequiresExactModelApiAndFirmwareFingerprint() {
+        val certification = BypassChargingCertification(
+            adapterId = "honor-test",
+            manufacturer = "HONOR",
+            brand = "HONOR",
+            model = "ELP-NX9",
+            minApiLevel = 36,
+            maxApiLevel = 36,
+            firmwareFingerprints = setOf("honor/elp-nx9/build:1.0/release-keys")
+        )
+        val exact = BypassChargingDevice(
+            "HONOR", "HONOR", "ELP-NX9", 36,
+            "honor/elp-nx9/build:1.0/release-keys"
+        )
+        assertTrue(certification.matches(exact))
+        assertFalse(certification.matches(exact.copy(firmwareFingerprint = "honor/elp-nx9/build:2.0/release-keys")))
+        assertFalse(certification.matches(exact.copy(model = "ELP-NX9-OTHER")))
+        assertFalse(certification.matches(exact.copy(apiLevel = 35)))
+        assertFalse(certification.matches(exact.copy(firmwareFingerprint = "")))
+        assertFalse(certification.copy(firmwareFingerprints = setOf("*")).matches(exact))
+    }
+
+    @Test fun duplicateAdapterCertificationFailsClosed() {
+        val certification = BypassChargingCertification(
+            "duplicate", "HONOR", "HONOR", "ELP-NX9", 36, 36,
+            setOf("honor/elp-nx9/build:1.0/release-keys")
+        )
+        val device = BypassChargingDevice(
+            "HONOR", "HONOR", "ELP-NX9", 36,
+            "honor/elp-nx9/build:1.0/release-keys"
+        )
+        val adapter = Fake(supported, false)
+        val registration = BypassChargingAdapterRegistration(certification) { adapter }
+        assertTrue(BypassChargingAdapterRegistry.resolve(device, listOf(registration, registration)).isEmpty())
+    }
+
     @Test fun noAdapterFailsClosed() {
         val result=BypassChargingController(emptyList()) { 123L }.inspect()
         assertEquals(BypassChargingStatus.OEM_INTERFACE_UNAVAILABLE,result.status)
