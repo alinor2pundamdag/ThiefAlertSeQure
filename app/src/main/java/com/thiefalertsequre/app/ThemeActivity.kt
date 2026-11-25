@@ -26,7 +26,7 @@ class ThemeActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        ThemeRuntime.apply(this, window.decorView, previewId)
+        ThemeRuntime.apply(this, window.decorView, previewId, previewId)
     }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
@@ -210,6 +210,6 @@ class ThemeActivity : FragmentActivity() {
 
         setContentView(scroll)
         AndroidDeviceCompatibility.applySystemBarInsets(scroll)
-        ThemeRuntime.apply(this, scroll, previewId)
+        ThemeRuntime.apply(this, scroll, previewId, previewId)
     }
 }
