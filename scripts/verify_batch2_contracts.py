@@ -224,5 +224,6 @@ deadline_receiver = (APP / "AlarmDeadlineReceiver.kt").read_text(encoding="utf-8
 assert "nextUnknownRetryDelayMs" in power_recovery, "Inconclusive unplug revalidation must have bounded backoff"
 assert "retainPendingDisconnectForRetry" in power_coordinator and "PENDING_RETRY_COUNT" in power_coordinator, "Unknown power samples must retain known-same-boot unplug provenance"
 assert "schedulePowerReconciliationRetry" in alarm_scheduler and "power-reconcile" in deadline_receiver, "Pending unplug recovery must have an explicit receiver path"
+assert "ELAPSED_REALTIME_WAKEUP" in alarm_scheduler and "SafePreferences.readInt(prefs, PENDING_RETRY_COUNT" in power_coordinator, "Power retry must use monotonic time and fail-safe backoff on corrupted counters"
 
 print("Verified Batch 2 cross-file shutdown, managed-mode, flash, evidence, diagnostics, readiness, dashboard, and core-timing contracts.")
