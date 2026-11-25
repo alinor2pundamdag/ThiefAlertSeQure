@@ -730,18 +730,52 @@ class SettingsActivity : FragmentActivity() {
 
 
     private fun addBypassChargingSection() {
+        // Probe the certified adapter registry every time Settings is rendered.
+        // The control never guesses support from an OEM name or a battery metric.
         val device = BypassChargingDevice(Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.VERSION.SDK_INT, Build.FINGERPRINT)
         val controller = BypassChargingController(BypassChargingAdapterRegistry.forDevice(device))
         val snapshot = controller.inspect()
         root.addView(text("BYPASS CHARGING", 11f, R.color.tas_primary, true))
         root.addView(space(8))
-        root.addView(text("Actual mode: ${snapshot.modeLabel} • ${snapshot.statusLabel}",13f,R.color.tas_text,true))
-        root.addView(space(6))
+
+        // Unsupported/uncertified devices get a dark, clearly disabled panel.
+        // A certified, authorized adapter with readable state uses the current theme.
+        val controlCard = MaterialCardView(this).apply {
+            radius = dp(14).toFloat()
+            cardElevation = dp(1).toFloat()
+            setCardBackgroundColor(getColor(
+                if (snapshot.canToggle) R.color.tas_surface else android.R.color.darker_gray
+            ))
+            setStrokeColor(android.content.res.ColorStateList.valueOf(getColor(
+                if (snapshot.canToggle) R.color.tas_primary else android.R.color.darker_gray
+            )))
+            strokeWidth = dp(1)
+            isClickable = false
+            isFocusable = false
+        }
+        val controlContent = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+        }
+        val stateText = TextView(this).apply {
+            text = "Actual mode: ${snapshot.modeLabel} • ${snapshot.statusLabel}"
+            textSize = 13f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setTextColor(getColor(if (snapshot.canToggle) R.color.tas_text else android.R.color.white))
+            contentDescription = "Bypass Charging hardware status: ${snapshot.statusLabel}; actual mode ${snapshot.modeLabel}"
+        }
+        controlContent.addView(stateText, matchWrap())
+        controlContent.addView(space(6))
         val control = Switch(this).apply {
             text = "Bypass Charging ON/OFF"
             isChecked = snapshot.mode == BypassChargingMode.ENABLED
             isEnabled = snapshot.canToggle
-            contentDescription = "Bypass Charging ON/OFF; unavailable until OEM interface and actual state are verified"
+            setTextColor(android.graphics.Color.WHITE)
+            contentDescription = if (snapshot.canToggle) {
+                "Bypass Charging switch; hardware support, OEM authorization and current state verified"
+            } else {
+                "Bypass Charging switch disabled; no certified supported and authorized OEM adapter with verified state"
+            }
             setOnCheckedChangeListener { _, enabled ->
                 val result = controller.setEnabled(enabled)
                 LocalTamperHistory.record(this@SettingsActivity,"bypass_charging_control",result.status.name + ": " + result.detail)
@@ -751,13 +785,24 @@ class SettingsActivity : FragmentActivity() {
                 render()
             }
         }
-        root.addView(control,matchWrap())
-        root.addView(space(6))
-        root.addView(text(
-            if(snapshot.canToggle) "The ON/OFF switch is enabled only because an authorized OEM interface and readable state are verified."
-            else "ON/OFF control is unavailable. The switch is intentionally disabled; UNKNOWN does not mean OFF. A normal app cannot grant itself OEM/system privileges.",
-            12f,R.color.tas_muted
-        ))
+        controlContent.addView(control,matchWrap())
+        controlContent.addView(space(4))
+        val availability = TextView(this).apply {
+            text = if (snapshot.canToggle) {
+                "Supported OEM control detected. ON/OFF is available; every change requires hardware read-back."
+            } else {
+                "UNAVAILABLE — this device has no certified, authorized Bypass Charging control adapter. This dark panel is disabled. UNKNOWN does not mean OFF; use the phone manufacturer's own setting if available."
+            }
+            textSize = 12f
+            setTextColor(android.graphics.Color.WHITE)
+            setLineSpacing(dp(3).toFloat(), 1f)
+        }
+        controlContent.addView(availability,matchWrap())
+        controlCard.addView(controlContent,matchWrap())
+        root.addView(controlCard, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(8) })
+
         root.addView(space(8))
         root.addView(text(BypassChargingGuidance.instructions(device),12f,R.color.tas_muted))
         root.addView(space(8))

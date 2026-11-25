@@ -24,6 +24,10 @@ for forbidden in ("ProcessBuilder(","Runtime.getRuntime().exec","WRITE_SECURE_SE
                   "DEVICE_POWER","setprop ","sysfs","service call"):
     assert forbidden not in controller,f"Unsafe undocumented control path: {forbidden}"
 assert "isEnabled = snapshot.canToggle" in settings
+assert "android.R.color.darker_gray" in settings, "Unsupported adapter state must use the visibly disabled dark panel"
+assert "UNAVAILABLE — this device has no certified" in settings
+assert "UNKNOWN does not mean OFF" in settings
+assert "Supported OEM control detected" in settings
 assert "Build.FINGERPRINT" in settings
 assert "Intent(Settings.ACTION_SETTINGS)" in settings
 assert "ACTION_BATTERY_SAVER_SETTINGS" not in settings

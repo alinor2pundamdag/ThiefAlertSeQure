@@ -279,3 +279,8 @@ The active roadmap is **17 phases numbered Phase 0 through Phase 16**, organized
 - Historical CodeQL alert #8 remains unverified. The connected GitHub interface blocks the Code Scanning Alerts endpoint and Security page; user permission does not change the connector's endpoint allowlist. The old PR review thread is resolved/outdated, but that does not prove the alert record is closed.
 - No emulator, instrumentation, or physical-device test was run, per the code/GitHub-only Phase 2 scope. Owner device acceptance remains separate.
 - PR #10 remains draft/open/unmerged. No production signing preflight, merge, tag, release, or publication was performed.
+
+
+## Exact-head check refresh — 2026-11-25
+
+PR #10 latest source head before this UI follow-up: `fa1738344c66233a54a4d0dca5ba48a4b44360a5`. GitHub exact-head Android build/unit tests/lint/APK checks and CodeQL both passed (Android run 45557255897; CodeQL run 45557255835). The follow-up dark-disabled Bypass Charging Settings panel and its CI contract are being committed; treat the subsequent commit as a new head and wait for fresh CI before calling it verified. PR remains draft/open/unmerged. No official release action.
