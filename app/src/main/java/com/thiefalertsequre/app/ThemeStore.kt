@@ -107,6 +107,31 @@ internal object ThemeColorMapping {
     fun remapColors(colors: IntArray, source: ThemePalette, target: ThemePalette): IntArray =
         colors.map { remap(it, source, target) }.toIntArray()
 
+    /** Map colors while retaining the public, commonly used interactive view states. */
+    fun remapStateList(
+        colorStateList: ColorStateList,
+        source: ThemePalette,
+        target: ThemePalette
+    ): ColorStateList {
+        if (source.id == target.id) return colorStateList
+        val states = arrayOf(
+            intArrayOf(-android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_pressed, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_focused, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_hovered, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_checked, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_selected, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_activated, android.R.attr.state_enabled),
+            intArrayOf(android.R.attr.state_enabled),
+            intArrayOf()
+        )
+        val fallback = colorStateList.defaultColor
+        val mapped = states.map { state ->
+            remap(colorStateList.getColorForState(state, fallback), source, target)
+        }.toIntArray()
+        return ColorStateList(states, mapped)
+    }
+
     /** Map a color by its source palette role; source roles are unique per palette. */
     fun remap(color: Int, source: ThemePalette, target: ThemePalette): Int {
         if (source.id == target.id) return color
@@ -128,11 +153,7 @@ object ThemeRuntime {
    val appliedId=v.getTag(R.id.theme_palette_applied) as? String
    val source=ThemeStore.get(a,appliedId ?: initialSourceId)
    if(v is TextView) {
-    val current=v.textColors
-    val mapped=ThemeColorMapping.remapColors(current.colors,source,p)
-    if(!mapped.contentEquals(current.colors)) {
-     v.setTextColor(ColorStateList(current.states,mapped))
-    }
+    v.setTextColor(ThemeColorMapping.remapStateList(v.textColors, source, p))
    }
    if(v is MaterialCardView){
     val color=v.cardBackgroundColor.defaultColor
@@ -146,15 +167,9 @@ object ThemeRuntime {
    }
    if(v is MaterialButton){
     val tint=v.backgroundTintList
-    tint?.let { list ->
-     val mapped=ThemeColorMapping.remapColors(list.colors,source,p)
-     if(!mapped.contentEquals(list.colors)) v.backgroundTintList=ColorStateList(list.states,mapped)
-    }
+    tint?.let { list -> v.backgroundTintList=ThemeColorMapping.remapStateList(list, source, p) }
     val stroke=v.strokeColor
-    stroke?.let { list ->
-     val mapped=ThemeColorMapping.remapColors(list.colors,source,p)
-     if(!mapped.contentEquals(list.colors)) v.strokeColor=ColorStateList(list.states,mapped)
-    }
+    stroke?.let { list -> v.strokeColor=ThemeColorMapping.remapStateList(list, source, p) }
     AppearanceStudioStore.applyButtonAnimation(a, v)
    }
    v.setTag(R.id.theme_palette_applied,id)
