@@ -1,5 +1,9 @@
 # ThiefAlertSeQure — Project State
 
+# ThiefAlertSeQure — Project State
+
+> **Current v1.1.4 implementation status (2026-11-25):** The controlling phase/diff/owner-test ledger is [V1.1.4 Implementation Completion Ledger](docs/V1.1.4_IMPLEMENTATION_COMPLETION_LEDGER.md). Active integration PR #10 is `release/v1.1.4-integration`, exact reviewed source head `43dd52af7e09ff349dc474557ce9917f694e7cfa`, with 206 changed files. New exact-head verification is required after the latest implementation and ledger commits. Do not use the stale FIXALL branch heads or historical percentages below as current completion evidence. PR #10 remains draft/open/unmerged; no release action is authorized.
+
 ## Active FIXALL branch
 - Working branch: `work/phase-0-12-coding` (current coding branch; exact head recorded in the verification snapshot below)
 - Production branch: `main` (untouched)
