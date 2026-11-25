@@ -74,7 +74,11 @@ internal object ConfigurationBackup {
         try {
             require(password.size >= 12) { "Configuration backup password must contain at least 12 characters." }
             val payload = snapshot(context).toString().toByteArray(Charsets.UTF_8)
-            return encryptPayload(payload, password)
+            return try {
+                encryptPayload(payload, password)
+            } finally {
+                payload.fill(0)
+            }
         } finally {
             password.fill('\u0000')
         }
@@ -87,16 +91,25 @@ internal object ConfigurationBackup {
                 "Configuration restore is blocked while protection is latched. Complete fresh owner authentication first."
             }
             val payload = decryptPayload(bytes, password)
-            val imported = parse(payload)
-            // Validate current values before changing any settings and retain a rollback snapshot.
-            val previous = parse(snapshot(context).toString().toByteArray(Charsets.UTF_8))
-            if (!apply(context, imported)) {
-                if (!apply(context, previous)) {
-                    throw IllegalStateException("Configuration restore failed and automatic rollback was incomplete. Do not restart the app until settings are reviewed.")
+            try {
+                val imported = parse(payload)
+                // Validate current values before changing any settings and retain a rollback snapshot.
+                val previousPayload = snapshot(context).toString().toByteArray(Charsets.UTF_8)
+                val previous = try {
+                    parse(previousPayload)
+                } finally {
+                    previousPayload.fill(0)
                 }
-                throw IllegalStateException("Android did not confirm every configuration write. Previous settings were restored.")
+                if (!apply(context, imported)) {
+                    if (!apply(context, previous)) {
+                        throw IllegalStateException("Configuration restore failed and automatic rollback was incomplete. Do not restart the app until settings are reviewed.")
+                    }
+                    throw IllegalStateException("Android did not confirm every configuration write. Previous settings were restored.")
+                }
+                return imported.size
+            } finally {
+                payload.fill(0)
             }
-            return imported.size
         } finally {
             password.fill('\u0000')
         }
@@ -217,17 +230,23 @@ internal object ConfigurationBackup {
         cipher.init(Cipher.ENCRYPT_MODE, deriveKey(password, salt, ITERATIONS), GCMParameterSpec(128, iv))
         cipher.updateAAD(AAD)
         val encrypted = cipher.doFinal(payload)
-        val output = ByteArrayOutputStream()
-        DataOutputStream(output).use { data ->
-            data.write(MAGIC)
-            data.writeInt(ITERATIONS)
-            data.write(salt)
-            data.write(iv)
-            data.writeInt(encrypted.size)
-            data.write(encrypted)
+        try {
+            val output = ByteArrayOutputStream()
+            DataOutputStream(output).use { data ->
+                data.write(MAGIC)
+                data.writeInt(ITERATIONS)
+                data.write(salt)
+                data.write(iv)
+                data.writeInt(encrypted.size)
+                data.write(encrypted)
+            }
+            require(output.size() <= MAX_BACKUP_BYTES) { "Encrypted configuration backup is too large." }
+            return output.toByteArray()
+        } finally {
+            salt.fill(0)
+            iv.fill(0)
+            encrypted.fill(0)
         }
-        require(output.size() <= MAX_BACKUP_BYTES) { "Encrypted configuration backup is too large." }
-        return output.toByteArray()
     }
 
     internal fun decryptPayload(bytes: ByteArray, password: CharArray): ByteArray {
@@ -246,10 +265,16 @@ internal object ConfigurationBackup {
             "Configuration backup payload length is invalid."
         }
         val encrypted = ByteArray(encryptedSize).also(input::readFully)
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE, deriveKey(password, salt, iterations), GCMParameterSpec(128, iv))
-        cipher.updateAAD(AAD)
-        return cipher.doFinal(encrypted)
+        try {
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, deriveKey(password, salt, iterations), GCMParameterSpec(128, iv))
+            cipher.updateAAD(AAD)
+            return cipher.doFinal(encrypted)
+        } finally {
+            salt.fill(0)
+            iv.fill(0)
+            encrypted.fill(0)
+        }
     }
 
     private fun deriveKey(password: CharArray, salt: ByteArray, iterations: Int): SecretKeySpec {
