@@ -43,22 +43,32 @@ internal object EvidenceVaultBackup {
             }.toString().toByteArray(Charsets.UTF_8)
             val salt = ByteArray(SALT_BYTES).also(SecureRandom()::nextBytes)
             val iv = ByteArray(IV_BYTES).also(SecureRandom()::nextBytes)
-            val key = deriveKey(password, salt, ITERATIONS)
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
-            cipher.updateAAD(AAD)
-            val encrypted = cipher.doFinal(json)
-            val output = ByteArrayOutputStream()
-            DataOutputStream(output).use { data ->
-                data.write(MAGIC)
-                data.writeInt(ITERATIONS)
-                data.write(salt)
-                data.write(iv)
-                data.writeInt(encrypted.size)
-                data.write(encrypted)
+            try {
+                val key = deriveKey(password, salt, ITERATIONS)
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
+                cipher.updateAAD(AAD)
+                val encrypted = cipher.doFinal(json)
+                try {
+                    val output = ByteArrayOutputStream()
+                    DataOutputStream(output).use { data ->
+                        data.write(MAGIC)
+                        data.writeInt(ITERATIONS)
+                        data.write(salt)
+                        data.write(iv)
+                        data.writeInt(encrypted.size)
+                        data.write(encrypted)
+                    }
+                    require(output.size() <= MAX_BACKUP_BYTES) { "Encrypted backup is too large." }
+                    return output.toByteArray()
+                } finally {
+                    encrypted.fill(0)
+                }
+            } finally {
+                json.fill(0)
+                salt.fill(0)
+                iv.fill(0)
             }
-            require(output.size() <= MAX_BACKUP_BYTES) { "Encrypted backup is too large." }
-            return output.toByteArray()
         } finally {
             password.fill('\u0000')
         }
@@ -82,22 +92,31 @@ internal object EvidenceVaultBackup {
                 "Backup payload length is invalid."
             }
             val encrypted = ByteArray(encryptedSize).also(input::readFully)
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.DECRYPT_MODE, deriveKey(password, salt, iterations), GCMParameterSpec(128, iv))
-            cipher.updateAAD(AAD)
-            val array = JSONArray(String(cipher.doFinal(encrypted), Charsets.UTF_8))
-            require(array.length() <= MAX_RECORDS) { "Backup contains too many records." }
-            return buildList {
-                for (index in 0 until array.length()) {
-                    val item = array.getJSONObject(index)
-                    val at = item.getLong("at")
-                    val tz = item.getInt("tz")
-                    val event = LocalTamperHistoryPolicy.sanitizeEvent(item.getString("event"))
-                    val detail = LocalTamperHistoryPolicy.sanitizeDetail(item.optString("detail")).take(240)
-                    val hash = item.getString("sha256")
-                    require(hash == digest(at, tz, event, detail)) { "Backup record integrity check failed." }
-                    add(LocalEvidenceVault.Entry(at, tz, event, detail, hash))
+            var plaintext: ByteArray? = null
+            try {
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                cipher.init(Cipher.DECRYPT_MODE, deriveKey(password, salt, iterations), GCMParameterSpec(128, iv))
+                cipher.updateAAD(AAD)
+                plaintext = cipher.doFinal(encrypted)
+                val array = JSONArray(String(plaintext, Charsets.UTF_8))
+                require(array.length() <= MAX_RECORDS) { "Backup contains too many records." }
+                return buildList {
+                    for (index in 0 until array.length()) {
+                        val item = array.getJSONObject(index)
+                        val at = item.getLong("at")
+                        val tz = item.getInt("tz")
+                        val event = LocalTamperHistoryPolicy.sanitizeEvent(item.getString("event"))
+                        val detail = LocalTamperHistoryPolicy.sanitizeDetail(item.optString("detail")).take(240)
+                        val hash = item.getString("sha256")
+                        require(hash == digest(at, tz, event, detail)) { "Backup record integrity check failed." }
+                        add(LocalEvidenceVault.Entry(at, tz, event, detail, hash))
+                    }
                 }
+            } finally {
+                plaintext?.fill(0)
+                encrypted.fill(0)
+                salt.fill(0)
+                iv.fill(0)
             }
         } finally {
             password.fill('\u0000')
@@ -117,7 +136,11 @@ internal object EvidenceVaultBackup {
 
     private fun digest(at: Long, tz: Int, event: String, detail: String): String {
         val bytes = "$at|$tz|$event|$detail".toByteArray(Charsets.UTF_8)
-        return MessageDigest.getInstance("SHA-256").digest(bytes)
-            .joinToString("") { "%02x".format(it) }
+        return try {
+            MessageDigest.getInstance("SHA-256").digest(bytes)
+                .joinToString("") { "%02x".format(it) }
+        } finally {
+            bytes.fill(0)
+        }
     }
 }
