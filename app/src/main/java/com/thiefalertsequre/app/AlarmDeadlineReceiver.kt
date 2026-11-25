@@ -172,7 +172,19 @@ class AlarmDeadlineReceiver : BroadcastReceiver() {
         // stale deadline callback must still recover that latch, not discard it
         // merely because its old countdown token no longer matches.
         if (state.mode == ProtectionMode.ALARM_TRIGGERED) {
+            AlarmScheduler.cancelPowerReconciliationRetry(context)
             startAlarm(context, "Latched alarm observed during deadline callback")
+            return
+        }
+
+        if (token == "power-reconcile") {
+            val recovered = PowerTransitionCoordinator.recoverPendingDisconnectCandidate(context)
+            if (recovered.mode == ProtectionMode.ALARM_TRIGGERED) {
+                AlarmScheduler.cancelPowerReconciliationRetry(context)
+                startAlarm(context, "Power revalidation recovered a latched alarm")
+            } else if (!PowerTransitionCoordinator.hasPendingDisconnectCandidate(context)) {
+                AlarmScheduler.cancelPowerReconciliationRetry(context)
+            }
             return
         }
 
