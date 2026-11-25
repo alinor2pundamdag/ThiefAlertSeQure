@@ -5,6 +5,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
+APP = ROOT / "app/src/main/java/com/thiefalertsequre/app"
 manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
 android = "{http://schemas.android.com/apk/res/android}"
 permissions = {item.get(android + "name", "") for item in manifest.findall("uses-permission")}
