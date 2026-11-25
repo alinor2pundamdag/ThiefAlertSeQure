@@ -1152,15 +1152,26 @@ class SettingsActivity : FragmentActivity() {
                             android.widget.Toast.makeText(this, "Photo failed its integrity check or is unavailable.", android.widget.Toast.LENGTH_LONG).show()
                             return@runOnUiThread
                         }
+                        val bitmap = try {
+                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        } finally {
+                            // The vault returns authenticated plaintext for this
+                            // display operation only; do not retain the JPEG array.
+                            bytes.fill(0)
+                        }
+                        if (bitmap == null) {
+                            android.widget.Toast.makeText(this, "Photo could not be decoded; no plaintext buffer was retained.", android.widget.Toast.LENGTH_LONG).show()
+                            return@runOnUiThread
+                        }
                         val image = ImageView(this).apply {
                             contentDescription = "Encrypted front-camera evidence photo captured after successful owner authentication"
-                            setImageBitmap(BitmapFactory.decodeByteArray(bytes, 0, bytes.size))
+                            setImageBitmap(bitmap)
                             adjustViewBounds = true
                             maxHeight = dp(440)
                             scaleType = ImageView.ScaleType.FIT_CENTER
                             setPadding(dp(8), dp(8), dp(8), dp(8))
                         }
-                        MaterialAlertDialogBuilder(this)
+                        val dialog = MaterialAlertDialogBuilder(this)
                             .setTitle("Verified encrypted photo")
                             .setMessage("Captured after successful owner authentication. SHA-256: ${entry.sha256}")
                             .setView(image)
@@ -1176,6 +1187,10 @@ class SettingsActivity : FragmentActivity() {
                             }
                             .setPositiveButton("Close", null)
                             .showThemed(this)
+                        dialog.setOnDismissListener {
+                            image.setImageDrawable(null)
+                            runCatching { bitmap.recycle() }
+                        }
                     }
                 }
             }
@@ -1188,11 +1203,17 @@ class SettingsActivity : FragmentActivity() {
             val result = runCatching {
                 val bytes = runCatching { CameraEvidenceVault.read(this, id) }.getOrNull()
                     ?: throw IllegalStateException("Photo is missing or failed its integrity check.")
-                contentResolver.openOutputStream(uri)?.use { output ->
-                    output.write(bytes)
-                    output.flush()
-                } ?: throw IllegalStateException("Android could not open the selected export destination.")
-                bytes.size
+                try {
+                    contentResolver.openOutputStream(uri)?.use { output ->
+                        output.write(bytes)
+                        output.flush()
+                    } ?: throw IllegalStateException("Android could not open the selected export destination.")
+                    bytes.size
+                } finally {
+                    // Export is owner-requested; clear the decrypted in-memory
+                    // image buffer once the selected document stream is closed.
+                    bytes.fill(0)
+                }
             }
             runOnUiThread {
                 android.widget.Toast.makeText(
