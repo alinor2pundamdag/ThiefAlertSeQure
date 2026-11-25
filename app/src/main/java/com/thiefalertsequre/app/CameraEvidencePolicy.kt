@@ -4,6 +4,10 @@ package com.thiefalertsequre.app
 internal object CameraEvidencePolicy {
     const val MAX_IMAGES = 20
     const val MAX_IMAGE_BYTES = 2 * 1024 * 1024
+    const val MAX_ENCRYPTED_FILE_OVERHEAD_BYTES = 64
+    const val MAX_STAGING_FILES = MAX_IMAGES + 1
+    const val MAX_TOTAL_STORAGE_BYTES = MAX_STAGING_FILES.toLong() *
+        (MAX_IMAGE_BYTES + MAX_ENCRYPTED_FILE_OVERHEAD_BYTES).toLong()
     const val RETENTION_MS = 30L * 24L * 60L * 60L * 1000L
 
     fun shouldCapture(
@@ -20,4 +24,8 @@ internal object CameraEvidencePolicy {
 
     fun isValidImageSize(sizeBytes: Int): Boolean =
         sizeBytes in 1..MAX_IMAGE_BYTES
+
+    /** Bounds indexed images plus one atomic-write staging/orphan slot. */
+    fun isWithinStorageBudget(fileCount: Int, totalBytes: Long): Boolean =
+        fileCount in 0..MAX_STAGING_FILES && totalBytes in 0L..MAX_TOTAL_STORAGE_BYTES
 }
