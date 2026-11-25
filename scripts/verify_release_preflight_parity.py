@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ensure release preflight matches CI safety gates and compiles (but never runs) Android tests."""
+"""Ensure release preflight matches CI safety gates without instrumentation compilation."""
 from pathlib import Path
 import sys
 
@@ -27,9 +27,22 @@ required = [
 ]
 missing_android = [script for script in required if f"scripts/{script}" not in android]
 missing_release = [script for script in required if f"scripts/{script}" not in release]
+forbidden_instrumentation_tasks = (
+    "compileDebugAndroidTest",
+    "compileReleaseAndroidTest",
+    "assembleAndroidTest",
+    "connectedAndroidTest",
+    "instrumentationTestBuild",
+)
 checks = {
-    "Android CI compiles Android integration test sources": ":app:compileReleaseAndroidTestKotlin" in android,
-    "release preflight compiles Android integration test sources": ":app:compileReleaseAndroidTestKotlin" in release,
+    "Android CI keeps instrumentation compilation and execution disabled": not any(
+        task in android for task in forbidden_instrumentation_tasks
+    ),
+    "release preflight keeps instrumentation compilation and execution disabled": not any(
+        task in release for task in forbidden_instrumentation_tasks
+    ),
+    "Android CI invokes the instrumentation-disabled guard": "scripts/verify_no_instrumentation.py" in android,
+    "release preflight invokes the instrumentation-disabled guard": "scripts/verify_no_instrumentation.py" in release,
     "Android CI runs every required non-physical safety contract": not missing_android,
     "signed-release preflight runs every required non-physical safety contract": not missing_release,
 }
@@ -41,4 +54,4 @@ if missing_release:
     print("Missing from signed-release preflight: " + ", ".join(missing_release))
 if not all(checks.values()):
     sys.exit("Release preflight parity contract failed.")
-print(f"Verified {len(required)} shared safety and integration checks plus compile-only Android test coverage in both workflows.")
+print(f"Verified {len(required)} shared safety and integration checks; instrumentation compilation/execution is prohibited in both workflows.")
