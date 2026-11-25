@@ -296,13 +296,9 @@ internal object CameraEvidenceCapture {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(source, 0, source.size, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        var sampleSize = 1
-        while (bounds.outWidth / sampleSize > PREFERRED_WIDTH ||
-            bounds.outHeight / sampleSize > PREFERRED_HEIGHT
-        ) {
-            sampleSize = (sampleSize * 2).coerceAtMost(1 shl 15)
-            if (sampleSize >= (1 shl 15)) break
-        }
+        val sampleSize = CameraEvidencePolicy.decodeSampleSize(
+            bounds.outWidth, bounds.outHeight, PREFERRED_WIDTH, PREFERRED_HEIGHT
+        )
         val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
         val bitmap = runCatching {
             BitmapFactory.decodeByteArray(source, 0, source.size, decodeOptions)
