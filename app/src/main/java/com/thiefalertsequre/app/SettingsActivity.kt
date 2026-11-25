@@ -770,7 +770,7 @@ class SettingsActivity : FragmentActivity() {
             text = "Bypass Charging ON/OFF"
             isChecked = snapshot.mode == BypassChargingMode.ENABLED
             isEnabled = snapshot.canToggle
-            setTextColor(android.graphics.Color.WHITE)
+            setTextColor(getColor(if (snapshot.canToggle) R.color.tas_text else android.R.color.white))
             contentDescription = if (snapshot.canToggle) {
                 "Bypass Charging switch; hardware support, OEM authorization and current state verified"
             } else {
@@ -794,7 +794,7 @@ class SettingsActivity : FragmentActivity() {
                 "UNAVAILABLE — this device has no certified, authorized Bypass Charging control adapter. This dark panel is disabled. UNKNOWN does not mean OFF; use the phone manufacturer's own setting if available."
             }
             textSize = 12f
-            setTextColor(android.graphics.Color.WHITE)
+            setTextColor(getColor(if (snapshot.canToggle) R.color.tas_text else android.R.color.white))
             setLineSpacing(dp(3).toFloat(), 1f)
         }
         controlContent.addView(availability,matchWrap())
