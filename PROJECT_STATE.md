@@ -284,3 +284,6 @@ The active roadmap is **17 phases numbered Phase 0 through Phase 16**, organized
 ## Exact-head check refresh — 2026-11-25
 
 PR #10 latest source head before this UI follow-up: `fa1738344c66233a54a4d0dca5ba48a4b44360a5`. GitHub exact-head Android build/unit tests/lint/APK checks and CodeQL both passed (Android run 45557255897; CodeQL run 45557255835). The follow-up dark-disabled Bypass Charging Settings panel and its CI contract are being committed; treat the subsequent commit as a new head and wait for fresh CI before calling it verified. PR remains draft/open/unmerged. No official release action.
+
+
+- Bypass Charging UI source commits: `9078ee6bbd886afc5bfa8eac773d88ab12253f70` (dark fail-closed panel and source guard) and `818a7f60c5e2af6394bf7c0c33a957eaa11c1d7c` (theme contrast correction). Final current integration head is being rechecked; do not reuse prior-head green checks as final.
