@@ -17,7 +17,7 @@ for token in ("interface BypassChargingAdapter","adapter.readEnabled()",
               "deviceFingerprint == deviceFingerprint.trim()",
               "!deviceFingerprint.contains(\"*\")", "isKnownIdentity(device.model)",
               
-              "duplicate certification is ambiguous","registeredId","actualId == registeredId",
+              "duplicated certification is ambiguous","registeredId","actualId == registeredId",
               "return emptyList()"):
     assert token in controller,f"Missing fail-closed contract: {token}"
 for forbidden in ("ProcessBuilder(","Runtime.getRuntime().exec","WRITE_SECURE_SETTINGS",
