@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item name="batch_three_animation_bound" type="id" />
+    <item name="theme_palette_applied" type="id" />
 </resources>
