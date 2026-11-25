@@ -26,6 +26,13 @@ class CameraEvidencePolicyTest {
         assertFalse(CameraEvidencePolicy.isValidImageSize(CameraEvidencePolicy.MAX_IMAGE_BYTES + 1))
     }
 
+    @Test fun sourceJpegBufferAllocationIsBoundedBeforeDecode() {
+        assertTrue(CameraEvidencePolicy.isValidSourceImageSize(1))
+        assertTrue(CameraEvidencePolicy.isValidSourceImageSize(CameraEvidencePolicy.MAX_SOURCE_IMAGE_BYTES))
+        assertFalse(CameraEvidencePolicy.isValidSourceImageSize(0))
+        assertFalse(CameraEvidencePolicy.isValidSourceImageSize(CameraEvidencePolicy.MAX_SOURCE_IMAGE_BYTES + 1))
+    }
+
     @Test fun encryptedVaultBudgetAllowsOnlyBoundedStagingAndOrphans() {
         assertTrue(CameraEvidencePolicy.isWithinStorageBudget(20, 20L * (2L * 1024L * 1024L + 64L)))
         assertTrue(CameraEvidencePolicy.isWithinStorageBudget(21, CameraEvidencePolicy.MAX_TOTAL_STORAGE_BYTES))
