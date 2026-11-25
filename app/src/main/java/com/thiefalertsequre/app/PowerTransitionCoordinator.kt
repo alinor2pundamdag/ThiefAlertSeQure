@@ -18,6 +18,7 @@ object PowerTransitionCoordinator {
     private const val PENDING_ELAPSED_MS = "pending_disconnect_elapsed_ms"
     private const val PENDING_BOOT_COUNT = "pending_disconnect_boot_count"
     private const val PENDING_GENERATION = "pending_disconnect_generation"
+    private const val PENDING_RETRY_COUNT = "pending_disconnect_retry_count"
     private val lock = Any()
 
     private data class DisconnectCandidate(
@@ -204,6 +205,68 @@ object PowerTransitionCoordinator {
      * sampling succeeds. Restore the prior connected baseline only when this
      * candidate still owns the generation; a newer connect event must win.
      */
+    /** Keep a known-same-boot unplug event durable when live samples are inconclusive. */
+    private fun retainPendingDisconnectForRetry(
+        context: Context,
+        candidate: DisconnectCandidate,
+        reason: String
+    ) {
+        synchronized(lock) {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            if (!isPendingCandidateCurrent(prefs, candidate)) return
+            val state = ProtectionStore(context).read()
+            if (state.mode != ProtectionMode.ARMED) {
+                clearPendingDisconnectLocked(context, prefs)
+                AlarmScheduler.cancelPowerReconciliationRetry(context)
+                return
+            }
+            val currentBoot = ProtectionClock.bootCount(context)
+            val nowElapsed = ProtectionClock.elapsedRealtime()
+            if (!PowerTransitionRecoveryPolicy.isSameBoot(
+                    candidate.eventBootCount, currentBoot,
+                    candidate.eventElapsedRealtimeMs, nowElapsed
+                )
+            ) {
+                restoreDisconnectCandidateLocked(context, candidate.generation)
+                LocalTamperHistory.record(
+                    context, "charger_disconnect_retry_not_proven",
+                    "$reason; retry omitted because same-boot provenance is unavailable"
+                )
+                return
+            }
+            val attempts = SafePreferences.int(prefs, PENDING_RETRY_COUNT, 0).coerceIn(0, 100)
+            val delayMs = PowerTransitionRecoveryPolicy.nextUnknownRetryDelayMs(attempts)
+            if (!prefs.edit().putInt(PENDING_RETRY_COUNT, attempts + 1).commit()) {
+                LocalTamperHistory.record(
+                    context, "charger_disconnect_retry_count_persist_failed",
+                    "$reason; pending candidate retained but retry backoff could not be committed"
+                )
+                return
+            }
+            if (AlarmScheduler.schedulePowerReconciliationRetry(context, delayMs)) {
+                LocalTamperHistory.record(
+                    context, "charger_disconnect_confirmation_pending",
+                    "$reason; same-boot candidate retained and live-state retry scheduled in ${delayMs}ms"
+                )
+            } else {
+                LocalTamperHistory.record(
+                    context, "charger_disconnect_retry_schedule_failed",
+                    "$reason; candidate remains durable for monitor/process recovery"
+                )
+            }
+        }
+    }
+
+    fun hasPendingDisconnectCandidate(context: Context): Boolean = synchronized(lock) {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        PowerTransitionRecoveryPolicy.isCurrentCandidate(
+            pending = SafePreferences.boolean(prefs, PENDING_DISCONNECT, false),
+            pendingGeneration = SafePreferences.long(prefs, PENDING_GENERATION, -1L),
+            currentGeneration = SafePreferences.long(prefs, GENERATION, -1L),
+            baselineConnected = SafePreferences.boolean(prefs, CONNECTED, true)
+        )
+    }
+
     private fun restoreDisconnectCandidateLocked(context: Context, expectedGeneration: Long) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (SafePreferences.long(prefs, GENERATION, -1L) != expectedGeneration ||
@@ -217,6 +280,7 @@ object PowerTransitionCoordinator {
             .remove(PENDING_ELAPSED_MS)
             .remove(PENDING_BOOT_COUNT)
             .remove(PENDING_GENERATION)
+            .remove(PENDING_RETRY_COUNT)
             .commit()
         if (!saved) {
             LocalTamperHistory.record(context, "power_candidate_restore_failed", "Could not restore the prior connected baseline; pending event retained for live-state revalidation")
@@ -390,6 +454,7 @@ object PowerTransitionCoordinator {
                 .putLong(PENDING_ELAPSED_MS, eventElapsedRealtimeMs)
                 .putInt(PENDING_BOOT_COUNT, eventBootCount)
                 .putLong(PENDING_GENERATION, nextGeneration)
+                .putInt(PENDING_RETRY_COUNT, 0)
                 .commit()
             if (!saved) {
                 // A transition is not actionable until its provenance is durable.
@@ -472,15 +537,8 @@ object PowerTransitionCoordinator {
             )
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
-            synchronized(lock) {
-                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                if (isPendingCandidateCurrent(prefs, candidate)) {
-                    restoreDisconnectCandidateLocked(context, candidate.generation)
-                }
-            }
-            LocalTamperHistory.record(
-                context, "charger_unplug_rejected",
-                "Live-state confirmation was interrupted; pending event was safely cleared"
+            retainPendingDisconnectForRetry(
+                context, candidate, "Live-state confirmation was interrupted"
             )
             return ProtectionStore(context).read()
         }
@@ -489,17 +547,11 @@ object PowerTransitionCoordinator {
             if (confirmation.lastObserved == true) {
                 confirmConnectedAndArm(context, "Final debounce sample confirms external power is connected")
             } else {
-                synchronized(lock) {
-                    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    if (isPendingCandidateCurrent(prefs, candidate)) {
-                        restoreDisconnectCandidateLocked(context, candidate.generation)
-                    }
-                }
+                retainPendingDisconnectForRetry(
+                    context, candidate,
+                    "Disconnect did not stabilize after ${confirmation.sampleCount} samples; final=${confirmation.lastObserved}"
+                )
             }
-            LocalTamperHistory.record(
-                context, "charger_unplug_rejected",
-                "Disconnect did not stabilize after " + confirmation.sampleCount + " samples; final=" + confirmation.lastObserved
-            )
             return ProtectionStore(context).read()
         }
 
@@ -515,8 +567,9 @@ object PowerTransitionCoordinator {
                 if (finalConnected == true) {
                     confirmConnectedAndArmLocked(context, "Final connected snapshot invalidated unplug candidate")
                 } else {
-                    restoreDisconnectCandidateLocked(context, candidate.generation)
-                    LocalTamperHistory.record(context, "charger_unplug_rejected", "Final power-state sample was unknown; connected baseline restored")
+                    retainPendingDisconnectForRetry(
+                        context, candidate, "Final power-state sample was unknown"
+                    )
                 }
                 return@synchronized ProtectionStore(context).read()
             }
