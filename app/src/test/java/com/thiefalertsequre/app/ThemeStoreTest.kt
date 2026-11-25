@@ -1,5 +1,6 @@
 package com.thiefalertsequre.app
 
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -90,6 +91,16 @@ class ThemeStoreTest {
                 }
             }
         }
+    }
+
+    @Test fun statefulColorArraysRetainEveryStateWhileRemapping() {
+        val source = ThemeStore.get(ThemeStore.DEFAULT_ID)
+        val target = ThemeStore.get("ocean")
+        val states = intArrayOf(source.primary, source.text, source.muted, 0x7f123456)
+        assertArrayEquals(
+            intArrayOf(target.primary, target.text, target.muted, 0x7f123456),
+            ThemeColorMapping.remapColors(states, source, target)
+        )
     }
 
     @Test fun sourceSemanticRoleWinsWhenItsRgbMatchesAnotherTargetRole() {
