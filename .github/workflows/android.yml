@@ -95,6 +95,9 @@ jobs:
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
 
+      - name: Compile Android integration tests (no device execution)
+        run: ./gradlew :app:compileReleaseAndroidTestKotlin :app:compileReleaseAndroidTestJavaWithJavac --no-daemon --stacktrace
+
       - name: Verify Bypass Charging privilege and state boundary
         run: python3 scripts/verify_bypass_charging_contract.py
 
