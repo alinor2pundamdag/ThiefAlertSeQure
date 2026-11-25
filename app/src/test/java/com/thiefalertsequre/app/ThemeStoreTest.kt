@@ -55,6 +55,32 @@ class ThemeStoreTest {
         }
     }
 
+    @Test fun defaultResourceColorsNeverCollideWithAnotherThemeRole() {
+        val source = ThemeStore.get(ThemeStore.DEFAULT_ID)
+        val sourceColors = listOf(
+            source.primary, source.onPrimary, source.background, source.surface,
+            source.variant, source.text, source.muted, source.success,
+            source.warning, source.danger
+        )
+        ThemeStore.all.forEach { target ->
+            val targetColors = listOf(
+                target.primary, target.onPrimary, target.background, target.surface,
+                target.variant, target.text, target.muted, target.success,
+                target.warning, target.danger
+            )
+            sourceColors.forEachIndexed { sourceRole, sourceColor ->
+                targetColors.forEachIndexed { targetRole, targetColor ->
+                    if (sourceColor == targetColor && sourceRole != targetRole) {
+                        assertFalse(
+                            "${target.name}: default role $sourceRole collides with target role $targetRole",
+                            true
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     @Test fun destinationPaletteColorsAreNotRemappedAgain() {
         ThemeStore.all.forEach { palette ->
             ThemeColorMapping.paletteColors(palette).forEach { color ->
