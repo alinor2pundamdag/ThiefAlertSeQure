@@ -17,6 +17,14 @@ object AlarmRecoveryNotice {
     private const val CHANNEL_ID = "alarm_recovery_required"
     private const val NOTIFICATION_ID = 9042
 
+    fun cancel(context: Context) {
+        runCatching {
+            context.getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
+        }.onFailure {
+            LocalTamperHistory.record(context, "alarm_recovery_notice_cancel_failed", it.javaClass.simpleName + ": " + it.message)
+        }
+    }
+
     fun show(context: Context, reason: String) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED

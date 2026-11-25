@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+"""Static interaction contracts for internal navigation, dialogs, theme preview and setup actions."""
+from pathlib import Path
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+ROOT = Path(__file__).resolve().parents[1]
+JAVA = ROOT / "app" / "src" / "main" / "java"
+APP = JAVA / "com" / "thiefalertsequre" / "app"
+MANIFEST = ROOT / "app" / "src" / "main" / "AndroidManifest.xml"
+ANDROID = "{http://schemas.android.com/apk/res/android}"
+
+manifest = ET.parse(MANIFEST).getroot()
+declared = {
+    element.get(ANDROID + "name", "").rsplit(".", 1)[-1]
+    for element in manifest.findall("application/activity")
+}
+sources = list(JAVA.rglob("*.kt"))
+defined = set()
+targets = set()
+errors = []
+
+class_pattern = re.compile(r"\bclass\s+([A-Z][A-Za-z0-9_]*Activity)\b")
+target_pattern = re.compile(r"\b([A-Z][A-Za-z0-9_]*Activity)::class\.java")
+builder_pattern = re.compile(r"MaterialAlertDialogBuilder\s*\(")
+themed_pattern = re.compile(r"\.showThemed\s*\(")
+empty_click_pattern = re.compile(r"setOnClickListener\s*\{\s*(?:/\*.*?\*/\s*)?\}", re.S)
+empty_click_value_pattern = re.compile(r"setOnClickListener\s*\{\s*Unit\s*\}")
+
+for path in sources:
+    source = path.read_text(encoding="utf-8")
+    defined.update(class_pattern.findall(source))
+    targets.update(target_pattern.findall(source))
+    builders = len(builder_pattern.findall(source))
+    themed = len(themed_pattern.findall(source))
+    if "fun MaterialAlertDialogBuilder.showThemed" in source:
+        themed -= 1
+    if builders != themed:
+        errors.append(
+            f"{path.relative_to(ROOT)}: {builders} MaterialAlertDialogBuilder calls, "
+            f"but {themed} themed show calls"
+        )
+    if empty_click_pattern.search(source) or empty_click_value_pattern.search(source):
+        errors.append(f"{path.relative_to(ROOT)}: empty/no-op click listener detected")
+
+missing_declarations = sorted(targets - declared)
+missing_sources = sorted(declared - defined)
+if missing_declarations:
+    errors.append("Internal navigation targets missing from manifest: " + ", ".join(missing_declarations))
+if missing_sources:
+    errors.append("Manifest Activities missing Kotlin classes: " + ", ".join(missing_sources))
+
+theme_activity = (APP / "ThemeActivity.kt").read_text(encoding="utf-8")
+for required in (
+    "LIVE APP PREVIEW", "SETTINGS", "PROTECTION READINESS",
+    "SAMPLE CONFIRMATION DIALOG", "ThemeStore.save",
+    "AndroidDeviceCompatibility.applySystemBarInsets"
+):
+    if required not in theme_activity:
+        errors.append("ThemeActivity missing required preview/inset contract: " + required)
+
+bluetooth_activity = (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
+if "AndroidDeviceCompatibility.open(this, Intent(Settings.ACTION_BLUETOOTH_SETTINGS)" not in bluetooth_activity:
+    errors.append("BluetoothCenterActivity must provide a fallback for Bluetooth Settings navigation")
+
+device_activity = (APP / "DeviceIntelligenceActivity.kt").read_text(encoding="utf-8")
+for required in ("Not needed — optional A2 is OFF", "Not needed — optional dashboard is OFF", "optional owner-initiated API 36 capability query"):
+    if required not in device_activity:
+        errors.append("DeviceIntelligenceActivity missing optional-feature context: " + required)
+
+bluetooth_activity = (APP / "BluetoothCenterActivity.kt").read_text(encoding="utf-8")
+if "Monitor runtime:" not in bluetooth_activity or "Monitoring runs only while A2 is ON" not in bluetooth_activity:
+    errors.append("Bluetooth center must distinguish enabled preference from confirmed runtime")
+if "AndroidDeviceCompatibility.appInfoIntent(packageName)" not in device_activity:
+    errors.append("DeviceIntelligenceActivity must provide a fallback for app Settings navigation")
+for screen, source in (("BluetoothCenterActivity.kt", bluetooth_activity), ("DeviceIntelligenceActivity.kt", device_activity)):
+    if "lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)" not in source:
+        errors.append(screen + " must not show asynchronous diagnostics while paused")
+
+# Permission/capability screens must refresh their live snapshot after returning from Android Settings.
+for screen in (
+    "SettingsActivity.kt", "BluetoothCenterActivity.kt",
+    "DeviceIntelligenceActivity.kt", "SetupStatusActivity.kt"
+):
+    source = (APP / screen).read_text(encoding="utf-8")
+    resume = re.search(r"override fun onResume\(\)(.*?)(?=\n    (?:override fun|private fun|protected fun))", source, re.S)
+    if not resume or "render()" not in resume.group(0):
+        errors.append(screen + " must refresh live permission/capability status on resume")
+
+for screen in (
+    "MainActivity.kt", "SettingsActivity.kt", "BluetoothCenterActivity.kt",
+    "DeviceIntelligenceActivity.kt", "ThemeActivity.kt", "SetupStatusActivity.kt", "AboutActivity.kt",
+    "LocalTamperHistoryActivity.kt", "AppearanceStudioOptionsActivity.kt"
+):
+    source = (APP / screen).read_text(encoding="utf-8")
+    if "applySystemBarInsets" not in source:
+        errors.append(screen + " must apply system-bar/cutout insets")
+    if "override fun onResume" not in source or "ThemeRuntime.apply" not in source:
+        errors.append(screen + " must reapply the persisted/preview theme when returning to the screen")
+
+# Every user-facing page exposes its primary title as an accessibility heading.
+for screen in (
+    "MainActivity.kt", "SettingsActivity.kt", "BluetoothCenterActivity.kt",
+    "DeviceIntelligenceActivity.kt", "ThemeActivity.kt", "SetupStatusActivity.kt", "AboutActivity.kt",
+    "LocalTamperHistoryActivity.kt", "AppearanceStudioOptionsActivity.kt"
+):
+    source = (APP / screen).read_text(encoding="utf-8")
+    if ".markAsPageHeading()" not in source:
+        errors.append(screen + " must mark its primary page title for accessibility navigation")
+accessibility_helper = APP / "PageAccessibility.kt"
+if not accessibility_helper.is_file() or "ViewCompat.setAccessibilityHeading" not in accessibility_helper.read_text(encoding="utf-8"):
+    errors.append("PageAccessibility.kt must use AndroidX ViewCompat accessibility heading semantics")
+
+settings_activity = (APP / "SettingsActivity.kt").read_text(encoding="utf-8")
+resume_block = re.search(r"override fun onResume\(\).*?override fun onPause\(", settings_activity, re.S)
+pause_block = re.search(r"override fun onPause\(\).*?override fun onDestroy\(", settings_activity, re.S)
+if not resume_block or "render()" not in resume_block.group(0):
+    errors.append("SettingsActivity must refresh Android permission/readiness state after returning from Settings")
+if not pause_block or "stopPreview()" not in pause_block.group(0):
+    errors.append("SettingsActivity must stop audio preview when it leaves the foreground")
+if "lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)" not in settings_activity or "candidate?.release()" not in settings_activity:
+    errors.append("SettingsActivity must release a preview player that finishes preparing after the Activity is paused or destroyed")
+installer_start = settings_activity.index("private fun launchAndroidInstaller")
+installer_end = settings_activity.index("override fun onResume", installer_start)
+installer_block = settings_activity[installer_start:installer_end]
+if (
+    "Intent(Intent.ACTION_INSTALL_PACKAGE)" not in installer_block
+    or "FileProvider.getUriForFile" not in installer_block
+    or "startActivity(installIntent)" not in installer_block
+):
+    errors.append("APK update handoff must use the explicit Package Installer with an app-private FileProvider URI")
+if "Intent(Intent.ACTION_VIEW)" in installer_block:
+    errors.append("Generic ACTION_VIEW APK installation fallback is forbidden")
+if "startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" in settings_activity:
+    errors.append("Battery optimization request must use guarded Android Settings/activity fallback")
+if "AndroidDeviceCompatibility.open(" not in settings_activity:
+    errors.append("Settings external destinations must use the centralized guarded launcher")
+if (
+    "putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).apply()" in settings_activity
+    or "putBoolean(ProtectionMonitorService.KEY_ENABLED, enabled).commit()" not in settings_activity
+    or "batteryAlertEdit.commit()" not in settings_activity
+    or ".setAction(ProtectionMonitorService.ACTION_STOP)" not in settings_activity
+    or "putExtra(ProtectionMonitorService.EXTRA_STOP_PREFERENCE_COMMITTED, true)" not in settings_activity
+    or "stopService(Intent(this, ProtectionMonitorService::class.java))" in settings_activity
+):
+    errors.append("Critical monitor settings must be durably committed and shutdown must use the service-owned retry path")
+main_activity = (APP / "MainActivity.kt").read_text(encoding="utf-8")
+if "device_credential_launch_failed" not in main_activity:
+    errors.append("Device credential launch failures must be handled without terminating the active alarm")
+if "Android access not granted" not in settings_activity or "Open access settings" not in settings_activity:
+    errors.append("Optional full-screen dashboard toggle must disclose missing Android access and provide a settings route")
+
+main_activity = (APP / "MainActivity.kt").read_text(encoding="utf-8")
+if "minHeight = dp(46)" in main_activity:
+    errors.append("MainActivity contains a primary touch target below 48dp")
+
+for screen in ("BluetoothCenterActivity.kt", "DeviceIntelligenceActivity.kt"):
+    source = (APP / screen).read_text(encoding="utf-8")
+    if "minHeight = dp(48)" not in source:
+        errors.append(screen + " button helper must enforce a 48dp minimum touch target")
+
+setup_activity = (APP / "SetupStatusActivity.kt").read_text(encoding="utf-8")
+for action_label in (
+    "Open exact-alarm access", "Open full-screen access",
+    "Review battery restrictions", "Open notification settings",
+    "Open Android screen-lock settings"
+):
+    if action_label not in setup_activity:
+        errors.append("Setup status action label missing or ambiguous: " + action_label)
+for required in (
+    "AndroidDeviceCompatibility.open", "AndroidDeviceCompatibility.applySystemBarInsets",
+    "openStatusAction", "Toast.LENGTH_LONG"
+):
+    if required not in setup_activity:
+        errors.append("SetupStatusActivity missing safe action/inset contract: " + required)
+
+full_screen_policy = (APP / "FullScreenSetupStatusPolicy.kt").read_text(encoding="utf-8")
+if "!ownerEnabledDashboard" not in full_screen_policy or "SetupState.NEUTRAL" not in full_screen_policy:
+    errors.append("Full-screen intent access must remain optional until the owner enables the dashboard")
+
+setup_snapshot = (APP / "SetupStatusSnapshot.kt").read_text(encoding="utf-8")
+if "FullScreenSetupStatusPolicy.evaluate" not in setup_snapshot:
+    errors.append("Setup status must use the owner-aware full-screen access policy")
+
+setup_activity = (APP / "SetupStatusActivity.kt").read_text(encoding="utf-8")
+if "item.state == SetupState.ACTION_REQUIRED || item.state == SetupState.UNKNOWN" not in setup_activity:
+    errors.append("Setup status must not show action buttons for neutral/unsupported/verified items")
+
+bluetooth_policy = (APP / "BluetoothSetupStatusPolicy.kt").read_text(encoding="utf-8")
+if "!a2Enabled" not in bluetooth_policy:
+    errors.append("Bluetooth permission and adapter must be optional while A2 is disabled")
+
+setup_snapshot = (APP / "SetupStatusSnapshot.kt").read_text(encoding="utf-8")
+if "BluetoothSetupStatusPolicy.permission" not in setup_snapshot or "BluetoothSetupStatusPolicy.adapter" not in setup_snapshot:
+    errors.append("Setup status must use owner-aware Bluetooth readiness policy")
+
+a2_policy = (APP / "A2SetupStatusPolicy.kt").read_text(encoding="utf-8")
+if "connectedBaselineCount < trustedDeviceCount" not in a2_policy:
+    errors.append("A2 setup readiness must require a fresh baseline for every registered device")
+
+registry = (APP / "TrustedBluetoothRegistry.kt").read_text(encoding="utf-8")
+service = (APP / "ProtectionMonitorService.kt").read_text(encoding="utf-8")
+if "fun deviceRevision(" not in registry or "TrustedBluetoothRegistry.deviceRevision(prefs, address)" not in service:
+    errors.append("A2 disconnect timers must use per-device registry revisions")
+if "TrustedBluetoothRegistry.revision(prefs)" not in service:
+    errors.append("A2 disconnect timers must retain global monitor-reset invalidation")
+
+if errors:
+    print("\n".join("ERROR: " + item for item in errors))
+    sys.exit(1)
+
+print(
+    f"Verified {len(declared)} declared Activities, {len(targets)} internal navigation targets, "
+    "themed Material dialogs, no obvious empty click listeners, theme-preview/inset contracts, "
+    "safe setup-action fallbacks, and A2 readiness/timer invalidation contracts."
+)

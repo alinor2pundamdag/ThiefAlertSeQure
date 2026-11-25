@@ -3,26 +3,54 @@ package com.thiefalertsequre.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import java.util.concurrent.Executors
+
+internal object PowerTransitionQueuePolicy {
+    const val MAX_PENDING_EVENTS = 4
+    const val BACKPRESSURE_TIMEOUT_MS = 2_000L
+
+    fun createExecutor(
+        queueCapacity: Int = MAX_PENDING_EVENTS,
+        backpressureTimeoutMs: Long = BACKPRESSURE_TIMEOUT_MS
+    ): java.util.concurrent.ThreadPoolExecutor =
+        BoundedSerialExecutor.create(
+            queueCapacity = queueCapacity,
+            backpressureTimeoutMs = backpressureTimeoutMs,
+            threadName = "power-transition-events"
+        )
+}
 
 class PowerTransitionReceiver : BroadcastReceiver() {
     companion object {
-        // Preserve event order across CONNECTED and DISCONNECTED work.
-        private val powerEventExecutor = Executors.newSingleThreadExecutor()
+        // One FIFO worker preserves CONNECTED/DISCONNECTED/recovery ordering.
+        // The bounded queue applies at most 2 seconds of backpressure rather than
+        // allowing a broadcast burst to grow an unbounded in-memory backlog.
+        private val powerEventExecutor = PowerTransitionQueuePolicy.createExecutor()
+
+        fun enqueuePendingRecovery(context: Context) {
+            try {
+                powerEventExecutor.execute {
+                    PowerTransitionCoordinator.recoverPendingDisconnectCandidate(context.applicationContext)
+                }
+            } catch (error: Exception) {
+                LocalTamperHistory.record(
+                    context, "pending_unplug_recovery_queue_failed",
+                    error.javaClass.simpleName + ": " + error.message
+                )
+            }
+        }
     }
     override fun onReceive(context: Context, intent: Intent?) {
         val action = intent?.action ?: return
         if (action != Intent.ACTION_POWER_CONNECTED && action != Intent.ACTION_POWER_DISCONNECTED) return
-        val monitorEnabled = context.getSharedPreferences(
-            ProtectionMonitorService.PREFS, Context.MODE_PRIVATE
-        ).getBoolean(
-            ProtectionMonitorService.KEY_ENABLED, ProtectionMonitorPolicy.DEFAULT_ENABLED
+        val monitorEnabled = SafePreferences.boolean(
+            context.getSharedPreferences(ProtectionMonitorService.PREFS, Context.MODE_PRIVATE),
+            ProtectionMonitorService.KEY_ENABLED,
+            ProtectionMonitorPolicy.DEFAULT_ENABLED
         )
         if (!monitorEnabled) return
 
-        // Capture the physical event time before serialized debounce work. Otherwise
-        // the five-sample confirmation (~1.4 s) is incorrectly added before the
-        // user's ten-second grace period even begins.
+        // Capture the physical event time before serialized debounce work so the
+        // confirmation window is not added before the user's ten-second grace period.
         val eventEpochMs = System.currentTimeMillis()
         val eventElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime()
         val eventBootCount = ProtectionClock.bootCount(context)

@@ -15,6 +15,12 @@ import android.os.UserManager
  * Lock Task getters expose resolved policy, so multi-admin attribution cannot be
  * reconstructed exactly. Rollback restores the captured DPM-visible baseline.
  */
+internal object ManagedRestrictionPolicy {
+    /** DISALLOW_ADD_USER is accepted by addUserRestriction, but not the API 34+ global API. */
+    fun useGlobalRestriction(apiLevel: Int, key: String): Boolean =
+        apiLevel >= 34 && key != UserManager.DISALLOW_ADD_USER
+}
+
 object ManagedProtectionController {
     private const val PREFS = "managed_protection_rollback"
     private const val SNAPSHOT_VERSION = 1
@@ -60,9 +66,27 @@ object ManagedProtectionController {
         if (Build.VERSION.SDK_INT < 28 || !isDeviceOwner(context)) return false
         val dpm = context.getSystemService(DevicePolicyManager::class.java)
         val admin = admin(context)
-        return context.packageName in dpm.getLockTaskPackages(admin) &&
-            (dpm.getLockTaskFeatures(admin) and DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS) == 0
+        return runCatching {
+            context.packageName in dpm.getLockTaskPackages(admin) &&
+                dpm.getLockTaskFeatures(admin) == DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD &&
+                managedRestrictions.all { key -> isRestrictionApplied(dpm, admin, key) }
+        }.getOrDefault(false)
     }
+
+    private fun isRestrictionApplied(
+        dpm: DevicePolicyManager,
+        admin: ComponentName,
+        key: String
+    ): Boolean = runCatching {
+        val applied = if (Build.VERSION.SDK_INT >= 34 &&
+            ManagedRestrictionPolicy.useGlobalRestriction(Build.VERSION.SDK_INT, key)
+        ) {
+            dpm.getUserRestrictionsGlobally()
+        } else {
+            dpm.getUserRestrictions(admin)
+        }
+        applied.getBoolean(key, false)
+    }.getOrDefault(false)
 
     fun enable(activity: Activity): Boolean {
         if (Build.VERSION.SDK_INT < 28) return false
@@ -111,13 +135,24 @@ object ManagedProtectionController {
             // Allow only this app in kiosk mode. Keep Keyguard available; omit GLOBAL_ACTIONS.
             dpm.setLockTaskPackages(admin, arrayOf(activity.packageName))
             dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD)
+            check(dpm.getLockTaskFeatures(admin) == DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD) {
+                "Android did not confirm that Keyguard remains available in Lock Task mode."
+            }
 
             managedRestrictions.forEach { key ->
-                if (Build.VERSION.SDK_INT >= 34) {
+                if (Build.VERSION.SDK_INT >= 34 &&
+                    ManagedRestrictionPolicy.useGlobalRestriction(Build.VERSION.SDK_INT, key)
+                ) {
                     dpm.addUserRestrictionGlobally(key)
                 } else {
+                    // DISALLOW_ADD_USER is supported by addUserRestriction but is
+                    // not in the API 34+ addUserRestrictionGlobally key allowlist.
                     dpm.addUserRestriction(admin, key)
                 }
+            }
+
+            check(managedRestrictions.all { key -> isRestrictionApplied(dpm, admin, key) }) {
+                "Android did not confirm every managed user restriction; rollback will be attempted."
             }
 
             check(dpm.isLockTaskPermitted(activity.packageName)) {
@@ -202,15 +237,30 @@ object ManagedProtectionController {
     }
 
     private fun validateSnapshot(prefs: android.content.SharedPreferences) {
-        check(prefs.getInt(KEY_VERSION, -1) == SNAPSHOT_VERSION) {
+        fun <T> readRequired(label: String, getter: () -> T): T = try {
+            getter()
+        } catch (error: ClassCastException) {
+            throw IllegalStateException(
+                "Managed-policy rollback $label has an invalid stored type. Refusing to change device policies.",
+                error
+            )
+        }
+
+        check(readRequired("version") { prefs.getInt(KEY_VERSION, -1) } == SNAPSHOT_VERSION) {
             "Managed-policy rollback data is invalid. Refusing to apply lockdown over an unreadable recovery snapshot."
         }
-        check(prefs.getStringSet(KEY_PACKAGES, null) != null) {
+        check(readRequired("package list") { prefs.getStringSet(KEY_PACKAGES, null) } != null) {
             "Managed-policy rollback package list is missing. Refusing to change device policies."
         }
-        check(prefs.contains(KEY_FEATURES) &&
+        check(prefs.contains(KEY_FEATURES) && prefs.contains(KEY_RECOVERY_PENDING) &&
             restrictions.all { prefs.contains("local_restriction:$it") && prefs.contains("global_restriction:$it") }) {
             "Managed-policy rollback data is incomplete. Refusing to change device policies."
+        }
+        readRequired("lock-task features") { prefs.getInt(KEY_FEATURES, 0) }
+        readRequired("recovery state") { prefs.getBoolean(KEY_RECOVERY_PENDING, false) }
+        restrictions.forEach { key ->
+            readRequired("local restriction '$key'") { prefs.getBoolean("local_restriction:$key", false) }
+            readRequired("global restriction '$key'") { prefs.getBoolean("global_restriction:$key", false) }
         }
     }
 
@@ -268,6 +318,25 @@ object ManagedProtectionController {
             dpm.setLockTaskPackages(admin, snapshot.lockTaskPackages)
         }.onFailure(failures::add)
 
+        val snapshotReadbackMatches = runCatching {
+            val local = dpm.getUserRestrictions(admin)
+            val global = if (Build.VERSION.SDK_INT >= 34) {
+                dpm.getUserRestrictionsGlobally()
+            } else {
+                android.os.Bundle()
+            }
+            restrictions.all { key ->
+                local.getBoolean(key, false) == snapshot.shouldKeepLocalRestrictionEnabled(key) &&
+                    global.getBoolean(key, false) == snapshot.shouldKeepGlobalRestrictionEnabled(key)
+            } && dpm.getLockTaskPackages(admin).toSet() == snapshot.lockTaskPackages.toSet() &&
+                (Build.VERSION.SDK_INT < 28 || dpm.getLockTaskFeatures(admin) == snapshot.lockTaskFeatures)
+        }.getOrDefault(false)
+        if (!snapshotReadbackMatches) {
+            failures += IllegalStateException(
+                "Android did not confirm the complete original managed-policy snapshot after rollback."
+            )
+        }
+
         if (failures.isNotEmpty()) {
             throw IllegalStateException(
                 "Managed-policy rollback is incomplete. The saved original policy snapshot was retained " +
@@ -291,20 +360,37 @@ object ManagedProtectionController {
         restrictions.forEach { key ->
             runCatching { dpm.clearUserRestriction(admin, key) }.onFailure(failures::add)
         }
+        val emergencyFeatures =
+            DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS or
+                DevicePolicyManager.LOCK_TASK_FEATURE_HOME or
+                DevicePolicyManager.LOCK_TASK_FEATURE_OVERVIEW or
+                DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS or
+                DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO or
+                DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD
         if (Build.VERSION.SDK_INT >= 28) {
             runCatching {
-                dpm.setLockTaskFeatures(
-                    admin,
-                    DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS or
-                        DevicePolicyManager.LOCK_TASK_FEATURE_HOME or
-                        DevicePolicyManager.LOCK_TASK_FEATURE_OVERVIEW or
-                        DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS or
-                        DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO or
-                        DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD
-                )
+                dpm.setLockTaskFeatures(admin, emergencyFeatures)
             }.onFailure(failures::add)
         }
         runCatching { dpm.setLockTaskPackages(admin, emptyArray()) }.onFailure(failures::add)
+
+        val emergencyReadbackMatches = runCatching {
+            val local = dpm.getUserRestrictions(admin)
+            val global = if (Build.VERSION.SDK_INT >= 34) {
+                dpm.getUserRestrictionsGlobally()
+            } else {
+                android.os.Bundle()
+            }
+            restrictions.all { key ->
+                !local.getBoolean(key, false) && !global.getBoolean(key, false)
+            } && dpm.getLockTaskPackages(admin).isEmpty() &&
+                (Build.VERSION.SDK_INT < 28 || dpm.getLockTaskFeatures(admin) == emergencyFeatures)
+        }.getOrDefault(false)
+        if (!emergencyReadbackMatches) {
+            failures += IllegalStateException(
+                "Android did not confirm emergency navigation and restriction recovery."
+            )
+        }
 
         if (failures.isNotEmpty()) {
             throw IllegalStateException(

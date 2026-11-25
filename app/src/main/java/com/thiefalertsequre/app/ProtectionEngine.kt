@@ -35,6 +35,20 @@ object ProtectionEngine {
             ProtectionState(ProtectionMode.ARMED, 0L, now, 0L, -1)
     }
 
+    /** Explicit owner opt-out disarms protection but never clears a latched alarm. */
+    fun disableMonitoring(s: ProtectionState, nowEpochMs: Long): ProtectionState =
+        if (s.mode == ProtectionMode.ALARM_TRIGGERED) s
+        else ProtectionState(ProtectionMode.DISARMED, 0L, nowEpochMs, 0L, -1)
+
+    /** Motion and trusted-device alerts may latch only from the ARMED state. */
+    fun triggerFromArmed(
+        s: ProtectionState,
+        nowEpochMs: Long,
+        currentBootCount: Int
+    ): ProtectionState = if (s.mode == ProtectionMode.ARMED) {
+        ProtectionState(ProtectionMode.ALARM_TRIGGERED, 0L, nowEpochMs, 0L, currentBootCount)
+    } else s
+
     fun chargerDisconnected(
         s: ProtectionState,
         nowEpochMs: Long,

@@ -1,38 +1,113 @@
 package com.thiefalertsequre.app
 
 import android.content.Context
+import android.content.SharedPreferences
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Bounded, on-device protection event history. Never records credentials,
- * biometric material, notification contents, or arbitrary user data.
- */
+/** Bounded, encrypted, on-device protection event history with safe v1 migration. */
 object LocalTamperHistory {
-    private const val PREFS = "local_tamper_history_v1"
-    private const val KEY_EVENTS = "events"
-    private const val MAX_EVENTS = 100
+    private const val PREFS = "local_tamper_history_v2"
+    private const val KEY_EVENTS = "encrypted_events"
+    private const val LEGACY_PREFS = "local_tamper_history_v1"
+    private const val LEGACY_KEY_EVENTS = "events"
+    private const val PURPOSE = "thiefalertsequre:local-tamper-history:v2"
+
+    private data class HistoryRead(val value: String, val healthy: Boolean)
 
     @Synchronized
-    fun record(context: Context, event: String, detail: String = "") {
-        val safeEvent = event.filter { it.isLetterOrDigit() || it in "_- ." }.take(48)
-        val safeDetail = detail.replace(Regex("[\\r\\n\\t]"), " ").take(180)
-        val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+    fun record(context: Context, event: String, detail: String = "", writeEvidenceArchive: Boolean = true): Boolean {
+        val app = context.applicationContext
+        val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val current = readStored(app, prefs)
+        if (!current.healthy) return false
+        val safeEvent = LocalTamperHistoryPolicy.sanitizeEvent(event)
+        val safeDetail = LocalTamperHistoryPolicy.sanitizeDetail(detail)
+        val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.US).format(Date())
         val line = "$stamp | $safeEvent" + if (safeDetail.isBlank()) "" else " | $safeDetail"
-        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val existing = prefs.getString(KEY_EVENTS, "").orEmpty()
-        val next = (existing.split('\n').filter { it.isNotBlank() } + line).takeLast(MAX_EVENTS)
-        prefs.edit().putString(KEY_EVENTS, next.joinToString("\n")).commit()
+        val next = LocalTamperHistoryPolicy.append(current.value, line)
+        val encrypted = runCatching { LocalPreferenceCipher.encrypt(PURPOSE, next) }.getOrNull() ?: return false
+        if (!prefs.edit().putString(KEY_EVENTS, encrypted).commit()) return false
+        // Never report success while a legacy plaintext copy remains on disk.
+        if (!clearLegacyPlaintext(app)) return false
+        if (writeEvidenceArchive) LocalEvidenceVault.recordAsync(context, safeEvent, safeDetail)
+        return true
     }
 
-    fun read(context: Context, limit: Int = 100): List<String> =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_EVENTS, "").orEmpty()
-            .split('\n').filter { it.isNotBlank() }.takeLast(limit.coerceIn(1, MAX_EVENTS))
-            .reversed()
+    @Synchronized
+    fun read(context: Context, limit: Int = 100): List<String> {
+        val app = context.applicationContext
+        val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val result = readStored(app, prefs)
+        if (!result.healthy) return emptyList()
+        val safe = LocalTamperHistoryPolicy.sanitizeStoredHistory(result.value)
+        if (safe != result.value) {
+            val encrypted = runCatching { LocalPreferenceCipher.encrypt(PURPOSE, safe) }.getOrNull()
+            if (encrypted != null) prefs.edit().putString(KEY_EVENTS, encrypted).commit()
+        }
+        return LocalTamperHistoryPolicy.newestFirst(safe, limit)
+    }
 
-    fun clear(context: Context): Boolean =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().remove(KEY_EVENTS).commit()
+    /** Verifies the encrypted event log without overwriting corrupt data. */
+    @Synchronized
+    fun verifyIntegrity(context: Context): Boolean {
+        val app = context.applicationContext
+        return readStored(app, app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)).healthy
+    }
+
+    /** Clears only the event timeline; the separate encrypted evidence archive is retained. */
+    @Synchronized
+    fun clear(context: Context): Boolean {
+        val app = context.applicationContext
+        // Remove legacy plaintext first. If that commit fails, keep the current
+        // encrypted timeline intact so a later migration cannot resurrect it.
+        if (!clearLegacyPlaintext(app)) return false
+        val current = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val committed = current.edit().remove(KEY_EVENTS).commit()
+        return committed && !current.contains(KEY_EVENTS)
+    }
+
+    private fun readStored(context: Context, prefs: SharedPreferences): HistoryRead {
+        when (val stored = SafePreferences.readString(prefs, KEY_EVENTS, null)) {
+            is PreferenceRead.Corrupt -> return HistoryRead("", false)
+            is PreferenceRead.Value -> {
+                val raw = stored.value
+                if (raw != null) {
+                    val plaintext = runCatching { LocalPreferenceCipher.decrypt(PURPOSE, raw) }.getOrNull()
+                        ?: return HistoryRead("", false)
+                    // Older builds may have left a plaintext copy if migration cleanup failed.
+                    // Retry cleanup before exposing decrypted history or recording more events.
+                    if (!clearLegacyPlaintext(context)) return HistoryRead("", false)
+                    return HistoryRead(LocalTamperHistoryPolicy.sanitizeStoredHistory(plaintext), true)
+                }
+            }
+        }
+        // First-use migration from v1 plaintext SharedPreferences.
+        val legacyPrefs = context.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE)
+        val legacy = when (val old = SafePreferences.readString(legacyPrefs, LEGACY_KEY_EVENTS, "")) {
+            is PreferenceRead.Value -> old.value.orEmpty()
+            is PreferenceRead.Corrupt -> return HistoryRead("", false)
+        }
+        val safeLegacy = LocalTamperHistoryPolicy.sanitizeStoredHistory(legacy)
+        if (safeLegacy.isNotBlank()) {
+            val encrypted = runCatching { LocalPreferenceCipher.encrypt(PURPOSE, safeLegacy) }.getOrNull()
+                ?: return HistoryRead("", false)
+            if (!prefs.edit().putString(KEY_EVENTS, encrypted).commit()) return HistoryRead("", false)
+        }
+        // The encrypted replacement is durable before plaintext deletion is attempted.
+        // A failed removal keeps the history locked; a later read retries this migration.
+        if (!clearLegacyPlaintext(context)) return HistoryRead("", false)
+        return HistoryRead(safeLegacy, true)
+    }
+
+    private fun clearLegacyPlaintext(context: Context): Boolean = runCatching {
+        val legacyPrefs = context.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE)
+        if (!legacyPrefs.contains(LEGACY_KEY_EVENTS)) {
+            true
+        } else {
+            val removed = legacyPrefs.edit().remove(LEGACY_KEY_EVENTS).commit()
+            removed && !legacyPrefs.contains(LEGACY_KEY_EVENTS)
+        }
+    }.getOrDefault(false)
 }
