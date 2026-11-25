@@ -29,6 +29,10 @@ internal object PowerTransitionRecoveryPolicy {
         return true
     }
 
+    /** A malformed negative persisted attempt count must not reset backoff to its fastest slot. */
+    fun normalizeRetryAttempt(storedAttempt: Int): Int =
+        if (storedAttempt < 0) 100 else storedAttempt.coerceIn(0, 100)
+
     /** Retry inconclusive live power reads with bounded exponential backoff. */
     fun nextUnknownRetryDelayMs(attempt: Int): Long {
         val exponent = attempt.coerceAtLeast(0).coerceAtMost(6)
