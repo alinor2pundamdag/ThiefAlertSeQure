@@ -53,3 +53,14 @@ Before registering an adapter, verify: exact model/regional SKU/firmware/API; ha
 **Verified in source design:** fail-closed adapter registry; support/authorization gates; actual-state read-back; failure/unknown states; no privileged permission or shell path; disabled UI without an adapter.
 
 **Not implemented / not verified:** direct ON/OFF control on any OEM, model-level capability certification, persistence/reboot restoration, and physical charging-path behavior. These require a documented and authorized OEM interface.
+
+
+## Public API investigation — 2026-11-25
+
+The current adapter gap was checked against public platform and OEM documentation before considering an implementation:
+
+- Android's public [BatteryManager API](https://developer.android.com/reference/android/os/BatteryManager) exposes charging/battery queries (including `isCharging()` and battery properties); it does not document a vendor Bypass Charging mode setter.
+- [Settings.Global](https://developer.android.com/reference/android/provider/Settings.Global) documents that apps may read global settings but may not write them. A general `WRITE_SETTINGS` grant does not certify access to an OEM-private charging key or service.
+- [HONOR's user guidance](https://iknow-dl.service.hihonor.com/ctkbfm/applet/simulator/en-us15903291/index.html) describes Bypass Charging as a model/software-dependent system setting. The [HONOR MDM SDK API reference](https://contentplatform-drcn.hihonorcdn.com/developerPlatform/MagicOS_MDM%E8%83%BD%E5%8A%9BSDK_API%E6%8E%A5%E5%8F%A3/MagicOS_MDM%E8%83%BD%E5%8A%9BSDK_API%E6%8E%A5%E5%8F%A3.pdf) and [certificate application guide](https://developer.honor.com/cn/kitdoc?category=System&docId=cert_apply.md&kitId=11015&navigation=guides) describe certificate-gated device-management APIs; the public API material reviewed did not identify a Bypass Charging toggle or read-back method.
+
+**Research conclusion:** no safe, documented, universal third-party control interface was found. This does not prove that no private OEM interface exists; it means none is currently eligible for this app's adapter registry. A future adapter requires written/documented OEM authorization or a reviewed supported SDK contract, then model/firmware-specific read-back and rollback validation. Until then this requirement remains **INCOMPLETE / OEM-BLOCKED**, not 100% implemented.
