@@ -1,96 +1,94 @@
-# Phase 12 — Physical-device acceptance record
+# Owner Physical-Device Acceptance Checklist — v1.1.4
 
-**Project:** ThiefAlertSeQure  
-**Candidate branch:** `work/phase-0-12-coding`  
-**Current candidate commit:** `475c1fa00b8c30c1280f77053d83eb91c0db7f64`  
-**Current build:** `1.1.4-test` / versionCode `6`  
-**Development package:** `com.thiefalertsequre.app.v114test`  
-**Status:** **NOT TESTED — preparation only**
+**Purpose:** A manual acceptance record for the owner after the software implementation and exact-head CI are complete. This checklist is not an implementation task and does not block the assistant's non-physical coding work.
 
-This document is a blank record for real physical-device execution. CI, JVM tests, source checks, and emulator results do not count as physical acceptance. No result may be marked PASS until it is observed on the named device and build.
+**Candidate branch:** `release/v1.1.4-integration`  
+**Production identity:** `com.thiefalertsequre.app` / `1.1.4_Developer_Alinor` / versionCode `6`  
+**Development test identity:** `com.thiefalertsequre.app.v114test` / `1.1.4-test` / versionCode `6`  
+**Execution status:** NOT TESTED — owner to fill in after receiving the final CI-verified test APK.  
+**Instrumentation / emulator:** Do not compile or run instrumentation tests or emulator scenarios in this implementation pass.
 
-## Device and build identity
+## Device and candidate record
 
-| Field | Record |
+| Field | Owner record |
 |---|---|
-| Device model / model code | NOT RECORDED |
-| Android version / API level | NOT RECORDED |
-| OEM OS / MagicOS version | NOT RECORDED |
+| Device manufacturer/model/code | NOT RECORDED |
+| Android/API version | NOT RECORDED |
+| OEM OS/MagicOS version | NOT RECORDED |
 | Build fingerprint | NOT RECORDED |
-| Region / carrier (if relevant) | NOT RECORDED |
-| App package / version / versionCode | `com.thiefalertsequre.app.v114test` / `1.1.4-test` / `6` |
-| Tested commit | `475c1fa00b8c30c1280f77053d83eb91c0db7f64` |
-| Test date / local timezone | NOT RECORDED |
-| Tester | NOT RECORDED |
-| Initial battery / power mode | NOT RECORDED |
+| Region/carrier (if relevant) | NOT RECORDED |
+| Candidate commit SHA | Fill in from final handoff |
+| APK package/version/versionCode | Fill in from installed APK |
+| Test date/time and timezone | NOT RECORDED |
+| Initial battery/power mode | NOT RECORDED |
+| Tester | Owner |
 
-## Result definitions
-
-- **PASS** — expected behavior observed and supporting evidence saved.
-- **FAIL** — expected behavior not observed; preserve state/logs and record the exact failure.
-- **NOT TESTED** — not executed on this physical device.
-- **NOT APPLICABLE** — only when the hardware/API genuinely does not expose the capability; explain why.
+Use PASS, FAIL, NOT TESTED, or NOT APPLICABLE. A capability is N/A only when the device genuinely lacks it; record the reason. Do not infer physical acceptance from CI, JVM tests, screenshots, or emulator results.
 
 ## Scenario matrix
 
 | ID | Physical scenario | Expected acceptance condition | Result |
 |---|---|---|---|
-| P12-01 | Install development APK side-by-side | Development package installs without replacing production package or altering production app data | NOT TESTED |
-| P12-02 | First launch / privacy notice | Notice is shown once until acknowledged; acknowledgement persists locally | NOT TESTED |
-| P12-03 | Charger connected baseline | Protection reports ARMED only after a live connected baseline is confirmed | NOT TESTED |
-| P12-04 | Physical charger unplug | A confirmed unplug starts exactly the 10-second grace period | NOT TESTED |
-| P12-05 | Transient / unknown power snapshot | Unknown state does not start a countdown or alarm | NOT TESTED |
-| P12-06 | Reconnect before 10-second deadline | Pending countdown cancels and state returns to ARMED | NOT TESTED |
-| P12-07 | Reconnect after alarm latch | ALARM_TRIGGERED remains latched; reconnect does not clear it | NOT TESTED |
-| P12-08 | Cancel or fail owner authentication | Alarm remains active; no unauthenticated path clears it | NOT TESTED |
-| P12-09 | Successful Android credential / strong biometric | Only fresh Android device-credential or BIOMETRIC_STRONG success clears the alarm | NOT TESTED |
-| P12-10 | Alarm volume and recovery | Prior alarm-stream volume is restored after authenticated disarm | NOT TESTED |
-| P12-11 | Rear LED unavailable / busy | Audio alarm remains independent; no camera capture or CAMERA permission is used | NOT TESTED |
-| P12-12 | Reboot while charging | Live charger state is revalidated; no false unplug alarm occurs | NOT TESTED |
-| P12-13 | Reboot while unplugged / pending countdown | Recovery uses the approved fresh-sample and grace-period policy; no stale-boot deadline is trusted | NOT TESTED |
-| P12-14 | Notification permission denied | App reports the degraded state accurately; core protection state is not silently cleared | NOT TESTED |
-| P12-15 | Exact-alarm access denied | Inexact fallback limitation is disclosed; no promise of exact 8/10-second background delivery | NOT TESTED |
-| P12-16 | Two trusted Bluetooth accessories | Each accessory has an independent fresh baseline and independent 8-second disconnect grace | NOT TESTED |
-| P12-17 | Bluetooth reconnect during grace | Only that accessory's matching pending deadline is invalidated | NOT TESTED |
-| P12-18 | Unregister trusted accessory | App trust is removed; Android pairing remains unchanged | NOT TESTED |
-| P12-19 | Screen off / battery saver / OEM background limits | Record monitor, ACL receiver and alarm delivery behavior; do not infer guaranteed delivery | NOT TESTED |
-| P12-20 | Foreground service stop / restart / process recreation | UI reports actual runtime state; recovery does not create false baseline or clear a latched alarm | NOT TESTED |
-| P12-21 | Themes / rotation / font scaling / cutouts | All 16 themes, dialogs, insets, text scaling and screen recreation remain usable | NOT TESTED |
-| P12-22 | TalkBack / accessibility | Page headings, focus order, labels and touch targets are usable with TalkBack | NOT TESTED |
-| P12-23 | Android 16+ ranging capability check | Owner action only; local availability result or safe timeout; no peer discovery, session, location access or fabricated distance | NOT TESTED |
-| P12-24 | Root diagnostics declined / unavailable | No root action without explicit owner confirmation; denial/unavailability is reported safely | NOT TESTED |
-| P12-25 | Update identity / package boundary | Development APK is not offered as production update; production package/version/signer checks remain intact | NOT TESTED |
+| DEV-01 | Install test APK beside production | Test package installs without replacing production or altering its data; verify package, version and signer | NOT TESTED |
+| DEV-02 | First launch / legal disclosures | Privacy and Terms open offline; acknowledgement is explicit and persists; missing/failed content does not bypass acknowledgement | NOT TESTED |
+| DEV-03 | Deny/revoke permissions | Notifications, Bluetooth, camera, location, exact alarm and full-screen access show accurate degraded readiness; no false “protected” status | NOT TESTED |
+| DEV-04 | Establish connected charger baseline | ARMED only after a current live connected state is confirmed; no countdown from a snapshot alone | NOT TESTED |
+| DEV-05 | Physically unplug charger | Confirmed OS unplug starts the exact configured 10-second grace from the original event time | NOT TESTED |
+| DEV-06 | Reconnect within grace | Pending countdown is cancelled and state returns to ARMED only after live connected confirmation | NOT TESTED |
+| DEV-07 | Unknown/flapping power state | UNKNOWN or unstable samples never create a false countdown/alarm; pending candidate revalidation is bounded and recoverable | NOT TESTED |
+| DEV-08 | Inconclusive unplug / delayed revalidation | Durable same-boot candidate retries with bounded backoff; reconnect invalidates it; no false alarm after reboot/elapsed-clock reset | NOT TESTED |
+| DEV-09 | Reconnect after alarm latch | ALARM_TRIGGERED remains latched; reconnect, tile, widget or notification cannot clear it | NOT TESTED |
+| DEV-10 | Cancel/deny/fail owner authentication | Alarm remains active; no stale, cancelled or weak authentication clears the latch | NOT TESTED |
+| DEV-11 | Successful credential / BIOMETRIC_STRONG | Only fresh Android device credential or strong biometric proof clears the alarm; verify state persistence | NOT TESTED |
+| DEV-12 | Alarm sound/haptics/volume | Selected tone and haptics behave as configured; original alarm-stream volume is restored after authenticated stop | NOT TESTED |
+| DEV-13 | Flashlight unavailable/busy/thermal | Flash failure or thermal suppression does not stop alarm audio; no camera capture or CAMERA permission is used for flash | NOT TESTED |
+| DEV-14 | Reboot while charger is connected | Boot reconciliation uses current live power; no stale prior-boot unplug is inferred | NOT TESTED |
+| DEV-15 | Reboot during unplug/countdown | Prior-boot monotonic deadline is not trusted; approved fresh grace/recovery policy is followed; alarm state remains authoritative | NOT TESTED |
+| DEV-16 | Exact-alarm access denied | App reports limitation and fallback honestly; verify actual OEM delivery timing without assuming exact background delivery | NOT TESTED |
+| DEV-17 | Notification/lock-screen controls | Alarm notification and full-screen behavior match granted settings; dismissing notification does not disarm or clear state | NOT TESTED |
+| DEV-18 | Two trusted Bluetooth accessories | Each device has an independent baseline, identity and 8-second disconnect grace | NOT TESTED |
+| DEV-19 | Bluetooth reconnect during grace | Only the matching accessory's candidate/deadline is invalidated; the other device remains protected | NOT TESTED |
+| DEV-20 | Unregister trusted accessory | App trust is removed without unpairing the Android Bluetooth accessory | NOT TESTED |
+| DEV-21 | Bluetooth off/on and process/service restart | UI recovers real receiver/service state; no duplicate receiver, stale baseline or false alarm | NOT TESTED |
+| DEV-22 | Screen-off, Doze, battery saver and OEM background restrictions | Record monitor/ACL/alarm delivery and recovery; no claim of guaranteed delivery where OS/OEM suppresses it | NOT TESTED |
+| DEV-23 | Device Owner enrollment/rollback | If owner intentionally provisions Device Owner, verify allowed restrictions and safe rollback; otherwise mark N/A | NOT TESTED |
+| DEV-24 | Shutdown observation | Verify only the documented platform-supported behavior; no claim of universal shutdown interception or unauthorized lock bypass | NOT TESTED |
+| DEV-25 | Explicit location consent | One-shot location is requested only after opt-in and permission; no background tracking; denial clears no protection state | NOT TESTED |
+| DEV-26 | Optional front-camera evidence | Capture only from visible authenticated UI after opt-in; stopped/disabled/denied states do not capture; verify encryption and bounded size/count | NOT TESTED |
+| DEV-27 | Evidence/history integrity and cleanup | Migration, fresh-auth gate, redaction, corrupt-record handling, export/delete separation, retention and actual orphan cleanup behave safely | NOT TESTED |
+| DEV-28 | Backup/restore | User-selected document destination only; encrypted payload and metadata validation; malformed/oversized backup fails closed; restore does not weaken alarm/auth state | NOT TESTED |
+| DEV-29 | Themes and personalization | All 120 palettes, theme transitions, preview Apply/Cancel isolation, custom icon/background/motion/audio options and dialog colors work | NOT TESTED |
+| DEV-30 | Rotation, font scaling, cutouts and TalkBack | No clipped/overlapping controls; readable contrast; headings/focus/touch targets and system-bar insets remain usable | NOT TESTED |
+| DEV-31 | Bypass Charging capability boundary | Without a certified OEM adapter, app reports UNKNOWN/unsupported and disables ON/OFF; manual OEM setting is not represented as app-verified | NOT TESTED |
+| DEV-32 | Owner-initiated update | Update offered only in allowed protection state; HTTPS, digest, package, version and signer mismatch reject; Android installer confirmation/cancel path works | NOT TESTED |
+| DEV-33 | Tiles, widgets and state projections | Refresh/recreate widgets and Quick Settings tile; actions cannot disarm, reset baselines or clear a latched alarm without owner auth | NOT TESTED |
+| DEV-34 | Lifecycle/resource soak | Repeated navigation, background/foreground, Activity recreation, service restart, low storage and offline network; no stale camera/audio/receiver/worker, unbounded growth or lost persisted alarm state | NOT TESTED |
 
-## Evidence record — repeat for each scenario
+## Evidence record (repeat per scenario)
 
-| Field | Value |
-|---|---|
-| Scenario ID | NOT RECORDED |
-| Start state / settings | NOT RECORDED |
-| Action and timestamp | NOT RECORDED |
-| Expected result | NOT RECORDED |
-| Observed result | NOT RECORDED |
-| PASS / FAIL / NOT TESTED | NOT TESTED |
-| Log / screenshot evidence path | NOT RECORDED |
-| App event-history reference | NOT RECORDED |
-| Relevant error code / exception | NONE RECORDED |
-| Recovery completed and verified | NOT TESTED |
+- Scenario ID and result:
+- Device/API/OEM build and candidate SHA:
+- Initial state/settings:
+- Action and local timestamp:
+- Expected vs observed:
+- Relevant event-history entry/error:
+- Non-secret log/screenshot evidence path:
+- Recovery/cleanup completed:
+- Notes or follow-up defect:
 
-## Safe evidence and cleanup rules
+## Safe cleanup
 
-1. Capture the exact device model, Android/API, OEM build fingerprint, app package/version, candidate commit, date/time and relevant settings before each scenario.
-2. Save `adb logcat -v threadtime` output and only the relevant non-secret `dumpsys alarm`, service and package snapshots. Redact personal identifiers and unrelated app data before sharing.
-3. For alarm scenarios, stop only through the app's fresh Android credential or BIOMETRIC_STRONG flow. Confirm the persisted state, audio/torch stop, and volume restoration.
-4. Restore the prior monitor preference, A2 registration and Android accessory state. Removing app trust must not unpair an accessory.
-5. Never clear app data, uninstall the production package, factory-reset the phone, bypass authentication, or leave Device Owner / Lock Task restrictions enabled as test cleanup.
-6. On any failure, preserve state and logs and stop destructive retries until the cause is understood.
+1. Save only relevant, non-secret `logcat -v threadtime`, alarm/service/package snapshots and screenshots; redact personal data.
+2. Stop a latched alarm only through fresh Android credential or BIOMETRIC_STRONG authentication; verify persisted state and sound/flash cleanup.
+3. Restore prior monitor, trusted-accessory and Android settings. Removing app trust must not unpair devices.
+4. Do not clear app data, uninstall the production package, factory-reset, bypass authentication, or leave Device Owner/Lock Task restrictions enabled as test cleanup.
+5. On failure, preserve state and evidence; stop destructive retries until root cause is understood.
 
-## Acceptance decision
+## Acceptance summary
 
-- Physical scenarios passed: **0 / 25 recorded**
-- Physical scenarios failed: **0 / 25 recorded**
-- Physical scenarios not tested: **25 / 25**
-- Overall physical acceptance: **NOT TESTED**
-- Final reviewer / approval: NOT RECORDED
+- PASS: 0 / 34 recorded
+- FAIL: 0 / 34 recorded
+- NOT TESTED: 34 / 34
+- Physical acceptance: NOT TESTED — owner execution pending
 
-Do not change this status to PASS based on GitHub Actions. Physical acceptance closes only after real-device evidence is recorded and reviewed.
+Never mark this record PASS based on GitHub Actions. Physical acceptance is owner-run and separate from software implementation completion.
