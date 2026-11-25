@@ -54,15 +54,16 @@ class BypassChargingController(
     private val adapters:List<BypassChargingAdapter>,
     private val nowEpochMs:()->Long = { System.currentTimeMillis() }
 ) {
-    @Synchronized fun inspect():BypassChargingSnapshot {
-        val adapter=adapters.firstOrNull() ?: return unavailable()
-        return assess(adapter)
-    }
+    @Synchronized fun inspect():BypassChargingSnapshot =
+        selectSnapshot(adapters.map { adapter -> adapter to assess(adapter) })
 
     @Synchronized fun setEnabled(enabled:Boolean):BypassChargingSnapshot {
-        val adapter=adapters.firstOrNull() ?: return unavailable()
-        val before=assess(adapter)
-        if(!before.canToggle) return before
+        // Never let an unsupported or broken first adapter mask a later
+        // compatible adapter. Prefer an adapter with a verified current state.
+        val assessed=adapters.map { adapter -> adapter to assess(adapter) }
+        val selected=assessed.firstOrNull { it.second.canToggle }
+            ?: return selectSnapshot(assessed)
+        val (adapter,before)=selected
         val requested=if(enabled) BypassChargingMode.ENABLED else BypassChargingMode.DISABLED
         if(before.mode==requested) return before
         val accepted=runCatching { adapter.setEnabled(enabled) }.getOrDefault(false)
@@ -81,6 +82,25 @@ class BypassChargingController(
                 else -> "The observed mode does not match the requested mode."
             },timestamp()
         )
+    }
+
+    private fun selectSnapshot(
+        assessed:List<Pair<BypassChargingAdapter,BypassChargingSnapshot>>
+    ):BypassChargingSnapshot {
+        if(assessed.isEmpty()) return unavailable()
+        // Prefer verified state, then an authorized supported adapter, then
+        // useful denial/unsupported diagnostics. Provider order is only a tie-break.
+        return assessed.maxByOrNull { (_,snapshot) ->
+            when {
+                snapshot.isVerified -> 100
+                snapshot.support==BypassChargingSupport.SUPPORTED &&
+                    snapshot.authorization==BypassChargingAuthorization.AUTHORIZED -> 80
+                snapshot.support==BypassChargingSupport.SUPPORTED &&
+                    snapshot.authorization==BypassChargingAuthorization.REQUIRED -> 70
+                snapshot.support==BypassChargingSupport.UNSUPPORTED -> 40
+                else -> 10
+            }
+        }?.second ?: unavailable()
     }
 
     private fun assess(adapter:BypassChargingAdapter):BypassChargingSnapshot {
