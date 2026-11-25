@@ -17,9 +17,10 @@ A normal APK cannot grant itself platform-signature or privileged permissions. A
 - BypassChargingController.kt defines the model/firmware-specific adapter contract.
 - BypassChargingAdapterRegistry is intentionally empty until an OEM interface is documented and reviewed.
 - The controller requires a positive capability probe, explicit authorization, and a readable current state before enabling ON/OFF.
+- Adapter registration is a strict certification gate: exact manufacturer, brand, model, API range, and reviewed Android build fingerprint are required. Wildcards, model-name heuristics, unknown fingerprints, and duplicate adapter IDs fail closed.
 - After a command, the controller reads the mode again. A command return value alone never produces a verified state.
 - Settings displays actual mode as UNKNOWN and keeps the switch disabled when no adapter is available.
-- The owner can open Android battery settings and follow model-specific manual guidance.
+- The owner can open the general Android Settings page (safe public intent) and follow model-specific manual guidance; the app does not mislabel Battery Saver settings as a direct Bypass Charging page.
 - No new Android permission, service, backend, telemetry, root command, hidden API, or database was added.
 - No desired ON/OFF preference is replayed at boot without a certified OEM persistence contract.
 
@@ -50,7 +51,7 @@ Before registering an adapter, verify: exact model/regional SKU/firmware/API; ha
 
 ## Acceptance result
 
-**Verified in source design:** fail-closed adapter registry; support/authorization gates; actual-state read-back; failure/unknown states; no privileged permission or shell path; disabled UI without an adapter.
+**Verified in source design:** fail-closed adapter registry; exact device/API/build certification gate; duplicate-registration rejection; support/authorization gates; actual-state read-back; failure/unknown states; no privileged permission or shell path; disabled UI without an adapter.
 
 **Not implemented / not verified:** direct ON/OFF control on any OEM, model-level capability certification, persistence/reboot restoration, and physical charging-path behavior. These require a documented and authorized OEM interface.
 
