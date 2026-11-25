@@ -13,7 +13,8 @@ for token in ("interface BypassChargingAdapter","adapter.readEnabled()",
               "firmwareFingerprint: String","firmwareFingerprints: Set<String>",
               "firmwareFingerprints.any { it == device.firmwareFingerprint }",
               "firmwareFingerprints.none { it.isBlank() || it.contains(\"*\") }",
-              "duplicate certification is ambiguous","return emptyList()"):
+              "duplicate certification is ambiguous","registeredId","actualId == registeredId",
+              "return emptyList()"):
     assert token in controller,f"Missing fail-closed contract: {token}"
 for forbidden in ("ProcessBuilder(","Runtime.getRuntime().exec","WRITE_SECURE_SETTINGS",
                   "DEVICE_POWER","setprop ","sysfs","service call"):
@@ -26,7 +27,9 @@ assert "BypassChargingGuidance.instructions" in settings
 assert tests.is_file()
 test_source=tests.read_text(encoding="utf-8")
 for test_name in ("adapterCertificationRequiresExactModelApiAndFirmwareFingerprint",
-                  "duplicateAdapterCertificationFailsClosed"):
+                  "duplicateAdapterCertificationFailsClosed",
+                  "factoryCannotBorrowAnotherCertificationAdapterId",
+                  "adapterIdGetterFailureIsContainedAndFailsClosed"):
     assert test_name in test_source, f"Missing bypass registry regression test: {test_name}"
 for permission in ("android.permission.WRITE_SECURE_SETTINGS",
                    "android.permission.DEVICE_POWER","android.permission.BATTERY_STATS"):
