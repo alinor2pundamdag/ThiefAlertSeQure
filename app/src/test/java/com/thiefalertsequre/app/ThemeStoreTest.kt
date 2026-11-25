@@ -92,10 +92,20 @@ class ThemeStoreTest {
         }
     }
 
-    @Test fun destinationPaletteColorsAreNotRemappedAgain() {
+    @Test fun sourceSurfaceMapsToTargetSurfaceEvenWhenRgbMatchesTargetOnPrimary() {
+        val source = ThemeStore.get("spectrum_21")
+        val target = ThemeStore.get("contrast")
+        assertEquals(source.onPrimary, target.onPrimary)
+        assertEquals(
+            target.surface,
+            ThemeColorMapping.remap(source.surface, source, target)
+        )
+    }
+
+    @Test fun reapplyingTheSamePaletteIsAnIdentityMapping() {
         ThemeStore.all.forEach { palette ->
             ThemeColorMapping.paletteColors(palette).forEach { color ->
-                assertEquals(color, ThemeColorMapping.remap(color, ThemeStore.get(ThemeStore.DEFAULT_ID), palette))
+                assertEquals(color, ThemeColorMapping.remap(color, palette, palette))
             }
         }
     }
