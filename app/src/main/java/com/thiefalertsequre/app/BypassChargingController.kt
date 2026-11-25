@@ -29,17 +29,26 @@ data class BypassChargingCertification(
 ) {
     fun matches(device: BypassChargingDevice): Boolean {
         fun normalized(value: String) = value.trim().lowercase(java.util.Locale.ROOT)
+        fun isKnownIdentity(value: String) =
+            value.isNotBlank() && normalized(value) != "unknown" && !value.contains("*")
+        val deviceFingerprint = device.firmwareFingerprint
         return adapterId.isNotBlank() &&
+            isKnownIdentity(manufacturer) && isKnownIdentity(brand) && isKnownIdentity(model) &&
+            isKnownIdentity(device.manufacturer) && isKnownIdentity(device.brand) && isKnownIdentity(device.model) &&
             normalized(manufacturer) == normalized(device.manufacturer) &&
             normalized(brand) == normalized(device.brand) &&
             normalized(model) == normalized(device.model) &&
             minApiLevel > 0 && maxApiLevel >= minApiLevel &&
             device.apiLevel in minApiLevel..maxApiLevel &&
-            device.firmwareFingerprint.isNotBlank() &&
-            device.firmwareFingerprint != "unknown" &&
+            deviceFingerprint.isNotBlank() &&
+            deviceFingerprint == deviceFingerprint.trim() &&
+            !deviceFingerprint.equals("unknown", ignoreCase = true) &&
+            !deviceFingerprint.contains("*") &&
             firmwareFingerprints.isNotEmpty() &&
-            firmwareFingerprints.none { it.isBlank() || it.contains("*") } &&
-            firmwareFingerprints.any { it == device.firmwareFingerprint }
+            firmwareFingerprints.none {
+                it.isBlank() || it != it.trim() || it.equals("unknown", ignoreCase = true) || it.contains("*")
+            } &&
+            firmwareFingerprints.any { it == deviceFingerprint }
     }
 }
 
