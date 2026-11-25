@@ -7,6 +7,8 @@ on:
       - "feat/**"
       - "feature/**"
       - "fix/**"
+      - "fixall/**"
+      - "dev/**"
       - "release/**"
       - "security/**"
       - "work/**"
