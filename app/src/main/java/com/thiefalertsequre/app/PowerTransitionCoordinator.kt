@@ -235,7 +235,7 @@ object PowerTransitionCoordinator {
                 return
             }
             val attempts = when (val retryRead = SafePreferences.readInt(prefs, PENDING_RETRY_COUNT, 0)) {
-                is PreferenceRead.Value -> retryRead.value.coerceIn(0, 100)
+                is PreferenceRead.Value -> PowerTransitionRecoveryPolicy.normalizeRetryAttempt(retryRead.value)
                 // A corrupt retry counter must not reset to a rapid retry loop.
                 is PreferenceRead.Corrupt -> 100
             }
