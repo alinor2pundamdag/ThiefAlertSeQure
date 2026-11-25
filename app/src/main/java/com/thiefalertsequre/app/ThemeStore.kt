@@ -84,28 +84,79 @@ object ThemeStore {
  fun get(c:Context,id:String=selected(c))=all.firstOrNull{it.id==id}?:all.first{it.id==DEFAULT_ID}
  fun save(c:Context,id:String)=valid(id)&&c.getSharedPreferences(PREFS,0).edit().putString(KEY,id).commit()
 }
+internal object ThemeColorMapping {
+    fun colors(source: ThemePalette, target: ThemePalette): Map<Int, Int> = mapOf(
+        source.primary to target.primary,
+        source.onPrimary to target.onPrimary,
+        source.background to target.background,
+        source.surface to target.surface,
+        source.variant to target.variant,
+        source.text to target.text,
+        source.muted to target.muted,
+        source.success to target.success,
+        source.warning to target.warning,
+        source.danger to target.danger
+    )
+
+    fun paletteColors(palette: ThemePalette): Set<Int> = setOf(
+        palette.primary, palette.onPrimary, palette.background, palette.surface,
+        palette.variant, palette.text, palette.muted, palette.success,
+        palette.warning, palette.danger
+    )
+
+    /** Preserve colors already authored for the destination palette. */
+    fun remap(color: Int, source: ThemePalette, target: ThemePalette): Int {
+        if (color in paletteColors(target)) return color
+        return colors(source, target)[color] ?: color
+    }
+}
+
 object ThemeRuntime {
- fun apply(a:Activity,root:View,id:String=ThemeStore.selected(a)){
+ fun apply(
+  a:Activity,
+  root:View,
+  id:String=ThemeStore.selected(a),
+  initialSourceId:String=ThemeStore.DEFAULT_ID
+ ){
   val p=ThemeStore.get(a,id); a.window.statusBarColor=p.background; a.window.navigationBarColor=p.background
   @Suppress("DEPRECATION") run { a.window.decorView.systemUiVisibility=if(p.mode=="Light") View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0 }
   val decor=a.window.decorView
-  val previousId=decor.tag as? String ?: ThemeStore.DEFAULT_ID
-  val previous=ThemeStore.get(a,previousId)
-  val old=mapOf(previous.primary to p.primary,previous.onPrimary to p.onPrimary,previous.background to p.background,previous.surface to p.surface,previous.variant to p.variant,previous.text to p.text,previous.muted to p.muted,previous.success to p.success,previous.warning to p.warning,previous.danger to p.danger)
   fun walk(v:View){
-   if(v is TextView) old[v.currentTextColor]?.let(v::setTextColor)
-   if(v is MaterialCardView){old[v.cardBackgroundColor.defaultColor]?.let(v::setCardBackgroundColor);v.strokeColor=p.variant}
-   else if(v.background is ColorDrawable) old[(v.background as ColorDrawable).color]?.let(v::setBackgroundColor)
+   val appliedId=v.getTag(R.id.theme_palette_applied) as? String
+   val source=ThemeStore.get(a,appliedId ?: initialSourceId)
+   if(v is TextView) {
+    val color=v.currentTextColor
+    val mapped=ThemeColorMapping.remap(color,source,p)
+    if(mapped!=color) v.setTextColor(mapped)
+   }
+   if(v is MaterialCardView){
+    val color=v.cardBackgroundColor.defaultColor
+    val mapped=ThemeColorMapping.remap(color,source,p)
+    if(mapped!=color) v.setCardBackgroundColor(mapped)
+    v.strokeColor=p.variant
+   } else if(v.background is ColorDrawable) {
+    val color=(v.background as ColorDrawable).color
+    val mapped=ThemeColorMapping.remap(color,source,p)
+    if(mapped!=color) v.setBackgroundColor(mapped)
+   }
    if(v is MaterialButton){
     val tint=v.backgroundTintList?.defaultColor
-    old[tint]?.let{v.backgroundTintList=ColorStateList.valueOf(it)}
+    tint?.let { color ->
+     val mapped=ThemeColorMapping.remap(color,source,p)
+     if(mapped!=color) v.backgroundTintList=ColorStateList.valueOf(mapped)
+    }
     val stroke=v.strokeColor?.defaultColor
-    old[stroke]?.let{v.strokeColor=ColorStateList.valueOf(it)}
+    stroke?.let { color ->
+     val mapped=ThemeColorMapping.remap(color,source,p)
+     if(mapped!=color) v.strokeColor=ColorStateList.valueOf(mapped)
+    }
     AppearanceStudioStore.applyButtonAnimation(a, v)
    }
+   v.setTag(R.id.theme_palette_applied,id)
    if(v is ViewGroup) for(i in 0 until v.childCount) walk(v.getChildAt(i))
   }
-  walk(root); root.background=AppearanceStudioStore.backgroundDrawable(a,p); decor.tag=id
+  walk(root); root.background=AppearanceStudioStore.backgroundDrawable(a,p)
+  root.setTag(R.id.theme_palette_applied,id); decor.tag=id
  }
 
  fun applyDialog(activity:Activity,dialog:AlertDialog){
