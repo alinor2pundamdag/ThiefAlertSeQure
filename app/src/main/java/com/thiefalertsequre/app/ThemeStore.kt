@@ -72,7 +72,7 @@ object ThemeStore {
   val mutedColor = if (light) 0xFF526171.toInt() else 0xFFB2BECC.toInt()
   ThemePalette(
    "spectrum_${index + 17}", "Spectrum ${index + 17}", if (light) "Light" else "Dark",
-   primary, if (light) 0xFFFFFFFF.toInt() else 0xFF07111F.toInt(),
+   primary, if (light) 0xFFFFFFFF.toInt() else 0xFF050A12.toInt(),
    background, surface, variantColor, textColor, mutedColor,
    if (light) 0xFF146B48.toInt() else 0xFF43D6A1.toInt(),
    if (light) 0xFF805000.toInt() else 0xFFFFC66D.toInt(),
