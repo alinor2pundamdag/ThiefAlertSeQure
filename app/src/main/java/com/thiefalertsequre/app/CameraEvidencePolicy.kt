@@ -33,9 +33,9 @@ internal object CameraEvidencePolicy {
     /** Power-of-two sampling keeps decoded bitmap dimensions within the target bounds. */
     fun decodeSampleSize(width: Int, height: Int, maxWidth: Int, maxHeight: Int): Int {
         if (width <= 0 || height <= 0 || maxWidth <= 0 || maxHeight <= 0) return 1
+        val shrinkRatio = maxOf(width.toDouble() / maxWidth, height.toDouble() / maxHeight)
         var sampleSize = 1
-        while (width / sampleSize > maxWidth || height / sampleSize > maxHeight) {
-            if (sampleSize >= (1 shl 15)) return sampleSize
+        while (sampleSize < (1 shl 15) && sampleSize * 2 <= shrinkRatio) {
             sampleSize *= 2
         }
         return sampleSize
