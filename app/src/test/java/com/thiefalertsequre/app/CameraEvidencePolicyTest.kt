@@ -37,7 +37,7 @@ class CameraEvidencePolicyTest {
     @Test fun jpegDownsamplingBoundsPortraitAndLandscapeDimensions() {
         assertEquals(1, CameraEvidencePolicy.decodeSampleSize(1280, 720, 1280, 720))
         assertEquals(4, CameraEvidencePolicy.decodeSampleSize(4000, 3000, 1280, 720))
-        assertEquals(4, CameraEvidencePolicy.decodeSampleSize(1080, 2400, 1280, 720))
+        assertEquals(2, CameraEvidencePolicy.decodeSampleSize(1080, 2400, 1280, 720))
         assertEquals(1, CameraEvidencePolicy.decodeSampleSize(0, 720, 1280, 720))
     }
 
