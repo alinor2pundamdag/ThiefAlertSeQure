@@ -213,7 +213,7 @@ object BypassChargingAdapterRegistry {
             // created it. A different registration's ID must never authorize it.
             val registeredId = registration.certification.adapterId
             val actualId = runCatching { adapter.id }.getOrNull()
-            adapter.takeIf { actualId.isNotBlank() && actualId == registeredId }
+            adapter.takeIf { actualId?.isNotBlank() == true && actualId == registeredId }
         }
     }
 }
