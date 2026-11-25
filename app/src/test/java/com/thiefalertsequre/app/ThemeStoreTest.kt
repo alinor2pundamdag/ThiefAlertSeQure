@@ -41,7 +41,7 @@ class ThemeStoreTest {
     }
 
     @Test fun defaultResourceColorsMapIntoEveryTheme() {
-        val source = ThemeStore.get(ThemeStore.DEFAULT_ID)
+        val source = ThemeStore.all.first { it.id == ThemeStore.DEFAULT_ID }
         ThemeStore.all.forEach { target ->
             val mapping = ThemeColorMapping.colors(source, target)
             assertEquals(target.primary, mapping[source.primary])
@@ -58,7 +58,7 @@ class ThemeStoreTest {
     }
 
     @Test fun previouslyAppliedPaletteCanTransitionToEveryTheme() {
-        val source = ThemeStore.get("ocean")
+        val source = ThemeStore.all.first { it.id == "ocean" }
         ThemeStore.all.forEach { target ->
             val mapping = ThemeColorMapping.colors(source, target)
             assertEquals(target.primary, mapping[source.primary])
@@ -68,7 +68,7 @@ class ThemeStoreTest {
     }
 
     @Test fun defaultResourceColorsNeverCollideWithAnotherThemeRole() {
-        val source = ThemeStore.get(ThemeStore.DEFAULT_ID)
+        val source = ThemeStore.all.first { it.id == ThemeStore.DEFAULT_ID }
         val sourceColors = listOf(
             source.primary, source.onPrimary, source.background, source.surface,
             source.variant, source.text, source.muted, source.success,
@@ -94,8 +94,8 @@ class ThemeStoreTest {
     }
 
     @Test fun statefulColorArraysRetainEveryStateWhileRemapping() {
-        val source = ThemeStore.get(ThemeStore.DEFAULT_ID)
-        val target = ThemeStore.get("ocean")
+        val source = ThemeStore.all.first { it.id == ThemeStore.DEFAULT_ID }
+        val target = ThemeStore.all.first { it.id == "ocean" }
         val semiTransparentText = (source.text and 0x00ffffff) or 0x7f000000
         val states = intArrayOf(source.primary, semiTransparentText, source.muted, 0x7f123456)
         assertArrayEquals(
