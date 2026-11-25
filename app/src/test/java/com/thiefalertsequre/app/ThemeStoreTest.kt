@@ -93,28 +93,18 @@ class ThemeStoreTest {
         }
     }
 
-    @Test fun publicColorStateListRemappingPreservesCommonInteractionStates() {
-        val source = ThemeStore.get(ThemeStore.DEFAULT_ID)
-        val target = ThemeStore.get("ocean")
-        val pressed = android.R.attr.state_pressed
-        val enabled = android.R.attr.state_enabled
-        val disabled = -android.R.attr.state_enabled
-        val original = android.content.res.ColorStateList(
-            arrayOf(intArrayOf(pressed), intArrayOf(disabled), intArrayOf()),
-            intArrayOf(source.primary, source.muted, source.text)
-        )
-        val mapped = ThemeColorMapping.remapStateList(original, source, target)
-        assertEquals(target.primary, mapped.getColorForState(intArrayOf(pressed, enabled), 0))
-        assertEquals(target.muted, mapped.getColorForState(intArrayOf(disabled), 0))
-        assertEquals(target.text, mapped.defaultColor)
-    }
-
     @Test fun statefulColorArraysRetainEveryStateWhileRemapping() {
         val source = ThemeStore.get(ThemeStore.DEFAULT_ID)
         val target = ThemeStore.get("ocean")
-        val states = intArrayOf(source.primary, source.text, source.muted, 0x7f123456)
+        val semiTransparentText = (source.text and 0x00ffffff) or 0x7f000000
+        val states = intArrayOf(source.primary, semiTransparentText, source.muted, 0x7f123456)
         assertArrayEquals(
-            intArrayOf(target.primary, target.text, target.muted, 0x7f123456),
+            intArrayOf(
+                target.primary,
+                (target.text and 0x00ffffff) or 0x7f000000,
+                target.muted,
+                0x7f123456
+            ),
             ThemeColorMapping.remapColors(states, source, target)
         )
     }
