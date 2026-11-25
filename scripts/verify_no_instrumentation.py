@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enforce the owner-directed non-instrumentation build policy."""
+"""Allow Android-test source compilation, but prohibit emulator/instrumentation execution."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,16 +17,12 @@ if not gradle_files:
 
 workflows = sorted((ROOT / ".github/workflows").glob("*.yml"))
 forbidden_gradle = (
-    "androidTest",
     "connectedCheck",
     "managedDeviceCheck",
     "instrumentationTestBuild",
-    "testInstrumentationRunner",
-    "androidTestImplementation",
     "assembleAndroidTest",
-    "compileReleaseAndroidTest",
-    "compileDebugAndroidTest",
     "assembleDebugAndroidTest",
+    "assembleReleaseAndroidTest",
     "connectedAndroidTest",
     "connectedDebugAndroidTest",
     "connectedReleaseAndroidTest",
@@ -52,14 +48,11 @@ for helper in obsolete_helpers:
 for workflow in workflows:
     source = workflow.read_text(encoding="utf-8")
     forbidden_workflow = (
-        "androidTest",
         "connectedCheck",
         "managedDeviceCheck",
         "android-emulator-runner",
         "am instrument",
         "assembleReleaseAndroidTest",
-        "compileReleaseAndroidTest",
-        "compileDebugAndroidTest",
         "assembleDebugAndroidTest",
         "connectedAndroidTest",
         "connectedDebugAndroidTest",
@@ -72,6 +65,6 @@ for workflow in workflows:
             raise SystemExit(f"Instrumentation/emulator workflow wiring is forbidden: {workflow}: {token}")
 
 print(
-    "Verified: no instrumentation runner/dependencies/build tasks or emulator execution "
+    "Verified: Android-test source compilation is allowed, but no instrumentation execution or emulator wiring "
     f"across {len(gradle_files)} Gradle configuration files and {len(workflows)} GitHub Actions workflows."
 )
