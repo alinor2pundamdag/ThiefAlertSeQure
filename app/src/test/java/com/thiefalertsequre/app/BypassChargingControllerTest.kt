@@ -40,6 +40,24 @@ class BypassChargingControllerTest {
         assertTrue(BypassChargingAdapterRegistry.resolve(device, listOf(registration, registration)).isEmpty())
     }
 
+    @Test fun certificationRejectsUnknownCaseVariantsAndWildcardIdentities() {
+        val exact = BypassChargingCertification(
+            "strict", "HONOR", "HONOR", "ELP-NX9", 36, 36,
+            setOf("honor/elp-nx9/build:1.0/release-keys")
+        )
+        val known = BypassChargingDevice(
+            "HONOR", "HONOR", "ELP-NX9", 36,
+            "honor/elp-nx9/build:1.0/release-keys"
+        )
+        assertFalse(exact.matches(known.copy(manufacturer = "unknown")))
+        assertFalse(exact.matches(known.copy(brand = "*")))
+        assertFalse(exact.matches(known.copy(model = "")))
+        assertFalse(exact.matches(known.copy(firmwareFingerprint = "UNKNOWN")))
+        assertFalse(exact.matches(known.copy(firmwareFingerprint = " " + known.firmwareFingerprint)))
+        assertFalse(exact.copy(firmwareFingerprints = setOf("UNKNOWN")).matches(known))
+        assertFalse(exact.copy(firmwareFingerprints = setOf("prefix*")).matches(known))
+    }
+
     @Test fun factoryCannotBorrowAnotherCertificationAdapterId() {
         val exact = BypassChargingCertification(
             "certified-adapter", "HONOR", "HONOR", "ELP-NX9", 36, 36,
