@@ -92,11 +92,27 @@ class ThemeStoreTest {
         }
     }
 
-    @Test fun sourceSurfaceMapsToTargetSurfaceEvenWhenRgbMatchesTargetOnPrimary() {
-        val source = ThemeStore.get("spectrum_21")
-        val target = ThemeStore.get("contrast")
-        assertEquals(source.onPrimary, target.onPrimary)
+    @Test fun sourceSemanticRoleWinsWhenItsRgbMatchesAnotherTargetRole() {
+        val sourceSurface = 0xff112233.toInt()
+        val source = ThemePalette(
+            id = "test-source", name = "Test Source", mode = "Dark",
+            primary = 0xff010101.toInt(), onPrimary = 0xff020202.toInt(),
+            background = 0xff030303.toInt(), surface = sourceSurface,
+            variant = 0xff040404.toInt(), text = 0xff050505.toInt(),
+            muted = 0xff060606.toInt(), success = 0xff070707.toInt(),
+            warning = 0xff080808.toInt(), danger = 0xff090909.toInt()
+        )
+        val target = ThemePalette(
+            id = "test-target", name = "Test Target", mode = "Light",
+            primary = 0xffaabbcc.toInt(), onPrimary = sourceSurface,
+            background = 0xff101010.toInt(), surface = 0xff445566.toInt(),
+            variant = 0xff202020.toInt(), text = 0xff303030.toInt(),
+            muted = 0xff404040.toInt(), success = 0xff505050.toInt(),
+            warning = 0xff606060.toInt(), danger = 0xff707070.toInt()
+        )
+        assertEquals(source.surface, target.onPrimary)
         assertEquals(
+            "A source SURFACE color must map to target SURFACE, not remain target ON_PRIMARY",
             target.surface,
             ThemeColorMapping.remap(source.surface, source, target)
         )
