@@ -1,5 +1,6 @@
 package com.thiefalertsequre.app
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -31,6 +32,13 @@ class CameraEvidencePolicyTest {
         assertTrue(CameraEvidencePolicy.isValidSourceImageSize(CameraEvidencePolicy.MAX_SOURCE_IMAGE_BYTES))
         assertFalse(CameraEvidencePolicy.isValidSourceImageSize(0))
         assertFalse(CameraEvidencePolicy.isValidSourceImageSize(CameraEvidencePolicy.MAX_SOURCE_IMAGE_BYTES + 1))
+    }
+
+    @Test fun jpegDownsamplingBoundsPortraitAndLandscapeDimensions() {
+        assertEquals(1, CameraEvidencePolicy.decodeSampleSize(1280, 720, 1280, 720))
+        assertEquals(4, CameraEvidencePolicy.decodeSampleSize(4000, 3000, 1280, 720))
+        assertEquals(4, CameraEvidencePolicy.decodeSampleSize(1080, 2400, 1280, 720))
+        assertEquals(1, CameraEvidencePolicy.decodeSampleSize(0, 720, 1280, 720))
     }
 
     @Test fun encryptedVaultBudgetAllowsOnlyBoundedStagingAndOrphans() {
