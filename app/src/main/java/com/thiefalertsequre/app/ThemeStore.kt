@@ -32,14 +32,14 @@ object ThemeStore {
  p("ember","Ember","Dark","#FFAB70","#49220B","#1B100C","#2A1B15","#3D291F","#FFF4EC","#D2B6A5","#7BDEA8","#FFD078","#FF7180"),
  p("royal","Royal","Dark","#91A9FF","#182B68","#0B1024","#151D3A","#202D50","#F0F3FF","#B1BCDF","#68D6A8","#F0C66D","#FF7188"),
  p("mono","Monochrome","Dark","#E5E7EB","#202124","#101112","#1C1D1F","#2B2D30","#F7F7F7","#B9BBBF","#85D6AC","#E8C875","#FF7A85"),
- p("cloud","Cloud","Light","#176B9A","#FFFFFF","#F3F7FB","#FFFFFF","#E7EEF5","#172635","#526477","#167A55","#956000","#B4233C"),
- p("paper","Paper","Light","#345D85","#FFFFFF","#F7F5F0","#FFFFFF","#ECE8DF","#25231F","#68645C","#167A55","#956000","#B4233C"),
- p("mint","Mint","Light","#147D68","#FFFFFF","#EFF8F4","#FFFFFF","#DDEFE7","#18352D","#547269","#167A55","#956000","#B4233C"),
- p("lavender","Lavender","Light","#6650A4","#FFFFFF","#F5F1FB","#FFFFFF","#E9E1F4","#2D2440","#716681","#167A55","#956000","#B4233C"),
- p("rose","Rose","Light","#A23D62","#FFFFFF","#FFF3F6","#FFFFFF","#F5DFE7","#40232E","#80616D","#167A55","#956000","#B4233C"),
- p("sand","Sand","Light","#79552B","#FFFFFF","#FAF5EB","#FFFFFF","#EFE4D1","#382D20","#786B59","#167A55","#956000","#B4233C"),
- p("sky","Sky","Light","#1769AA","#FFFFFF","#EFF7FF","#FFFFFF","#DCEBFA","#183047","#58728A","#167A55","#956000","#B4233C"),
- p("contrast","High Contrast","Light","#003B70","#FFFFFF","#FFFFFF","#FFFFFF","#E5E5E5","#000000","#333333","#006B3C","#805000","#A40019"))
+ p("cloud","Cloud","Light","#176B9A","#FFFFFF","#F3F7FB","#FFFEFE","#E7EEF5","#172635","#526477","#167A55","#956000","#B4233C"),
+ p("paper","Paper","Light","#345D85","#FFFFFF","#F7F5F0","#FFFCFA","#ECE8DF","#25231F","#68645C","#167A55","#956000","#B4233C"),
+ p("mint","Mint","Light","#147D68","#FFFFFF","#EFF8F4","#FFFCFE","#DDEFE7","#18352D","#547269","#167A55","#956000","#B4233C"),
+ p("lavender","Lavender","Light","#6650A4","#FFFFFF","#F5F1FB","#FFFCFF","#E9E1F4","#2D2440","#716681","#167A55","#956000","#B4233C"),
+ p("rose","Rose","Light","#A23D62","#FFFFFF","#FFF3F6","#FFFEFC","#F5DFE7","#40232E","#80616D","#167A55","#956000","#B4233C"),
+ p("sand","Sand","Light","#79552B","#FFFFFF","#FAF5EB","#FFFCF7","#EFE4D1","#382D20","#786B59","#167A55","#956000","#B4233C"),
+ p("sky","Sky","Light","#1769AA","#FFFFFF","#EFF7FF","#FFFCFE","#DCEBFA","#183047","#58728A","#167A55","#956000","#B4233C"),
+ p("contrast","High Contrast","Light","#003B70","#FFFFFF","#FAFAFA","#F0F0F0","#E5E5E5","#000000","#333333","#006B3C","#805000","#A40019"))
  val all = base + generatedPalettes()
  private fun generatedPalettes(): List<ThemePalette> = (0 until 104).map { index ->
   val hue = (index % 13) * (360f / 13f)
@@ -66,7 +66,7 @@ object ThemeStore {
   }
   val primary = hsl(hue, saturation, primaryLightness)
   val background = if (light) 0xFFF7F8FA.toInt() else 0xFF080D16.toInt()
-  val surface = if (light) 0xFFFFFFFF.toInt() else 0xFF121B29.toInt()
+  val surface = if (light) 0xFFFEFEFE.toInt() else 0xFF121B29.toInt()
   val variantColor = if (light) 0xFFE7ECF2.toInt() else 0xFF202D3E.toInt()
   val textColor = if (light) 0xFF17212B.toInt() else 0xFFF3F6FA.toInt()
   val mutedColor = if (light) 0xFF526171.toInt() else 0xFFB2BECC.toInt()
