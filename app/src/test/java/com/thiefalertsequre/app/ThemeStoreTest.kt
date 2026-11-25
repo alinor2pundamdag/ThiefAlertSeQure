@@ -11,6 +11,17 @@ class ThemeStoreTest {
         assertEquals(120, ThemeStore.all.map { it.id }.toSet().size)
     }
 
+    @Test fun everyThemeHasUniqueSemanticColorRolesForReliableTransitions() {
+        ThemeStore.all.forEach { palette ->
+            val roles = listOf(
+                palette.primary, palette.onPrimary, palette.background, palette.surface,
+                palette.variant, palette.text, palette.muted, palette.success,
+                palette.warning, palette.danger
+            )
+            assertEquals("${palette.name}: semantic color roles must be unique", roles.size, roles.toSet().size)
+        }
+    }
+
     @Test fun allPaletteColorsAreOpaque() {
         ThemeStore.all.forEach { palette ->
             listOf(
