@@ -30,6 +30,17 @@ internal object CameraEvidencePolicy {
     fun isValidSourceImageSize(sizeBytes: Int): Boolean =
         sizeBytes in 1..MAX_SOURCE_IMAGE_BYTES
 
+    /** Power-of-two sampling keeps decoded bitmap dimensions within the target bounds. */
+    fun decodeSampleSize(width: Int, height: Int, maxWidth: Int, maxHeight: Int): Int {
+        if (width <= 0 || height <= 0 || maxWidth <= 0 || maxHeight <= 0) return 1
+        var sampleSize = 1
+        while (width / sampleSize > maxWidth || height / sampleSize > maxHeight) {
+            if (sampleSize >= (1 shl 15)) return sampleSize
+            sampleSize *= 2
+        }
+        return sampleSize
+    }
+
     /** Bounds indexed images plus one atomic-write staging/orphan slot. */
     fun isWithinStorageBudget(fileCount: Int, totalBytes: Long): Boolean =
         fileCount in 0..MAX_STAGING_FILES && totalBytes in 0L..MAX_TOTAL_STORAGE_BYTES
