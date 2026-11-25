@@ -10,14 +10,24 @@ tests=ROOT/"app/src/test/java/com/thiefalertsequre/app/BypassChargingControllerT
 
 for token in ("interface BypassChargingAdapter","adapter.readEnabled()",
               "BypassChargingStatus.STATE_UNVERIFIED","BypassChargingStatus.ACTIVATION_FAILED",
-              "return emptyList()"):
+              "firmwareFingerprint: String","firmwareFingerprints: Set<String>",
+              "firmwareFingerprints.any { it == device.firmwareFingerprint }",
+              "firmwareFingerprints.none { it.isBlank() || it.contains(\"*\") }",
+              "duplicate certification is ambiguous","return emptyList()"):
     assert token in controller,f"Missing fail-closed contract: {token}"
 for forbidden in ("ProcessBuilder(","Runtime.getRuntime().exec","WRITE_SECURE_SETTINGS",
                   "DEVICE_POWER","setprop ","sysfs","service call"):
     assert forbidden not in controller,f"Unsafe undocumented control path: {forbidden}"
 assert "isEnabled = snapshot.canToggle" in settings
+assert "Build.FINGERPRINT" in settings
+assert "Intent(Settings.ACTION_SETTINGS)" in settings
+assert "ACTION_BATTERY_SAVER_SETTINGS" not in settings
 assert "BypassChargingGuidance.instructions" in settings
 assert tests.is_file()
+test_source=tests.read_text(encoding="utf-8")
+for test_name in ("adapterCertificationRequiresExactModelApiAndFirmwareFingerprint",
+                  "duplicateAdapterCertificationFailsClosed"):
+    assert test_name in test_source, f"Missing bypass registry regression test: {test_name}"
 for permission in ("android.permission.WRITE_SECURE_SETTINGS",
                    "android.permission.DEVICE_POWER","android.permission.BATTERY_STATS"):
     assert permission not in manifest,f"Unexpected privileged permission: {permission}"
