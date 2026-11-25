@@ -8,7 +8,45 @@ enum class BypassChargingStatus {
     OEM_INTERFACE_UNAVAILABLE, STATE_UNVERIFIED, ACTIVATION_FAILED
 }
 
-data class BypassChargingDevice(val manufacturer:String,val brand:String,val model:String,val apiLevel:Int)
+data class BypassChargingDevice(
+    val manufacturer: String,
+    val brand: String,
+    val model: String,
+    val apiLevel: Int,
+    /** Exact Android build fingerprint; unknown/empty values never qualify for certification. */
+    val firmwareFingerprint: String = ""
+)
+
+data class BypassChargingCertification(
+    val adapterId: String,
+    val manufacturer: String,
+    val brand: String,
+    val model: String,
+    val minApiLevel: Int,
+    val maxApiLevel: Int,
+    /** Exact reviewed fingerprints only. Wildcards and prefix matching are forbidden. */
+    val firmwareFingerprints: Set<String>
+) {
+    fun matches(device: BypassChargingDevice): Boolean {
+        fun normalized(value: String) = value.trim().lowercase(java.util.Locale.ROOT)
+        return adapterId.isNotBlank() &&
+            normalized(manufacturer) == normalized(device.manufacturer) &&
+            normalized(brand) == normalized(device.brand) &&
+            normalized(model) == normalized(device.model) &&
+            minApiLevel > 0 && maxApiLevel >= minApiLevel &&
+            device.apiLevel in minApiLevel..maxApiLevel &&
+            device.firmwareFingerprint.isNotBlank() &&
+            device.firmwareFingerprint != "unknown" &&
+            firmwareFingerprints.isNotEmpty() &&
+            firmwareFingerprints.none { it.isBlank() || it.contains("*") } &&
+            firmwareFingerprints.any { it == device.firmwareFingerprint }
+    }
+}
+
+data class BypassChargingAdapterRegistration(
+    val certification: BypassChargingCertification,
+    val factory: (BypassChargingDevice) -> BypassChargingAdapter?
+)
 data class BypassChargingProbe(val support:BypassChargingSupport,val authorization:BypassChargingAuthorization,val detail:String)
 
 interface BypassChargingAdapter {
@@ -148,11 +186,31 @@ class BypassChargingController(
     private fun timestamp()=runCatching { nowEpochMs().coerceAtLeast(0L) }.getOrDefault(0L)
 }
 
-/** Intentionally empty until a documented, authorized model/firmware adapter is verified. */
+/**
+ * Only exact, reviewed model/API/build-fingerprint certifications may resolve.
+ * The production registration list intentionally remains empty until an OEM
+ * interface has written authorization, state read-back and rollback evidence.
+ */
 object BypassChargingAdapterRegistry {
-    fun forDevice(device:BypassChargingDevice):List<BypassChargingAdapter> {
-        // Do not infer an OEM control interface from a brand or model string.
-        return emptyList()
+    private val certifiedRegistrations: List<BypassChargingAdapterRegistration> = emptyList()
+
+    fun forDevice(device: BypassChargingDevice): List<BypassChargingAdapter> =
+        resolve(device, certifiedRegistrations)
+
+    internal fun resolve(
+        device: BypassChargingDevice,
+        registrations: List<BypassChargingAdapterRegistration>
+    ): List<BypassChargingAdapter> {
+        val matching = registrations.filter { it.certification.matches(device) }
+        // A duplicated certification is ambiguous and fails closed.
+        if (matching.map { it.certification.adapterId }.distinct().size != matching.size) {
+            return emptyList()
+        }
+        return matching.mapNotNull { registration ->
+            runCatching { registration.factory(device) }.getOrNull()
+        }.filter { adapter ->
+            adapter.id.isNotBlank() && matching.any { it.certification.adapterId == adapter.id }
+        }
     }
 }
 
