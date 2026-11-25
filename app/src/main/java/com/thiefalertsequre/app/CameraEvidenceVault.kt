@@ -42,7 +42,7 @@ internal object CameraEvidenceVault {
         val retained = entries.filter { CameraEvidencePolicy.isRetained(it.timestampEpochMs, now) }
         // Reclaim prior failed-write or expired-file orphans before creating another image.
         // If deletion fails, reject this capture rather than growing private storage unbounded.
-        if (!removeUnreferencedFiles(app, retained)) return null
+        if (!removeUnreferencedFiles(app, entries)) return null
         val id = UUID.randomUUID().toString()
         val directory = evidenceDirectory(app)
         val file = directory.resolve("$id.aesgcm")
