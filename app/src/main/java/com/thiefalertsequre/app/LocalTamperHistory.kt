@@ -60,9 +60,12 @@ object LocalTamperHistory {
     @Synchronized
     fun clear(context: Context): Boolean {
         val app = context.applicationContext
-        val currentCleared = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(KEY_EVENTS).commit()
-        val legacyCleared = app.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE).edit().remove(LEGACY_KEY_EVENTS).commit()
-        return currentCleared && legacyCleared
+        // Remove legacy plaintext first. If that commit fails, keep the current
+        // encrypted timeline intact so a later migration cannot resurrect it.
+        if (!clearLegacyPlaintext(app)) return false
+        val current = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val committed = current.edit().remove(KEY_EVENTS).commit()
+        return committed && !current.contains(KEY_EVENTS)
     }
 
     private fun readStored(context: Context, prefs: SharedPreferences): HistoryRead {
