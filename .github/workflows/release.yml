@@ -170,6 +170,9 @@ jobs:
       - name: Run unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
 
+      - name: Compile Android integration tests (no device execution)
+        run: ./gradlew :app:compileReleaseAndroidTestKotlin :app:compileReleaseAndroidTestJavaWithJavac --no-daemon --stacktrace
+
       - name: Run release lint
         run: ./gradlew :app:lintRelease --no-daemon --stacktrace
 
