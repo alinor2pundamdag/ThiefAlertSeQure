@@ -730,7 +730,7 @@ class SettingsActivity : FragmentActivity() {
 
 
     private fun addBypassChargingSection() {
-        val device = BypassChargingDevice(Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.VERSION.SDK_INT)
+        val device = BypassChargingDevice(Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.VERSION.SDK_INT, Build.FINGERPRINT)
         val controller = BypassChargingController(BypassChargingAdapterRegistry.forDevice(device))
         val snapshot = controller.inspect()
         root.addView(text("BYPASS CHARGING", 11f, R.color.tas_primary, true))
@@ -761,11 +761,21 @@ class SettingsActivity : FragmentActivity() {
         root.addView(space(8))
         root.addView(text(BypassChargingGuidance.instructions(device),12f,R.color.tas_muted))
         root.addView(space(8))
-        root.addView(action("Open Android battery and charging settings") {
-            val opened=runCatching { startActivity(Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS)); true }.getOrElse {
-                runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)); true }.getOrDefault(false)
+        root.addView(action("Open Android Settings to search for Bypass Charging") {
+            val opened = runCatching {
+                startActivity(Intent(Settings.ACTION_SETTINGS))
+                true
+            }.getOrElse {
+                runCatching {
+                    startActivity(AndroidDeviceCompatibility.appInfoIntent(packageName))
+                    true
+                }.getOrDefault(false)
             }
-            if(!opened) android.widget.Toast.makeText(this,"Android Settings could not be opened.",android.widget.Toast.LENGTH_LONG).show()
+            if (!opened) android.widget.Toast.makeText(
+                this,
+                "Android Settings could not be opened. Search Settings manually for Bypass Charging or Charge Separation.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
         })
         root.addView(space(22))
     }
