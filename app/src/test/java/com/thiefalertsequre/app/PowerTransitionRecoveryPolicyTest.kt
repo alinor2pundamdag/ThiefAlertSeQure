@@ -16,6 +16,13 @@ class PowerTransitionRecoveryPolicyTest {
         assertEquals(5_000L, PowerTransitionRecoveryPolicy.nextUnknownRetryDelayMs(-1))
     }
 
+    @Test fun persistedRetryCounterFailsSafeForNegativeAndOversizedValues() {
+        assertEquals(0, PowerTransitionRecoveryPolicy.normalizeRetryAttempt(0))
+        assertEquals(4, PowerTransitionRecoveryPolicy.normalizeRetryAttempt(4))
+        assertEquals(100, PowerTransitionRecoveryPolicy.normalizeRetryAttempt(-1))
+        assertEquals(100, PowerTransitionRecoveryPolicy.normalizeRetryAttempt(101))
+    }
+
     @Test fun pendingCandidateRequiresItsOwnCurrentGenerationAndDisconnectedBaseline() {
         assertTrue(PowerTransitionRecoveryPolicy.isCurrentCandidate(true, 8L, 8L, false))
         assertFalse(PowerTransitionRecoveryPolicy.isCurrentCandidate(false, 8L, 8L, false))
