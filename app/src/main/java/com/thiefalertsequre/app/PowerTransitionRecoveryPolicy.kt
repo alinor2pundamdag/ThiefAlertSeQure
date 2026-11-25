@@ -28,4 +28,10 @@ internal object PowerTransitionRecoveryPolicy {
         ) return false
         return true
     }
+
+    /** Retry inconclusive live power reads with bounded exponential backoff. */
+    fun nextUnknownRetryDelayMs(attempt: Int): Long {
+        val exponent = attempt.coerceAtLeast(0).coerceAtMost(6)
+        return (5_000L * (1L shl exponent)).coerceAtMost(300_000L)
+    }
 }
