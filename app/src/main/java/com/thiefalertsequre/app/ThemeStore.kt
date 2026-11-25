@@ -104,6 +104,9 @@ internal object ThemeColorMapping {
         palette.warning, palette.danger
     )
 
+    fun remapColors(colors: IntArray, source: ThemePalette, target: ThemePalette): IntArray =
+        colors.map { remap(it, source, target) }.toIntArray()
+
     /** Map a color by its source palette role; source roles are unique per palette. */
     fun remap(color: Int, source: ThemePalette, target: ThemePalette): Int {
         if (source.id == target.id) return color
@@ -125,9 +128,11 @@ object ThemeRuntime {
    val appliedId=v.getTag(R.id.theme_palette_applied) as? String
    val source=ThemeStore.get(a,appliedId ?: initialSourceId)
    if(v is TextView) {
-    val color=v.currentTextColor
-    val mapped=ThemeColorMapping.remap(color,source,p)
-    if(mapped!=color) v.setTextColor(mapped)
+    val current=v.textColors
+    val mapped=ThemeColorMapping.remapColors(current.colors,source,p)
+    if(!mapped.contentEquals(current.colors)) {
+     v.setTextColor(ColorStateList(current.states,mapped))
+    }
    }
    if(v is MaterialCardView){
     val color=v.cardBackgroundColor.defaultColor
@@ -140,15 +145,15 @@ object ThemeRuntime {
     if(mapped!=color) v.setBackgroundColor(mapped)
    }
    if(v is MaterialButton){
-    val tint=v.backgroundTintList?.defaultColor
-    tint?.let { color ->
-     val mapped=ThemeColorMapping.remap(color,source,p)
-     if(mapped!=color) v.backgroundTintList=ColorStateList.valueOf(mapped)
+    val tint=v.backgroundTintList
+    tint?.let { list ->
+     val mapped=ThemeColorMapping.remapColors(list.colors,source,p)
+     if(!mapped.contentEquals(list.colors)) v.backgroundTintList=ColorStateList(list.states,mapped)
     }
-    val stroke=v.strokeColor?.defaultColor
-    stroke?.let { color ->
-     val mapped=ThemeColorMapping.remap(color,source,p)
-     if(mapped!=color) v.strokeColor=ColorStateList.valueOf(mapped)
+    val stroke=v.strokeColor
+    stroke?.let { list ->
+     val mapped=ThemeColorMapping.remapColors(list.colors,source,p)
+     if(!mapped.contentEquals(list.colors)) v.strokeColor=ColorStateList(list.states,mapped)
     }
     AppearanceStudioStore.applyButtonAnimation(a, v)
    }
